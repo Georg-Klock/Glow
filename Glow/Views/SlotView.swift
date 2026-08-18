@@ -55,6 +55,7 @@ struct SlotView: View {
         }
         .accessibilityElement()
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint(accessibilityHint)
         .accessibilityAddTraits(slot.isTappable ? .isButton : [])
     }
 
@@ -65,6 +66,14 @@ struct SlotView: View {
         case .inactive: "not done"
         }
         return "\(habitName), \(state)"
+    }
+
+    /// The glow is the only thing distinguishing an open slot, and it is
+    /// invisible to VoiceOver, so the hint has to carry what a sighted user
+    /// reads off the screen: which slot can actually be acted on.
+    private var accessibilityHint: String {
+        guard slot.isTappable else { return "" }
+        return slot.state == .filled ? "Mark as not done" : "Mark as done"
     }
 
     /// Settle straight into the current state on first layout, so scrolling a

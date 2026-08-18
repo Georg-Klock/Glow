@@ -79,11 +79,17 @@ Mostly layout. The one piece of real behaviour is `SlotView`'s completion
 transition, which is documented in place and in [glow.md](glow.md).
 
 Width flows down rather than being measured per row: `WeeklyGridView` reads the
-screen width once and passes a concrete `trackWidth` into the header and every
-row. Measuring per row would need a `GeometryReader` inside each one, and since
-slot *height* is derived from track *width*, that is circular. Passing it down
-also guarantees the header and the rows divide the screen identically, which is
-the one thing the whole screen is for.
+screen width once, builds a `RowGeometry`, and hands the same value to the
+header and every row. Measuring per row would need a `GeometryReader` inside
+each one, and since slot *height* is derived from track *width*, that is
+circular. Passing one value down also guarantees the header and the rows divide
+the screen identically, which is the one thing the whole screen is for.
+
+`RowGeometry` is where the label column's response to Dynamic Type lives. It
+scales with the user's text size and is then clamped to 42% of the screen, so a
+large accessibility size cannot shrink the track until a week stops looking like
+one. The weekday header's own numerals stay fixed, because they sit inside
+columns that are one slot wide and have nowhere to grow into.
 
 ## Day rollover
 
@@ -117,7 +123,7 @@ CI runs the same script on pull requests and on merges to `main`.
 
 - No view models. The logic that would live in one is in `Logic/`, and the rest
   is `@Query`.
-- No coordinator or router. There is one screen and two sheets.
+- No coordinator or router. There is one screen and three sheets.
 - No dependency injection container. The two things needing injection, the
   calendar and the model context, are parameters with defaults.
 - No networking. There is none.

@@ -1,11 +1,43 @@
 import SwiftUI
 
+/// How the screen is divided horizontally.
+///
+/// Computed once per layout and passed to the header and every row, so they
+/// cannot disagree. If they did, the columns would stop lining up, which is the
+/// one thing the whole screen is for.
+struct RowGeometry: Equatable {
+    let labelWidth: CGFloat
+    let trackWidth: CGFloat
+
+    init(totalWidth: CGFloat) {
+        // The label column grows with the user's text size, but never past a
+        // point where the track it is stealing from stops being a week.
+        let scaled = UIFontMetrics(forTextStyle: .subheadline)
+            .scaledValue(for: GridMetrics.baseLabelWidth)
+        labelWidth = min(scaled, max(0, totalWidth * 0.42))
+
+        let available = totalWidth
+            - GridMetrics.horizontalPadding * 2
+            - labelWidth
+            - GridMetrics.labelSpacing
+        trackWidth = max(0, available)
+    }
+}
+
+enum GridMetrics {
+    static let baseLabelWidth: CGFloat = 116
+    static let labelSpacing: CGFloat = 10
+    static let horizontalPadding: CGFloat = 20
+    static let rowSpacing: CGFloat = 16
+    static let minimumRowHeight: CGFloat = 34
+}
+
 /// One habit: icon and name on the left, a fixed-width status track on the right.
 struct HabitRowView: View {
     let snapshot: HabitSnapshot
     let week: Week
     let today: Date
-    let trackWidth: CGFloat
+    let geometry: RowGeometry
     let onToggle: (Date) -> Void
 
     private var slots: [Slot] {
@@ -13,7 +45,10 @@ struct HabitRowView: View {
     }
 
     private var slotSize: CGSize {
-        SlotLayout.slotSize(trackWidth: trackWidth, slotCount: snapshot.frequency.slotCount)
+        SlotLayout.slotSize(
+            trackWidth: geometry.trackWidth,
+            slotCount: snapshot.frequency.slotCount
+        )
     }
 
     var body: some View {
@@ -33,7 +68,7 @@ struct HabitRowView: View {
                     }
                 }
             }
-            .frame(width: trackWidth, alignment: .leading)
+            .frame(width: geometry.trackWidth, alignment: .leading)
         }
         .frame(height: max(slotSize.height, GridMetrics.minimumRowHeight))
     }
@@ -43,28 +78,15 @@ struct HabitRowView: View {
             Text(snapshot.icon)
                 .font(.system(size: 18))
             Text(snapshot.name)
-                .font(.system(size: 15, weight: .medium))
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 0)
         }
-        .frame(width: GridMetrics.labelWidth, alignment: .leading)
+        .frame(width: geometry.labelWidth, alignment: .leading)
+        // The slots carry the habit's name in their own labels, so reading the
+        // row aloud twice would be noise.
         .accessibilityHidden(true)
-    }
-}
-
-/// Shared geometry, so the weekday header and every row divide the screen the
-/// same way. If these drifted apart the columns would stop lining up, which is
-/// the one thing the whole screen is for.
-enum GridMetrics {
-    static let labelWidth: CGFloat = 116
-    static let labelSpacing: CGFloat = 10
-    static let horizontalPadding: CGFloat = 20
-    static let minimumRowHeight: CGFloat = 34
-
-    /// The width left for slots once the label column and padding are taken.
-    static func trackWidth(totalWidth: CGFloat) -> CGFloat {
-        max(0, totalWidth - horizontalPadding * 2 - labelWidth - labelSpacing)
     }
 }
