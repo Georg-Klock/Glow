@@ -119,6 +119,29 @@ be stated as facts rather than as intentions.
 
 CI runs the same script on pull requests and on merges to `main`.
 
+## The App Group
+
+The widget runs in its own process and cannot see the app's private container,
+so the store lives in `group.com.georgklock.glow` and both open it there.
+`StoreLocation` owns that decision and the one-time move of a pre-widget store,
+copying the write-ahead log alongside the store because a copy without it loses
+every write still sitting in the log.
+
+If the group container is unavailable the app falls back to its own container
+and keeps working; only the widget goes blank. That is deliberate: a missing
+entitlement should not stop the app launching.
+
+**The capability has to be registered against the App ID by Apple, and that
+cannot be done from the command line.** The project declares everything needed
+(an entitlements file per target, `CODE_SIGN_ENTITLEMENTS`, and
+`SystemCapabilities` in the target attributes), and `xcodebuild
+-allowProvisioningUpdates` still signs with a wildcard profile and strips the
+entitlement without a warning. The fix is to open the project in Xcode once and
+let automatic signing register it, or to add the App Group to the App ID on the
+developer portal. Verify with:
+
+    codesign -d --entitlements :- <path>/Glow.app | grep application-groups
+
 ## What is deliberately absent
 
 - No view models. The logic that would live in one is in `Logic/`, and the rest

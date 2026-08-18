@@ -28,6 +28,14 @@ targets:
       Release: Signing.xcconfig
     entitlements:
       path: Glow/Glow.entitlements
+    # Tells Xcode's automatic signing that this target needs the App Groups
+    # capability registered against the App ID. Without it the entitlements
+    # file is compiled in but codesign strips it, because the wildcard profile
+    # it picked never granted the group, and nothing warns you.
+    attributes:
+      SystemCapabilities:
+        com.apple.ApplicationGroups.iOS:
+          enabled: 1
     dependencies:
       - target: GlowWidget
         embed: true
@@ -65,6 +73,14 @@ targets:
       Release: Signing.xcconfig
     entitlements:
       path: GlowWidget/GlowWidget.entitlements
+    # Tells Xcode's automatic signing that this target needs the App Groups
+    # capability registered against the App ID. Without it the entitlements
+    # file is compiled in but codesign strips it, because the wildcard profile
+    # it picked never granted the group, and nothing warns you.
+    attributes:
+      SystemCapabilities:
+        com.apple.ApplicationGroups.iOS:
+          enabled: 1
     # A widget extension needs NSExtensionPointIdentifier *nested* inside an
     # NSExtension dictionary. INFOPLIST_KEY_ settings can only write top-level
     # keys, and the resulting bundle fails to install with a placeholder error
