@@ -13,8 +13,8 @@
 // never depend on a script having been run.
 //
 // Three variants, per the iOS 18 icon appearances:
-//   light   opaque black background, the glow in teal
-//   dark    transparent, the glow in teal, composited on the system's backdrop
+//   light   opaque black background, the glow in the app's white
+//   dark    transparent, composited on the system's backdrop
 //   tinted  transparent, greyscale, the system applies the user's tint
 
 import CoreGraphics
@@ -23,7 +23,9 @@ import ImageIO
 import UniformTypeIdentifiers
 
 let side = 1024
-let teal = (red: 0.16, green: 0.85, blue: 0.78)
+// Must track GlowPalette.components: an icon in the old accent is the
+// clearest possible signal that the app's colour moved and the icon did not.
+let glow = (red: 0.85, green: 0.91, blue: 1.0)
 
 enum Variant: String, CaseIterable {
     case light = "AppIcon"
@@ -60,7 +62,7 @@ func drawIcon(_ variant: Variant) -> CGImage? {
     func colour(_ level: Double, alpha: Double) -> CGColor {
         let rgb = variant.isGreyscale
             ? (red: 1.0, green: 1.0, blue: 1.0)
-            : teal
+            : glow
         return CGColor(
             srgbRed: rgb.red * level,
             green: rgb.green * level,

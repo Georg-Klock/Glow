@@ -1,4 +1,4 @@
-# Glow, product spec (v1)
+# Glow Up Habit Tracker, product spec (v1)
 
 Product truth. Where this and the code disagree, one of them is a bug; say
 which in the same session you find it.
