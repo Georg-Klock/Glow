@@ -32,10 +32,11 @@ signal, not a reward for completion. It disappears when you complete the habit
   Frequency habits are pure count-based; any day counts.
 - **No multiple completions per day.** A habit is done or not done for a day.
 - **No notifications or reminders.**
-- **No home screen widget.** WidgetKit renders snapshots in a separate process
-  and does not carry the HDR image pipeline the way the in-app view does, so the
-  real glow only exists inside the app. A future widget would mirror the grid
-  in flat colour rather than attempt the glow.
+- **The home screen widget does not glow.** It exists now, and it mirrors the
+  grid in flat colour: WidgetKit renders in a separate process and archives the
+  result, and that pipeline does not carry HDR. What it keeps is the part that
+  matters daily, which is logging a habit without opening anything. The real
+  glow lives in the app.
 - **No streaks, badges, or celebratory flourishes** beyond the completion
   transition itself. These were explored as candidate glow moments and cut, to
   keep the interaction model at one rule rather than three.
@@ -143,7 +144,20 @@ granted EDR headroom rises from 1.2 to 6.0, matching what the renderer asks for.
 What no test and no measurement can answer is whether it *reads* as lit in a
 given room, which stays a matter of looking at it.
 
-## 9. Resolved questions
+## 9. The widget
+
+One widget, three families, reading the same store through an App Group.
+Today's slot is a button backed by an `AppIntent`, so a habit can be logged from
+the home screen without launching the app. Past days are not buttons, which is
+R2 holding in a second process.
+
+The store therefore lives in the App Group container rather than the app's
+private one, and `StoreLocation` migrates a pre-widget store into it on first
+launch. Without the App Group entitlement the app falls back to its own
+container and keeps working; only the widget goes blank, which is a better
+failure than refusing to launch.
+
+## 10. Resolved questions
 
 The spec's open questions and their answers are in
 [docs/decisions.md](docs/decisions.md).

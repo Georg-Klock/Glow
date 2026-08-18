@@ -25,14 +25,12 @@ struct HabitStore {
         name: String,
         icon: String,
         frequency: Frequency,
-        accent: HabitAccent,
         now: Date = Date()
     ) throws -> Habit {
         let habit = Habit(
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
             icon: icon,
             frequency: frequency,
-            accent: accent,
             createdAt: now,
             sortOrder: try nextSortOrder()
         )
@@ -45,13 +43,11 @@ struct HabitStore {
         _ habit: Habit,
         name: String,
         icon: String,
-        frequency: Frequency,
-        accent: HabitAccent
+        frequency: Frequency
     ) throws {
         habit.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         habit.icon = icon
         habit.frequency = frequency
-        habit.accent = accent
         try context.save()
     }
 

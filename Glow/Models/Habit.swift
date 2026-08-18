@@ -19,7 +19,10 @@ final class Habit {
     var isDaily: Bool = true
     /// Only meaningful when `isDaily` is false.
     var timesPerWeek: Int = 3
-    var accentRaw: String = HabitAccent.teal.rawValue
+    /// Retained so the stored schema does not change. The app committed to a
+    /// single colour, so nothing reads this; dropping the column would be a
+    /// migration for no gain.
+    var accentRaw: String = ""
     var createdAt: Date = Date.distantPast
     var sortOrder: Int = 0
 
@@ -31,14 +34,12 @@ final class Habit {
         name: String,
         icon: String,
         frequency: Frequency,
-        accent: HabitAccent,
         createdAt: Date,
         sortOrder: Int
     ) {
         self.id = id
         self.name = name
         self.icon = icon
-        self.accentRaw = accent.rawValue
         self.createdAt = createdAt
         self.sortOrder = sortOrder
         self.completions = []
@@ -58,11 +59,6 @@ final class Habit {
         }
     }
 
-    var accent: HabitAccent {
-        get { HabitAccent(rawValue: accentRaw) ?? .teal }
-        set { accentRaw = newValue.rawValue }
-    }
-
     var completedDays: Set<Date> {
         Set((completions ?? []).map(\.day))
     }
@@ -73,7 +69,6 @@ final class Habit {
             name: name,
             icon: icon,
             frequency: frequency,
-            accent: accent,
             completedDays: completedDays
         )
     }

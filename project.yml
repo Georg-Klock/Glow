@@ -26,6 +26,11 @@ targets:
     configFiles:
       Debug: Signing.xcconfig
       Release: Signing.xcconfig
+    entitlements:
+      path: Glow/Glow.entitlements
+    dependencies:
+      - target: GlowWidget
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.georgklock.glow
@@ -38,6 +43,51 @@ targets:
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_CFBundleDisplayName: Glow
+
+  # The widget shares the model, logic and store with the app by compiling the
+  # same files into both. A framework would avoid the duplication and cost a
+  # dynamic link on every widget refresh, which is the wrong trade for four
+  # folders of value types.
+  GlowWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: GlowWidget
+      - path: Glow/Logic
+      - path: Glow/Models
+      - path: Glow/Store
+      - path: Glow/Glow
+      - path: Glow/Views/HabitIconView.swift
+      - path: Glow/Resources/SymbolCatalog.json
+        buildPhase: resources
+    configFiles:
+      Debug: Signing.xcconfig
+      Release: Signing.xcconfig
+    entitlements:
+      path: GlowWidget/GlowWidget.entitlements
+    # A widget extension needs NSExtensionPointIdentifier *nested* inside an
+    # NSExtension dictionary. INFOPLIST_KEY_ settings can only write top-level
+    # keys, and the resulting bundle fails to install with a placeholder error
+    # that never mentions Info.plist.
+    info:
+      path: GlowWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Glow
+        # An extension whose version differs from its host app is a build
+        # warning and an App Store rejection.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.georgklock.glow.widget
+        PRODUCT_NAME: GlowWidget
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+    dependencies:
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
 
   GlowTests:
     type: bundle.unit-test
@@ -56,6 +106,7 @@ schemes:
     build:
       targets:
         Glow: all
+        GlowWidget: all
         GlowTests: [test]
     run:
       config: Debug

@@ -9,7 +9,7 @@ struct GlowApp: App {
 
     init() {
         do {
-            container = try ModelContainer(for: Habit.self, Completion.self)
+            container = try GlowStore.makeContainer()
         } catch {
             // A store that cannot open is not recoverable from inside the app,
             // and continuing would silently drop every write.
@@ -20,7 +20,8 @@ struct GlowApp: App {
     var body: some Scene {
         WindowGroup {
             WeeklyGridView()
-                .tint(HabitAccent.teal.color)
+                .tint(GlowPalette.color)
+                .preferredColorScheme(.dark)
         }
         .modelContainer(container)
     }

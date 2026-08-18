@@ -15,7 +15,6 @@ import SwiftUI
 /// puts the HDR layer through a blend.
 struct SlotView: View {
     let slot: Slot
-    let accent: HabitAccent
     let size: CGSize
     let habitName: String
 
@@ -33,11 +32,11 @@ struct SlotView: View {
                 .fill(.fill.tertiary)
 
             if isGlowing {
-                GlowImageView(size: size, accent: accent)
+                GlowImageView(size: size)
             }
 
             Capsule(style: .continuous)
-                .fill(accent.color)
+                .fill(GlowPalette.filled)
                 .opacity(fillCoverage)
         }
         .frame(width: size.width, height: size.height)
