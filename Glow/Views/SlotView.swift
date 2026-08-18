@@ -3,17 +3,16 @@ import SwiftUI
 /// One circle or pill, and the completion animation.
 ///
 /// Layering, bottom to top:
-///  1. the empty track, so an inactive slot is a flat grey shape;
-///  2. a dim outline, shown while the slot is open;
-///  3. the HDR glow image;
-///  4. the solid filled shape, which fades **in** over the glow.
+///  1. the empty track, so an inactive slot is a flat quiet shape;
+///  2. the HDR glow, clipped to the slot;
+///  3. the solid filled shape, which fades **in** over the glow.
 ///
-/// Step 4 is the whole trick of the completion transition. The obvious
-/// implementation is to fade the glow out, but animating opacity on an HDR layer
-/// invites the compositor to flatten it into an offscreen SDR buffer, and a glow
-/// that dies the instant you touch it is exactly the bug that would be hardest
-/// to explain. Fading an opaque SDR shape in over a glow that never changes
-/// looks identical and never puts the HDR layer through a blend.
+/// Step 3 is the trick of the completion transition. The obvious implementation
+/// is to fade the glow out, but animating opacity on an HDR layer invites the
+/// compositor to flatten it into an offscreen SDR buffer, and a glow that dies
+/// the instant you touch it is the hardest possible bug to diagnose. Fading an
+/// opaque shape in over a glow that never changes looks identical and never
+/// puts the HDR layer through a blend.
 struct SlotView: View {
     let slot: Slot
     let accent: HabitAccent
@@ -30,26 +29,21 @@ struct SlotView: View {
 
     var body: some View {
         ZStack {
-            Capsule()
-                .fill(Color.slotTrack)
-
-            if slot.state == .open {
-                Capsule()
-                    .strokeBorder(accent.color.opacity(0.55), lineWidth: 1.5)
-            }
+            Capsule(style: .continuous)
+                .fill(.fill.tertiary)
 
             if isGlowing {
                 GlowImageView(size: size, accent: accent)
             }
 
-            Capsule()
+            Capsule(style: .continuous)
                 .fill(accent.color)
                 .opacity(fillCoverage)
         }
         .frame(width: size.width, height: size.height)
-        .contentShape(Capsule())
+        .contentShape(Capsule(style: .continuous))
         .allowsHitTesting(slot.isTappable)
-        .onAppear { applyStateWithoutAnimation() }
+        .onAppear { settleWithoutAnimation() }
         .onChange(of: slot.state) { previous, next in
             transition(from: previous, to: next)
         }
@@ -68,9 +62,9 @@ struct SlotView: View {
         return "\(habitName), \(state)"
     }
 
-    /// The glow is the only thing distinguishing an open slot, and it is
+    /// The glow is the only thing marking a slot as actionable, and it is
     /// invisible to VoiceOver, so the hint has to carry what a sighted user
-    /// reads off the screen: which slot can actually be acted on.
+    /// reads off the screen.
     private var accessibilityHint: String {
         guard slot.isTappable else { return "" }
         return slot.state == .filled ? "Mark as not done" : "Mark as done"
@@ -78,7 +72,7 @@ struct SlotView: View {
 
     /// Settle straight into the current state on first layout, so scrolling a
     /// row back into view does not replay the completion animation.
-    private func applyStateWithoutAnimation() {
+    private func settleWithoutAnimation() {
         isGlowing = slot.state == .open
         fillCoverage = slot.state == .filled ? 1 : 0
     }
@@ -104,17 +98,9 @@ struct SlotView: View {
                 fillCoverage = 1
             }
             // Drop the HDR layer once it is fully covered, so a settled week
-            // holds no gain-map images alive behind opaque shapes.
+            // holds no HDR images alive behind opaque shapes.
             try? await Task.sleep(for: .seconds(Self.fadeDuration))
             if slot.state == .filled { isGlowing = false }
         }
     }
-}
-
-extension Color {
-    /// The empty slot. Dim enough to read as "nothing here" next to a glow.
-    static let slotTrack = Color(white: 0.13)
-    /// Pure black, because the glow layer is opaque and its corners have to
-    /// disappear into the background rather than blend with it.
-    static let appBackground = Color.black
 }

@@ -34,9 +34,6 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
-        # The glow only reads on a dark background, so the app is dark, always.
-        # This is also what lets the HDR layer be opaque instead of alpha-blended.
-        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait

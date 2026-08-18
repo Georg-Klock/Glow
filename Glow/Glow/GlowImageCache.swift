@@ -73,9 +73,13 @@ struct GlowImageView: View {
                 // exercise is a slightly bright capsule.
                 .allowedDynamicRange(.high)
                 .frame(width: size.width, height: size.height)
+                // The encoder drops alpha, so the tile is opaque and its corners
+                // are black. Clipping is what lets the app sit on any background
+                // instead of requiring a black one behind every slot.
+                .clipShape(Capsule(style: .continuous))
                 .accessibilityHidden(true)
         } else {
-            Capsule()
+            Capsule(style: .continuous)
                 .fill(accent.color)
                 .frame(width: size.width, height: size.height)
                 .accessibilityHidden(true)

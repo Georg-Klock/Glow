@@ -20,7 +20,6 @@ struct GlowApp: App {
     var body: some Scene {
         WindowGroup {
             WeeklyGridView()
-                .preferredColorScheme(.dark)
                 .tint(HabitAccent.teal.color)
         }
         .modelContainer(container)

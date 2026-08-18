@@ -1,121 +1,113 @@
 # The glow
 
-Everything about the HDR effect: what it is, what was verified, how, and what
-is still unproven.
+Everything about the HDR effect: what it is, what was measured, and what is
+still only inferred.
 
 ## Why an image and not a colour
 
 Plain SwiftUI and UIKit colours never get extended dynamic range headroom.
-Feeding a `Color` or `UIColor` a component above 1.0 does nothing outside a
-Metal rendering context. There is no "brighter than white" for a view fill.
+Feeding a `Color` a component above 1.0 does nothing outside a Metal rendering
+context, and SwiftUI has no HDR colour API: searching the iOS 26 SwiftUI
+interface turns up no way to ask a shape to draw brighter than white.
 
-The channel that does work, and is the direct equivalent of the effect that
-makes HDR photos glow in Photos, is a **gain-map image** decoded through the
-normal image pipeline. No Metal and no custom shader required.
+The channel that does work is an HDR **image** decoded through the normal image
+pipeline. So the glow is literally a small photo of a glowing capsule, rendered
+at runtime by `GlowRenderer` and cached per size and colour.
 
-So the glow is literally a small photo of a glowing capsule.
+## Why PQ and not a gain map
 
-## How the image is made
+This is the part that was wrong for the first three versions of this app, so it
+is worth stating plainly.
 
-`Glow/Glow/GlowRenderer.swift`, in five steps:
+There are two ways to store HDR in a still image:
 
-1. Draw a greyscale capsule with a radial falloff on black, in Core Graphics.
-2. Multiply it by the accent colour to get the **base** image, deliberately
-   dimmed to half brightness.
-3. Multiply it again by a much larger gain to get the **HDR** image.
-4. Hand both to Core Image, which derives the gain map from their ratio and
-   writes it as an ISO gain map alongside the base image in a JPEG.
-5. Decode that JPEG back into a `UIImage` and draw it with
-   `.allowedDynamicRange(.high)`.
+- **A gain map**: an SDR picture, plus an auxiliary map saying "here is how much
+  brighter each pixel could be". This is what an iPhone camera writes, and it is
+  what makes HDR photos glow in Photos.
+- **PQ**: a transfer function whose range extends above SDR white, so bright
+  pixels are simply *in* the image. No annotation, nothing for a decoder to
+  decline.
 
-Rendered at runtime and cached per size and colour, rather than shipped as an
-asset. Asset catalogues have had unreliable support for importing gain-map
-images, and a bundled sprite would have to be stretched to fit each slot width.
-Encoding on demand sidesteps both and costs a few milliseconds once per
-distinct slot.
+The first implementation used gain maps. It produced files that genuinely
+contained an ISO gain map with correct headroom metadata, verified by tests, and
+it did not glow on a real iPhone. Measured on an iPhone 14 Pro:
 
-### Three things that will waste your afternoon
+| Encoding | `UIImage.isHighDynamicRange` |
+| --- | --- |
+| JPEG + ISO gain map | **false** |
+| HEIF10 + ISO gain map | **false** |
+| HEIF10, Rec. 2100 PQ | **true** |
+| HEIF10, Display P3 PQ | **true** |
+
+A gain map that the image pipeline declines to treat as HDR is an ordinary
+picture of a dim capsule. The app now writes 10-bit HEIF in Rec. 2100 PQ, which
+is what the technique this app is based on called for in the first place.
+
+PQ files are also about ten times smaller: 2,230 bytes against 22,681.
+
+### It is confirmed working
+
+With the glow on screen, `UIScreen.currentEDRHeadroom` rises from **1.2 to
+6.0**, which is exactly the renderer's `peakHeadroom`. The system granted the
+headroom the image asked for, which is as close to "it glows" as a machine can
+report. Reproduce it by printing `UIScreen.main.currentEDRHeadroom` before the
+grid appears and three seconds after.
+
+`potentialEDRHeadroom` on that device is 8.0, so there is room to push harder if
+6x turns out to be too subtle in daylight.
+
+## Three things that will waste your afternoon
 
 **A non-zero bias vector gives a `CIColorMatrix` an infinite extent.** The bias
 applies at every point in the plane, including outside the source image, so the
-output extent becomes effectively infinite. `jpegRepresentation` cannot encode
-an infinite image and returns `nil` with no error and no log line, which looks
+output extent becomes effectively infinite. `jpegRepresentation` cannot encode an
+infinite image and returns `nil` with no error and no log line, which looks
 exactly like "HDR encoding is unsupported here". Crop back to the source bounds
 before encoding.
 
 **Core Image infers headroom from the brightest pixel.** Ask for a 6x glow in
 teal, whose brightest channel is 0.85, and you get 5.1x. The renderer divides
 the gain by the largest colour component first, so the brightest channel lands
-exactly on the requested peak. Without that, every accent glows a different
-amount and the amount depends on its hue.
+exactly on the requested peak. Without it, every accent glows a different amount
+and the amount depends on its hue.
 
-**JPEG has no alpha, and blend modes are a trap.** The obvious fix for a
-rectangular glow tile is `.blendMode(.plusLighter)` or a `clipShape`, but any
-blend or mask risks the compositor flattening the HDR layer into an SDR
-offscreen buffer. Instead the glow tile is opaque with a black background and
-the app background is pure black, so the corners disappear on their own and
-nothing has to blend. This is why the app is dark-mode-only, and it is a
-structural reason rather than a taste one.
+**The PQ encoder drops alpha.** Encoding from a bitmap with a transparent
+surround produces byte-identical output to encoding from an opaque one, and the
+result reports `noneSkipFirst` either way. The tile is therefore always opaque,
+and callers clip it to the slot shape. That clip is what lets the app follow the
+system appearance instead of requiring a black background behind every slot,
+which is what an earlier version did.
 
-## What is verified, and how
+## What the tests can and cannot say
 
-`Tests/GlowRendererTests.swift` asserts on the encoded bytes:
+`Tests/GlowRendererTests.swift` asserts on the encoded bytes: that the file is
+in a PQ colour space, that ImageIO reports headroom above SDR white, that a
+higher `peakHeadroom` produces more headroom, and that the decoded pixels
+exceed 1.0 in extended linear.
 
-- every accent renders a file that carries a gain map;
-- the gain map's `AlternateHeadroom` metadata equals the requested peak, so a
-  6x glow really encodes 6x and not 5.1x;
-- the glow exceeds one stop above SDR white, which fails loudly if the pipeline
-  ever silently degrades to plain colour;
-- without EDR the slot is a dim version of the accent, and visibly darker than
-  a completed slot;
-- rendering is deterministic, so the cache key is honest.
+The previous version of that file asserted a gain map was present and that its
+metadata carried the right headroom. Both were true. The app did not glow. The
+lesson is not "test harder" but "test the property that predicts the
+behaviour": the colour space is what decided it, and nothing was checking the
+colour space.
 
-### Two tests that look right and are not
+Two things that look like good tests and are not, because both ask the *display*
+rather than the file, and so pass on a Mac and fail on a simulator:
 
-Both of these were written, both passed on a Mac, and both failed in the
-simulator, which is the useful direction to fail in:
+- `CIImage(data:options: [.expandToHDR: true]).contentHeadroom`
+- `applyingGainMap(_:headroom:)` followed by measuring the result
 
-- `CIImage(data:options: [.expandToHDR: true]).contentHeadroom` returns the
-  headroom **the display can show**, not the headroom in the file. A simulator
-  answers 1.0 however good the file is.
-- `applyingGainMap(_:headroom:)` is likewise clamped by the display, so
-  reconstructing the HDR pixels and measuring them returns the base image
-  unchanged on a simulator.
-
-Either would have failed on CI and passed on a phone. The gain map's own
-metadata is the display-independent fact, and it is what the tests assert.
-
-Note that which auxiliary entry carries that metadata differs by platform: on
-macOS it hangs off the ISO gain map, on iOS off the legacy one. The test reads
-whichever has it.
-
-## What is not verified
-
-**How bright it actually looks.** Intensity depends on ambient light, display
-brightness, thermal state and whether Low Power Mode is on. Design for "visibly
+**No test can say how bright it looks.** Intensity depends on ambient light,
+display brightness, thermal state and Low Power Mode. Design for "visibly
 brighter than the surrounding UI", not for a nit value, and expect it to be
 dramatic outdoors and subtle in a dim room.
 
-**That an EDR screen renders it at all.** The encoding is proven; the
-end-to-end path through `Image.allowedDynamicRange(.high)` on a real iPhone is
-not, because no simulator can answer it. This is the outstanding item of Phase
-0 and it needs about two minutes with a phone: run the app, add a habit, look
-at today's slot in a normally-lit room and confirm it reads as lit rather than
-merely coloured.
-
-If it does not glow on device, the most likely causes, in order: the hosting
-window is not permitting EDR; the completion layer is being composited in a way
-that flattens dynamic range; or the peak headroom of 6.0 is too conservative
-for the ambient conditions. `GlowRenderer.peakHeadroom` is the first dial to
-turn.
-
 ## Tuning
-
-`GlowRenderer` exposes the whole look as four values:
 
 | Property | Default | Effect |
 | --- | --- | --- |
 | `peakHeadroom` | 6.0 | How far above SDR white the glow peaks |
 | `edgeFalloff` | 0.62 | Edge brightness relative to centre |
-| `sdrDimming` | 0.5 | How dim the no-headroom fallback is |
-| `compressionQuality` | 0.9 | JPEG quality of the base image |
+
+`GlowRenderer.colorSpace` selects the container's colour space. Display P3 PQ
+measures as HDR too and is the narrower gamut of the two.

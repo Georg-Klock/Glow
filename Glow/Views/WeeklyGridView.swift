@@ -2,6 +2,10 @@ import SwiftData
 import SwiftUI
 
 /// The whole app: every habit's status for the current week, one tap from done.
+///
+/// Built on `List` rather than a hand-rolled `ScrollView` of rows, so that
+/// reordering, deleting, separators, scroll behaviour and edit mode are the
+/// system's implementations rather than this app's approximations of them.
 struct WeeklyGridView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
@@ -10,54 +14,36 @@ struct WeeklyGridView: View {
     @State private var today = WeekCalendar.day(Date())
     @State private var editingHabit: Habit?
     @State private var isAddingHabit = false
-    @State private var isEditingList = false
 
     private var week: Week { WeekCalendar.week(containing: today) }
     private var store: HabitStore { HabitStore(context: context) }
 
     var body: some View {
         NavigationStack {
-            GeometryReader { geometry in
-                let rowGeometry = RowGeometry(totalWidth: geometry.size.width)
-                Group {
-                    if habits.isEmpty {
-                        EmptyStateView { isAddingHabit = true }
-                    } else {
-                        grid(rowGeometry)
-                    }
+            Group {
+                if habits.isEmpty {
+                    emptyState
+                } else {
+                    grid
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .background(Color.appBackground)
             .navigationTitle(monthTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     if !habits.isEmpty {
-                        Button {
-                            isEditingList = true
-                        } label: {
-                            Image(systemName: "line.3.horizontal")
-                        }
-                        .accessibilityLabel("Edit habits")
+                        EditButton()
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
+                    Button("Add habit", systemImage: "plus") {
                         isAddingHabit = true
-                    } label: {
-                        Image(systemName: "plus")
                     }
-                    .accessibilityLabel("Add habit")
                 }
             }
-            .toolbarBackground(Color.appBackground, for: .navigationBar)
         }
         .sheet(isPresented: $isAddingHabit) {
             HabitEditorView(habit: nil)
-        }
-        .sheet(isPresented: $isEditingList) {
-            EditHabitsView()
         }
         .sheet(item: $editingHabit) { habit in
             HabitEditorView(habit: habit)
@@ -74,40 +60,73 @@ struct WeeklyGridView: View {
         }
     }
 
-    private func grid(_ rowGeometry: RowGeometry) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: GridMetrics.rowSpacing) {
-                WeekdayHeader(geometry: rowGeometry, week: week, today: today)
-                    .padding(.bottom, 2)
-                ForEach(habits) { habit in
-                    HabitRowView(
-                        snapshot: habit.snapshot(),
-                        week: week,
-                        today: today,
-                        geometry: rowGeometry
-                    ) { day in
-                        toggle(habit, on: day)
-                    }
-                    .contextMenu {
-                        Button("Edit", systemImage: "pencil") { editingHabit = habit }
-                        Button("Delete", systemImage: "trash", role: .destructive) {
-                            delete(habit)
+    private var grid: some View {
+        GeometryReader { proxy in
+            let geometry = RowGeometry(totalWidth: proxy.size.width)
+            List {
+                Section {
+                    ForEach(habits) { habit in
+                        HabitRowView(
+                            snapshot: habit.snapshot(),
+                            week: week,
+                            today: today,
+                            geometry: geometry
+                        ) { day in
+                            toggle(habit, on: day)
+                        }
+                        .listRowInsets(EdgeInsets(
+                            top: 6, leading: GridMetrics.horizontalPadding,
+                            bottom: 6, trailing: GridMetrics.horizontalPadding
+                        ))
+                        .listRowSeparator(.hidden)
+                        // Swipe actions rather than a long-press menu: this is
+                        // where iOS users already reach for edit and delete.
+                        .swipeActions(edge: .trailing) {
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                delete(habit)
+                            }
+                            Button("Edit", systemImage: "pencil") {
+                                editingHabit = habit
+                            }
+                            .tint(.indigo)
                         }
                     }
+                    .onMove(perform: move)
+                    .onDelete(perform: deleteAt)
+                } header: {
+                    WeekdayHeader(geometry: geometry, week: week, today: today)
+                        .listRowInsets(EdgeInsets(
+                            top: 0, leading: GridMetrics.horizontalPadding,
+                            bottom: 8, trailing: GridMetrics.horizontalPadding
+                        ))
                 }
             }
-            .padding(.horizontal, GridMetrics.horizontalPadding)
-            .padding(.vertical, 18)
+            .listStyle(.plain)
+            .environment(\.defaultMinListRowHeight, GridMetrics.minimumRowHeight)
         }
-        .scrollBounceBehavior(.basedOnSize)
+    }
+
+    /// The system's empty state, rather than a stack of centred labels.
+    ///
+    /// Its icon is a real slot rendered by the real code path, so the thing the
+    /// app is about is the first thing on screen, and on an HDR display it
+    /// glows here before there is anything to track.
+    private var emptyState: some View {
+        ContentUnavailableView {
+            VStack(spacing: 14) {
+                GlowImageView(size: CGSize(width: 54, height: 54), accent: .teal)
+                Text("No Habits")
+            }
+        } description: {
+            Text("Add a habit and today's slot will be waiting for you.")
+        } actions: {
+            Button("Add Habit") { isAddingHabit = true }
+                .buttonStyle(.borderedProminent)
+        }
     }
 
     private var monthTitle: String {
-        let formatter = DateFormatter()
-        formatter.calendar = WeekCalendar.calendar
-        formatter.locale = WeekCalendar.calendar.locale ?? .current
-        formatter.setLocalizedDateFormatFromTemplate("MMMM")
-        return formatter.string(from: today)
+        today.formatted(.dateTime.month(.wide).locale(WeekCalendar.calendar.locale ?? .current))
     }
 
     private func refreshToday() {
@@ -125,6 +144,20 @@ struct WeeklyGridView: View {
             }
         } catch {
             HabitStore.report(error, operation: "toggleCompletion")
+        }
+    }
+
+    private func move(from source: IndexSet, to destination: Int) {
+        do {
+            try store.reorder(habits, from: source, to: destination)
+        } catch {
+            HabitStore.report(error, operation: "reorder")
+        }
+    }
+
+    private func deleteAt(_ offsets: IndexSet) {
+        for habit in offsets.map({ habits[$0] }) {
+            delete(habit)
         }
     }
 
@@ -156,13 +189,13 @@ struct WeekdayHeader: View {
             HStack(spacing: SlotLayout.gap) {
                 ForEach(0..<7, id: \.self) { index in
                     let isToday = week.days[index] == today
-                    VStack(spacing: 3) {
+                    VStack(spacing: 2) {
                         Text(initials[index])
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(isToday ? .white : Color.white.opacity(0.3))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(isToday ? Color.primary : .secondary)
                         Text(numbers[index])
-                            .font(.system(size: 12, weight: isToday ? .semibold : .regular))
-                            .foregroundStyle(isToday ? .white : Color.white.opacity(0.45))
+                            .font(.caption.weight(isToday ? .semibold : .regular))
+                            .foregroundStyle(isToday ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
                             .monospacedDigit()
                     }
                     .frame(width: SlotLayout.slotWidth(trackWidth: geometry.trackWidth, slotCount: 7))
@@ -171,37 +204,6 @@ struct WeekdayHeader: View {
             .frame(width: geometry.trackWidth, alignment: .leading)
         }
         .accessibilityHidden(true)
-    }
-}
-
-private struct EmptyStateView: View {
-    let onAdd: () -> Void
-
-    /// A live slot rather than an illustration: the empty state shows the exact
-    /// thing the app is about, rendered by the same code that draws the grid.
-    /// On an HDR screen it glows here too.
-    private let sampleSize = CGSize(width: 56, height: 56)
-
-    var body: some View {
-        VStack(spacing: 0) {
-            GlowImageView(size: sampleSize, accent: .teal)
-                .padding(.bottom, 28)
-            Text("No habits yet")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white)
-            Text("Add one, and today's slot will be waiting for you.")
-                .font(.system(size: 15))
-                .foregroundStyle(.white.opacity(0.5))
-                .multilineTextAlignment(.center)
-                .padding(.top, 8)
-                .padding(.horizontal, 24)
-            Button("Add a habit", action: onAdd)
-                .buttonStyle(.borderedProminent)
-                .tint(HabitAccent.teal.color)
-                .foregroundStyle(.black)
-                .padding(.top, 24)
-        }
-        .padding(32)
     }
 }
 
