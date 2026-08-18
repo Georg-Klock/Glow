@@ -11,13 +11,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-if ! command -v xcodegen >/dev/null 2>&1; then
-  echo "error: xcodegen is not installed. brew install xcodegen" >&2
-  exit 1
-fi
-
 echo "==> Generating Glow.xcodeproj"
-xcodegen generate --quiet
+"$(dirname "$0")/generate.sh"
 
 DEVICE_ID=$(
   xcrun simctl list devices available --json |

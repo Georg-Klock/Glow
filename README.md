@@ -37,8 +37,11 @@ The Xcode project is generated and is not in the repository, so generate it
 first:
 
 ```bash
-brew install xcodegen && xcodegen generate
+brew install xcodegen && Tools/generate.sh
 ```
+
+Use `Tools/generate.sh` rather than `xcodegen generate`: it fixes up one value
+xcodegen cannot write in the form Xcode reads. See the script for what and why.
 
 Then open `Glow.xcodeproj`, or just run the tests:
 
@@ -56,7 +59,7 @@ echo "DEVELOPMENT_TEAM = YOURTEAMID" > Local.xcconfig && xcodegen generate
 That file is gitignored, because a team ID is an account identifier rather than
 a project fact. Everything else, simulator included, works without it.
 
-Regenerate after any change to `project.yml`, and after switching to a branch
+Regenerate (`Tools/generate.sh`) after any change to `project.yml`, and after switching to a branch
 that has different files: the generated project keeps pointing at whatever
 existed when it was made, and the resulting failure reads like a missing file
 rather than a stale project.
