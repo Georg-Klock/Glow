@@ -59,6 +59,7 @@ struct WeeklyGridView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { refreshToday() }
         }
+        .task { seedIfNeeded() }
     }
 
     private var grid: some View {
@@ -128,6 +129,17 @@ struct WeeklyGridView: View {
 
     private var monthTitle: String {
         today.formatted(.dateTime.month(.wide).locale(WeekCalendar.calendar.locale ?? .current))
+    }
+
+    /// First launch starts with habits rather than an empty state. Nothing is
+    /// pre-completed: see DefaultHabits.
+    private func seedIfNeeded() {
+        do {
+            let added = try HabitSeeder(context: context).seedIfNeeded()
+            if added > 0 { WidgetCenter.shared.reloadAllTimelines() }
+        } catch {
+            HabitStore.report(error, operation: "seedDefaults")
+        }
     }
 
     private func refreshToday() {

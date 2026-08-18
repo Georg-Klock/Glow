@@ -1,4 +1,8 @@
-# Glow
+# Glow Up
+
+Glow Up Habit Tracker. The home screen icon says "Glow Up", because a home
+screen label truncates at about twelve characters and "Glow Up habit tra..."
+is not a name.
 
 A habit tracker whose weekly overview is the whole app: a grid of habits by
 day, filled when done.

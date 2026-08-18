@@ -16,9 +16,14 @@ struct GlowWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: WeekProvider()) { entry in
             WeekWidgetView(entry: entry)
-                .containerBackground(.fill.tertiary, for: .widget)
+                // Fully transparent, so the widget disappears into a dark
+                // wallpaper and reads as slots floating on the home screen
+                // rather than as a card sitting on it. iOS 17 and later still
+                // require a container background to be declared; declaring it
+                // clear is how you opt out rather than omitting it.
+                .containerBackground(.clear, for: .widget)
         }
-        .configurationDisplayName("This Week")
+        .configurationDisplayName("Glow Up: This Week")
         .description("Your habits for the week. Tap today's slot to log it.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
