@@ -21,6 +21,11 @@ targets:
     platform: iOS
     sources:
       - path: Glow
+    # Picks up a gitignored Local.xcconfig if there is one, which is where a
+    # development team goes. See Signing.xcconfig.
+    configFiles:
+      Debug: Signing.xcconfig
+      Release: Signing.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.georgklock.glow

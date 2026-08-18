@@ -14,8 +14,10 @@ xcuserdata/
 *.dSYM.zip
 .DS_Store
 
-# Machine-local values (signing team, device UDIDs). Never committed.
+# Machine-local values (signing team, device UDIDs). Never committed: a team ID
+# is an account identifier, not a project fact.
 Tools/local.env
+Local.xcconfig
 
 # Scratch space for drafts and notes that are worth keeping but not shipping.
 private/

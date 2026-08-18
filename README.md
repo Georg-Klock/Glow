@@ -41,6 +41,16 @@ Then open `Glow.xcodeproj`, or just run the tests:
 Tools/test.sh
 ```
 
+To run on a real phone, which is the only way to see the glow, create a
+`Local.xcconfig` with your team and regenerate:
+
+```bash
+echo "DEVELOPMENT_TEAM = YOURTEAMID" > Local.xcconfig && xcodegen generate
+```
+
+That file is gitignored, because a team ID is an account identifier rather than
+a project fact. Everything else, simulator included, works without it.
+
 Regenerate after any change to `project.yml`, and after switching to a branch
 that has different files: the generated project keeps pointing at whatever
 existed when it was made, and the resulting failure reads like a missing file

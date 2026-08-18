@@ -1,0 +1,12 @@
+// Signing settings.
+//
+// Simulator builds and CI need nothing here. Running on a real phone needs a
+// development team, which is an account identifier and so does not belong in
+// the repository. Put it in Local.xcconfig instead, which is gitignored:
+//
+//     DEVELOPMENT_TEAM = ABCDE12345
+//
+// The include below is the optional form, so a checkout without that file
+// still generates and builds for the simulator.
+
+#include? "Local.xcconfig"
