@@ -9,8 +9,9 @@ A habit tracker whose weekly overview is the whole app: a grid of habits by
 day, filled when done.
 
 The slot for today, while still incomplete, physically glows on HDR-capable
-screens, using the same gain-map technique that makes HDR photos look brighter
-than white in Photos. The glow is an "unfinished, still actionable today"
+screens: the slot is drawn from an image encoded in a colour space with real
+headroom above SDR white, which is what makes HDR photos look brighter than
+white in Photos. The glow is an "unfinished, still actionable today"
 signal, not a reward for completion. It disappears when you complete the habit
 (after a beat) or when the day ends.
 
@@ -32,7 +33,7 @@ signal, not a reward for completion. It disappears when you complete the habit
 - **No multiple completions per day.** A habit is done or not done for a day.
 - **No notifications or reminders.**
 - **No home screen widget.** WidgetKit renders snapshots in a separate process
-  and does not carry the gain-map pipeline the way the in-app view does, so the
+  and does not carry the HDR image pipeline the way the in-app view does, so the
   real glow only exists inside the app. A future widget would mirror the grid
   in flat colour rather than attempt the glow.
 - **No streaks, badges, or celebratory flourishes** beyond the completion
@@ -69,13 +70,14 @@ A build that violates one of these is broken regardless of what else works.
 - **R5.** A daily row draws exactly 7 slots; an N-times row draws exactly N.
 - **R6.** Every row spans the same track width, whatever its slot count.
 - **R7.** Weeks reset clean. A frequency habit's unmet goal does not carry over.
-- **R8.** Without EDR headroom the app renders flat colour, never a broken or
-  blank slot.
+- **R8.** The glow is encoded in a colour space with headroom above SDR white.
+  Without EDR the app renders flat colour, never a broken or blank slot.
 
 R1, R2, R5 and R7 are asserted in `Tests/WeekGridTests.swift`, including an
 exhaustive pass over all 128 possible completion histories of a week. R3 and R4
 are asserted in `Tests/PersistenceTests.swift`, R6 in `Tests/SlotLayoutTests.swift`,
-and R8 is the SDR-fallback test in `Tests/GlowRendererTests.swift`.
+and R8 in `Tests/GlowRendererTests.swift`, which asserts the encoded colour
+space rather than trusting it.
 
 ## 6. Layout
 
@@ -102,8 +104,8 @@ Every slot is in exactly one of three states.
 
 1. **Inactive.** Not completed and not actionable today. Flat grey, no glow.
    Also the resting look of unfilled pills.
-2. **Open.** Today's slot, not yet completed. A dim outlined shape under a
-   bright HDR glow. The only steadily glowing state.
+2. **Open.** Today's slot, not yet completed. The HDR glow, drawn over the
+   empty track. The only steadily glowing state.
 3. **Filled.** Completed. Solid colour, no glow once the animation settles.
 
 **Completion transition.** On tap the slot holds the glow for ~200ms, then the
@@ -134,9 +136,12 @@ inactive.
 - [x] Without EDR the glow renders as flat colour, no crash, no artifact.
 - [x] Restarting preserves all habits and completions.
 
-Each was verified in the simulator and is held by a test. The one thing no test
-covers is whether the glow is *visibly* brighter on a real screen, which is
-Phase 0's outstanding item.
+Each was verified in the simulator and is held by a test.
+
+The glow itself is confirmed on an iPhone 14 Pro: with it on screen the system's
+granted EDR headroom rises from 1.2 to 6.0, matching what the renderer asks for.
+What no test and no measurement can answer is whether it *reads* as lit in a
+given room, which stays a matter of looking at it.
 
 ## 9. Resolved questions
 

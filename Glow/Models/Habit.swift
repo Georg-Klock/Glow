@@ -15,7 +15,7 @@ import SwiftData
 final class Habit {
     var id: UUID = UUID()
     var name: String = ""
-    var icon: String = "⭐️"
+    var icon: String = HabitSymbol.default
     var isDaily: Bool = true
     /// Only meaningful when `isDaily` is false.
     var timesPerWeek: Int = 3

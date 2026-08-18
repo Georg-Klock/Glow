@@ -75,11 +75,10 @@ struct HabitRowView: View {
 
     private var label: some View {
         HStack(spacing: 8) {
-            Text(snapshot.icon)
-                .font(.system(size: 18))
+            HabitIconView(icon: snapshot.icon, accent: snapshot.accent)
             Text(snapshot.name)
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 0)

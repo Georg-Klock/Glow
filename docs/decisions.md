@@ -16,16 +16,23 @@ a screen whose entire job is to be read at a glance. The cost is that the glow
 render is cached per colour as well as per size, which is a slightly larger
 cache and nothing else.
 
-## Icon: free-text emoji
+## Icon: a curated SF Symbols set
 
 **Question.** Emoji free-text, or a curated SF Symbols set?
 
-**Decision.** Emoji, capped at two characters.
+**First decision.** Emoji, capped at two characters, on the grounds that it was
+less work.
 
-Less implementation work, as the spec noted, and it lets the user pick anything
-without a picker to design or a symbol set to curate. If a curated set is ever
-wanted, the stored field is a string either way, so it is a UI change and not a
-migration.
+**Now.** A curated set of SF Symbols, grouped into four sections.
+
+Emoji renders at whatever weight and colour the font vendor chose. It ignores
+the habit's accent, ignores Dynamic Type's optical sizing, and sits next to
+system typography looking like a sticker. A symbol inherits all of it and takes
+the accent colour, which ties the label to its row.
+
+Nothing had to migrate. The stored field was a string before and still is:
+`HabitSymbol.isSymbol` decides whether to draw it as a symbol or as text, so a
+habit created with an emoji keeps it.
 
 ## 1x and 7x per week: neither is selectable
 
@@ -62,15 +69,22 @@ The implementation makes this automatic rather than a rule to enforce: slot
 state is computed from the completions falling inside the displayed week, so
 last week's are not consulted at all. `WeekGridTests` covers it.
 
-## Dark mode only
+## Appearance: follow the system
 
-**Question.** Not in the spec's list. It arrived from the implementation.
+**Question.** Not in the spec's list. It arrived from the implementation, twice.
 
-**Decision.** The app is dark, always.
+**First decision.** Dark, always. The glow layer was an opaque JPEG, and an
+opaque tile only disappears into its background if the background is the black
+it was drawn on.
 
-The spec already leaned this way for Phase 3 on the grounds that the glow reads
-better on a dark background. It turned out to be structural rather than
-aesthetic: the glow layer is an opaque JPEG, because JPEG has no alpha and
-because compositing an HDR layer with a blend mode risks it being flattened to
-SDR. An opaque tile only disappears into its background if the background is
-the black the tile was drawn on. See [glow.md](glow.md).
+**Now.** Whatever the system is set to.
+
+The constraint was real but the conclusion did not follow from it. The tile is
+still opaque, because the PQ encoder drops alpha whatever it is handed. But
+clipping the tile to the slot's own capsule removes its corners entirely, and a
+shape with no corners needs no particular colour behind it. The earlier worry
+that clipping would flatten the HDR layer was never measured; it does not.
+
+Dark is still where the glow reads best, and it is still what the app looks
+best in. That is now the user's choice rather than the app's. See
+[glow.md](glow.md).
