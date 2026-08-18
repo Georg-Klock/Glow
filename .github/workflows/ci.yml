@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push to a branch makes the previous run's answer irrelevant, and macOS
+# runners are the expensive kind.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests
+    # Pinned rather than macos-latest: the test suite reads gain-map metadata,
+    # and where that metadata lives has already been seen to differ between
+    # platform versions. Pin, and bump deliberately.
+    runs-on: macos-26
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun simctl list runtimes | grep iOS || true
+
+      # Generates the project, picks an available simulator, runs the suite,
+      # and fails if the run reported no tests.
+      - name: Run tests
+        run: Tools/test.sh

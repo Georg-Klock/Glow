@@ -1,0 +1,78 @@
+import Foundation
+import Testing
+@testable import Glow
+
+@Suite("Week boundaries")
+struct WeekCalendarTests {
+    private let calendar = TestCalendar.monday
+
+    @Test("A week starts on Monday and runs seven days")
+    func weekShape() {
+        let wednesday = TestCalendar.date(2026, 8, 19)
+        let week = WeekCalendar.week(containing: wednesday, calendar: calendar)
+
+        #expect(week.days.count == 7)
+        #expect(week.start == TestCalendar.date(2026, 8, 17))
+        #expect(week.days.last == TestCalendar.date(2026, 8, 23))
+        #expect(calendar.component(.weekday, from: week.start) == 2)
+    }
+
+    @Test("Sunday belongs to the week that started the Monday before it")
+    func sundayIsTheEndOfTheWeek() {
+        // The bug this guards: with a Sunday-first calendar, Sunday would open
+        // a new week and every column would shift by one.
+        let sunday = TestCalendar.date(2026, 8, 23)
+        let week = WeekCalendar.week(containing: sunday, calendar: calendar)
+
+        #expect(week.start == TestCalendar.date(2026, 8, 17))
+        #expect(week.index(of: sunday) == 6)
+    }
+
+    @Test("Monday is its own week's first day")
+    func mondayIsTheStart() {
+        let monday = TestCalendar.date(2026, 8, 17)
+        let week = WeekCalendar.week(containing: monday, calendar: calendar)
+
+        #expect(week.start == monday)
+        #expect(week.index(of: monday) == 0)
+    }
+
+    @Test("Any instant during a day normalizes to that day's midnight")
+    func dayNormalization() {
+        let midnight = TestCalendar.date(2026, 8, 19)
+        let lateEvening = midnight.addingTimeInterval(23 * 3600 + 59 * 60)
+
+        #expect(WeekCalendar.day(lateEvening, calendar: calendar) == midnight)
+        #expect(WeekCalendar.day(midnight, calendar: calendar) == midnight)
+    }
+
+    @Test("Weeks are seven distinct midnights even across a DST transition")
+    func daylightSavingWeek() {
+        // Europe/Berlin springs forward on 2026-03-29, mid-week. Adding 86,400
+        // seconds seven times would land these columns on 23:00 the day before.
+        var berlin = Calendar(identifier: .gregorian)
+        berlin.timeZone = TimeZone(identifier: "Europe/Berlin") ?? .gmt
+        berlin.firstWeekday = 2
+
+        var components = DateComponents()
+        components.year = 2026
+        components.month = 3
+        components.day = 25
+        let midWeek = berlin.date(from: components) ?? .distantPast
+
+        let week = WeekCalendar.week(containing: midWeek, calendar: berlin)
+        #expect(week.days.count == 7)
+        #expect(Set(week.days).count == 7)
+        for day in week.days {
+            #expect(berlin.startOfDay(for: day) == day)
+        }
+    }
+
+    @Test("Weekday initials are ordered Monday first")
+    func weekdayInitialsOrder() {
+        let initials = WeekCalendar.weekdayInitials(calendar: calendar)
+        #expect(initials.count == 7)
+        #expect(initials.first == "M")
+        #expect(initials.last == "S")
+    }
+}

@@ -1,0 +1,80 @@
+# Glow
+
+A habit tracker whose weekly overview is the whole app: a grid of habits by
+day, filled when done.
+
+The one twist is in the name. The slot for today, while it is still
+incomplete, physically glows on an HDR-capable screen, using the same gain-map
+technique that makes HDR photos look brighter than white in Photos. The glow
+means "unfinished, still actionable today". It is not a reward for finishing:
+it disappears the moment you complete the habit, and again when the day ends.
+
+Working name. Rename freely.
+
+## Status
+
+| Phase | What it is | State |
+| --- | --- | --- |
+| 0 | Glow spike: prove a gain-map image really glows | Encoding proven, device check outstanding |
+| 1 | Core app: CRUD, persistence, weekly grid, tap to complete | Done |
+| 2 | Glow integration: open state and the completion transition | Done |
+| 3 | Polish: app icon, richer empty states, visual pass | Not started |
+
+Phase 0's remaining question can only be answered by looking at a real phone.
+Everything a machine can check about the glow is checked by the test suite:
+that the encoded file carries a gain map, and that the gain map's headroom is
+the value the renderer asked for. What no test can tell you is how bright it
+looks in your kitchen. See [docs/glow.md](docs/glow.md).
+
+## Getting started
+
+The Xcode project is generated and is not in the repository, so generate it
+first:
+
+```bash
+brew install xcodegen && xcodegen generate
+```
+
+Then open `Glow.xcodeproj`, or just run the tests:
+
+```bash
+Tools/test.sh
+```
+
+Regenerate after any change to `project.yml`, and after switching to a branch
+that has different files: the generated project keeps pointing at whatever
+existed when it was made, and the resulting failure reads like a missing file
+rather than a stale project.
+
+## Layout
+
+```
+Glow/Logic/     Pure logic: weeks, slot states, row geometry. No UI, no store.
+Glow/Glow/      The HDR glow: renderer, cache, accents.
+Glow/Models/    SwiftData models.
+Glow/Store/     Every write to the store.
+Glow/Views/     SwiftUI.
+Tests/          Swift Testing. 47 tests, no device needed.
+Tools/test.sh   The test command.
+```
+
+The split that matters is `Logic/`: it holds every decision the grid makes and
+depends on neither SwiftData nor SwiftUI, so the rules can be tested directly
+rather than through a view. `Views/` is then mostly layout, and a view never
+works out for itself which day a tap belongs to.
+
+## Documentation
+
+- [SPEC.md](SPEC.md) is the product truth: what the app does and what it
+  deliberately does not.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) is the technical truth.
+- [docs/glow.md](docs/glow.md) is the HDR technique, what was verified and how,
+  and the parts that only a real screen can answer.
+- [docs/decisions.md](docs/decisions.md) records the open questions from the
+  spec and what they were resolved to.
+
+## How this was built
+
+Most of the code here was written by Claude Opus 5 under direction. The commit
+log records it in git's own terms rather than in a footnote: Claude is the
+author of a commit it wrote, and the committer is whoever applied it.

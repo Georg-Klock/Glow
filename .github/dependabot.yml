@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # The only dependency this repo has is its Actions. Keeping them current is
+  # cheap; a monthly batch avoids a PR per action per week.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci
