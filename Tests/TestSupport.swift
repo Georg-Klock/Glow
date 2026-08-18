@@ -33,7 +33,6 @@ extension HabitSnapshot {
             name: name,
             icon: "📖",
             frequency: frequency,
-            accent: .teal,
             completedDays: completedDays
         )
     }

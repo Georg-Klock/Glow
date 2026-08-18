@@ -2,6 +2,7 @@
 # artifact, and a committed copy goes stale the moment a file is added.
 *.xcodeproj
 *.xcworkspace
+GlowWidget/Info.plist
 
 # Xcode
 build/

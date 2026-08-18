@@ -26,7 +26,7 @@ struct PersistenceTests {
         let context = try makeContext()
         let store = makeStore(context)
 
-        try store.addHabit(name: "Read", icon: "📖", frequency: .timesPerWeek(4), accent: .violet)
+        try store.addHabit(name: "Read", icon: "📖", frequency: .timesPerWeek(4))
 
         let fetched = try context.fetch(FetchDescriptor<Habit>())
         #expect(fetched.count == 1)
@@ -34,14 +34,13 @@ struct PersistenceTests {
         #expect(habit.name == "Read")
         #expect(habit.icon == "📖")
         #expect(habit.frequency == .timesPerWeek(4))
-        #expect(habit.accent == .violet)
     }
 
     @Test("Toggling twice leaves no completion behind")
     func toggleIsReversible() throws {
         let context = try makeContext()
         let store = makeStore(context)
-        let habit = try store.addHabit(name: "Walk", icon: "🚶", frequency: .daily, accent: .teal)
+        let habit = try store.addHabit(name: "Walk", icon: "🚶", frequency: .daily)
 
         #expect(try store.toggleCompletion(for: habit, on: today) == true)
         #expect(try context.fetch(FetchDescriptor<Completion>()).count == 1)
@@ -55,7 +54,7 @@ struct PersistenceTests {
     func noDuplicateCompletionsPerDay() throws {
         let context = try makeContext()
         let store = makeStore(context)
-        let habit = try store.addHabit(name: "Walk", icon: "🚶", frequency: .daily, accent: .teal)
+        let habit = try store.addHabit(name: "Walk", icon: "🚶", frequency: .daily)
 
         // Different instants within the same day must collapse to one record.
         try store.toggleCompletion(for: habit, on: today.addingTimeInterval(60))
@@ -73,7 +72,7 @@ struct PersistenceTests {
     func completionsAreNormalized() throws {
         let context = try makeContext()
         let store = makeStore(context)
-        let habit = try store.addHabit(name: "Walk", icon: "🚶", frequency: .daily, accent: .teal)
+        let habit = try store.addHabit(name: "Walk", icon: "🚶", frequency: .daily)
 
         try store.toggleCompletion(for: habit, on: today.addingTimeInterval(3600 * 22 + 1800))
 
@@ -85,7 +84,7 @@ struct PersistenceTests {
     func deleteCascades() throws {
         let context = try makeContext()
         let store = makeStore(context)
-        let habit = try store.addHabit(name: "Walk", icon: "🚶", frequency: .daily, accent: .teal)
+        let habit = try store.addHabit(name: "Walk", icon: "🚶", frequency: .daily)
         try store.toggleCompletion(for: habit, on: today)
         try store.toggleCompletion(for: habit, on: TestCalendar.date(2026, 8, 18))
 
@@ -100,9 +99,9 @@ struct PersistenceTests {
         let context = try makeContext()
         let store = makeStore(context)
 
-        let first = try store.addHabit(name: "One", icon: "1️⃣", frequency: .daily, accent: .teal)
-        let second = try store.addHabit(name: "Two", icon: "2️⃣", frequency: .daily, accent: .rose)
-        let third = try store.addHabit(name: "Three", icon: "3️⃣", frequency: .daily, accent: .sky)
+        let first = try store.addHabit(name: "One", icon: "1️⃣", frequency: .daily)
+        let second = try store.addHabit(name: "Two", icon: "2️⃣", frequency: .daily)
+        let third = try store.addHabit(name: "Three", icon: "3️⃣", frequency: .daily)
 
         #expect(first.sortOrder == 0)
         #expect(second.sortOrder == 1)
@@ -113,9 +112,9 @@ struct PersistenceTests {
     func reorderRewritesOrder() throws {
         let context = try makeContext()
         let store = makeStore(context)
-        let a = try store.addHabit(name: "A", icon: "🅰️", frequency: .daily, accent: .teal)
-        let b = try store.addHabit(name: "B", icon: "🅱️", frequency: .daily, accent: .rose)
-        let c = try store.addHabit(name: "C", icon: "©️", frequency: .daily, accent: .sky)
+        let a = try store.addHabit(name: "A", icon: "🅰️", frequency: .daily)
+        let b = try store.addHabit(name: "B", icon: "🅱️", frequency: .daily)
+        let c = try store.addHabit(name: "C", icon: "©️", frequency: .daily)
 
         try store.reorder([a, b, c], from: IndexSet(integer: 2), to: 0)
 
@@ -128,13 +127,12 @@ struct PersistenceTests {
     func snapshotReflectsStoredState() throws {
         let context = try makeContext()
         let store = makeStore(context)
-        let habit = try store.addHabit(name: "Read", icon: "📖", frequency: .timesPerWeek(3), accent: .amber)
+        let habit = try store.addHabit(name: "Read", icon: "📖", frequency: .timesPerWeek(3))
         try store.toggleCompletion(for: habit, on: today)
 
         let snapshot = habit.snapshot()
         #expect(snapshot.name == "Read")
         #expect(snapshot.frequency == .timesPerWeek(3))
-        #expect(snapshot.accent == .amber)
         #expect(snapshot.completedDays == [today])
 
         // And the grid agrees that today is spent.
@@ -147,7 +145,7 @@ struct PersistenceTests {
     func namesAreTrimmed() throws {
         let context = try makeContext()
         let store = makeStore(context)
-        let habit = try store.addHabit(name: "  Stretch \n", icon: "🧘", frequency: .daily, accent: .lime)
+        let habit = try store.addHabit(name: "  Stretch \n", icon: "🧘", frequency: .daily)
         #expect(habit.name == "Stretch")
     }
 
@@ -164,7 +162,7 @@ struct PersistenceTests {
             let container = try ModelContainer(for: Habit.self, Completion.self, configurations: configuration)
             let context = ModelContext(container)
             let store = HabitStore(context: context, calendar: calendar)
-            let habit = try store.addHabit(name: "Read", icon: "📖", frequency: .timesPerWeek(4), accent: .violet)
+            let habit = try store.addHabit(name: "Read", icon: "📖", frequency: .timesPerWeek(4))
             habitID = habit.id
             try store.toggleCompletion(for: habit, on: today)
             try store.toggleCompletion(for: habit, on: TestCalendar.date(2026, 8, 17))
@@ -181,7 +179,6 @@ struct PersistenceTests {
         #expect(habit.id == habitID)
         #expect(habit.name == "Read")
         #expect(habit.frequency == .timesPerWeek(4))
-        #expect(habit.accent == .violet)
         #expect(habit.completedDays == [today, TestCalendar.date(2026, 8, 17)])
     }
 }

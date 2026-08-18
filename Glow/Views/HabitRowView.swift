@@ -58,7 +58,6 @@ struct HabitRowView: View {
                 ForEach(slots) { slot in
                     SlotView(
                         slot: slot,
-                        accent: snapshot.accent,
                         size: slotSize,
                         habitName: snapshot.name
                     )
@@ -75,7 +74,7 @@ struct HabitRowView: View {
 
     private var label: some View {
         HStack(spacing: 8) {
-            HabitIconView(icon: snapshot.icon, accent: snapshot.accent)
+            HabitIconView(icon: snapshot.icon)
             Text(snapshot.name)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.primary)

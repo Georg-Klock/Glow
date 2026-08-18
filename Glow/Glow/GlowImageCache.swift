@@ -1,88 +1,95 @@
 import SwiftUI
 import UIKit
 
-/// Caches rendered glows so a scroll does not re-encode a JPEG per frame.
+/// Holds the one rendered tile.
 ///
-/// Keyed on pixel size and colour, which is everything the render depends on.
+/// The tile is uniform and shape-free, so unlike the earlier per-size, per-hue
+/// cache there is exactly one image for the whole app. It is rendered on first
+/// use and kept.
 @MainActor
 final class GlowImageCache {
     static let shared = GlowImageCache()
 
     private let renderer: GlowRenderer
-    private var cache: [Key: UIImage] = [:]
-    /// Sizes that failed to render, so a broken combination is attempted once
-    /// rather than on every layout pass.
-    private var failures: Set<Key> = []
-
-    private struct Key: Hashable {
-        let width: Int
-        let height: Int
-        let accent: HabitAccent
-    }
+    private var tile: UIImage?
+    /// Set when rendering fails, so a broken build attempts it once rather than
+    /// on every layout pass.
+    private var didFail = false
 
     init(renderer: GlowRenderer = GlowRenderer()) {
         self.renderer = renderer
     }
 
-    /// The glow for one slot, or nil if it could not be rendered. Callers fall
-    /// back to a flat SDR shape, which is also what a non-EDR screen shows, so
-    /// there is no visually broken state either way.
-    func image(size: CGSize, accent: HabitAccent, scale: CGFloat) -> UIImage? {
-        let pixelSize = CGSize(
-            width: (size.width * scale).rounded(),
-            height: (size.height * scale).rounded()
-        )
-        let key = Key(width: Int(pixelSize.width), height: Int(pixelSize.height), accent: accent)
-
-        if let cached = cache[key] { return cached }
-        if failures.contains(key) { return nil }
+    /// The lit tile, or nil if it could not be rendered. Callers fall back to a
+    /// flat shape, which is also what a screen with no headroom shows, so there
+    /// is no visually broken state either way.
+    func litTile() -> UIImage? {
+        if let tile { return tile }
+        if didFail { return nil }
 
         do {
-            let data = try renderer.imageData(pixelSize: pixelSize, color: accent.components)
-            guard let image = UIImage(data: data, scale: scale) else {
-                failures.insert(key)
+            let data = try renderer.imageData(color: GlowPalette.components)
+            guard let image = UIImage(data: data) else {
+                didFail = true
                 return nil
             }
-            cache[key] = image
+            tile = image
             return image
         } catch {
-            failures.insert(key)
+            didFail = true
             return nil
         }
     }
-
-    func removeAll() {
-        cache.removeAll()
-        failures.removeAll()
-    }
 }
 
-/// The HDR layer of a slot.
+/// A lit slot: the HDR core, and the halo around it.
+///
+/// The halo is an ordinary SwiftUI shadow rather than part of the image. Two
+/// reasons. The image is opaque, because the PQ encoder drops alpha, so a halo
+/// baked into it would arrive as a black square covering its neighbours. And a
+/// shadow composites against whatever is behind it, which an opaque tile
+/// cannot. The core is what has to be HDR; a halo is dimmer than its source by
+/// definition, so nothing is lost by drawing it in SDR.
 struct GlowImageView: View {
     let size: CGSize
-    let accent: HabitAccent
 
-    @Environment(\.displayScale) private var displayScale
+    private var shape: Capsule { Capsule(style: .continuous) }
+    private var haloRadius: CGFloat { size.height * GlowPalette.haloRadius }
 
     var body: some View {
-        if let image = GlowImageCache.shared.image(size: size, accent: accent, scale: displayScale) {
-            Image(uiImage: image)
+        ZStack {
+            // The shadow caster sits under the core and is never seen directly.
+            // Three passes at increasing radius: one shadow falls off far too
+            // fast to read as a bloom, and stacking them approximates the long
+            // tail a real light source has.
+            shape
+                .fill(GlowPalette.color)
+                .frame(width: size.width, height: size.height)
+                .shadow(color: GlowPalette.color.opacity(0.55), radius: haloRadius * 0.35)
+                .shadow(color: GlowPalette.color.opacity(0.35), radius: haloRadius * 0.8)
+                .shadow(color: GlowPalette.color.opacity(0.22), radius: haloRadius * 1.6)
+
+            core
+        }
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var core: some View {
+        if let tile = GlowImageCache.shared.litTile() {
+            Image(uiImage: tile)
                 .resizable()
-                .interpolation(.high)
                 // Without this the image is tone-mapped to SDR and the whole
                 // exercise is a slightly bright capsule.
                 .allowedDynamicRange(.high)
                 .frame(width: size.width, height: size.height)
-                // The encoder drops alpha, so the tile is opaque and its corners
-                // are black. Clipping is what lets the app sit on any background
-                // instead of requiring a black one behind every slot.
-                .clipShape(Capsule(style: .continuous))
-                .accessibilityHidden(true)
+                // The tile is a plain square, so the slot's shape comes from
+                // here rather than from anything baked into the image.
+                .clipShape(shape)
         } else {
-            Capsule(style: .continuous)
-                .fill(accent.color)
+            shape
+                .fill(GlowPalette.color)
                 .frame(width: size.width, height: size.height)
-                .accessibilityHidden(true)
         }
     }
 }

@@ -18,7 +18,6 @@ import Testing
 @Suite("HDR glow rendering")
 struct GlowRendererTests {
     private let renderer = GlowRenderer()
-    private let size = CGSize(width: 64, height: 64)
 
     private func properties(_ data: Data) throws -> [CFString: Any] {
         let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
@@ -35,25 +34,18 @@ struct GlowRendererTests {
         // This is the property that separates working from not working. A file
         // in an SDR colour space is an SDR file however bright its pixels were
         // before encoding, and however much gain-map metadata rides along.
-        let data = try renderer.imageData(pixelSize: size, color: HabitAccent.teal.components)
+        let data = try renderer.imageData(color: GlowPalette.components)
         let space = try #require(try decoded(data).colorSpace)
         let name = (space.name as String?) ?? ""
 
         #expect(name.contains("PQ"), "encoded in \(name), which has no headroom above SDR white")
     }
 
-    @Test("Every accent encodes as HDR", arguments: HabitAccent.allCases)
-    func everyAccentEncodesAsHDR(accent: HabitAccent) throws {
-        let data = try renderer.imageData(pixelSize: size, color: accent.components)
-        let name = (try decoded(data).colorSpace?.name as String?) ?? ""
-        #expect(name.contains("PQ"))
-    }
-
     @Test("The file declares more headroom than SDR white")
     func fileDeclaresHeadroom() throws {
         // ImageIO reports the headroom it will hand the display. One stop or
         // less means the glow would be indistinguishable from a filled slot.
-        let data = try renderer.imageData(pixelSize: size, color: HabitAccent.teal.components)
+        let data = try renderer.imageData(color: GlowPalette.components)
         let headroom = try #require(
             properties(data)["Headroom" as CFString] as? Double,
             "the file declares no headroom at all"
@@ -69,10 +61,10 @@ struct GlowRendererTests {
         bright.peakHeadroom = 8
 
         let dimHeadroom = try #require(
-            properties(dim.imageData(pixelSize: size, color: HabitAccent.teal.components))["Headroom" as CFString] as? Double
+            properties(dim.imageData(color: GlowPalette.components))["Headroom" as CFString] as? Double
         )
         let brightHeadroom = try #require(
-            properties(bright.imageData(pixelSize: size, color: HabitAccent.teal.components))["Headroom" as CFString] as? Double
+            properties(bright.imageData(color: GlowPalette.components))["Headroom" as CFString] as? Double
         )
         #expect(brightHeadroom > dimHeadroom + 1, "\(dimHeadroom)x vs \(brightHeadroom)x")
     }
@@ -82,7 +74,7 @@ struct GlowRendererTests {
         // Decoded into extended linear, where 1.0 is SDR white. This is the
         // display-independent form of "it glows": no screen is consulted, the
         // question is only whether the values in the file are above reference.
-        let data = try renderer.imageData(pixelSize: size, color: HabitAccent.teal.components)
+        let data = try renderer.imageData(color: GlowPalette.components)
         let image = try #require(CIImage(data: data))
 
         var pixel = [Float](repeating: 0, count: 4)
@@ -90,7 +82,7 @@ struct GlowRendererTests {
             image,
             toBitmap: &pixel,
             rowBytes: 16,
-            bounds: CGRect(x: 32, y: 32, width: 1, height: 1),
+            bounds: CGRect(x: 4, y: 4, width: 1, height: 1),
             format: .RGBAf,
             colorSpace: GlowRenderer.workingSpace
         )
@@ -98,31 +90,29 @@ struct GlowRendererTests {
         #expect(brightest > 1.0, "the glow peaks at \(brightest), no brighter than SDR white")
     }
 
-    @Test("Pill and circle aspect ratios both render")
-    func pillAndCircle() throws {
-        let sizes = [
-            CGSize(width: 96, height: 96),    // daily circle
-            CGSize(width: 300, height: 96),   // 2x per week pill
-            CGSize(width: 130, height: 96)    // 5x per week pill
-        ]
-        for size in sizes {
-            let image = try decoded(renderer.imageData(pixelSize: size, color: HabitAccent.rose.components))
-            #expect(image.width == Int(size.width))
-            #expect(image.height == Int(size.height))
-        }
+    @Test("The tile is uniform, so one image serves every slot")
+    func tileIsUniform() throws {
+        // The shape comes from clipping and the halo from a shadow, so the
+        // encoded image carries neither. If this ever stops being flat, the
+        // single shared tile silently becomes wrong for most slot sizes.
+        let image = try decoded(renderer.imageData(color: GlowPalette.components))
+        #expect(image.width == renderer.tileSize)
+        #expect(image.height == renderer.tileSize)
     }
 
-    @Test("A zero-sized slot is refused rather than encoded")
+    @Test("A zero-sized tile is refused rather than encoded")
     func emptySizeThrows() {
+        var empty = GlowRenderer()
+        empty.tileSize = 0
         #expect(throws: GlowRenderer.RenderError.emptySize) {
-            try renderer.imageData(pixelSize: .zero, color: HabitAccent.teal.components)
+            try empty.imageData(color: GlowPalette.components)
         }
     }
 
     @Test("Rendering is deterministic, so the cache key is honest")
     func deterministicOutput() throws {
-        let first = try renderer.imageData(pixelSize: size, color: HabitAccent.sky.components)
-        let second = try renderer.imageData(pixelSize: size, color: HabitAccent.sky.components)
+        let first = try renderer.imageData(color: GlowPalette.components)
+        let second = try renderer.imageData(color: GlowPalette.components)
         #expect(first == second)
     }
 }

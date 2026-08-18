@@ -30,7 +30,6 @@ struct HabitSnapshot: Identifiable, Equatable, Sendable {
     var name: String
     var icon: String
     var frequency: Frequency
-    var accent: HabitAccent
     var completedDays: Set<Date>
 
     init(
@@ -38,14 +37,12 @@ struct HabitSnapshot: Identifiable, Equatable, Sendable {
         name: String,
         icon: String,
         frequency: Frequency,
-        accent: HabitAccent,
         completedDays: Set<Date>
     ) {
         self.id = id
         self.name = name
         self.icon = icon
         self.frequency = frequency
-        self.accent = accent
         self.completedDays = completedDays
     }
 }

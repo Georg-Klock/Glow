@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import WidgetKit
 
 /// The whole app: every habit's status for the current week, one tap from done.
 ///
@@ -114,7 +115,7 @@ struct WeeklyGridView: View {
     private var emptyState: some View {
         ContentUnavailableView {
             VStack(spacing: 14) {
-                GlowImageView(size: CGSize(width: 54, height: 54), accent: .teal)
+                GlowImageView(size: CGSize(width: 54, height: 54))
                 Text("No Habits")
             }
         } description: {
@@ -142,6 +143,8 @@ struct WeeklyGridView: View {
             } else {
                 Haptics.uncompleted()
             }
+            // The widget reads the same store but is not told when it changes.
+            WidgetCenter.shared.reloadAllTimelines()
         } catch {
             HabitStore.report(error, operation: "toggleCompletion")
         }
