@@ -10,6 +10,7 @@ struct WeeklyGridView: View {
     @State private var today = WeekCalendar.day(Date())
     @State private var editingHabit: Habit?
     @State private var isAddingHabit = false
+    @State private var isEditingList = false
 
     private var week: Week { WeekCalendar.week(containing: today) }
     private var store: HabitStore { HabitStore(context: context) }
@@ -17,20 +18,30 @@ struct WeeklyGridView: View {
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
-                let trackWidth = GridMetrics.trackWidth(totalWidth: geometry.size.width)
+                let rowGeometry = RowGeometry(totalWidth: geometry.size.width)
                 Group {
                     if habits.isEmpty {
                         EmptyStateView { isAddingHabit = true }
                     } else {
-                        grid(trackWidth: trackWidth)
+                        grid(rowGeometry)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .background(Color.appBackground)
-            .navigationTitle(weekTitle)
+            .navigationTitle(monthTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if !habits.isEmpty {
+                        Button {
+                            isEditingList = true
+                        } label: {
+                            Image(systemName: "line.3.horizontal")
+                        }
+                        .accessibilityLabel("Edit habits")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         isAddingHabit = true
@@ -44,6 +55,9 @@ struct WeeklyGridView: View {
         }
         .sheet(isPresented: $isAddingHabit) {
             HabitEditorView(habit: nil)
+        }
+        .sheet(isPresented: $isEditingList) {
+            EditHabitsView()
         }
         .sheet(item: $editingHabit) { habit in
             HabitEditorView(habit: habit)
@@ -60,34 +74,38 @@ struct WeeklyGridView: View {
         }
     }
 
-    private func grid(trackWidth: CGFloat) -> some View {
+    private func grid(_ rowGeometry: RowGeometry) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                WeekdayHeader(trackWidth: trackWidth, week: week, today: today)
+            VStack(alignment: .leading, spacing: GridMetrics.rowSpacing) {
+                WeekdayHeader(geometry: rowGeometry, week: week, today: today)
+                    .padding(.bottom, 2)
                 ForEach(habits) { habit in
                     HabitRowView(
                         snapshot: habit.snapshot(),
                         week: week,
                         today: today,
-                        trackWidth: trackWidth
+                        geometry: rowGeometry
                     ) { day in
                         toggle(habit, on: day)
                     }
                     .contextMenu {
-                        Button("Edit") { editingHabit = habit }
-                        Button("Delete", role: .destructive) { delete(habit) }
+                        Button("Edit", systemImage: "pencil") { editingHabit = habit }
+                        Button("Delete", systemImage: "trash", role: .destructive) {
+                            delete(habit)
+                        }
                     }
                 }
             }
             .padding(.horizontal, GridMetrics.horizontalPadding)
-            .padding(.vertical, 16)
+            .padding(.vertical, 18)
         }
         .scrollBounceBehavior(.basedOnSize)
     }
 
-    private var weekTitle: String {
+    private var monthTitle: String {
         let formatter = DateFormatter()
         formatter.calendar = WeekCalendar.calendar
+        formatter.locale = WeekCalendar.calendar.locale ?? .current
         formatter.setLocalizedDateFormatFromTemplate("MMMM")
         return formatter.string(from: today)
     }
@@ -99,7 +117,12 @@ struct WeeklyGridView: View {
 
     private func toggle(_ habit: Habit, on day: Date) {
         do {
-            try store.toggleCompletion(for: habit, on: day)
+            let isNowComplete = try store.toggleCompletion(for: habit, on: day)
+            if isNowComplete {
+                Haptics.completed()
+            } else {
+                Haptics.uncompleted()
+            }
         } catch {
             HabitStore.report(error, operation: "toggleCompletion")
         }
@@ -114,28 +137,38 @@ struct WeeklyGridView: View {
     }
 }
 
-/// M T W T F S S, aligned to a seven-slot track.
+/// M T W T F S S over the dates they stand for, aligned to a seven-slot track.
 ///
 /// Frequency rows deliberately do not line up with these: their pills are not
 /// day-pinned, so there is nothing for them to line up with.
 struct WeekdayHeader: View {
-    let trackWidth: CGFloat
+    let geometry: RowGeometry
     let week: Week
     let today: Date
+
+    private var initials: [String] { WeekCalendar.weekdayInitials() }
+    private var numbers: [String] { WeekCalendar.dayNumbers(in: week) }
 
     var body: some View {
         HStack(spacing: GridMetrics.labelSpacing) {
             Color.clear
-                .frame(width: GridMetrics.labelWidth, height: 1)
+                .frame(width: geometry.labelWidth, height: 1)
             HStack(spacing: SlotLayout.gap) {
-                ForEach(Array(WeekCalendar.weekdayInitials().enumerated()), id: \.offset) { index, initial in
-                    Text(initial)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(week.days[index] == today ? .white : Color.white.opacity(0.35))
-                        .frame(width: SlotLayout.slotWidth(trackWidth: trackWidth, slotCount: 7))
+                ForEach(0..<7, id: \.self) { index in
+                    let isToday = week.days[index] == today
+                    VStack(spacing: 3) {
+                        Text(initials[index])
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(isToday ? .white : Color.white.opacity(0.3))
+                        Text(numbers[index])
+                            .font(.system(size: 12, weight: isToday ? .semibold : .regular))
+                            .foregroundStyle(isToday ? .white : Color.white.opacity(0.45))
+                            .monospacedDigit()
+                    }
+                    .frame(width: SlotLayout.slotWidth(trackWidth: geometry.trackWidth, slotCount: 7))
                 }
             }
-            .frame(width: trackWidth, alignment: .leading)
+            .frame(width: geometry.trackWidth, alignment: .leading)
         }
         .accessibilityHidden(true)
     }
@@ -144,19 +177,29 @@ struct WeekdayHeader: View {
 private struct EmptyStateView: View {
     let onAdd: () -> Void
 
+    /// A live slot rather than an illustration: the empty state shows the exact
+    /// thing the app is about, rendered by the same code that draws the grid.
+    /// On an HDR screen it glows here too.
+    private let sampleSize = CGSize(width: 56, height: 56)
+
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 0) {
+            GlowImageView(size: sampleSize, accent: .teal)
+                .padding(.bottom, 28)
             Text("No habits yet")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(.white)
             Text("Add one, and today's slot will be waiting for you.")
                 .font(.system(size: 15))
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(.white.opacity(0.5))
                 .multilineTextAlignment(.center)
+                .padding(.top, 8)
+                .padding(.horizontal, 24)
             Button("Add a habit", action: onAdd)
                 .buttonStyle(.borderedProminent)
                 .tint(HabitAccent.teal.color)
-                .padding(.top, 8)
+                .foregroundStyle(.black)
+                .padding(.top, 24)
         }
         .padding(32)
     }

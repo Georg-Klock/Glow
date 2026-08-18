@@ -49,6 +49,19 @@ enum WeekCalendar {
         return Week(days: days)
     }
 
+    /// Day-of-month numbers for a week's columns, as displayed strings.
+    ///
+    /// Formatted through the calendar rather than by interpolating the integer,
+    /// so a non-Gregorian or non-Latin locale shows its own numerals.
+    static func dayNumbers(in week: Week, calendar: Calendar = WeekCalendar.calendar) -> [String] {
+        let formatter = NumberFormatter()
+        formatter.locale = calendar.locale ?? .current
+        return week.days.map { day in
+            let number = calendar.component(.day, from: day)
+            return formatter.string(from: NSNumber(value: number)) ?? String(number)
+        }
+    }
+
     /// Single-letter column headers in the user's locale, Monday first.
     static func weekdayInitials(calendar: Calendar = WeekCalendar.calendar) -> [String] {
         let symbols = calendar.veryShortStandaloneWeekdaySymbols

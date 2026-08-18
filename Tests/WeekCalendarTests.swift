@@ -75,4 +75,20 @@ struct WeekCalendarTests {
         #expect(initials.first == "M")
         #expect(initials.last == "S")
     }
+
+    @Test("Header dates are the week's own days, in order")
+    func dayNumbersMatchTheWeek() {
+        let week = WeekCalendar.week(containing: TestCalendar.date(2026, 8, 19), calendar: calendar)
+        #expect(WeekCalendar.dayNumbers(in: week, calendar: calendar)
+            == ["17", "18", "19", "20", "21", "22", "23"])
+    }
+
+    @Test("Header dates roll over a month boundary rather than running past it")
+    func dayNumbersAcrossMonthEnd() {
+        // The week of Monday 2026-08-31 runs into September, so the column
+        // labels have to restart at 1 rather than read 32.
+        let week = WeekCalendar.week(containing: TestCalendar.date(2026, 8, 31), calendar: calendar)
+        #expect(WeekCalendar.dayNumbers(in: week, calendar: calendar)
+            == ["31", "1", "2", "3", "4", "5", "6"])
+    }
 }
