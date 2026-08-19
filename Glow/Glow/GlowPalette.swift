@@ -36,4 +36,10 @@ enum GlowPalette {
 
     /// How far the halo carries beyond the slot, as a multiple of slot height.
     static let haloRadius: CGFloat = 0.55
+
+    /// Amber, and the only colour in the app that is not the glow. It is used
+    /// for exactly one thing: saying that the glow is not available. A warning
+    /// rendered in the app's own white would be indistinguishable from the
+    /// thing it is warning about.
+    static let warning = Color(.sRGB, red: 1.0, green: 0.72, blue: 0.22, opacity: 1)
 }

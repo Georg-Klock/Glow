@@ -38,6 +38,16 @@ struct GlowRenderer: Sendable {
     /// Rec. 2100 PQ, which is what the technique this app is built on calls for.
     static let colorSpace = CGColorSpace(name: CGColorSpace.itur_2100_PQ)
 
+    /// Below this peak the tile is encoded as ordinary SDR instead.
+    ///
+    /// PQ declares headroom as a property of the container, not of the pixels
+    /// in it: encoding a 1x image into PQ still produced a file reporting
+    /// nearly 5x, so the "off" end of the slider would have gone on glowing.
+    /// Switching to Display P3 makes the slot a plain bright capsule, which is
+    /// what off is supposed to mean. Found by a test, not by looking.
+    static let sdrThreshold: CGFloat = 1.05
+    static let sdrColorSpace = CGColorSpace(name: CGColorSpace.displayP3)
+
     /// Core Image works in extended linear, where values above 1.0 are the
     /// point rather than an overflow to be clamped.
     static let workingSpace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)
@@ -68,8 +78,11 @@ struct GlowRenderer: Sendable {
             bounds: bounds
         )
 
+        let isOff = peakHeadroom <= Self.sdrThreshold
         let context = CIContext(options: [.workingColorSpace: Self.workingSpace as Any])
-        guard let space = Self.colorSpace else { throw RenderError.encodeFailed }
+        guard let space = isOff ? Self.sdrColorSpace : Self.colorSpace else {
+            throw RenderError.encodeFailed
+        }
 
         // 10 bits per channel. Note this drops alpha: measured on device, an
         // encode from a bitmap with a transparent surround is byte-identical to
