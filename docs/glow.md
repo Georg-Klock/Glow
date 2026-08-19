@@ -121,6 +121,20 @@ the bottom of the slider went on glowing while the UI said "Off". Below
 bright capsule. Found by a test asserting that off means off, not by looking at
 it.
 
+## The widget glows too
+
+This project spent a long time asserting the opposite, and wrote it into the
+spec as a non-goal: WidgetKit renders out-of-process and archives its result, so
+HDR was supposed to be impossible in a widget. That reasoning is plausible and
+it was never tested.
+
+Swapping the widget's flat capsule for the same PQ tile the app uses took one
+line, and the fallback was identical either way, so the experiment cost nothing
+but a build. It glows. Measured on an iPhone 14 Pro, iOS 26.
+
+The lesson is the same one this file already records twice: the assumption was
+load-bearing, cheap to check, and wrong. Check the cheap ones.
+
 ## When the glow will not appear
 
 Low Power Mode reduces the headroom iOS grants, so the tile tone-maps back to
