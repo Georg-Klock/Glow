@@ -167,6 +167,16 @@ with the Apple ID would remove that dependency and let automatic signing work.
 Verify the whole chain with `Tools/check-app-group.sh`, which reports which
 profiles grant the group and whether the last device build actually carries it.
 
+## The widget
+
+Small, medium and large, reading the same store through the App Group, with
+today's slot as an `AppIntent` button. Past days are not buttons, which is R2
+holding in a second process.
+
+It renders the same HDR tile as the app, via the same `GlowImageView`, with
+`fillsWidth` set because the widget's slots are distributed by an HStack rather
+than measured by `SlotLayout`.
+
 ## What is deliberately absent
 
 - No view models. The logic that would live in one is in `Logic/`, and the rest

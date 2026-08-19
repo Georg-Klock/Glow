@@ -123,13 +123,15 @@ private struct WidgetSlot: View {
     @ViewBuilder
     private var shape: some View {
         if slot.state == .open {
-            // Try the real HDR tile here rather than assuming WidgetKit cannot
-            // carry it. The received wisdom is that it renders out-of-process
-            // and archives the result, which drops HDR — but that was never
-            // measured on this device, and the fallback is the same soft-shadow
-            // capsule either way, so the experiment costs nothing.
-            GlowImageView(size: CGSize(width: 200, height: 14))
-                .frame(height: 14)
+            // The widget glows. This is worth stating plainly because this
+            // project assumed the opposite for a long time and wrote it into
+            // the spec as a non-goal: WidgetKit renders out-of-process and
+            // archives the result, so HDR was supposed to be impossible here.
+            // Measured on an iPhone 14 Pro running the real PQ tile, it is not.
+            //
+            // fillsWidth because the widget's slots are distributed by the
+            // HStack; pinning a width here would fight the layout.
+            GlowImageView(size: CGSize(width: 0, height: 14), fillsWidth: true)
         } else {
             Capsule(style: .continuous)
                 .fill(fill)

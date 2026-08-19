@@ -32,11 +32,11 @@ signal, not a reward for completion. It disappears when you complete the habit
   Frequency habits are pure count-based; any day counts.
 - **No multiple completions per day.** A habit is done or not done for a day.
 - **No notifications or reminders.**
-- **The home screen widget does not glow.** It exists now, and it mirrors the
-  grid in flat colour: WidgetKit renders in a separate process and archives the
-  result, and that pipeline does not carry HDR. What it keeps is the part that
-  matters daily, which is logging a habit without opening anything. The real
-  glow lives in the app.
+- ~~**The home screen widget does not glow.**~~ **It does.** This was written as
+  a non-goal on the reasoning that WidgetKit renders in a separate process and
+  archives the result, so HDR could not survive. That was never measured, and it
+  is wrong: running the real Rec. 2100 PQ tile in the widget glows on an
+  iPhone 14 Pro. The widget now uses the same renderer as the app.
 - **No streaks, badges, or celebratory flourishes** beyond the completion
   transition itself. These were explored as candidate glow moments and cut, to
   keep the interaction model at one rule rather than three.

@@ -60,6 +60,11 @@ final class GlowImageCache {
 /// definition, so nothing is lost by drawing it in SDR.
 struct GlowImageView: View {
     let size: CGSize
+    /// When true the tile takes whatever width the layout offers and
+    /// `size.width` is ignored; only the height is honoured. The app's slots
+    /// are measured by `SlotLayout` and want a fixed width, but the widget's
+    /// are distributed by an HStack and must not be pinned.
+    var fillsWidth = false
 
     @AppStorage(GlowSettings.key, store: GlowSettings.store)
     private var peak: Double = GlowSettings.defaultValue
@@ -75,9 +80,7 @@ struct GlowImageView: View {
             // Three passes at increasing radius: one shadow falls off far too
             // fast to read as a bloom, and stacking them approximates the long
             // tail a real light source has.
-            shape
-                .fill(GlowPalette.color)
-                .frame(width: size.width, height: size.height)
+            sized(shape.fill(GlowPalette.color))
                 .shadow(color: GlowPalette.color.opacity(0.55), radius: haloRadius * 0.35)
                 .shadow(color: GlowPalette.color.opacity(0.35), radius: haloRadius * 0.8)
                 .shadow(color: GlowPalette.color.opacity(0.22), radius: haloRadius * 1.6)
@@ -90,19 +93,27 @@ struct GlowImageView: View {
     @ViewBuilder
     private var core: some View {
         if let tile = GlowImageCache.shared.litTile(peak: peak) {
-            Image(uiImage: tile)
-                .resizable()
-                // Without this the image is tone-mapped to SDR and the whole
-                // exercise is a slightly bright capsule.
-                .allowedDynamicRange(.high)
-                .frame(width: size.width, height: size.height)
-                // The tile is a plain square, so the slot's shape comes from
-                // here rather than from anything baked into the image.
-                .clipShape(shape)
+            sized(
+                Image(uiImage: tile)
+                    .resizable()
+                    // Without this the image is tone-mapped to SDR and the
+                    // whole exercise is a slightly bright capsule.
+                    .allowedDynamicRange(.high)
+            )
+            // The tile is a plain square, so the slot's shape comes from here
+            // rather than from anything baked into the image.
+            .clipShape(shape)
         } else {
-            shape
-                .fill(GlowPalette.color)
-                .frame(width: size.width, height: size.height)
+            sized(shape.fill(GlowPalette.color))
+        }
+    }
+
+    @ViewBuilder
+    private func sized(_ content: some View) -> some View {
+        if fillsWidth {
+            content.frame(maxWidth: .infinity).frame(height: size.height)
+        } else {
+            content.frame(width: size.width, height: size.height)
         }
     }
 }
