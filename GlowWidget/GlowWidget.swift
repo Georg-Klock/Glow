@@ -73,10 +73,10 @@ struct WeekProvider: TimelineProvider {
     /// The window stays at 60s deliberately. Entries are cheap and the reload
     /// at the end of the window is what costs refresh budget, so sampling finer
     /// buys smoothness for free; shortening the window would not.
-    private static let breathStep: TimeInterval = 0.25
+    private static let breathStep: TimeInterval = 1
     private static let breathWindow: TimeInterval = 60
     /// Seconds for a full down-and-up cycle.
-    private static let breathCycle: Double = 1
+    private static let breathCycle: Double = 2
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<WeekEntry>) -> Void) {
         let base = loadEntry()
