@@ -193,9 +193,22 @@ static snapshot; animated GIF and APNG do not animate in a widget. The only
 self-updating widget primitives are `Text(timerInterval:)` and
 `ProgressView(timerInterval:)`, and neither can drive opacity.
 
-If motion in the widget is ever wanted again, the honest shape is a short burst
-after a tap: an `AppIntent` already reloads the timeline, so a few seconds of
-entries after an interaction costs a reload that is being spent anyway.
+### The tap burst
+
+Motion in the widget is affordable in exactly one place: after a tap. The
+`AppIntent` already writes to the store and asks WidgetKit for a new timeline,
+so a second's worth of entries can ride inside the timeline that reload
+produces. It spends nothing extra.
+
+`WidgetBurst` is the note the intent leaves for the provider — which habit, and
+when. The provider turns that into ten frames at 10fps and then one settled
+entry, animating the same direction the app does: the solid fill rises over a
+glow that never changes, after a 0.2s hold. Only completing animates.
+Un-completing is a correction and should not be celebrated.
+
+The note expires. Without that, a midnight rollover or an edit made in the app
+would replay somebody's last tap hours later, and there is a test for exactly
+that. Reduce Motion skips the burst and renders the settled frame.
 
 ## When the glow will not appear
 

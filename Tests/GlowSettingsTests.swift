@@ -61,3 +61,57 @@ struct GlowSettingsTests {
         #expect(headroom <= 1.05, "\"off\" still encodes \(headroom)x of headroom")
     }
 }
+
+@Suite("Widget tap burst")
+struct WidgetBurstTests {
+    @Test("The glow is held before the fill starts rising")
+    func holdBeforeFade() {
+        // Completion should read as an event, not as the light going out, so
+        // coverage stays at zero through the hold.
+        #expect(WidgetBurst.coverage(at: 0) == 0)
+        #expect(WidgetBurst.coverage(at: WidgetBurst.hold - 0.01) == 0)
+        #expect(WidgetBurst.coverage(at: WidgetBurst.hold + 0.01) > 0)
+    }
+
+    @Test("Coverage rises to fully covered and never past it")
+    func coverageRange() {
+        #expect(WidgetBurst.coverage(at: WidgetBurst.duration) == 1)
+        #expect(WidgetBurst.coverage(at: WidgetBurst.duration * 5) == 1)
+        for step in stride(from: 0.0, through: WidgetBurst.duration, by: 0.05) {
+            let c = WidgetBurst.coverage(at: step)
+            #expect(c >= 0 && c <= 1, "coverage \(c) out of range at \(step)")
+        }
+    }
+
+    @Test("Coverage only ever increases")
+    func monotonic() {
+        var previous = -1.0
+        for step in stride(from: 0.0, through: WidgetBurst.duration, by: 0.05) {
+            let c = WidgetBurst.coverage(at: step)
+            #expect(c >= previous, "coverage went backwards at \(step)")
+            previous = c
+        }
+    }
+
+    @Test("A stale tap does not replay")
+    func burstExpires() {
+        // Otherwise a midnight rollover, or an edit made in the app, would
+        // re-animate somebody's last tap hours after they made it.
+        let id = UUID()
+        let started = Date()
+        WidgetBurst.record(habitID: id, at: started)
+
+        #expect(WidgetBurst.pending(now: started.addingTimeInterval(0.1))?.habitID == id)
+        #expect(WidgetBurst.pending(now: started.addingTimeInterval(WidgetBurst.duration + 1)) == nil)
+        #expect(WidgetBurst.pending(now: started.addingTimeInterval(3600)) == nil)
+    }
+
+    @Test("The burst fits inside one timeline, so it spends no extra reloads")
+    func burstIsCheap() {
+        // The whole point: a tap already costs a reload, and the animation
+        // rides inside the timeline that reload produces.
+        let frames = Int(WidgetBurst.duration / WidgetBurst.step)
+        #expect(frames <= 15, "\(frames) frames is more timeline than a second of animation needs")
+        #expect(WidgetBurst.duration <= 1.5)
+    }
+}

@@ -34,7 +34,13 @@ struct ToggleHabitIntent: AppIntent {
         let descriptor = FetchDescriptor<Habit>(predicate: #Predicate { $0.id == id })
 
         guard let habit = try context.fetch(descriptor).first else { return .result() }
-        try HabitStore(context: context).toggleCompletion(for: habit, on: Date())
+        let isNowComplete = try HabitStore(context: context).toggleCompletion(for: habit, on: Date())
+
+        // A tap already costs a timeline reload, so the completion can animate
+        // inside the timeline that reload produces. This is the note the
+        // provider reads. Only completing animates; un-completing is a
+        // correction and should not be celebrated.
+        if isNowComplete { WidgetBurst.record(habitID: id) }
 
         // The widget's own timeline is now stale by definition.
         WidgetCenter.shared.reloadAllTimelines()
