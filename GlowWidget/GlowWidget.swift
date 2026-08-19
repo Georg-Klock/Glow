@@ -63,12 +63,20 @@ struct WeekProvider: TimelineProvider {
     /// of the window is not — widgets get a limited refresh budget per day, and
     /// spending it on a pulse would leave the widget stale by evening. If the
     /// pulse works, the window length is the dial to trade against that budget.
-    /// TEMPORARY — sampled every second to match the exaggerated test breath.
-    /// Back to 2s (or coarser) once the question is answered.
-    private static let breathStep: TimeInterval = 1
+    /// TEMPORARY, still exaggerated for testing.
+    ///
+    /// One-second entries visibly pulsed on device, which is the interesting
+    /// result: WidgetKit honours entries far finer than the "one minute
+    /// minimum" this is usually described as having. So this pushes further —
+    /// quarter-second sampling on a one-second cycle.
+    ///
+    /// The window stays at 60s deliberately. Entries are cheap and the reload
+    /// at the end of the window is what costs refresh budget, so sampling finer
+    /// buys smoothness for free; shortening the window would not.
+    private static let breathStep: TimeInterval = 0.25
     private static let breathWindow: TimeInterval = 60
     /// Seconds for a full down-and-up cycle.
-    private static let breathCycle: Double = 2
+    private static let breathCycle: Double = 1
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<WeekEntry>) -> Void) {
         let base = loadEntry()
