@@ -231,6 +231,50 @@ The note expires. Without that, a midnight rollover or an edit made in the app
 would replay somebody's last tap hours later, and there is a test for exactly
 that. Reduce Motion skips the burst and renders the settled frame.
 
+**Not yet confirmed on device.** The logic is tested and the timeline is
+observed being built, but nobody has watched the burst actually animate under a
+thumb. Given what happened to the sweep, that distinction is kept.
+
+## How to see inside a widget at all
+
+A widget extension is close to unobservable: its own process, under a second of
+animation, nothing to pause, and no debugger attached in ordinary use. This cost
+more time than it should have, so the working route is written down.
+
+`log stream --device-name "<phone>"` is the documented way to read a tethered
+phone's `os_log`. **The flag no longer exists** on current macOS —
+`log: unrecognized option '--device-name'` — and there is then no live view into
+an extension at all. Console.app still has one; nothing scriptable does.
+
+So the same lines are also recorded into the App Group, and
+`Tools/pull-widget-log.sh` fetches them. Getting them back is where the
+assumptions were:
+
+| Route out of the group container | Result |
+| --- | --- |
+| `devicectl copy from --source widget-trace.log` | fails — `File paths cannot contain '..'` |
+| `devicectl copy from --source /` (whole container) | "succeeds", returns only `Library/`, silently omitting root-level files |
+| `Library/Preferences/<group>.plist` | works |
+
+The second row is the trap: a directory copy that reports success and returns an
+incomplete tree. It does not bring back `Glow.store` either, which certainly
+exists — so an empty-looking container is not evidence of an empty container,
+and briefly looked like proof the App Group had broken again.
+
+Hence the transport is the group's own `UserDefaults`. Unglamorous, and it
+arrives. `WidgetTrace` records habit IDs, entry counts and timings — never a
+habit's name, never anything anyone typed — capped at 60 lines, and nothing
+leaves the phone by itself.
+
+A still widget reads:
+
+```
+14:55:01.649  timeline: 1 entry, still (burst none pending)
+```
+
+and a tap should add the intent's write followed by a burst timeline of about
+eleven entries.
+
 ## When the glow will not appear
 
 Low Power Mode reduces the headroom iOS grants, so the tile tone-maps back to
