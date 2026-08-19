@@ -39,6 +39,7 @@ struct HabitRowView: View {
     let today: Date
     let geometry: RowGeometry
     let onToggle: (Date) -> Void
+    let onEdit: () -> Void
 
     private var slots: [Slot] {
         WeekGrid.slots(for: snapshot, in: week, today: today)
@@ -83,8 +84,16 @@ struct HabitRowView: View {
             Spacer(minLength: 0)
         }
         .frame(width: geometry.labelWidth, alignment: .leading)
-        // The slots carry the habit's name in their own labels, so reading the
-        // row aloud twice would be noise.
-        .accessibilityHidden(true)
+        // The whole label column is the edit target, not just the text. Editing
+        // used to live only behind a leftward swipe, which is discoverable if
+        // you already know it is there and invisible if you do not.
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onEdit)
+        // The slots already announce the habit's name with their own state, so
+        // this element says what it *does* rather than repeating the name on
+        // its own.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Edit \(snapshot.name)")
+        .accessibilityAddTraits(.isButton)
     }
 }

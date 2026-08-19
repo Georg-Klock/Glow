@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import WidgetKit
 
 /// Add or edit a habit. One sheet for both, since the fields are identical.
 struct HabitEditorView: View {
@@ -14,6 +15,7 @@ struct HabitEditorView: View {
     @State private var timesPerWeek = 3
 
     @FocusState private var isNameFocused: Bool
+    @State private var isConfirmingDelete = false
 
     private var isEditing: Bool { habit != nil }
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -52,6 +54,17 @@ struct HabitEditorView: View {
                         }
                     }
                 }
+
+                if isEditing {
+                    Section {
+                        Button("Delete Habit", role: .destructive) {
+                            isConfirmingDelete = true
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    } footer: {
+                        Text("Deleting a habit also removes everything logged against it.")
+                    }
+                }
             }
             .navigationTitle(isEditing ? "Edit Habit" : "New Habit")
             .navigationBarTitleDisplayMode(.inline)
@@ -66,6 +79,17 @@ struct HabitEditorView: View {
             }
         }
         .onAppear(perform: loadExisting)
+        // Destructive and irreversible: the completions cascade with it.
+        .confirmationDialog(
+            "Delete this habit?",
+            isPresented: $isConfirmingDelete,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Habit", role: .destructive, action: delete)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This also removes every day logged against it. It cannot be undone.")
+        }
     }
 
     private func loadExisting() {
@@ -84,6 +108,17 @@ struct HabitEditorView: View {
         }
     }
 
+    private func delete() {
+        guard let habit else { return }
+        do {
+            try HabitStore(context: context).delete(habit)
+            WidgetCenter.shared.reloadAllTimelines()
+            dismiss()
+        } catch {
+            HabitStore.report(error, operation: "delete")
+        }
+    }
+
     private func save() {
         let store = HabitStore(context: context)
         do {
@@ -92,6 +127,7 @@ struct HabitEditorView: View {
             } else {
                 try store.addHabit(name: trimmedName, icon: icon, frequency: frequency)
             }
+            WidgetCenter.shared.reloadAllTimelines()
             dismiss()
         } catch {
             HabitStore.report(error, operation: isEditing ? "update" : "addHabit")
