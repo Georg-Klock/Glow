@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 import WidgetKit
 
 /// The home screen widget: the same week, the same rule, one tap.
@@ -33,6 +34,10 @@ struct WeekEntry: TimelineEntry {
     let date: Date
     let week: Week
     let habits: [HabitSnapshot]
+    /// The habit whose completion is mid-animation, if any.
+    var burstHabit: UUID?
+    /// How far the solid fill has risen over the glow, 0 through 1.
+    var coverage: Double = 1
 }
 
 struct WeekProvider: TimelineProvider {
@@ -69,11 +74,42 @@ struct WeekProvider: TimelineProvider {
         // still came out, because entries are free and reloads are not. See
         // docs/glow.md.
         let entry = loadEntry()
+        let now = Date()
         let midnight = WeekCalendar.calendar.date(
-            byAdding: .day, value: 1, to: WeekCalendar.day(Date())
-        ) ?? Date().addingTimeInterval(3600)
-        completion(Timeline(entries: [entry], policy: .after(midnight)))
+            byAdding: .day, value: 1, to: WeekCalendar.day(now)
+        ) ?? now.addingTimeInterval(3600)
+
+        // A tap animates. Everything else renders still.
+        guard let burst = WidgetBurst.pending(now: now), !reduceMotion else {
+            completion(Timeline(entries: [entry], policy: .after(midnight)))
+            return
+        }
+
+        var entries: [WeekEntry] = []
+        var t = now.timeIntervalSince(burst.startedAt)
+        while t < WidgetBurst.duration {
+            entries.append(WeekEntry(
+                date: burst.startedAt.addingTimeInterval(t),
+                week: entry.week,
+                habits: entry.habits,
+                burstHabit: burst.habitID,
+                coverage: WidgetBurst.coverage(at: t)
+            ))
+            t += WidgetBurst.step
+        }
+        // Settle, and then nothing until the day turns over. The burst rides
+        // inside this one timeline, so it spends no reloads of its own.
+        entries.append(WeekEntry(
+            date: burst.startedAt.addingTimeInterval(WidgetBurst.duration),
+            week: entry.week,
+            habits: entry.habits
+        ))
+        completion(Timeline(entries: entries, policy: .after(midnight)))
     }
+
+    /// Pulsing content is what Reduce Motion exists to switch off, and an
+    /// extension can read it directly.
+    private var reduceMotion: Bool { UIAccessibility.isReduceMotionEnabled }
 
     /// Not main-actor isolated: `TimelineProvider` is called on whatever queue
     /// WidgetKit chooses, and the context created here is local to this call,

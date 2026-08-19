@@ -43,7 +43,8 @@ struct WeekWidgetView: View {
                         habit: habit,
                         week: entry.week,
                         today: entry.date,
-                        showsLabel: showsLabels
+                        showsLabel: showsLabels,
+                        burst: entry.burstHabit == habit.id ? entry.coverage : nil
                     )
                 }
                 if overflow > 0 {
@@ -62,6 +63,8 @@ private struct WidgetRow: View {
     let week: Week
     let today: Date
     let showsLabel: Bool
+    /// Non-nil while this habit's completion is animating.
+    let burst: Double?
 
     private var slots: [Slot] {
         WeekGrid.slots(for: habit, in: week, today: today)
@@ -83,7 +86,12 @@ private struct WidgetRow: View {
 
             HStack(spacing: 3) {
                 ForEach(slots) { slot in
-                    WidgetSlot(slot: slot, habitID: habit.id, habitName: habit.name)
+                    WidgetSlot(
+                        slot: slot,
+                        habitID: habit.id,
+                        habitName: habit.name,
+                        burst: slot.isTappable ? burst : nil
+                    )
                 }
             }
         }
@@ -94,6 +102,8 @@ private struct WidgetSlot: View {
     let slot: Slot
     let habitID: UUID
     let habitName: String
+    /// Set only on the slot that was just tapped.
+    let burst: Double?
 
     private var fill: AnyShapeStyle {
         switch slot.state {
@@ -122,7 +132,18 @@ private struct WidgetSlot: View {
 
     @ViewBuilder
     private var shape: some View {
-        if slot.state == .open {
+        if let burst, slot.state == .filled {
+            // The same direction as the app: the solid fill rises over a glow
+            // that never changes, rather than the glow fading out.
+            ZStack {
+                GlowImageView(size: CGSize(width: 0, height: 14), fillsWidth: true)
+                Capsule(style: .continuous)
+                    .fill(GlowPalette.filled)
+                    .frame(height: 14)
+                    .opacity(burst)
+            }
+            .frame(height: 14)
+        } else if slot.state == .open {
             // The widget glows. This is worth stating plainly because this
             // project assumed the opposite for a long time and wrote it into
             // the spec as a non-goal: WidgetKit renders out-of-process and
