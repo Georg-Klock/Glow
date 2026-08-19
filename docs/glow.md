@@ -193,6 +193,27 @@ static snapshot; animated GIF and APNG do not animate in a widget. The only
 self-updating widget primitives are `Text(timerInterval:)` and
 `ProgressView(timerInterval:)`, and neither can drive opacity.
 
+### What does not work: a masked `ProgressView` sweep
+
+`ProgressView(timerInterval:)` and `Text(timerInterval:)` are the only two views
+the system keeps animating inside a widget without a timeline entry per frame.
+That makes them the obvious candidates for free motion: use one as a *mask* and
+the thing it reveals appears to move on its own, one entry per cycle instead of
+one per frame.
+
+Built and tried on device: a white capsule masked by a linear
+`ProgressView(timerInterval:)`, `plusLighter` over the lit slot. **Nothing
+moved.** The glow rendered normally and the sweep never appeared.
+
+It was deliberately built as an overlay rather than a replacement, so the
+failure mode was "no sweep" rather than "invisible slot" — worth doing for any
+effect resting on an uncertain rendering behaviour.
+
+What this does **not** distinguish is whether `ProgressView(timerInterval:)`
+fails to animate in a widget at all, or whether it animates but not once it is
+inside a `.mask`. Rendering one visibly, unmasked, would settle that in one
+build. Nobody has needed the answer enough to spend it yet.
+
 ### The tap burst
 
 Motion in the widget is affordable in exactly one place: after a tap. The

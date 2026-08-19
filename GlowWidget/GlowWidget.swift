@@ -111,6 +111,7 @@ struct WeekProvider: TimelineProvider {
     /// extension can read it directly.
     private var reduceMotion: Bool { UIAccessibility.isReduceMotionEnabled }
 
+
     /// Not main-actor isolated: `TimelineProvider` is called on whatever queue
     /// WidgetKit chooses, and the context created here is local to this call,
     /// so it never crosses a boundary.
