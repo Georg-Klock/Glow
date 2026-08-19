@@ -43,22 +43,13 @@ struct WeekWidgetView: View {
                         habit: habit,
                         week: entry.week,
                         today: entry.date,
-                        showsLabel: showsLabels,
-                        phase: entry.phase
+                        showsLabel: showsLabels
                     )
                 }
                 if overflow > 0 {
                     Text("+\(overflow) more")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
-                }
-                if WidgetSlot.diagnosticPink {
-                    // The entry's own timestamp. If these seconds advance, the
-                    // system is rendering the sub-minute entries; if they jump
-                    // by minutes, it is not, and the pulse is an illusion.
-                    Text(entry.date, format: .dateTime.minute().second())
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(Color(red: 1.0, green: 0.25, blue: 0.65))
                 }
                 Spacer(minLength: 0)
             }
@@ -71,7 +62,6 @@ private struct WidgetRow: View {
     let week: Week
     let today: Date
     let showsLabel: Bool
-    let phase: Double
 
     private var slots: [Slot] {
         WeekGrid.slots(for: habit, in: week, today: today)
@@ -93,7 +83,7 @@ private struct WidgetRow: View {
 
             HStack(spacing: 3) {
                 ForEach(slots) { slot in
-                    WidgetSlot(slot: slot, habitID: habit.id, habitName: habit.name, phase: phase)
+                    WidgetSlot(slot: slot, habitID: habit.id, habitName: habit.name)
                 }
             }
         }
@@ -104,7 +94,6 @@ private struct WidgetSlot: View {
     let slot: Slot
     let habitID: UUID
     let habitName: String
-    let phase: Double
 
     private var fill: AnyShapeStyle {
         switch slot.state {
@@ -131,21 +120,9 @@ private struct WidgetSlot: View {
         }
     }
 
-    /// TEMPORARY DIAGNOSTIC. Pink, and driven by nothing but the timeline
-    /// phase, so "did WidgetKit render this entry" is answerable at a glance
-    /// instead of by squinting at a subtle glow. Remove with the rest of the
-    /// exaggerated breathing.
-    static let diagnosticPink = true
-
     @ViewBuilder
     private var shape: some View {
-        if slot.state == .open && Self.diagnosticPink {
-            Capsule(style: .continuous)
-                .fill(Color(red: 1.0, green: 0.25, blue: 0.65))
-                .frame(height: 14)
-                .shadow(color: Color(red: 1.0, green: 0.25, blue: 0.65).opacity(0.9), radius: 6)
-                .opacity(phase)
-        } else if slot.state == .open {
+        if slot.state == .open {
             // The widget glows. This is worth stating plainly because this
             // project assumed the opposite for a long time and wrote it into
             // the spec as a non-goal: WidgetKit renders out-of-process and
@@ -154,7 +131,7 @@ private struct WidgetSlot: View {
             //
             // fillsWidth because the widget's slots are distributed by the
             // HStack; pinning a width here would fight the layout.
-            GlowImageView(size: CGSize(width: 0, height: 14), fillsWidth: true, phase: phase)
+            GlowImageView(size: CGSize(width: 0, height: 14), fillsWidth: true)
         } else {
             Capsule(style: .continuous)
                 .fill(fill)

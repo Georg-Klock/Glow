@@ -153,6 +153,11 @@ Today's slot is a button backed by an `AppIntent`, so a habit can be logged from
 the home screen without launching the app. Past days are not buttons, which is
 R2 holding in a second process.
 
+The widget glows but does not breathe. The pulse was built, measured working
+(WidgetKit renders sub-minute entries, contrary to its reputation), and removed:
+it costs the day's entire refresh allowance, and a stale widget is worse than a
+still one. See docs/glow.md.
+
 The store therefore lives in the App Group container rather than the app's
 private one, and `StoreLocation` migrates a pre-widget store into it on first
 launch. Without the App Group entitlement the app falls back to its own
