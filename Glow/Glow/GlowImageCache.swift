@@ -65,6 +65,11 @@ struct GlowImageView: View {
     /// are measured by `SlotLayout` and want a fixed width, but the widget's
     /// are distributed by an HStack and must not be pinned.
     var fillsWidth = false
+    /// When set, the caller drives the breath instead of the view animating
+    /// itself. A widget cannot run a continuous animation — it renders a
+    /// snapshot per timeline entry — so the widget supplies a phase per entry
+    /// and gets its breathing that way.
+    var phase: Double?
 
     @AppStorage(GlowSettings.key, store: GlowSettings.store)
     private var peak: Double = GlowSettings.defaultValue
@@ -76,8 +81,9 @@ struct GlowImageView: View {
     /// The lit slot breathes: opacity easing between these, forever, on the
     /// glowing layer only. Slow and shallow on purpose — the point is to catch
     /// the eye in peripheral vision, not to blink at someone.
-    private static let breathLow = 0.85
-    private static let breathPeriod: Double = 2.4
+    static let breathLow = 0.85
+    /// Half a breath: in and out is twice this.
+    private static let breathPeriod: Double = 1.2
 
     private var shape: Capsule { Capsule(style: .continuous) }
     private var haloRadius: CGFloat {
@@ -99,14 +105,14 @@ struct GlowImageView: View {
         }
         // The whole glowing layer breathes together, so the halo and the core
         // never drift out of step.
-        .opacity(isBreathing ? 1.0 : Self.breathLow)
+        .opacity(phase ?? (isBreathing ? 1.0 : Self.breathLow))
         .animation(
-            reduceMotion
+            (reduceMotion || phase != nil)
                 ? nil
                 : .easeInOut(duration: Self.breathPeriod).repeatForever(autoreverses: true),
             value: isBreathing
         )
-        .onAppear { if !reduceMotion { isBreathing = true } }
+        .onAppear { if !reduceMotion && phase == nil { isBreathing = true } }
         .accessibilityHidden(true)
     }
 

@@ -43,7 +43,8 @@ struct WeekWidgetView: View {
                         habit: habit,
                         week: entry.week,
                         today: entry.date,
-                        showsLabel: showsLabels
+                        showsLabel: showsLabels,
+                        phase: entry.phase
                     )
                 }
                 if overflow > 0 {
@@ -62,6 +63,7 @@ private struct WidgetRow: View {
     let week: Week
     let today: Date
     let showsLabel: Bool
+    let phase: Double
 
     private var slots: [Slot] {
         WeekGrid.slots(for: habit, in: week, today: today)
@@ -83,7 +85,7 @@ private struct WidgetRow: View {
 
             HStack(spacing: 3) {
                 ForEach(slots) { slot in
-                    WidgetSlot(slot: slot, habitID: habit.id, habitName: habit.name)
+                    WidgetSlot(slot: slot, habitID: habit.id, habitName: habit.name, phase: phase)
                 }
             }
         }
@@ -94,6 +96,7 @@ private struct WidgetSlot: View {
     let slot: Slot
     let habitID: UUID
     let habitName: String
+    let phase: Double
 
     private var fill: AnyShapeStyle {
         switch slot.state {
@@ -131,7 +134,7 @@ private struct WidgetSlot: View {
             //
             // fillsWidth because the widget's slots are distributed by the
             // HStack; pinning a width here would fight the layout.
-            GlowImageView(size: CGSize(width: 0, height: 14), fillsWidth: true)
+            GlowImageView(size: CGSize(width: 0, height: 14), fillsWidth: true, phase: phase)
         } else {
             Capsule(style: .continuous)
                 .fill(fill)
