@@ -88,7 +88,7 @@ struct GlowImageView: View {
     /// 0.85 / 1.2 once that question is answered.
     static let breathLow = 0.5
     /// Half a breath: in and out is twice this.
-    private static let breathPeriod: Double = 1.0
+    private static let breathPeriod: Double = 0.5
 
     private var shape: Capsule { Capsule(style: .continuous) }
     private var haloRadius: CGFloat {
