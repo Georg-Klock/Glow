@@ -231,9 +231,28 @@ The note expires. Without that, a midnight rollover or an edit made in the app
 would replay somebody's last tap hours later, and there is a test for exactly
 that. Reduce Motion skips the burst and renders the settled frame.
 
-**Not yet confirmed on device.** The logic is tested and the timeline is
-observed being built, but nobody has watched the burst actually animate under a
-thumb. Given what happened to the sweep, that distinction is kept.
+**The provider half is confirmed on device.** The note expires after one second,
+which raised an obvious way for this to be quietly broken: if WidgetKit takes
+longer than that to call the provider, the burst is always gone before it is
+read and the widget renders still no matter how correct the logic is. It does
+not. Measured on an iPhone 14 Pro, driving the burst from a tethered Mac with
+`-glow-force-burst`:
+
+```
+15:10:04.342  forced burst for 87EC9E01-…-55D71E196D3D, reloading
+15:10:04.399  timeline: 11 entries, burst 87EC9E01-…-55D71E196D3D starting 0.06s in
+```
+
+**57ms** from the write to the provider being called, and the full eleven-entry
+burst timeline built. Reload latency is not the problem, and the expiry window
+has fifteen times the margin it needs.
+
+**What is still unconfirmed is the rendering.** Nobody has watched the burst
+animate under a thumb, and "the timeline was built" is exactly the kind of
+evidence the masked `ProgressView` sweep also had. If a real tap produces these
+two lines and nothing visibly moves, the failure is WidgetKit declining to
+render sub-second entries during a burst, and the burst comes out the same way
+the sweep did.
 
 ## How to see inside a widget at all
 
