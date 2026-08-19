@@ -79,11 +79,16 @@ struct GlowImageView: View {
     @State private var isBreathing = false
 
     /// The lit slot breathes: opacity easing between these, forever, on the
-    /// glowing layer only. Slow and shallow on purpose — the point is to catch
-    /// the eye in peripheral vision, not to blink at someone.
-    static let breathLow = 0.85
+    /// glowing layer only.
+    ///
+    /// TEMPORARY — EXAGGERATED FOR TESTING. The intended values are a shallow
+    /// 0.85 low over 1.2s, subtle enough to catch peripheral vision without
+    /// blinking at anyone. These are turned up to make the effect unmistakable
+    /// while checking whether the widget pulses at all. Put them back to
+    /// 0.85 / 1.2 once that question is answered.
+    static let breathLow = 0.5
     /// Half a breath: in and out is twice this.
-    private static let breathPeriod: Double = 1.2
+    private static let breathPeriod: Double = 1.0
 
     private var shape: Capsule { Capsule(style: .continuous) }
     private var haloRadius: CGFloat {

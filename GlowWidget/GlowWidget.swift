@@ -63,8 +63,12 @@ struct WeekProvider: TimelineProvider {
     /// of the window is not — widgets get a limited refresh budget per day, and
     /// spending it on a pulse would leave the widget stale by evening. If the
     /// pulse works, the window length is the dial to trade against that budget.
-    private static let breathStep: TimeInterval = 2
+    /// TEMPORARY — sampled every second to match the exaggerated test breath.
+    /// Back to 2s (or coarser) once the question is answered.
+    private static let breathStep: TimeInterval = 1
     private static let breathWindow: TimeInterval = 60
+    /// Seconds for a full down-and-up cycle.
+    private static let breathCycle: Double = 2
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<WeekEntry>) -> Void) {
         let base = loadEntry()
@@ -92,7 +96,7 @@ struct WeekProvider: TimelineProvider {
             let t = Double(step) * Self.breathStep
             // A cosine gives the same ease-in-out shape the app animates with,
             // sampled rather than interpolated.
-            let curve = (cos(t / 2.4 * 2 * .pi) + 1) / 2
+            let curve = (cos(t / Self.breathCycle * 2 * .pi) + 1) / 2
             let phase = GlowImageView.breathLow + (1.0 - GlowImageView.breathLow) * curve
             entries.append(WeekEntry(
                 date: now.addingTimeInterval(t),
