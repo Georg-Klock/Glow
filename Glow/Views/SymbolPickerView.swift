@@ -19,6 +19,9 @@ struct SymbolPickerView: View {
     }
 
     private let columns = [GridItem(.adaptive(minimum: 52), spacing: 10)]
+    /// Tighter and chrome-free, like the emoji keyboard: glyphs sit next to
+    /// each other rather than each in its own tile.
+    private let emojiColumns = [GridItem(.adaptive(minimum: 44), spacing: 4)]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -93,18 +96,26 @@ struct SymbolPickerView: View {
     @ViewBuilder
     private var emojiContent: some View {
         if query.isEmpty {
-            LazyVStack(alignment: .leading, spacing: 20, pinnedViews: [.sectionHeaders]) {
-                ForEach(HabitEmoji.groups) { group in
+            LazyVStack(alignment: .leading, spacing: 14, pinnedViews: [.sectionHeaders]) {
+                // The habit-relevant ones first, since this is a habit tracker
+                // and nobody opens this screen looking for a flag.
+                Section {
+                    emojiGrid(HabitEmoji.suggested.map { ($0.emoji, $0.name) })
+                } header: {
+                    header("Suggested", systemImage: nil)
+                }
+                ForEach(HabitEmoji.categories) { category in
                     Section {
-                        emojiGrid(group.icons)
+                        emojiGrid(category.emoji.map { ($0.glyph, $0.name) })
                     } header: {
-                        header(group.title, systemImage: nil)
+                        header(category.title, systemImage: nil)
                     }
                 }
             }
             .padding(.vertical, 8)
         } else {
-            let results = HabitEmoji.search(query)
+            // Search spans everything, matched on the Unicode name.
+            let results = HabitEmoji.searchAll(query).map { ($0.glyph, $0.name) }
             if results.isEmpty {
                 ContentUnavailableView.search(text: query).padding(.top, 60)
             } else {
@@ -113,17 +124,29 @@ struct SymbolPickerView: View {
         }
     }
 
-    private func emojiGrid(_ icons: [HabitEmoji.Icon]) -> some View {
-        LazyVGrid(columns: columns, spacing: 10) {
-            ForEach(icons) { icon in
-                tile(isSelected: selection == icon.emoji) { selection = icon.emoji } content: {
-                    Text(icon.emoji).font(.system(size: 26))
+    private func emojiGrid(_ items: [(glyph: String, name: String)]) -> some View {
+        LazyVGrid(columns: emojiColumns, spacing: 4) {
+            ForEach(items, id: \.glyph) { item in
+                Button {
+                    selection = item.glyph
+                    dismiss()
+                } label: {
+                    Text(item.glyph)
+                        .font(.system(size: 30))
+                        .frame(width: 44, height: 44)
+                        .background {
+                            // Only the selected glyph gets any chrome at all.
+                            if selection == item.glyph {
+                                Circle().fill(GlowPalette.color.opacity(0.28))
+                            }
+                        }
                 }
-                .accessibilityLabel(icon.name)
-                .accessibilityAddTraits(selection == icon.emoji ? [.isSelected, .isButton] : .isButton)
+                .buttonStyle(.plain)
+                .accessibilityLabel(item.name)
+                .accessibilityAddTraits(selection == item.glyph ? [.isSelected, .isButton] : .isButton)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 12)
     }
 
     // MARK: - Shared

@@ -135,6 +135,27 @@ but a build. It glows. Measured on an iPhone 14 Pro, iOS 26.
 The lesson is the same one this file already records twice: the assumption was
 load-bearing, cheap to check, and wrong. Check the cheap ones.
 
+## The breathing
+
+The lit slot pulses: the glowing layer's opacity eases between 0.85 and 1.0 and
+back, forever, over 2.4 seconds. Core and halo breathe together, so the two
+never drift out of step.
+
+It is deliberately shallow and slow. The job is to catch the eye in peripheral
+vision, not to blink at anyone, and a pulse this subtle is the difference
+between "something here is live" and a notification badge.
+
+**Reduce Motion switches it off entirely.** Oscillating content is exactly what
+that setting exists for, and an app whose only signal is a glowing shape has to
+survive the glow standing still.
+
+One caveat worth watching: this animates opacity on the HDR layer, which is the
+thing `SlotView`'s completion transition deliberately avoids doing — the concern
+being that a compositor may flatten an animated HDR layer into an SDR buffer.
+Verified as animating (frame captures show the halo's luminance rising and
+falling smoothly), but whether the HDR survives the animation on device is a
+question only a real screen answers.
+
 ## When the glow will not appear
 
 Low Power Mode reduces the headroom iOS grants, so the tile tone-maps back to
