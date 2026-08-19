@@ -69,6 +69,16 @@ struct GlowImageView: View {
     @AppStorage(GlowSettings.key, store: GlowSettings.store)
     private var peak: Double = GlowSettings.defaultValue
 
+    /// Pulsing content is exactly what Reduce Motion exists to switch off.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isBreathing = false
+
+    /// The lit slot breathes: opacity easing between these, forever, on the
+    /// glowing layer only. Slow and shallow on purpose — the point is to catch
+    /// the eye in peripheral vision, not to blink at someone.
+    private static let breathLow = 0.85
+    private static let breathPeriod: Double = 2.4
+
     private var shape: Capsule { Capsule(style: .continuous) }
     private var haloRadius: CGFloat {
         size.height * GlowPalette.haloRadius * CGFloat(GlowSettings.haloScale(for: peak))
@@ -87,6 +97,16 @@ struct GlowImageView: View {
 
             core
         }
+        // The whole glowing layer breathes together, so the halo and the core
+        // never drift out of step.
+        .opacity(isBreathing ? 1.0 : Self.breathLow)
+        .animation(
+            reduceMotion
+                ? nil
+                : .easeInOut(duration: Self.breathPeriod).repeatForever(autoreverses: true),
+            value: isBreathing
+        )
+        .onAppear { if !reduceMotion { isBreathing = true } }
         .accessibilityHidden(true)
     }
 

@@ -106,7 +106,9 @@ Every slot is in exactly one of three states.
 1. **Inactive.** Not completed and not actionable today. Flat grey, no glow.
    Also the resting look of unfilled pills.
 2. **Open.** Today's slot, not yet completed. The HDR glow, drawn over the
-   empty track. The only steadily glowing state.
+   empty track. The only glowing state, and it breathes: the glowing layer eases
+   between 85% and 100% opacity and back, over 2.4 seconds, forever. Reduce
+   Motion switches the pulse off and leaves the glow steady.
 3. **Filled.** Completed. Solid colour, no glow once the animation settles.
 
 **Completion transition.** On tap the slot holds the glow for ~200ms, then the
