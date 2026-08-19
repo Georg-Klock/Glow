@@ -15,13 +15,24 @@ struct WeeklyGridView: View {
     @State private var today = WeekCalendar.day(Date())
     @State private var editingHabit: Habit?
     @State private var isAddingHabit = false
+    @State private var isShowingSettings = false
+    @State private var isShowingLowPowerNotice = false
+    @State private var lowPower = LowPowerMonitor()
+    /// Survives relaunches, so the notice appears once per time Low Power Mode
+    /// is switched on rather than once per launch.
+    @AppStorage("didAnnounceLowPower") private var didAnnounceLowPower = false
 
     private var week: Week { WeekCalendar.week(containing: today) }
     private var store: HabitStore { HabitStore(context: context) }
 
     var body: some View {
         NavigationStack {
-            Group {
+            VStack(spacing: 0) {
+                if lowPower.isLowPowerMode {
+                    LowPowerBanner { isShowingLowPowerNotice = true }
+                        .padding(.horizontal, GridMetrics.horizontalPadding)
+                        .padding(.bottom, 10)
+                }
                 if habits.isEmpty {
                     emptyState
                 } else {
@@ -36,7 +47,10 @@ struct WeeklyGridView: View {
                         EditButton()
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button("Settings", systemImage: "gearshape") {
+                        isShowingSettings = true
+                    }
                     Button("Add habit", systemImage: "plus") {
                         isAddingHabit = true
                     }
@@ -49,6 +63,19 @@ struct WeeklyGridView: View {
         .sheet(item: $editingHabit) { habit in
             HabitEditorView(habit: habit)
         }
+        .sheet(isPresented: $isShowingSettings) {
+            SettingsView()
+        }
+        .sheet(isPresented: $isShowingLowPowerNotice) {
+            LowPowerNoticeView(headroom: lowPower.currentHeadroom)
+        }
+        // Announce it once per activation, then leave the banner to carry it.
+        // Re-presenting on every launch would be nagging about a condition the
+        // user chose on purpose; never presenting when the app is launched
+        // already in Low Power Mode would mean the explanation only ever
+        // reaches people who happened to have the app open at the time.
+        .onChange(of: lowPower.isLowPowerMode) { _, _ in announceLowPowerIfNeeded() }
+        .task { announceLowPowerIfNeeded() }
         // The open slot is defined as "today", so the screen has to notice when
         // today changes. Both paths matter: the notification covers the app
         // being open across midnight, the scene phase covers it being resumed
@@ -57,7 +84,11 @@ struct WeeklyGridView: View {
             refreshToday()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { refreshToday() }
+            if phase == .active {
+                refreshToday()
+                // The power-state notification does not arrive while suspended.
+                lowPower.refresh()
+            }
         }
         .task { seedIfNeeded() }
     }
@@ -141,6 +172,17 @@ struct WeeklyGridView: View {
             if added > 0 { WidgetCenter.shared.reloadAllTimelines() }
         } catch {
             HabitStore.report(error, operation: "seedDefaults")
+        }
+    }
+
+    private func announceLowPowerIfNeeded() {
+        if lowPower.isLowPowerMode {
+            if !didAnnounceLowPower {
+                didAnnounceLowPower = true
+                isShowingLowPowerNotice = true
+            }
+        } else {
+            didAnnounceLowPower = false
         }
     }
 

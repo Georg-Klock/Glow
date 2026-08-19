@@ -104,10 +104,30 @@ dramatic outdoors and subtle in a dim room.
 
 ## Tuning
 
+`peakHeadroom` is a user setting now, not a constant: Settings has a slider over
+1x to 12x, stored in the App Group so the widget's halo scales with it too. The
+default is 6x.
+
 | Property | Default | Effect |
 | --- | --- | --- |
-| `peakHeadroom` | 6.0 | How far above SDR white the glow peaks |
+| `peakHeadroom` | 6.0, user-set | How far above SDR white the glow peaks |
 | `edgeFalloff` | 0.62 | Edge brightness relative to centre |
+| `tileSize` | 16 | Edge of the uniform tile, in pixels |
 
-`GlowRenderer.colorSpace` selects the container's colour space. Display P3 PQ
-measures as HDR too and is the narrower gamut of the two.
+**PQ declares headroom as a property of the container, not of the pixels in
+it.** Encoding a 1x image into PQ still produced a file reporting nearly 5x, so
+the bottom of the slider went on glowing while the UI said "Off". Below
+`sdrThreshold` the encode switches to Display P3 and the slot becomes a plain
+bright capsule. Found by a test asserting that off means off, not by looking at
+it.
+
+## When the glow will not appear
+
+Low Power Mode reduces the headroom iOS grants, so the tile tone-maps back to
+ordinary white and today's slot stops being distinguishable by brightness. The
+app watches `isLowPowerModeEnabled`, shows an amber banner for as long as it
+lasts, and explains it once per activation — quoting the live
+`currentEDRHeadroom` so the claim is checkable rather than asserted.
+
+Low Power Mode cannot be toggled in the Simulator. Launch with
+`-glow-force-low-power` to see the banner and the notice.
