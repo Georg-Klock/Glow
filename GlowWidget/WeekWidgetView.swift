@@ -52,6 +52,14 @@ struct WeekWidgetView: View {
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
+                if WidgetSlot.diagnosticPink {
+                    // The entry's own timestamp. If these seconds advance, the
+                    // system is rendering the sub-minute entries; if they jump
+                    // by minutes, it is not, and the pulse is an illusion.
+                    Text(entry.date, format: .dateTime.minute().second())
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(Color(red: 1.0, green: 0.25, blue: 0.65))
+                }
                 Spacer(minLength: 0)
             }
         }
@@ -123,9 +131,21 @@ private struct WidgetSlot: View {
         }
     }
 
+    /// TEMPORARY DIAGNOSTIC. Pink, and driven by nothing but the timeline
+    /// phase, so "did WidgetKit render this entry" is answerable at a glance
+    /// instead of by squinting at a subtle glow. Remove with the rest of the
+    /// exaggerated breathing.
+    static let diagnosticPink = true
+
     @ViewBuilder
     private var shape: some View {
-        if slot.state == .open {
+        if slot.state == .open && Self.diagnosticPink {
+            Capsule(style: .continuous)
+                .fill(Color(red: 1.0, green: 0.25, blue: 0.65))
+                .frame(height: 14)
+                .shadow(color: Color(red: 1.0, green: 0.25, blue: 0.65).opacity(0.9), radius: 6)
+                .opacity(phase)
+        } else if slot.state == .open {
             // The widget glows. This is worth stating plainly because this
             // project assumed the opposite for a long time and wrote it into
             // the spec as a non-goal: WidgetKit renders out-of-process and
