@@ -131,16 +131,41 @@ If the group container is unavailable the app falls back to its own container
 and keeps working; only the widget goes blank. That is deliberate: a missing
 entitlement should not stop the app launching.
 
-**The capability has to be registered against the App ID by Apple, and that
-cannot be done from the command line.** The project declares everything needed
-(an entitlements file per target, `CODE_SIGN_ENTITLEMENTS`, and
-`SystemCapabilities` in the target attributes), and `xcodebuild
--allowProvisioningUpdates` still signs with a wildcard profile and strips the
-entitlement without a warning. The fix is to open the project in Xcode once and
-let automatic signing register it, or to add the App Group to the App ID on the
-developer portal. Verify with:
+Getting this working took four separate fixes, each of which failed silently.
+Recorded here because every one of them presents as "the widget shows no
+habits".
 
-    codesign -d --entitlements :- <path>/Glow.app | grep application-groups
+**1. The entitlements file was empty.** xcodegen *generates* the file named by
+`entitlements.path`, so declaring a path without `properties` overwrites a
+hand-written file with an empty dict. An empty entitlements file requests
+nothing, signs cleanly against any profile, and produces no warning anywhere.
+The group is therefore declared in `project.yml` under
+`entitlements.properties`, and both generated files are gitignored.
+
+**2. Nothing had registered the App Group with Apple.** The group and two
+explicit App IDs (`com.georgklock.glow`, `com.georgklock.glow.widget`) now exist
+on the developer portal with App Groups enabled and the group assigned.
+
+**3. Automatic signing could not mint profiles.** Xcode has no Apple ID in its
+Accounts, so `-allowProvisioningUpdates` cannot talk to the portal. It never
+said so: with a wildcard profile cached on disk it silently used that instead.
+The error `No Accounts: Add a new account in Accounts settings` only appears
+once no matching profile exists at all.
+
+**4. Automatic signing preferred the wildcard.** Even with correct profiles
+installed, it kept choosing the Xcode-managed `iOS Team Provisioning Profile: *`.
+Both targets therefore use manual signing with an explicit
+`PROVISIONING_PROFILE_SPECIFIER`.
+
+The consequence: **device builds depend on two profiles existing on this
+machine**, `Glow Up Development` and `Glow Up Widget Development`. If they are
+lost, regenerate them on the developer portal (iOS App Development, the matching
+App ID, the Apple Development certificate, both devices) and drop them into
+`~/Library/Developer/Xcode/UserData/Provisioning Profiles/`. Signing into Xcode
+with the Apple ID would remove that dependency and let automatic signing work.
+
+Verify the whole chain with `Tools/check-app-group.sh`, which reports which
+profiles grant the group and whether the last device build actually carries it.
 
 ## What is deliberately absent
 
