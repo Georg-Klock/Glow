@@ -75,6 +75,8 @@ struct WeeklyGridView: View {
                             geometry: geometry
                         ) { day in
                             toggle(habit, on: day)
+                        } onEdit: {
+                            editingHabit = habit
                         }
                         .listRowInsets(EdgeInsets(
                             top: 6, leading: GridMetrics.horizontalPadding,
