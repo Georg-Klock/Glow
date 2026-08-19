@@ -42,6 +42,10 @@ struct ToggleHabitIntent: AppIntent {
         // correction and should not be celebrated.
         if isNowComplete { WidgetBurst.record(habitID: id) }
 
+        let outcome = "tap \(id.uuidString): \(isNowComplete ? "done" : "undone"), burst \(isNowComplete ? "recorded" : "skipped")"
+        GlowLog.widget.notice("\(outcome, privacy: .public)")
+        WidgetTrace.record(outcome)
+
         // The widget's own timeline is now stale by definition.
         WidgetCenter.shared.reloadAllTimelines()
         return .result()

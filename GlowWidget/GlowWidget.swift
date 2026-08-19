@@ -5,12 +5,14 @@ import WidgetKit
 
 /// The home screen widget: the same week, the same rule, one tap.
 ///
-/// It cannot glow. WidgetKit renders in a separate process and archives the
-/// result, and that pipeline does not carry HDR, so today's open slot is drawn
-/// in flat bright colour instead. This was called out as a non-goal in the spec
-/// before the widget existed, and it still holds: the real glow lives in the
-/// app. What the widget keeps is the part that matters daily, which is being
-/// able to log a habit without opening anything.
+/// It glows. That was written off as impossible before the widget existed —
+/// WidgetKit renders in a separate process and archives the result, so the
+/// pipeline was assumed to flatten HDR — and the assumption was never tested.
+/// It draws the same PQ image the app does, on the same headroom. See
+/// docs/glow.md.
+///
+/// What it keeps beyond that is the part that matters daily: logging a habit
+/// without opening anything.
 struct GlowWidget: Widget {
     let kind = "GlowWidget"
 
@@ -81,6 +83,9 @@ struct WeekProvider: TimelineProvider {
 
         // A tap animates. Everything else renders still.
         guard let burst = WidgetBurst.pending(now: now), !reduceMotion else {
+            let why = WidgetBurst.pending(now: now) == nil ? "none pending" : "suppressed by reduce motion"
+            GlowLog.widget.notice("timeline: 1 entry, still (burst \(why, privacy: .public))")
+            WidgetTrace.record("timeline: 1 entry, still (burst \(why))")
             completion(Timeline(entries: [entry], policy: .after(midnight)))
             return
         }
@@ -104,6 +109,10 @@ struct WeekProvider: TimelineProvider {
             week: entry.week,
             habits: entry.habits
         ))
+        let lag = String(format: "%.2f", now.timeIntervalSince(burst.startedAt))
+        let summary = "timeline: \(entries.count) entries, burst \(burst.habitID.uuidString) starting \(lag)s in"
+        GlowLog.widget.notice("\(summary, privacy: .public)")
+        WidgetTrace.record(summary)
         completion(Timeline(entries: entries, policy: .after(midnight)))
     }
 
