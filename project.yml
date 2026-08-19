@@ -26,8 +26,16 @@ targets:
     configFiles:
       Debug: Signing.xcconfig
       Release: Signing.xcconfig
+    # The group must be declared here, not in a hand-written file. xcodegen
+    # GENERATES the file at `path`, so a path with no `properties` silently
+    # overwrites it with an empty dict, and an empty entitlements file requests
+    # nothing, signs cleanly against any profile, and leaves the widget unable
+    # to see the store.
     entitlements:
       path: Glow/Glow.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.georgklock.glow
     # Tells Xcode's automatic signing that this target needs the App Groups
     # capability registered against the App ID. Without it the entitlements
     # file is compiled in but codesign strips it, because the wildcard profile
@@ -46,7 +54,15 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"
-        CODE_SIGN_STYLE: Automatic
+        # Manual signing, deliberately. Automatic signing needs an Apple ID in
+        # Xcode's Accounts to mint profiles; without one it silently falls back
+        # to the team's wildcard profile, which does not grant the App Group, and
+        # codesign then strips the entitlement with no warning. These profiles
+        # were generated on the developer portal and grant it. See
+        # docs/ARCHITECTURE.md.
+        CODE_SIGN_STYLE: Manual
+        PROVISIONING_PROFILE_SPECIFIER: Glow Up Development
+        CODE_SIGN_IDENTITY: Apple Development
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
@@ -73,6 +89,9 @@ targets:
       Release: Signing.xcconfig
     entitlements:
       path: GlowWidget/GlowWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.georgklock.glow
     # Tells Xcode's automatic signing that this target needs the App Groups
     # capability registered against the App ID. Without it the entitlements
     # file is compiled in but codesign strips it, because the wildcard profile
@@ -99,7 +118,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.georgklock.glow.widget
         PRODUCT_NAME: GlowWidget
-        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_STYLE: Manual
+        PROVISIONING_PROFILE_SPECIFIER: Glow Up Widget Development
+        CODE_SIGN_IDENTITY: Apple Development
         SKIP_INSTALL: YES
     dependencies:
       - sdk: WidgetKit.framework
