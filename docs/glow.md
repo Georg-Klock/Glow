@@ -156,24 +156,46 @@ slot still reads as HDR while breathing. That theory can now be retired for the
 opacity case, though the completion transition keeps its approach, which is
 correct for its own reasons.
 
-### Breathing in the widget
+### Breathing in the widget: measured, then removed
 
-A widget cannot run a continuous animation. WidgetKit renders one snapshot per
-timeline entry, out of process, so `repeatForever` has nothing to repeat in.
+A widget cannot run a continuous animation — WidgetKit renders one snapshot per
+timeline entry, out of process, so `repeatForever` has nothing to repeat in. The
+breath was therefore baked into the timeline: entries a second apart, each
+carrying the next point on the curve.
 
-The breath is therefore baked into the timeline: entries every two seconds for a
-minute, each carrying the next point on the same cosine curve the app eases
-along, with `GlowImageView.phase` overriding the view's own animation. The
-timeline collapses to a single entry when no slot is open, because a still image
-should not spend anything.
+**It worked, and that is the surprising part.** WidgetKit is widely described as
+having a one-minute floor on timeline entries. It does not behave that way:
+printing each entry's own timestamp in the widget showed the seconds advancing
+in step with the pulse, on an iPhone 14 Pro running iOS 26. Entries far finer
+than a minute are rendered.
 
-**This is an experiment with a real cost.** Timeline entries are free, but the
-reload at the end of the window is not: widgets get a limited number of refreshes
-per day, and a one-minute window spends them fast enough to leave the widget
-stale by evening. The open question is whether WidgetKit honours sub-minute
-entries at all — if it does, the window length is the dial to trade smoothness
-against that budget; if it does not, the widget simply will not pulse and the
-mechanism should be removed rather than tuned.
+It came out anyway, because entries are free and **reloads** are not. A widget
+gets roughly 40-70 timeline reloads per day, adaptively — more if you look at it
+often, fewer in Low Power Mode. Only regenerating the timeline spends that
+budget; the entries inside one are free. So the window length is the whole cost:
+
+| Window | Reloads/day | Entries per timeline | |
+| --- | --- | --- | --- |
+| 60s | 1,440 | 60 | far over budget |
+| 5 min | 288 | 300 | over budget |
+| 30 min | 48 | 1,800 | fits, but a 1,800-entry timeline is fragile |
+
+Breathing continuously for a whole day at 1s would need 86,400 entries.
+
+The 30-minute shape is the only version that fits, and it trades the entire
+day's refresh allowance for a pulse nobody is watching most of the time — while
+risking the system truncating a timeline that large. A widget that is *stale* is
+worse than one that does not breathe, so the widget keeps a steady glow and the
+breathing stays in the app, where there is a real run loop.
+
+**An animated GIF is not a way around this.** WidgetKit renders SwiftUI to a
+static snapshot; animated GIF and APNG do not animate in a widget. The only
+self-updating widget primitives are `Text(timerInterval:)` and
+`ProgressView(timerInterval:)`, and neither can drive opacity.
+
+If motion in the widget is ever wanted again, the honest shape is a short burst
+after a tap: an `AppIntent` already reloads the timeline, so a few seconds of
+entries after an interaction costs a reload that is being spent anyway.
 
 ## When the glow will not appear
 
