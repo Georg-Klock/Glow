@@ -138,23 +138,42 @@ load-bearing, cheap to check, and wrong. Check the cheap ones.
 ## The breathing
 
 The lit slot pulses: the glowing layer's opacity eases between 0.85 and 1.0 and
-back, forever, over 2.4 seconds. Core and halo breathe together, so the two
+back, forever, over 1.2 seconds each way. Core and halo breathe together, so the two
 never drift out of step.
 
-It is deliberately shallow and slow. The job is to catch the eye in peripheral
-vision, not to blink at anyone, and a pulse this subtle is the difference
-between "something here is live" and a notification badge.
+It is deliberately shallow. The job is to catch the eye in peripheral vision,
+not to blink at anyone, and a pulse this subtle is the difference between
+"something here is live" and a notification badge.
 
 **Reduce Motion switches it off entirely.** Oscillating content is exactly what
 that setting exists for, and an app whose only signal is a glowing shape has to
 survive the glow standing still.
 
-One caveat worth watching: this animates opacity on the HDR layer, which is the
-thing `SlotView`'s completion transition deliberately avoids doing — the concern
-being that a compositor may flatten an animated HDR layer into an SDR buffer.
-Verified as animating (frame captures show the halo's luminance rising and
-falling smoothly), but whether the HDR survives the animation on device is a
-question only a real screen answers.
+Animating opacity on the HDR layer is the thing `SlotView`'s completion
+transition deliberately avoids, on the theory that a compositor might flatten an
+animated HDR layer into SDR. **It does not.** Confirmed on an iPhone 14 Pro: the
+slot still reads as HDR while breathing. That theory can now be retired for the
+opacity case, though the completion transition keeps its approach, which is
+correct for its own reasons.
+
+### Breathing in the widget
+
+A widget cannot run a continuous animation. WidgetKit renders one snapshot per
+timeline entry, out of process, so `repeatForever` has nothing to repeat in.
+
+The breath is therefore baked into the timeline: entries every two seconds for a
+minute, each carrying the next point on the same cosine curve the app eases
+along, with `GlowImageView.phase` overriding the view's own animation. The
+timeline collapses to a single entry when no slot is open, because a still image
+should not spend anything.
+
+**This is an experiment with a real cost.** Timeline entries are free, but the
+reload at the end of the window is not: widgets get a limited number of refreshes
+per day, and a one-minute window spends them fast enough to leave the widget
+stale by evening. The open question is whether WidgetKit honours sub-minute
+entries at all — if it does, the window length is the dial to trade smoothness
+against that budget; if it does not, the widget simply will not pulse and the
+mechanism should be removed rather than tuned.
 
 ## When the glow will not appear
 

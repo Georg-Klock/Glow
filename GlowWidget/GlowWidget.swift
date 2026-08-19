@@ -33,6 +33,13 @@ struct WeekEntry: TimelineEntry {
     let date: Date
     let week: Week
     let habits: [HabitSnapshot]
+    /// Opacity for the glowing layer at this instant.
+    ///
+    /// A widget cannot run a continuous animation: WidgetKit renders one
+    /// snapshot per timeline entry, out of process. So the breath is baked into
+    /// the timeline instead — a series of entries a couple of seconds apart,
+    /// each carrying the next point on the curve.
+    var phase: Double = 1.0
 }
 
 struct WeekProvider: TimelineProvider {
@@ -49,16 +56,54 @@ struct WeekProvider: TimelineProvider {
         completion(loadEntry())
     }
 
+    /// How long a breath takes, and how finely it is sampled.
+    ///
+    /// Deliberately bounded: this is an experiment in whether WidgetKit honours
+    /// sub-minute entries at all. Every entry is free, but the reload at the end
+    /// of the window is not — widgets get a limited refresh budget per day, and
+    /// spending it on a pulse would leave the widget stale by evening. If the
+    /// pulse works, the window length is the dial to trade against that budget.
+    private static let breathStep: TimeInterval = 2
+    private static let breathWindow: TimeInterval = 60
+
     func getTimeline(in context: Context, completion: @escaping (Timeline<WeekEntry>) -> Void) {
-        // One entry, and a refresh at midnight. The open slot is defined as
-        // "today", so the only scheduled moment the widget goes stale on its
-        // own is the day rolling over. Everything else is a write, and writes
-        // reload the timeline explicitly.
-        let entry = loadEntry()
+        let base = loadEntry()
+        let now = Date()
+
+        // The open slot is defined as "today", so the day rolling over is the
+        // one moment the widget goes stale on its own. Everything else is a
+        // write, and writes reload the timeline explicitly.
         let midnight = WeekCalendar.calendar.date(
-            byAdding: .day, value: 1, to: WeekCalendar.day(Date())
-        ) ?? Date().addingTimeInterval(3600)
-        completion(Timeline(entries: [entry], policy: .after(midnight)))
+            byAdding: .day, value: 1, to: WeekCalendar.day(now)
+        ) ?? now.addingTimeInterval(3600)
+
+        guard base.habits.contains(where: { habit in
+            WeekGrid.slots(for: habit, in: base.week, today: base.date).contains { $0.state == .open }
+        }) else {
+            // Nothing is glowing, so nothing needs to breathe. Do not spend the
+            // refresh budget on a still image.
+            completion(Timeline(entries: [base], policy: .after(midnight)))
+            return
+        }
+
+        var entries: [WeekEntry] = []
+        let steps = Int(Self.breathWindow / Self.breathStep)
+        for step in 0...steps {
+            let t = Double(step) * Self.breathStep
+            // A cosine gives the same ease-in-out shape the app animates with,
+            // sampled rather than interpolated.
+            let curve = (cos(t / 2.4 * 2 * .pi) + 1) / 2
+            let phase = GlowImageView.breathLow + (1.0 - GlowImageView.breathLow) * curve
+            entries.append(WeekEntry(
+                date: now.addingTimeInterval(t),
+                week: base.week,
+                habits: base.habits,
+                phase: phase
+            ))
+        }
+
+        let next = min(now.addingTimeInterval(Self.breathWindow), midnight)
+        completion(Timeline(entries: entries, policy: .after(next)))
     }
 
     /// Not main-actor isolated: `TimelineProvider` is called on whatever queue
