@@ -1,0 +1,169 @@
+import Foundation
+
+/// A curated emoji set for habit icons, each paired with its closest SF Symbol.
+///
+/// Two things live here, and the pairing is the point of both.
+///
+/// **The picker's Emoji tab** offers these instead of the whole Unicode
+/// keyboard. A free-text emoji field was the original design and it let a user
+/// pick 🫥 for "Meditate"; a curated set of things people actually track is more
+/// useful than every glyph ever encoded.
+///
+/// **The nearest symbol** is a genuine judgement call per emoji, so it is
+/// hand-written rather than derived. It is what lets the app answer "you picked
+/// 🏃, here is the symbol version" without guessing at runtime, and it doubles
+/// as the review record for the curation: every `symbol` below is asserted
+/// against the real catalogue by a test, so a name that stops shipping fails the
+/// build rather than rendering as literal text on someone's phone.
+enum HabitEmoji {
+    struct Icon: Identifiable, Hashable {
+        /// The emoji itself. This is what gets stored on the habit.
+        let emoji: String
+        let name: String
+        /// Extra search terms beyond the name.
+        let keywords: String
+        /// The closest SF Symbol, for users who would rather have the symbol.
+        let symbol: String
+
+        var id: String { emoji }
+        var searchText: String { "\(name) \(keywords) \(symbol)".lowercased() }
+    }
+
+    struct Group: Identifiable {
+        let title: String
+        let icons: [Icon]
+        var id: String { title }
+    }
+
+    static let groups: [Group] = [
+        Group(title: "Health & Fitness", icons: [
+            Icon(emoji: "🏃", name: "Run", keywords: "running jog cardio", symbol: "figure.run"),
+            Icon(emoji: "🚶", name: "Walk", keywords: "walking steps", symbol: "figure.walk"),
+            Icon(emoji: "🏋️", name: "Lift", keywords: "weights gym strength", symbol: "figure.strengthtraining.traditional"),
+            Icon(emoji: "🧘", name: "Meditate", keywords: "yoga mindfulness calm", symbol: "figure.mind.and.body"),
+            Icon(emoji: "🏊", name: "Swim", keywords: "swimming pool", symbol: "figure.pool.swim"),
+            Icon(emoji: "🚴", name: "Cycle", keywords: "bike cycling", symbol: "bicycle"),
+            Icon(emoji: "🤸", name: "Stretch", keywords: "flexibility mobility", symbol: "figure.flexibility"),
+            Icon(emoji: "💪", name: "Strength", keywords: "muscle arms", symbol: "dumbbell"),
+            Icon(emoji: "❤️", name: "Heart", keywords: "cardio health love", symbol: "heart"),
+            Icon(emoji: "🫁", name: "Breathe", keywords: "lungs breathing", symbol: "lungs"),
+            Icon(emoji: "💊", name: "Medication", keywords: "pills vitamins", symbol: "pills"),
+            Icon(emoji: "🩺", name: "Health check", keywords: "doctor stethoscope", symbol: "stethoscope"),
+            Icon(emoji: "🛌", name: "Sleep", keywords: "bed rest", symbol: "bed.double"),
+            Icon(emoji: "💤", name: "Early night", keywords: "sleep zzz", symbol: "zzz"),
+            Icon(emoji: "🚿", name: "Shower", keywords: "wash clean", symbol: "shower"),
+            Icon(emoji: "🪥", name: "Brush teeth", keywords: "dental toothbrush", symbol: "mouth"),
+            Icon(emoji: "🧗", name: "Climb", keywords: "climbing bouldering", symbol: "figure.climbing"),
+            Icon(emoji: "🥾", name: "Hike", keywords: "hiking trail", symbol: "figure.hiking"),
+            Icon(emoji: "⛹️", name: "Basketball", keywords: "ball sport", symbol: "figure.basketball"),
+            Icon(emoji: "🥊", name: "Box", keywords: "boxing fight", symbol: "figure.boxing"),
+            Icon(emoji: "🏄", name: "Surf", keywords: "surfing waves", symbol: "figure.surfing"),
+            Icon(emoji: "🛹", name: "Skate", keywords: "skateboard", symbol: "figure.skateboarding"),
+            Icon(emoji: "⛷️", name: "Ski", keywords: "skiing snow", symbol: "figure.skiing.downhill"),
+            Icon(emoji: "🏂", name: "Snowboard", keywords: "snowboarding", symbol: "figure.snowboarding"),
+            Icon(emoji: "🚣", name: "Row", keywords: "rowing boat", symbol: "figure.outdoor.rowing"),
+            Icon(emoji: "🏓", name: "Table tennis", keywords: "pingpong", symbol: "figure.table.tennis"),
+            Icon(emoji: "🏆", name: "Win", keywords: "trophy achievement", symbol: "trophy")
+        ]),
+        Group(title: "Food & Drink", icons: [
+            Icon(emoji: "💧", name: "Water", keywords: "hydrate drink", symbol: "drop"),
+            Icon(emoji: "🥕", name: "Vegetables", keywords: "carrot veg healthy", symbol: "carrot"),
+            Icon(emoji: "🍽️", name: "Eat well", keywords: "meal food dinner", symbol: "fork.knife"),
+            Icon(emoji: "☕", name: "Coffee", keywords: "caffeine espresso", symbol: "cup.and.saucer"),
+            Icon(emoji: "🍵", name: "Tea", keywords: "brew mug", symbol: "mug"),
+            Icon(emoji: "🍷", name: "Wine", keywords: "alcohol drink", symbol: "wineglass"),
+            Icon(emoji: "🎂", name: "Treat", keywords: "cake dessert birthday", symbol: "birthday.cake"),
+            Icon(emoji: "🥗", name: "Salad", keywords: "greens healthy", symbol: "leaf"),
+            Icon(emoji: "🍳", name: "Cook", keywords: "cooking pan breakfast", symbol: "frying.pan"),
+            Icon(emoji: "🍔", name: "Junk food", keywords: "fast food burger", symbol: "takeoutbag.and.cup.and.straw")
+        ]),
+        Group(title: "Mind & Learning", icons: [
+            Icon(emoji: "📖", name: "Read", keywords: "book reading", symbol: "book"),
+            Icon(emoji: "📚", name: "Study", keywords: "books learning", symbol: "books.vertical"),
+            Icon(emoji: "✍️", name: "Write", keywords: "writing journal", symbol: "pencil.and.scribble"),
+            Icon(emoji: "📝", name: "Journal", keywords: "notes diary", symbol: "note.text"),
+            Icon(emoji: "🎓", name: "Course", keywords: "study school degree", symbol: "graduationcap"),
+            Icon(emoji: "💡", name: "Ideas", keywords: "lightbulb think", symbol: "lightbulb"),
+            Icon(emoji: "🧠", name: "Focus", keywords: "brain mind", symbol: "brain.head.profile"),
+            Icon(emoji: "🎵", name: "Music", keywords: "practice song", symbol: "music.note"),
+            Icon(emoji: "🎸", name: "Guitar", keywords: "instrument practice", symbol: "guitars"),
+            Icon(emoji: "🎹", name: "Piano", keywords: "keys instrument", symbol: "pianokeys"),
+            Icon(emoji: "🎨", name: "Create", keywords: "art paint draw", symbol: "paintbrush"),
+            Icon(emoji: "📷", name: "Photo", keywords: "camera photography", symbol: "camera"),
+            Icon(emoji: "🗣️", name: "Language", keywords: "speak practice", symbol: "text.bubble"),
+            Icon(emoji: "🧩", name: "Puzzle", keywords: "brain game", symbol: "puzzlepiece"),
+            Icon(emoji: "🎮", name: "Games", keywords: "gaming play", symbol: "gamecontroller")
+        ]),
+        Group(title: "Home & Life", icons: [
+            Icon(emoji: "🏠", name: "Home", keywords: "house tidy", symbol: "house"),
+            Icon(emoji: "🧹", name: "Clean", keywords: "tidy chores sweep", symbol: "sparkles"),
+            Icon(emoji: "🧺", name: "Laundry", keywords: "washing clothes", symbol: "basket"),
+            Icon(emoji: "🌱", name: "Plants", keywords: "water plants garden", symbol: "leaf"),
+            Icon(emoji: "🐕", name: "Dog", keywords: "walk pet", symbol: "dog"),
+            Icon(emoji: "🐈", name: "Cat", keywords: "pet", symbol: "cat"),
+            Icon(emoji: "🗑️", name: "Take out bins", keywords: "trash rubbish", symbol: "trash"),
+            Icon(emoji: "🔧", name: "Fix", keywords: "repair diy tools", symbol: "wrench.adjustable"),
+            Icon(emoji: "🧾", name: "Bills", keywords: "admin paperwork", symbol: "doc.text"),
+            Icon(emoji: "🛒", name: "Shop", keywords: "groceries shopping", symbol: "cart")
+        ]),
+        Group(title: "Work & Money", icons: [
+            Icon(emoji: "💼", name: "Work", keywords: "job office", symbol: "briefcase"),
+            Icon(emoji: "💻", name: "Code", keywords: "laptop programming", symbol: "laptopcomputer"),
+            Icon(emoji: "📧", name: "Inbox", keywords: "email mail", symbol: "envelope"),
+            Icon(emoji: "📞", name: "Call", keywords: "phone ring", symbol: "phone"),
+            Icon(emoji: "📅", name: "Plan", keywords: "calendar schedule", symbol: "calendar"),
+            Icon(emoji: "📈", name: "Progress", keywords: "growth chart", symbol: "chart.line.uptrend.xyaxis"),
+            Icon(emoji: "📊", name: "Review", keywords: "stats data", symbol: "chart.bar"),
+            Icon(emoji: "💰", name: "Save", keywords: "money savings", symbol: "dollarsign.circle"),
+            Icon(emoji: "🏦", name: "Budget", keywords: "bank finance", symbol: "building.columns"),
+            Icon(emoji: "🎯", name: "Goal", keywords: "target aim", symbol: "target")
+        ]),
+        Group(title: "Outdoors & Time", icons: [
+            Icon(emoji: "🌿", name: "Outside", keywords: "nature fresh air", symbol: "leaf"),
+            Icon(emoji: "☀️", name: "Daylight", keywords: "sun morning", symbol: "sun.max"),
+            Icon(emoji: "🌙", name: "Night", keywords: "moon evening", symbol: "moon.stars"),
+            Icon(emoji: "🌧️", name: "Rain", keywords: "weather wet", symbol: "cloud.rain"),
+            Icon(emoji: "❄️", name: "Cold", keywords: "snow winter", symbol: "snowflake"),
+            Icon(emoji: "🌊", name: "Open water", keywords: "sea waves", symbol: "water.waves"),
+            Icon(emoji: "🌳", name: "Trees", keywords: "forest park", symbol: "tree"),
+            Icon(emoji: "🏔️", name: "Mountains", keywords: "peak hike", symbol: "mountain.2"),
+            Icon(emoji: "🔥", name: "Streak", keywords: "fire momentum", symbol: "flame"),
+            Icon(emoji: "⭐", name: "Star", keywords: "favourite", symbol: "star"),
+            Icon(emoji: "✨", name: "Sparkle", keywords: "special", symbol: "sparkles"),
+            Icon(emoji: "⏰", name: "Alarm", keywords: "wake up early", symbol: "alarm"),
+            Icon(emoji: "⏳", name: "Timer", keywords: "time hourglass", symbol: "hourglass"),
+            Icon(emoji: "🔁", name: "Repeat", keywords: "routine habit", symbol: "repeat"),
+            Icon(emoji: "🏁", name: "Finish", keywords: "complete done", symbol: "flag.checkered"),
+            Icon(emoji: "✅", name: "Done", keywords: "check complete", symbol: "checkmark.circle")
+        ]),
+        Group(title: "Screens & People", icons: [
+            Icon(emoji: "📱", name: "Phone time", keywords: "screen time", symbol: "iphone"),
+            Icon(emoji: "📺", name: "TV", keywords: "watch series", symbol: "tv"),
+            Icon(emoji: "🚭", name: "No smoking", keywords: "quit smoke", symbol: "nosign"),
+            Icon(emoji: "🙏", name: "Gratitude", keywords: "thanks reflect", symbol: "hands.and.sparkles"),
+            Icon(emoji: "😊", name: "Mood", keywords: "feeling happy", symbol: "face.smiling"),
+            Icon(emoji: "👥", name: "Friends", keywords: "social people", symbol: "person.2"),
+            Icon(emoji: "💬", name: "Message", keywords: "chat text", symbol: "bubble.left"),
+            Icon(emoji: "🎁", name: "Give", keywords: "gift generosity", symbol: "gift")
+        ])
+    ]
+
+    static let all: [Icon] = groups.flatMap(\.icons)
+
+    private static let byEmoji: [String: Icon] = Dictionary(
+        all.map { ($0.emoji, $0) }, uniquingKeysWith: { first, _ in first }
+    )
+
+    /// The curated entry for a stored emoji, if it is one of ours.
+    static func icon(for emoji: String) -> Icon? { byEmoji[emoji] }
+
+    /// The closest SF Symbol for a stored emoji, when there is one.
+    static func nearestSymbol(for emoji: String) -> String? { byEmoji[emoji]?.symbol }
+
+    /// Emoji whose name, keywords or paired symbol contain every search term.
+    static func search(_ query: String) -> [Icon] {
+        let terms = query.lowercased().split(whereSeparator: { $0 == " " || $0 == "." }).map(String.init)
+        guard !terms.isEmpty else { return all }
+        return all.filter { icon in terms.allSatisfy { icon.searchText.contains($0) } }
+    }
+}
