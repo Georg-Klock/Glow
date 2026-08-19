@@ -120,15 +120,20 @@ private struct WidgetSlot: View {
         }
     }
 
+    @ViewBuilder
     private var shape: some View {
-        Capsule(style: .continuous)
-            .fill(fill)
-            .frame(height: 14)
-            // The open slot cannot glow here, so it gets the only other signal
-            // available in an SDR snapshot: a soft halo, drawn as a shadow.
-            .shadow(
-                color: slot.state == .open ? GlowPalette.color.opacity(0.6) : .clear,
-                radius: 4
-            )
+        if slot.state == .open {
+            // Try the real HDR tile here rather than assuming WidgetKit cannot
+            // carry it. The received wisdom is that it renders out-of-process
+            // and archives the result, which drops HDR — but that was never
+            // measured on this device, and the fallback is the same soft-shadow
+            // capsule either way, so the experiment costs nothing.
+            GlowImageView(size: CGSize(width: 200, height: 14))
+                .frame(height: 14)
+        } else {
+            Capsule(style: .continuous)
+                .fill(fill)
+                .frame(height: 14)
+        }
     }
 }
