@@ -182,3 +182,51 @@ struct SymbolCatalogueTests {
         }
     }
 }
+
+@Suite("Suggested symbols")
+struct SuggestedSymbolTests {
+    @Test("There is one for every suggested emoji")
+    func oneForEachSuggestion() {
+        // The pairing is what makes the Symbols tab openable: a shortcut to the
+        // ninety-odd things a habit is usually about, rather than three hundred
+        // pictograms to scroll.
+        #expect(!HabitSymbol.suggested.isEmpty)
+        #expect(HabitSymbol.suggested.count <= HabitEmoji.suggested.count)
+        #expect(HabitSymbol.suggested.count > 60)
+    }
+
+    @Test("No symbol appears twice in the suggestions")
+    func suggestionsAreDeduplicated() {
+        // Several emoji share a symbol — there are four ways to draw a person
+        // running and one `figure.run` — and the same tile twice in one grid
+        // reads as a bug.
+        #expect(Set(HabitSymbol.suggested).count == HabitSymbol.suggested.count)
+    }
+
+    @Test("Every suggestion is a symbol the app can draw")
+    func suggestionsAreReal() {
+        for symbol in HabitSymbol.suggested {
+            #expect(HabitSymbol.isSymbol(symbol), "\(symbol)")
+        }
+    }
+
+    @Test("Suggestions are searchable even when a category never claimed them")
+    func suggestionsAreSearchable() {
+        // `all` drives search. A suggestion that the emoji matching never
+        // reached would otherwise be visible at the top of the tab and
+        // unfindable by typing its name.
+        for symbol in HabitSymbol.suggested {
+            #expect(HabitSymbol.all.contains(symbol), "\(symbol) is suggested but not searchable")
+        }
+    }
+
+    @Test("Suggestions repeat inside the categories, deliberately")
+    func suggestionsAlsoAppearBelow() {
+        // A suggestion is a shortcut, not a claim of exclusivity. Removing
+        // `leaf` from Animals & Nature because it is also suggested would make
+        // Animals & Nature wrong.
+        let categorised = Set(HabitSymbol.groups.flatMap(\.symbols))
+        let overlap = HabitSymbol.suggested.filter(categorised.contains)
+        #expect(!overlap.isEmpty)
+    }
+}

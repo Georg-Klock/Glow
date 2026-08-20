@@ -75,10 +75,31 @@ enum HabitSymbol {
         return Set(names)
     }()
 
-    /// Every browsable symbol once, in catalogue order.
+    /// The symbol paired with each suggested emoji, in the same order.
+    ///
+    /// The pairing already existed — `HabitEmoji` carries a hand-picked symbol
+    /// for each of its curated icons, and it is what `HabitSymbol.random()`
+    /// draws from. This is that list, deduplicated: several emoji share a
+    /// symbol, because there are four ways to draw a person running and one
+    /// `figure.run`.
+    ///
+    /// These also appear further down in their own categories. A suggestion is
+    /// a shortcut, not a claim of exclusivity, and hiding a symbol from Objects
+    /// because it is also suggested would make Objects wrong.
+    static let suggested: [String] = {
+        var seen = Set<String>()
+        return HabitEmoji.suggested.compactMap {
+            seen.insert($0.symbol).inserted ? $0.symbol : nil
+        }
+    }()
+
+    /// Every browsable symbol once, suggestions first, then catalogue order.
     static let all: [String] = {
         var seen = Set<String>()
         var result: [String] = []
+        for symbol in suggested where seen.insert(symbol).inserted {
+            result.append(symbol)
+        }
         for group in groups {
             for symbol in group.symbols where seen.insert(symbol).inserted {
                 result.append(symbol)

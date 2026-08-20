@@ -75,6 +75,14 @@ struct SymbolPickerView: View {
     private var symbolContent: some View {
         if query.isEmpty {
             LazyVStack(alignment: .leading, spacing: 20, pinnedViews: [.sectionHeaders]) {
+                // The same shortcut the emoji tab opens with, in symbols: one
+                // for each suggested emoji, hand-paired. Nobody browsing three
+                // hundred pictograms for "the running one" should have to.
+                Section {
+                    symbolGrid(HabitSymbol.suggested)
+                } header: {
+                    header("Suggested", systemImage: nil)
+                }
                 ForEach(HabitSymbol.groups) { group in
                     Section {
                         symbolGrid(group.symbols)
