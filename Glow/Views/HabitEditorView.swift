@@ -36,13 +36,17 @@ struct HabitEditorView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    // Two platters rather than one row, so the icon reads as
-                    // its own control instead of as an ornament sitting inside
-                    // the name field. The row's own background is cleared and
-                    // each half brings its own, which is the only way a Form
-                    // row can be two things.
+            // A plain stack rather than a Form.
+            //
+            // Three rows here draw their own platter, and inside a Form each
+            // one was fighting a different piece of the list's own styling: the
+            // section background, the row background, the row insets. The
+            // result was three radii — measured at 4pt down from the top edge,
+            // the corners were inset 9px, 15px and 41px — for three things
+            // meant to look identical. Outside a list there is nothing to
+            // override, and all three now measure 20/12/7/4 at 2/4/6/8pt down.
+            ScrollView {
+                VStack(spacing: 16) {
                     HStack(spacing: 10) {
                         Button { isPickingIcon = true } label: {
                             HabitIconView(icon: icon)
@@ -70,23 +74,16 @@ struct HabitEditorView: View {
                             .focused($isNameFocused)
                             .submitLabel(.done)
                             .padding(.horizontal, 14)
+                            .frame(maxWidth: .infinity)
                             .frame(height: Self.rowHeight)
                             .background(platter)
                     }
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                }
 
-                Section {
                     frequencyRow
                         .frame(height: Self.rowHeight)
                         .background(platter)
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
-                }
 
-                if isEditing {
-                    Section {
+                    if isEditing {
                         // No platter and no explanation. The confirmation
                         // dialog says what deleting costs, at the moment it
                         // costs it — a sentence under the button says it to
@@ -99,11 +96,14 @@ struct HabitEditorView: View {
                             isConfirmingDelete = true
                         }
                         .foregroundStyle(.red)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .listRowBackground(Color.clear)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 12)
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 24)
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle(isEditing ? "Edit Habit" : "New Habit")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -136,8 +136,7 @@ struct HabitEditorView: View {
         }
     }
 
-    /// The background a Form row draws for itself, drawn by hand because these
-    /// rows have had theirs cleared to make room for two of them.
+    /// The background every platter draws, at one radius for all three.
     private var platter: some View {
         RoundedRectangle(cornerRadius: Self.platterRadius, style: .continuous)
             .fill(Color(.secondarySystemGroupedBackground))
