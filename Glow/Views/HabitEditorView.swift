@@ -11,46 +11,53 @@ struct HabitEditorView: View {
 
     @State private var name = ""
     @State private var icon = HabitSymbol.default
-    @State private var isDaily = true
-    @State private var timesPerWeek = 3
+    /// Counted, never a mode. Seven means every day — `Frequency` normalizes it
+    /// to `.daily`, so the two cadences are one number rather than a switch and
+    /// a number that have to agree.
+    @State private var timesPerWeek = Frequency.daysInWeek
 
     @FocusState private var isNameFocused: Bool
     @State private var isConfirmingDelete = false
+    @State private var isPickingIcon = false
 
     private var isEditing: Bool { habit != nil }
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var frequency: Frequency {
-        isDaily ? .daily : Frequency(timesPerWeek: timesPerWeek)
-    }
+    private var frequency: Frequency { Frequency(timesPerWeek: timesPerWeek) }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Name", text: $name)
-                        .textInputAutocapitalization(.sentences)
-                        .focused($isNameFocused)
-                        .submitLabel(.done)
-
-                    NavigationLink {
-                        SymbolPickerView(selection: $icon)
-                    } label: {
-                        LabeledContent("Icon") {
+                    HStack(spacing: 12) {
+                        // The icon leads the row, so a habit is a picture and a
+                        // name in that order — the same order the grid reads in.
+                        Button { isPickingIcon = true } label: {
                             HabitIconView(icon: icon)
+                                .font(.title3)
+                                .frame(width: 32)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Icon")
+
+                        TextField("Name", text: $name)
+                            .textInputAutocapitalization(.sentences)
+                            .focused($isNameFocused)
+                            .submitLabel(.done)
                     }
                 }
 
-                Section("Frequency") {
-                    Picker("Cadence", selection: $isDaily) {
-                        Text("Every day").tag(true)
-                        Text("Times per week").tag(false)
-                    }
-                    .pickerStyle(.segmented)
-
-                    if !isDaily {
-                        Stepper(value: $timesPerWeek, in: Frequency.selectableCounts) {
-                            LabeledContent("Per week", value: "\(timesPerWeek)")
+                Section {
+                    // A Stepper, which is the system's own — and + pair. There
+                    // is no cadence switch any more: seven times a week *is*
+                    // daily, and a mode plus a count is two controls that can
+                    // disagree with each other about one fact.
+                    Stepper(value: $timesPerWeek, in: 1...Frequency.daysInWeek) {
+                        HStack(spacing: 0) {
+                            Text("\(timesPerWeek)")
+                                .monospacedDigit()
+                                .foregroundStyle(GlowPalette.color)
+                            Text(timesPerWeek == 1 ? " time per week" : " times per week")
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -78,6 +85,9 @@ struct HabitEditorView: View {
                 }
             }
         }
+        .navigationDestination(isPresented: $isPickingIcon) {
+            SymbolPickerView(selection: $icon)
+        }
         .onAppear(perform: loadExisting)
         // Destructive and irreversible: the completions cascade with it.
         .confirmationDialog(
@@ -94,18 +104,17 @@ struct HabitEditorView: View {
 
     private func loadExisting() {
         guard let habit else {
+            // A new habit opens with an empty, focused name and an arbitrary
+            // icon. The icon is a starting point rather than a suggestion —
+            // something is always better than a placeholder tick, and it is one
+            // tap from being changed.
+            icon = HabitSymbol.random()
             isNameFocused = true
             return
         }
         name = habit.name
         icon = habit.icon
-        switch habit.frequency {
-        case .daily:
-            isDaily = true
-        case .timesPerWeek(let count):
-            isDaily = false
-            timesPerWeek = count
-        }
+        timesPerWeek = habit.frequency.slotCount
     }
 
     private func delete() {

@@ -7,22 +7,24 @@ enum Frequency: Equatable, Hashable, Sendable, Codable {
     case daily
     case timesPerWeek(Int)
 
-    /// What the frequency picker offers. 7x a week is `daily` wearing a
-    /// different hat, so it is not selectable; 1x is, since the design draws it.
-    /// See docs/decisions.md.
-    static let selectableCounts = 1...6
+    static let daysInWeek = 7
+
+    /// What the frequency stepper offers. Seven is included and *is* daily:
+    /// the editor counts days and this type decides what that means, so there
+    /// is no mode to keep in step with the number. See docs/decisions.md.
+    static let selectableCounts = 1...daysInWeek
 
     /// Normalizing initializer, so no caller can construct a degenerate case.
     /// Anything at or above 7 collapses to `.daily`; anything below 1 clamps up.
     init(timesPerWeek count: Int) {
-        let clamped = min(max(count, Frequency.selectableCounts.lowerBound), 7)
-        self = clamped >= 7 ? .daily : .timesPerWeek(clamped)
+        let clamped = min(max(count, Frequency.selectableCounts.lowerBound), Frequency.daysInWeek)
+        self = clamped >= Frequency.daysInWeek ? .daily : .timesPerWeek(clamped)
     }
 
     /// How many slots the row draws. A daily row is always the full week.
     var slotCount: Int {
         switch self {
-        case .daily: 7
+        case .daily: Frequency.daysInWeek
         case .timesPerWeek(let count): count
         }
     }

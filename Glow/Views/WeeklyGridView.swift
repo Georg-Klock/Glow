@@ -39,12 +39,12 @@ struct WeeklyGridView: View {
                 }
             }
             // A large title, which is the system's own left-aligned style, and
-            // both controls on the leading side beside it. Settings is a tab
-            // now, so the trailing side has nothing left to hold.
+            // both controls trailing, which puts them on the title's own line
+            // rather than on a bar above it. Settings is a tab now.
             .navigationTitle(monthTitle)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItemGroup(placement: .topBarLeading) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
                     if !habits.isEmpty {
                         EditButton()
                     }
@@ -245,15 +245,22 @@ struct WeekdayHeader: View {
             HStack(spacing: SlotLayout.gap(trackWidth: geometry.trackWidth)) {
                 ForEach(0..<7, id: \.self) { index in
                     let isToday = week.days[index] == today
-                    let letter = Text(initials[index]).font(.caption)
+                    // Letter and date, in the app only. The widget has no room
+                    // for a second line and does not need one: you read the
+                    // widget for a second, and the app when you want to know
+                    // which Tuesday.
+                    let column = VStack(spacing: 1) {
+                        Text(initials[index]).font(.caption)
+                        Text(numbers[index]).font(.caption2).monospacedDigit()
+                    }
 
                     Group {
-                        // Today's letter is white with a drop shadow in the
-                        // design, so it is a glow and not just a brighter grey.
+                        // Today is white with a drop shadow in the design, so it
+                        // is a glow and not just a brighter grey.
                         if isToday {
-                            letter.glowing(halo: GlowPalette.headerHalo)
+                            column.glowing(halo: GlowPalette.headerHalo)
                         } else {
-                            letter.foregroundStyle(GlowPalette.headerRest)
+                            column.foregroundStyle(GlowPalette.headerRest)
                         }
                     }
                     .frame(
