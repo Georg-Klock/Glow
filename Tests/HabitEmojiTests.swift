@@ -112,3 +112,73 @@ struct EmojiCatalogueTests {
         #expect(Set(all).count == all.count)
     }
 }
+
+@Suite("Symbol catalogue")
+struct SymbolCatalogueTests {
+    @Test("The picker is small enough to browse")
+    func browsableIsSmall() {
+        // It was 9,403 — mostly chevrons, transport controls and iOS furniture.
+        // The point of thinning is that the whole set can be looked through.
+        #expect(HabitSymbol.all.count < 500, "\(HabitSymbol.all.count) is back to being a phone book")
+        #expect(HabitSymbol.all.count > 150, "\(HabitSymbol.all.count) is too few to find anything in")
+    }
+
+    @Test("Validation is much wider than the picker")
+    func validationOutlivesThePicker() {
+        // The two sets exist separately for exactly this reason: a habit does
+        // not stop being a symbol because the picker stopped offering it.
+        for name in ["chevron.right", "wifi", "airplayvideo"] {
+            #expect(HabitSymbol.isSymbol(name), "\(name) should still validate")
+            #expect(!HabitSymbol.all.contains(name), "\(name) should not be browsable")
+        }
+    }
+
+    @Test("Every seeded and curated icon survives the thinning")
+    func storedIconsStillValidate() {
+        // The regression this guards: thin the picker, validate against it, and
+        // three of the seeded habits start rendering as literal text.
+        for template in DefaultHabits.all where !template.isSpacer {
+            #expect(HabitSymbol.isSymbol(template.icon), "\(template.icon)")
+        }
+        for icon in HabitEmoji.all {
+            #expect(HabitSymbol.isSymbol(icon.symbol), "\(icon.symbol)")
+        }
+        #expect(HabitSymbol.isSymbol(HabitSymbol.default))
+    }
+
+    @Test("A fill is not offered where its outline is")
+    func fillsAreDropped() {
+        for name in HabitSymbol.all where name.hasSuffix(".fill") {
+            let outline = String(name.dropLast(5))
+            #expect(!HabitSymbol.all.contains(outline), "\(name) and \(outline) are both offered")
+        }
+    }
+
+    @Test("No keycaps in the picker")
+    func noKeycaps() {
+        // "T-Rex" used to arrive as `t.bubble` and "100" as `100.circle`. A
+        // letter on a key is not a picture of anything.
+        for name in HabitSymbol.all {
+            let head = name.split(separator: ".").first.map(String.init) ?? name
+            #expect(head.count > 1, "\(name) is a keycap")
+        }
+    }
+
+    @Test("Grouped the way an emoji keyboard groups things")
+    func emojiCategories() {
+        let titles = HabitSymbol.groups.map(\.title)
+        #expect(titles.first == "Smileys & People")
+        #expect(titles.contains("Objects"))
+        #expect(titles.contains("Travel & Places"))
+        // Eight categories exist; Flags has no symbols and is simply absent
+        // rather than present and empty.
+        #expect(HabitSymbol.groups.allSatisfy { !$0.symbols.isEmpty })
+    }
+
+    @Test("Every browsable symbol is one the app can draw")
+    func browsableSymbolsAreReal() {
+        for name in HabitSymbol.all {
+            #expect(HabitSymbol.isSymbol(name), "\(name) is offered but does not validate")
+        }
+    }
+}
