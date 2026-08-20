@@ -185,7 +185,11 @@ private struct WidgetRow: View {
                 .frame(width: WidgetMetrics.iconWidth)
             Text(habit.name)
                 .lineLimit(1)
-                .truncationMode(.tail)
+                // Shrink before truncating. The design's 98pt label leaves
+                // 69.5pt for the name once the icon has its column, and at 12pt
+                // that is about eleven characters — so "Touch Grass" clips in
+                // the file too. The mock just never rendered a name that long.
+                .minimumScaleFactor(0.75)
             Spacer(minLength: 0)
         }
         .font(.system(size: WidgetMetrics.textSize))
