@@ -89,8 +89,8 @@ struct HabitRowView: View {
                 }
             } else {
                 ForEach(spans) { span in
-                    SlotMarkView(
-                        mark: span.mark,
+                    SpanView(
+                        span: span,
                         size: CGSize(
                             width: SlotLayout.spanWidth(
                                 trackWidth: geometry.trackWidth,
@@ -98,26 +98,11 @@ struct HabitRowView: View {
                             ),
                             height: slotHeight
                         ),
-                        spansDays: span.dayCount > 1
+                        habitName: snapshot.name,
+                        onToggle: onToggle
                     )
-                    .contentShape(Capsule(style: .continuous))
-                    .onTapGesture {
-                        guard let day = span.actionDay else { return }
-                        onToggle(day)
-                    }
-                    .accessibilityElement()
-                    .accessibilityLabel("\(snapshot.name), \(spanLabel(span))")
-                    .accessibilityAddTraits(span.isTappable ? .isButton : [])
                 }
             }
-        }
-    }
-
-    private func spanLabel(_ span: SlotSpan) -> String {
-        switch span.state {
-        case .filled: "done"
-        case .open: "due today"
-        case .missed, .inactive: "still to come"
         }
     }
 
