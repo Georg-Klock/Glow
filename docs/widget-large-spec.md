@@ -893,6 +893,15 @@ all 20 auto-layout frames and is likewise inert, since every one is `NO_WRAP`.
 
 ## 10. Consolidated colour table
 
+Complete paint census across all 117 nodes: **89 paints total — 88 `SOLID` and
+1 `GRADIENT_LINEAR`.** No image fills, no video fills, no pattern fills, no other
+gradient types. **No node anywhere carries more than one paint**, so there is no
+layered-fill compositing to unpick. Only **3 nodes have strokes** (`83:1703`,
+`1746`, `1757` — the three open rings), all three identical: one `SOLID` white
+paint, weight 1.5 uniform on all four sides, `INSIDE`, cap `NONE`, join `MITER`,
+miter limit 4, no dash. Every paint has `blendMode: NORMAL` and
+`boundVariables: {}`.
+
 There are **two colours** in this frame and nothing else. No hue anywhere. No
 accent. Everything is white, or grey at some strength, or the near-black gradient.
 
@@ -989,20 +998,44 @@ not used.
 
 ## 12. Consolidated effect table
 
-Every glow is `#FFFFFF`. There are exactly **five** distinct effect recipes plus
-the container's glass.
+Complete census. **27 effects across 18 nodes, forming 5 unique effect arrays.**
+By type: **20 × `DROP_SHADOW`, 6 × `INNER_SHADOW`, 1 × `GLASS`.** No
+`LAYER_BLUR`, no `BACKGROUND_BLUR`, no `NOISE`, no `TEXTURE`.
 
-| Recipe | Type(s) | Radius | Alpha | Offset | Applied to | Count |
-| --- | --- | --- | --- | --- | --- | --- |
-| **Mark glow** | `DROP_SHADOW` | **9** | 1.0 | (0, 0) | completion dots, completion bars | 7 |
-| **Ring glow** | `DROP_SHADOW` ×2 | **5** | **0.5** | (0, −1.25) and (0, +1.25) | open rings and open-ring spans | 3 |
-| **Ring inner** | `INNER_SHADOW` ×2 | **2.5** | 1.0 | (0, −1.25) and (0, +1.25) | open rings and open-ring spans | 3 |
-| **Label glow** | `DROP_SHADOW` | **1.5** | 1.0 | (0, 0) | lit habit names and lit habit icons | 6 |
-| **Today glow** | `DROP_SHADOW` | **2** | 1.0 | (0, 0) | today's weekday letter only | 1 |
-| **Glass** | `GLASS` | 4 | — | — | the root frame | 1 |
+Every glow colour is `#FFFFFF`. The four shadow recipes, plus glass:
 
-Every one is `blendMode: NORMAL`, `spread: 0`, `showShadowBehindNode: false`,
-`visible: true`, with no bound variables.
+| Recipe | Type(s) | Radius | Colour | Alpha | Offset | Spread | Nodes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **Mark glow** | `DROP_SHADOW` | **9** | `#FFFFFF` | 1.0 | (0, 0) | 0 | 7 |
+| **Ring** | `DROP_SHADOW` ×2 | **5** | `#FFFFFF` | **0.5** | (0, −1.25), (0, +1.25) | 0 | 3 |
+| ” *(same array)* | `INNER_SHADOW` ×2 | **2.5** | `#FFFFFF` | 1.0 | (0, −1.25), (0, +1.25) | 0 | ” |
+| **Label glow** | `DROP_SHADOW` | **1.5** | `#FFFFFF` | 1.0 | (0, 0) | 0 | 6 |
+| **Today glow** | `DROP_SHADOW` | **2** | `#FFFFFF` | 1.0 | (0, 0) | 0 | 1 |
+| **Glass** | `GLASS` | 4 | — | — | — | — | 1 |
+
+The ring's four effects are **one array on one node**, in this order: outer −y,
+outer +y, inner −y, inner +y. Order matters for compositing and is preserved
+here.
+
+Exactly which nodes carry which:
+
+| Recipe | Node IDs |
+| --- | --- |
+| Mark glow (r 9) | `83:1702`, `1719`, `1735`, `1769`, `1771` (dots) · `83:1783`, `1792` (bars) |
+| Ring (4-effect array) | `83:1703`, `1746`, `1757` |
+| Label glow (r 1.5) | `83:1698`, `1699` (Workout) · `83:1743`, `1744` (Early night) · `83:1750`, `1751` (Hydration) |
+| Today glow (r 2) | `83:1684` only |
+| Glass | `83:1676` only |
+
+Verified on **every** one of the 27: `visible: true`, `blendMode: NORMAL`,
+`spread: 0`, `boundVariables: {}`. Verified on every one of the 20 drop shadows:
+`showShadowBehindNode: false`. (`INNER_SHADOW` has no such property — correctly
+absent, not omitted.)
+
+Five radii — **1.5, 2, 2.5, 5, 9** — are the entire vocabulary. There is no
+stacking: no node carries two shadows of different radii to fake a long tail.
+The only node with more than one effect is the ring, and its four are two
+symmetric pairs.
 
 Nothing carrying `#8D8D93` has an effect. **A miss does not glow, an upcoming day
 does not glow, a resting label does not glow.** Light is the only signal of state;
@@ -1189,13 +1222,27 @@ space is documented and nobody has to re-derive it.
 - Per-side stroke weights — uniform 1.5 on all four sides of all three
 
 **Paint & effects**
-- Non-`NORMAL` blend modes — none, on any node, fill or effect
-- Image fills, video fills, pattern fills — none
+- Non-`NORMAL` blend modes — none, on any node, any fill, or any effect
+- Image fills, video fills, pattern fills — none; 88 `SOLID` + 1 `GRADIENT_LINEAR`, and nothing else
+- Nodes with more than one paint — **none**, all 117
+- `LAYER_BLUR`, `BACKGROUND_BLUR`, `NOISE`, `TEXTURE` effects — none
+- Non-zero effect `spread` — none, on all 27 effects
+- `showShadowBehindNode: true` — none, on all 20 drop shadows
+- Invisible effects (`visible: false`) — none
+- Effects bound to variables — none
 - Effects on anything grey — none
 
 **Text** (all 24 nodes)
-- Mixed styled segments — none; every node is a single uniform run
+- Font families other than `SF Pro` — none (`SF Pro Rounded` is installed, unused)
+- Font styles other than `Regular` — none, out of **45 installed styles**
 - Font weights other than **400** — none
+- Font sizes other than **12** and **14** — none
+- Italic, condensed, compressed or expanded styles — none
+- Variable-font axes — the family reports **none**; the `wdth 100` in Figma's generated CSS is codegen boilerplate
+- Mixed styled segments — none; every node is a single uniform run
+- Text strokes — none
+- Text nodes with more than one fill paint, or a fill opacity below 1 — none
+- Text node opacity below 1 — none
 - Explicit line heights — none; all `AUTO`
 - Letter spacing other than **0%** — none
 - `textTruncation` other than `DISABLED`, or any `maxLines` — none

@@ -74,8 +74,13 @@ enum GlowShape: Equatable {
     static let ringWeight: CGFloat = 3.0 / 35.0
     /// Diameter of `.dot`. 14 on 35.
     static let dotScale: CGFloat = 14.0 / 35.0
-    /// Thickness of `.bar`. 8 on 35.
-    static let barScale: CGFloat = 8.0 / 35.0
+    /// Thickness of `.bar`. 4 on 17.5.
+    static let barScale: CGFloat = 4.0 / 17.5
+
+    /// The missed ✕: 1pt bars with 9pt arms, crossed. Not a glyph — see
+    /// SlotMarkView.
+    static let missedThickness: CGFloat = 1.0 / 17.5
+    static let missedArm: CGFloat = 9.0 / 17.5
 }
 
 /// The HDR tile itself, sized by whatever it is put inside.
@@ -162,15 +167,18 @@ struct GlowModifier: ViewModifier {
         case .ring:
             // Two passes offset up and down rather than one centred: it is what
             // the file specifies, and it reads as a tube of light rather than a
-            // disc behind a hole.
+            // disc behind a hole. The offset is its own number, not a fraction
+            // of the radius: the file pairs a radius of 5 with an offset of
+            // 1.25, so the offset is a quarter of the reach.
+            let offset = haloRadius * GlowPalette.ringHaloOffsetRatio
             base
                 .shadow(
                     color: GlowPalette.color.opacity(GlowPalette.ringHaloOpacity),
-                    radius: haloRadius, y: haloRadius * 0.5
+                    radius: haloRadius, y: offset
                 )
                 .shadow(
                     color: GlowPalette.color.opacity(GlowPalette.ringHaloOpacity),
-                    radius: haloRadius, y: -haloRadius * 0.5
+                    radius: haloRadius, y: -offset
                 )
         }
     }
@@ -242,8 +250,18 @@ struct GlowImageView: View {
         case .capsule:
             Capsule(style: .continuous)
         case .ring:
+            // The stroke carries an inner pair as well as the outer one: white
+            // at full strength, offset up and down, which is what gives the ring
+            // its thickness at top and bottom rather than a flat hairline.
+            let inner = size.height * GlowPalette.ringInnerRadius
+            let innerOffset = size.height * GlowPalette.ringHaloOffset
             Capsule(style: .continuous)
-                .strokeBorder(style: StrokeStyle(lineWidth: size.height * GlowShape.ringWeight))
+                .strokeBorder(
+                    GlowPalette.color
+                        .shadow(.inner(color: GlowPalette.color, radius: inner, y: innerOffset))
+                        .shadow(.inner(color: GlowPalette.color, radius: inner, y: -innerOffset)),
+                    lineWidth: size.height * GlowShape.ringWeight
+                )
         case .dot:
             // Centred rather than inset, so a dot sits on the column's centre
             // line whatever the slot around it is doing.

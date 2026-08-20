@@ -35,15 +35,21 @@ enum WidgetMetrics {
 
     /// SF Pro Regular, one size for the habit name and every weekday letter.
     static let textSize: CGFloat = 12
+    /// The habit icon is a step larger than the name it sits beside.
+    static let iconSize: CGFloat = 14
 
     /// The weekday header's own row: shorter than a slot row, and its cells are
     /// wider than a slot with almost no gap, because a letter needs the width
     /// and a slot does not.
     static let headerHeight: CGFloat = 14
 
-    /// The container gradient. Very nearly nothing — five percent of a light
-    /// grey down to fifteen percent of a near-black — but it is what keeps the
-    /// widget from disappearing entirely on a black wallpaper.
-    static let backgroundTop = (red: 70.0 / 255, green: 70.0 / 255, blue: 73.0 / 255, alpha: 0.05)
-    static let backgroundBottom = (red: 10.0 / 255, green: 10.0 / 255, blue: 15.0 / 255, alpha: 0.15)
+    /// The container gradient, running straight down over the full height.
+    ///
+    /// Both stops carry the same 3% alpha — a 15% stop alpha inside a paint at
+    /// 20% opacity — and only the hue changes, from a near-black warm grey to
+    /// true black. On a black wallpaper that lightens the top edge by about two
+    /// levels out of 255, which is the point: it separates the widget's corner
+    /// from the wallpaper without reading as a panel.
+    static let backgroundTop = (red: 70.0 / 255, green: 70.0 / 255, blue: 73.0 / 255, alpha: 0.03)
+    static let backgroundBottom = (red: 0.0, green: 0.0, blue: 0.0, alpha: 0.03)
 }

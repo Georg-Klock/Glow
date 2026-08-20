@@ -6,7 +6,10 @@ Values marked **file** are taken from the design file's own properties, not
 measured off a render. `1x` values are half the file's, which is authored at 2x
 for a large widget.
 
-Source of truth in code: `Glow/Glow/GlowPalette.swift`.
+Source of truth in code: `Glow/Glow/GlowPalette.swift`. For the large widget,
+`docs/widget-large-spec.md` is the measurement this defers to — it reads the
+node's own properties through the Plugin API rather than the generated CSS, and
+where the two disagree it wins.
 
 ## Colour
 
@@ -19,13 +22,18 @@ it glows and, failing that, where it sits on the grey scale.
 | `color` | `#FFFFFF` | every glow: marks, due labels, today's letter |
 | `grey` | `#8D8D93` | the base for everything below |
 | `labelResting` | `#8D8D93` | a habit already handled today |
-| `headerRest` | `#8D8D93` @ 60% | weekday letters other than today |
+| `headerRest` | `#8D8D93` | weekday letters other than today |
 | `missed` | `#8D8D93` @ 50% | a day that went unlogged |
 | `upcoming` | `#8D8D93` @ 16% | a day still to come |
 | `warning` | `#FFB838` | Low Power Mode only — see below |
 
-**One grey at four strengths, and no fifth colour anywhere.** 100% for a resting
-label, 60% for a weekday letter, 50% for a miss, 16% for a day still to come.
+**One grey at three strengths, and no fourth colour anywhere.** 100% for a
+resting label *and* a weekday letter, 50% for a miss, 16% for a day still to
+come.
+
+The weekday letters were 60% here, taken from generated CSS that had folded a
+node opacity into the colour. `docs/widget-large-spec.md` §10 is a census of all
+89 paints in the frame: there is no 60% anywhere in it.
 
 The resting label was briefly a bespoke `#C7C7CC`, lifted on the grounds that an
 SDR value reads dark beside HDR. That is still true in general — worth knowing
@@ -75,17 +83,26 @@ and the app and the widget cannot disagree about column positions.
 A CSS blur is roughly twice a SwiftUI shadow radius, so the code carries half
 each published number.
 
-| Element | File | Code |
-| --- | --- | --- |
-| Completion dot / bar | `0 0 18px #FFF` | one shadow, radius 0.257 × slot |
-| Open ring, outer | `0 ±2.5px 10px #FFF` @ 50% | two shadows, ±y, radius 0.143 × slot, 50% |
-| Due label | `0 0 3px #FFF` | one shadow, radius 0.75pt |
-| Today's letter | `0 0 4px #FFF` | one shadow, radius 1pt |
-| Missed ✕ | none | none |
-| Upcoming disc | none | none |
+A Figma shadow radius is roughly **half** a CSS blur and roughly **equal** to a
+SwiftUI `.shadow(radius:)`. `get_design_context` emits the doubled CSS numbers;
+these are the file's own.
 
-Every glow is **one** shadow. It used to be three stacked at increasing radius —
-an invention to approximate a long tail the file never asked for.
+| Element | Radius | Colour | Offset |
+| --- | --- | --- | --- |
+| Completion dot / bar | **9** (0.514 × slot) | `#FFF` | 0 |
+| Open ring, outer ×2 | **5** (0.286 × slot) @ 50% | `#FFF` | ∓1.25 |
+| Open ring, inner ×2 | **2.5** (0.143 × slot) | `#FFF` | ∓1.25 |
+| Due label | **1.5** | `#FFF` | 0 |
+| Today's letter | **2** | `#FFF` | 0 |
+| Missed ✕ | none | | |
+| Upcoming disc | none | | |
+
+Five radii — 1.5, 2, 2.5, 5, 9 — are the whole vocabulary. **No stacking:** no
+element carries two shadows of different radii to fake a long tail. The only
+element with more than one is the ring, and its four are two symmetric pairs.
+
+These were briefly built at a quarter of their reach: the CSS numbers are already
+doubled, and halving them again compounds the error.
 
 ### Not in the file
 
@@ -102,9 +119,15 @@ Three effects exist in the app and nowhere in the design:
 
 ### Not reproduced
 
-The ring's **inner glow** — `inset 0 ±2.5px 5px #FFF` in the file. The outer
-halo is matched; the inset pair is not. It would have to be baked into the mask
-the HDR tile is cut with, and the ring already reads as lit without it.
+**Figma's `GLASS` effect** on the widget container — radius 4, refraction 0.8,
+depth 20, light at −45°. There is no SwiftUI equivalent; `Material` and
+`.glassEffect` reproduce none of the refraction, dispersion or directional light.
+In a flat export it contributes the faint hairline along the top-left corner arc.
+
+**The container's 30pt corner radius**, because iOS masks a widget to its own
+continuous-corner squircle regardless. The file's interior corners are plain
+circular arcs — corner smoothing is 0 on all 93 corner-bearing nodes — and those
+are reproduced.
 
 ## Outside the grid
 
@@ -127,8 +150,7 @@ Now that it is all in one place:
 - `.secondary` and `labelResting` are two greys doing one job in different
   places. They could be the same token — `.secondary` only appears on screens
   built from system controls, where a custom grey stops them looking systemic.
-- `headerRest` at 60% and `missed` at 50% are within ten percent of each other
-  and could merge, taking the grey from four steps to three.
+- `headerRest` and `labelResting` are now the same value and could be one name.
 - `haloRadius` and `ringHaloRadius` differ only because the file draws the ring's
   halo softer. If the ring is going to keep its offset pair anyway, one radius
   would do.

@@ -181,7 +181,7 @@ private struct WidgetRow: View {
     @ViewBuilder
     private var label: some View {
         let text = HStack(spacing: WidgetMetrics.iconGap) {
-            HabitIconView(icon: habit.icon)
+            HabitIconView(icon: habit.icon, size: WidgetMetrics.iconSize)
                 .frame(width: WidgetMetrics.iconWidth)
             Text(habit.name)
                 .lineLimit(1)
