@@ -19,13 +19,41 @@ struct GlowWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: WeekProvider()) { entry in
             WeekWidgetView(entry: entry)
-                // Fully transparent, so the widget disappears into a dark
-                // wallpaper and reads as slots floating on the home screen
-                // rather than as a card sitting on it. iOS 17 and later still
-                // require a container background to be declared; declaring it
-                // clear is how you opt out rather than omitting it.
-                .containerBackground(.clear, for: .widget)
+                .padding(.leading, WidgetMetrics.padLeading)
+                .padding(.trailing, WidgetMetrics.padTrailing)
+                .padding(.vertical, WidgetMetrics.padVertical)
+                // The design's gradient, and it is very nearly nothing: five
+                // percent of a light grey falling to fifteen percent of a
+                // near-black. It replaces a fully transparent background, which
+                // was right when the widget was slots on a black wallpaper and
+                // is wrong now that the design draws a container.
+                .containerBackground(for: .widget) {
+                    LinearGradient(
+                        colors: [
+                            Color(
+                                .sRGB,
+                                red: WidgetMetrics.backgroundTop.red,
+                                green: WidgetMetrics.backgroundTop.green,
+                                blue: WidgetMetrics.backgroundTop.blue,
+                                opacity: WidgetMetrics.backgroundTop.alpha
+                            ),
+                            Color(
+                                .sRGB,
+                                red: WidgetMetrics.backgroundBottom.red,
+                                green: WidgetMetrics.backgroundBottom.green,
+                                blue: WidgetMetrics.backgroundBottom.blue,
+                                opacity: WidgetMetrics.backgroundBottom.alpha
+                            ),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
         }
+        // WidgetKit's own margins are close to the design's but not equal, and
+        // they are applied inside the container — so the padding above only
+        // means what the file says once they are switched off.
+        .contentMarginsDisabled()
         .configurationDisplayName("Glow Up: This Week")
         .description("Your habits for the week. Tap today's slot to log it.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])

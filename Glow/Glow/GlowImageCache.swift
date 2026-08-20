@@ -166,11 +166,11 @@ struct GlowModifier: ViewModifier {
             base
                 .shadow(
                     color: GlowPalette.color.opacity(GlowPalette.ringHaloOpacity),
-                    radius: haloRadius, y: haloRadius * 0.25
+                    radius: haloRadius, y: haloRadius * 0.5
                 )
                 .shadow(
                     color: GlowPalette.color.opacity(GlowPalette.ringHaloOpacity),
-                    radius: haloRadius, y: -haloRadius * 0.25
+                    radius: haloRadius, y: -haloRadius * 0.5
                 )
         }
     }
@@ -250,8 +250,12 @@ struct GlowImageView: View {
                 height: size.height * GlowShape.dotScale
             )
         case .bar:
+            // Inset to the dot's own margin at each end, so a bar starts where
+            // the first day's dot would start and ends where the last one's
+            // would — a run of completions, not a shape covering the columns.
             Capsule(style: .continuous)
                 .frame(height: size.height * GlowShape.barScale)
+                .padding(.horizontal, size.height * (1 - GlowShape.dotScale) / 2)
         }
     }
 

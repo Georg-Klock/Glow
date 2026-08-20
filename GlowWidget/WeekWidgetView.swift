@@ -1,13 +1,18 @@
 import SwiftUI
 import WidgetKit
 
-/// The widget's grid.
+/// The widget's grid, laid out to `WidgetMetrics`.
 ///
 /// Deliberately not a reuse of `HabitRowView`. That view is built around a track
 /// measured from the screen and rows that can afford a tap target, which is the
 /// right model for a full screen and the wrong one for a 155pt square. What the
-/// two do share is `SlotLayout` and `SlotMarkView`, so the marks and the column
-/// rhythm cannot drift apart between them.
+/// two do share is `SlotLayout`, `SlotMarkView` and `GlowPalette`, so the marks
+/// and the column rhythm cannot drift apart between them.
+///
+/// The large family is the one the design specifies, and its numbers are used
+/// literally. Medium and small have no frame, so they keep the same label column
+/// and gaps and simply get a narrower track — the slot size falls out of that,
+/// which is the same rule the app uses.
 struct WeekWidgetView: View {
     let entry: WeekEntry
 
@@ -17,7 +22,7 @@ struct WeekWidgetView: View {
         switch family {
         case .systemSmall: 3
         case .systemMedium: 4
-        default: 7
+        default: 8
         }
     }
 
@@ -25,41 +30,41 @@ struct WeekWidgetView: View {
     /// Only the large family has the height to spend a row on the header.
     private var showsHeader: Bool { family == .systemLarge }
 
-    private var labelWidth: CGFloat { showsLabels ? 74 : 0 }
-    private var labelSpacing: CGFloat { showsLabels ? 8 : 0 }
-
-    private var habits: [HabitSnapshot] { Array(entry.habits.prefix(rowLimit)) }
-    private var overflow: Int { max(0, entry.habits.count - rowLimit) }
+    private var labelWidth: CGFloat { showsLabels ? WidgetMetrics.labelWidth : 0 }
+    private var labelGap: CGFloat { showsLabels ? WidgetMetrics.labelGap : 0 }
 
     var body: some View {
         if entry.habits.isEmpty {
             VStack(spacing: 6) {
                 Image(systemName: "circle.dotted")
                     .font(.title2)
-                    .foregroundStyle(.secondary)
                 Text("No habits yet")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: WidgetMetrics.textSize))
             }
+            .foregroundStyle(GlowPalette.headerRest)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             // One measurement for the whole widget, so every row divides the
-            // same track by the same rule and the columns line up. Measured
-            // once here rather than per row, which is also how the app does it.
+            // same track by the same rule and the columns line up. Measured once
+            // here rather than per row, which is also how the app does it.
             GeometryReader { proxy in
-                let track = max(0, proxy.size.width - labelWidth - labelSpacing)
+                let track = max(0, proxy.size.width - labelWidth - labelGap)
                 let side = SlotLayout.slotHeight(trackWidth: track)
 
-                VStack(alignment: .leading, spacing: side * 0.55) {
+                VStack(alignment: .leading, spacing: WidgetMetrics.rowGap) {
                     if showsHeader {
                         WidgetHeader(
                             week: entry.week,
                             today: entry.date,
                             track: track,
                             labelWidth: labelWidth,
-                            labelSpacing: labelSpacing
+                            labelGap: labelGap
                         )
+                        // The header stands further from the first row than the
+                        // rows stand from each other.
+                        .padding(.bottom, WidgetMetrics.headerGap - WidgetMetrics.rowGap)
                     }
-                    ForEach(habits) { habit in
+                    ForEach(Array(entry.habits.prefix(rowLimit))) { habit in
                         WidgetRow(
                             habit: habit,
                             week: entry.week,
@@ -67,15 +72,15 @@ struct WeekWidgetView: View {
                             track: track,
                             side: side,
                             labelWidth: labelWidth,
-                            labelSpacing: labelSpacing,
+                            labelGap: labelGap,
                             showsLabel: showsLabels,
                             burst: entry.burstHabit == habit.id ? entry.coverage : nil
                         )
                     }
-                    if overflow > 0 {
-                        Text("+\(overflow) more")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                    if entry.habits.count > rowLimit {
+                        Text("+\(entry.habits.count - rowLimit) more")
+                            .font(.system(size: WidgetMetrics.textSize))
+                            .foregroundStyle(GlowPalette.headerRest)
                     }
                     Spacer(minLength: 0)
                 }
@@ -89,20 +94,22 @@ private struct WidgetHeader: View {
     let today: Date
     let track: CGFloat
     let labelWidth: CGFloat
-    let labelSpacing: CGFloat
+    let labelGap: CGFloat
 
     private var initials: [String] { WeekCalendar.weekdayInitials() }
 
     var body: some View {
-        HStack(spacing: labelSpacing) {
+        HStack(spacing: labelGap) {
             Color.clear.frame(width: labelWidth, height: 1)
             HStack(spacing: SlotLayout.gap(trackWidth: track)) {
                 ForEach(0..<7, id: \.self) { index in
                     let isToday = week.days[index] == today
                     let letter = Text(initials[index])
-                        .font(.system(size: GlowPalette.widgetTextSize))
+                        .font(.system(size: WidgetMetrics.textSize))
 
                     Group {
+                        // Today's letter is white with a drop shadow in the
+                        // design, so it is a glow and not a brighter grey.
                         if isToday {
                             letter.glowing(halo: GlowPalette.headerHalo)
                         } else {
@@ -113,6 +120,7 @@ private struct WidgetHeader: View {
                 }
             }
         }
+        .frame(height: WidgetMetrics.headerHeight)
         .accessibilityHidden(true)
     }
 }
@@ -124,7 +132,7 @@ private struct WidgetRow: View {
     let track: CGFloat
     let side: CGFloat
     let labelWidth: CGFloat
-    let labelSpacing: CGFloat
+    let labelGap: CGFloat
     let showsLabel: Bool
     /// Non-nil while this habit's completion is animating.
     let burst: Double?
@@ -146,27 +154,8 @@ private struct WidgetRow: View {
     }
 
     var body: some View {
-        HStack(spacing: labelSpacing) {
-            if showsLabel {
-                let text = HStack(spacing: 5) {
-                    HabitIconView(icon: habit.icon)
-                    Text(habit.name)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-                .font(.system(size: GlowPalette.widgetTextSize))
-
-                Group {
-                    // Full white with a drop shadow in the design means a real
-                    // glow, the same rule the marks follow.
-                    if isDue {
-                        text.glowing(halo: GlowPalette.labelHalo)
-                    } else {
-                        text.foregroundStyle(GlowPalette.labelResting)
-                    }
-                }
-                .frame(width: labelWidth, alignment: .leading)
-            }
+        HStack(spacing: labelGap) {
+            if showsLabel { label }
 
             HStack(spacing: SlotLayout.gap(trackWidth: track)) {
                 if spans.isEmpty {
@@ -187,6 +176,30 @@ private struct WidgetRow: View {
             }
         }
         .frame(height: side)
+    }
+
+    @ViewBuilder
+    private var label: some View {
+        let text = HStack(spacing: WidgetMetrics.iconGap) {
+            HabitIconView(icon: habit.icon)
+                .frame(width: WidgetMetrics.iconWidth)
+            Text(habit.name)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: WidgetMetrics.textSize))
+
+        Group {
+            // Full white with a drop shadow in the design means a real glow, the
+            // same rule the marks follow.
+            if isDue {
+                text.glowing(halo: GlowPalette.labelHalo)
+            } else {
+                text.foregroundStyle(GlowPalette.labelResting)
+            }
+        }
+        .frame(width: labelWidth, alignment: .leading)
     }
 }
 
