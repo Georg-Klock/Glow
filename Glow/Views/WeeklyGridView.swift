@@ -15,7 +15,6 @@ struct WeeklyGridView: View {
     @State private var today = WeekCalendar.day(Date())
     @State private var editingHabit: Habit?
     @State private var isAddingHabit = false
-    @State private var isShowingSettings = false
     @State private var isShowingLowPowerNotice = false
     @State private var lowPower = LowPowerMonitor()
     /// Survives relaunches, so the notice appears once per time Low Power Mode
@@ -39,17 +38,15 @@ struct WeeklyGridView: View {
                     grid
                 }
             }
+            // A large title, which is the system's own left-aligned style, and
+            // both controls on the leading side beside it. Settings is a tab
+            // now, so the trailing side has nothing left to hold.
             .navigationTitle(monthTitle)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItemGroup(placement: .topBarLeading) {
                     if !habits.isEmpty {
                         EditButton()
-                    }
-                }
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button("Settings", systemImage: "gearshape") {
-                        isShowingSettings = true
                     }
                     Button("Add habit", systemImage: "plus") {
                         isAddingHabit = true
@@ -62,9 +59,6 @@ struct WeeklyGridView: View {
         }
         .sheet(item: $editingHabit) { habit in
             HabitEditorView(habit: habit)
-        }
-        .sheet(isPresented: $isShowingSettings) {
-            SettingsView()
         }
         .sheet(isPresented: $isShowingLowPowerNotice) {
             LowPowerNoticeView(headroom: lowPower.currentHeadroom)

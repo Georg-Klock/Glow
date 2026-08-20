@@ -50,7 +50,7 @@ struct GlowApp: App {
 
     var body: some Scene {
         WindowGroup {
-            WeeklyGridView()
+            RootTabView()
                 .tint(GlowPalette.color)
                 .preferredColorScheme(.dark)
         }

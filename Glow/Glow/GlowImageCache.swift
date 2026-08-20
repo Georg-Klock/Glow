@@ -176,15 +176,17 @@ struct GlowModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        ZStack {
-            // The shadow caster sits under the core and is never seen directly.
-            // One shadow, not the three this used to stack: the design specifies
-            // a single blur per mark, and three passes were an invention to
-            // approximate a long tail that the file never asked for.
-            caster(content)
-
-            GlowTile(peak: peak).mask { content }
-        }
+        // An overlay rather than a ZStack, and that is load-bearing: the tile is
+        // a `resizable()` image, so inside a ZStack it expands to whatever space
+        // is going and drags the layout with it. Text glowed that way stops
+        // hugging its leading edge and drifts to the middle of whatever it is
+        // in. An overlay takes the base view's size and cannot do that.
+        //
+        // The caster is one shadow, not the three this used to stack: the design
+        // specifies a single blur per mark, and three passes were an invention
+        // approximating a long tail the file never asked for.
+        caster(content)
+            .overlay { GlowTile(peak: peak).mask { content } }
         // The whole glowing layer breathes together, so the halo and the core
         // never drift out of step.
         .opacity(isBreathing ? 1.0 : Self.breathLow)
