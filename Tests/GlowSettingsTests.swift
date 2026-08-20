@@ -77,24 +77,42 @@ struct WidgetBurstTests {
         #expect(WidgetBurst.coverage(at: WidgetBurst.hold + 0.01) > 0)
     }
 
-    @Test("Coverage rises to fully covered and never past it")
-    func coverageRange() {
+    @Test("Coverage settles at fully covered")
+    func coverageSettles() {
         #expect(WidgetBurst.coverage(at: WidgetBurst.duration) == 1)
         #expect(WidgetBurst.coverage(at: WidgetBurst.duration * 5) == 1)
-        for step in stride(from: 0.0, through: WidgetBurst.duration, by: 0.05) {
-            let c = WidgetBurst.coverage(at: step)
-            #expect(c >= 0 && c <= 1, "coverage \(c) out of range at \(step)")
-        }
     }
 
-    @Test("Coverage only ever increases")
-    func monotonic() {
-        var previous = -1.0
-        for step in stride(from: 0.0, through: WidgetBurst.duration, by: 0.05) {
-            let c = WidgetBurst.coverage(at: step)
-            #expect(c >= previous, "coverage went backwards at \(step)")
-            previous = c
-        }
+    @Test("Coverage overshoots, which is the whole point")
+    func coverageOvershoots() {
+        // It used to be an easeOut, and was asserted never to pass 1. A spring
+        // does pass 1 — the ring closes past the dot and settles back — and
+        // without that the widget eases politely shut while the app snaps, so
+        // the two read as different gestures for the same act.
+        let samples = stride(from: 0.0, through: WidgetBurst.duration, by: 0.005)
+            .map(WidgetBurst.coverage)
+        #expect(samples.max() ?? 0 > 1.02, "no overshoot: peak \(samples.max() ?? 0)")
+        // Bounded, though. A big overshoot would invert the mark it is driving.
+        #expect(samples.max() ?? 0 < 1.25)
+        #expect(samples.allSatisfy { $0 >= 0 })
+    }
+
+    @Test("It settles rather than ringing on")
+    func coverageSettlesQuickly() {
+        // The last third should be within a whisker of 1, or the dot is still
+        // visibly wobbling when the animation is supposed to be over.
+        let tail = stride(from: WidgetBurst.duration * 0.8, through: WidgetBurst.duration, by: 0.005)
+            .map(WidgetBurst.coverage)
+        #expect(tail.allSatisfy { abs($0 - 1) < 0.05 }, "still ringing: \(tail.map { ($0 * 100).rounded() / 100 })")
+    }
+
+    @Test("There are enough frames to read as motion")
+    func frameCount() {
+        // At 10fps across a second this was a handful of stills. Entries inside
+        // a timeline are free — only reloads are budgeted — and this burst rides
+        // inside the reload a tap already paid for.
+        let frames = Int(WidgetBurst.duration / WidgetBurst.step)
+        #expect(frames >= 15, "\(frames) frames is not a movement")
     }
 
     @Test("A stale tap does not replay")
@@ -112,10 +130,15 @@ struct WidgetBurstTests {
 
     @Test("The burst fits inside one timeline, so it spends no extra reloads")
     func burstIsCheap() {
-        // The whole point: a tap already costs a reload, and the animation
-        // rides inside the timeline that reload produces.
+        // The whole point: a tap already costs a reload, and the animation rides
+        // inside the timeline that reload produces.
+        //
+        // The bound here used to be fifteen frames, which confused two things.
+        // Entries are free; it is *reloads* that are budgeted, and this spends
+        // none. What has to stay small is the duration — a long burst would
+        // still be animating when the next tap arrives.
         let frames = Int(WidgetBurst.duration / WidgetBurst.step)
-        #expect(frames <= 15, "\(frames) frames is more timeline than a second of animation needs")
-        #expect(WidgetBurst.duration <= 1.5)
+        #expect(frames <= 60, "\(frames) frames is more timeline than one gesture needs")
+        #expect(WidgetBurst.duration <= 0.75)
     }
 }
