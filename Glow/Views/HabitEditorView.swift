@@ -31,13 +31,28 @@ struct HabitEditorView: View {
                     HStack(spacing: 12) {
                         // The icon leads the row, so a habit is a picture and a
                         // name in that order — the same order the grid reads in.
+                        //
+                        // On a filled circle with a chevron, because a bare
+                        // glyph beside a text field reads as decoration and
+                        // nothing about it says it can be changed. This is the
+                        // same shape Reminders and Calendar use for the job.
                         Button { isPickingIcon = true } label: {
                             HabitIconView(icon: icon)
                                 .font(.title3)
-                                .frame(width: 32)
+                                .frame(width: 36, height: 36)
+                                .background(Circle().fill(.fill.tertiary))
+                                .overlay(alignment: .bottomTrailing) {
+                                    Image(systemName: "chevron.down.circle.fill")
+                                        .font(.caption2)
+                                        .symbolRenderingMode(.palette)
+                                        .foregroundStyle(GlowPalette.color, .black)
+                                        .offset(x: 2, y: 2)
+                                }
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Icon")
+                        .accessibilityHint("Choose a different icon")
+                        .accessibilityAddTraits(.isButton)
 
                         TextField("Name", text: $name)
                             .textInputAutocapitalization(.sentences)
@@ -72,9 +87,12 @@ struct HabitEditorView: View {
                         .disabled(trimmedName.isEmpty)
                 }
             }
-        }
-        .navigationDestination(isPresented: $isPickingIcon) {
-            SymbolPickerView(selection: $icon)
+            // Inside the stack, not on it. Applied to the NavigationStack
+            // itself this compiles, shows nothing, and reads as a dead tap
+            // target — there is no stack above it to push onto.
+            .navigationDestination(isPresented: $isPickingIcon) {
+                SymbolPickerView(selection: $icon)
+            }
         }
         .onAppear(perform: loadExisting)
         // Destructive and irreversible: the completions cascade with it.
@@ -109,7 +127,7 @@ struct HabitEditorView: View {
                 Text("\(timesPerWeek)")
                     .monospacedDigit()
                     .foregroundStyle(GlowPalette.color)
-                Text(timesPerWeek == 1 ? " time per week" : " times per week")
+                Text("x per week")
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
