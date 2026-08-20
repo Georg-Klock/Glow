@@ -22,34 +22,25 @@ struct GlowWidget: Widget {
                 .padding(.leading, WidgetMetrics.padLeading)
                 .padding(.trailing, WidgetMetrics.padTrailing)
                 .padding(.vertical, WidgetMetrics.padVertical)
+                // Declared with `containerBackground`, never `.background`, and
+                // left removable. That is the whole contract: a widget does not
+                // choose whether it has a background — the person does, by
+                // setting the Home Screen to Default, Tinted or Clear. Under
+                // Tinted or Clear the system renders in `accented` mode, drops
+                // this background and substitutes glass.
+                //
+                // Black is what it is under Default, where the background is
+                // composited into the snapshot opaquely and every alpha resolves
+                // against black. `.clear` measures as black there — which it
+                // does, and which was wrongly written up in this file as proof
+                // that a home screen widget cannot be transparent. It is not a
+                // platform limit; it is one appearance out of three.
+                //
+                // `containerBackgroundRemovable` is deliberately untouched. Its
+                // default is true, and passing false opts out of glass, out of
+                // the StandBy and iPad Lock Screen galleries, and out of
+                // foreground tinting with it.
                 .containerBackground(.black, for: .widget)
-                // **A home screen widget cannot be transparent.** Measured on
-                // a simulator against a bright wallpaper, all three ways:
-                //
-                //   .clear              opaque black
-                //   omitted entirely    opaque black
-                //   .red                red — so this is ours, not the system's
-                //   .ultraThinMaterial  translucent, wallpaper showing through
-                //
-                // Alpha in a container background composites against black
-                // rather than against the wallpaper, so "clear" is not nothing,
-                // it is black — and the design's 3% gradient was black too, for
-                // the same reason. Only a Material samples what is behind it.
-                //
-                // A Material was tried and is not the answer either: a widget
-                // renders out of process into a snapshot, so it cannot sample
-                // the wallpaper, and the material comes out as flat dark grey
-                // rather than as anything see-through.
-                //
-                // So the background is not removable, and the only real choice
-                // is which one. Black: it is what every other surface in this
-                // app is, and it is the one value that guarantees the marks
-                // keep their contrast whatever the wallpaper is doing. A grey
-                // card on a bright photo would take the glow with it.
-                //
-                // Widgets that really are transparent were built against a
-                // pre-iOS-17 SDK and are grandfathered. A build made today
-                // cannot opt out.
         }
         // WidgetKit's own margins are close to the design's but not equal, and
         // they are applied inside the container — so the padding above only
