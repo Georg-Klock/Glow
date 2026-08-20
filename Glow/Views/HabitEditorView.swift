@@ -47,19 +47,7 @@ struct HabitEditorView: View {
                 }
 
                 Section {
-                    // A Stepper, which is the system's own — and + pair. There
-                    // is no cadence switch any more: seven times a week *is*
-                    // daily, and a mode plus a count is two controls that can
-                    // disagree with each other about one fact.
-                    Stepper(value: $timesPerWeek, in: 1...Frequency.daysInWeek) {
-                        HStack(spacing: 0) {
-                            Text("\(timesPerWeek)")
-                                .monospacedDigit()
-                                .foregroundStyle(GlowPalette.color)
-                            Text(timesPerWeek == 1 ? " time per week" : " times per week")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    frequencyRow
                 }
 
                 if isEditing {
@@ -100,6 +88,67 @@ struct HabitEditorView: View {
         } message: {
             Text("This also removes every day logged against it. It cannot be undone.")
         }
+    }
+
+    /// Minus, the reading, plus — in that order across the row.
+    ///
+    /// Hand-rolled rather than a `Stepper`, which always puts its label on one
+    /// side and both buttons on the other and cannot be split around the middle.
+    /// What a `Stepper` gives away for free has to be put back by hand, and the
+    /// pieces below are exactly that: bounds that disable rather than clamp
+    /// silently, hit targets a thumb can find, and an adjustable action so
+    /// VoiceOver still reads this as one control with a value rather than as two
+    /// unlabelled buttons either side of some text.
+    private var frequencyRow: some View {
+        HStack(spacing: 8) {
+            stepButton("minus", enabled: timesPerWeek > Frequency.selectableCounts.lowerBound) {
+                timesPerWeek -= 1
+            }
+
+            HStack(spacing: 0) {
+                Text("\(timesPerWeek)")
+                    .monospacedDigit()
+                    .foregroundStyle(GlowPalette.color)
+                Text(timesPerWeek == 1 ? " time per week" : " times per week")
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+
+            stepButton("plus", enabled: timesPerWeek < Frequency.selectableCounts.upperBound) {
+                timesPerWeek += 1
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Times per week")
+        .accessibilityValue("\(timesPerWeek)")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment where timesPerWeek < Frequency.selectableCounts.upperBound:
+                timesPerWeek += 1
+            case .decrement where timesPerWeek > Frequency.selectableCounts.lowerBound:
+                timesPerWeek -= 1
+            default:
+                break
+            }
+        }
+    }
+
+    private func stepButton(
+        _ symbol: String,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.body.weight(.medium))
+                .frame(width: 44, height: 32)
+                .contentShape(Rectangle())
+        }
+        // Borderless, or a Form row treats its whole width as one button and
+        // either control fires whichever was tapped.
+        .buttonStyle(.borderless)
+        .disabled(!enabled)
+        .accessibilityHidden(true)
     }
 
     private func loadExisting() {
