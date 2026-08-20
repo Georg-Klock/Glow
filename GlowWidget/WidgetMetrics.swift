@@ -38,6 +38,17 @@ enum WidgetMetrics {
     /// The habit icon is a step larger than the name it sits beside.
     static let iconSize: CGFloat = 14
 
+    /// How far a habit name may run before it is truncated.
+    ///
+    /// Not the label column — a name is allowed to overflow it and use the gap
+    /// before the track, which is how the design fits "Watch Sunset". The limit
+    /// is where the track begins, so a name can never collide with the grid:
+    ///
+    ///     (label 98 + gap 15) − icon 24 − iconGap 4.5 = 84.5
+    ///
+    /// The longest name in the design measures 79, so nothing there reaches it.
+    static let nameMaxWidth: CGFloat = (labelWidth + labelGap) - iconWidth - iconGap
+
     /// The weekday header's own row: shorter than a slot row, and its cells are
     /// wider than a slot with almost no gap, because a letter needs the width
     /// and a slot does not.
