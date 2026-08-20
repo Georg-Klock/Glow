@@ -18,7 +18,18 @@ struct SymbolPickerView: View {
         var id: String { rawValue }
     }
 
-    private let columns = [GridItem(.adaptive(minimum: 52), spacing: 10)]
+    /// Six per row, fixed rather than adaptive, and square.
+    ///
+    /// Adaptive sizing fits as many as it can and then distributes the slack,
+    /// so the cells are never quite square and the count changes with the
+    /// screen. A fixed count divides the width exactly, and a 1:1 aspect ratio
+    /// makes each cell a square — which is what a grid of pictograms wants to
+    /// be when there is no card behind them to define the shape.
+    private static let symbolColumnCount = 6
+    private let columns = Array(
+        repeating: GridItem(.flexible(), spacing: 10),
+        count: symbolColumnCount
+    )
     /// Tighter and chrome-free, like the emoji keyboard: glyphs sit next to
     /// each other rather than each in its own tile.
     private let emojiColumns = [GridItem(.adaptive(minimum: 44), spacing: 4)]
@@ -81,14 +92,40 @@ struct SymbolPickerView: View {
     private func symbolGrid(_ symbols: [String]) -> some View {
         LazyVGrid(columns: columns, spacing: 10) {
             ForEach(symbols, id: \.self) { symbol in
-                tile(isSelected: selection == symbol) { selection = symbol } content: {
-                    Image(systemName: symbol).font(.system(size: 22))
-                }
-                .accessibilityLabel(symbol.replacingOccurrences(of: ".", with: " "))
-                .accessibilityAddTraits(selection == symbol ? [.isSelected, .isButton] : .isButton)
+                symbolTile(symbol)
+                    .accessibilityLabel(symbol.replacingOccurrences(of: ".", with: " "))
+                    .accessibilityAddTraits(
+                        selection == symbol ? [.isSelected, .isButton] : .isButton
+                    )
             }
         }
         .padding(.horizontal, 16)
+    }
+
+    private func symbolTile(_ symbol: String) -> some View {
+        Button {
+            selection = symbol
+            dismiss()
+        } label: {
+            // A clear square carrying the glyph, rather than the glyph carrying
+            // a frame. It is what makes the cell exactly square regardless of
+            // how wide or tall the symbol inside it happens to draw.
+            Color.clear
+                .aspectRatio(1, contentMode: .fit)
+                .overlay {
+                    let glyph = Image(systemName: symbol).font(.system(size: 24))
+                    // Selection is the glow, because the card that used to
+                    // carry it is gone — and a glow is what this app says
+                    // "chosen" with everywhere else.
+                    if selection == symbol {
+                        glyph.glowing(halo: GlowPalette.labelHalo)
+                    } else {
+                        glyph.foregroundStyle(GlowPalette.color)
+                    }
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Emoji
@@ -161,25 +198,5 @@ struct SymbolPickerView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
         .background(.bar)
-    }
-
-    private func tile<Content: View>(
-        isSelected: Bool,
-        select: @escaping () -> Void,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        Button {
-            select()
-            dismiss()
-        } label: {
-            content()
-                .frame(width: 52, height: 52)
-                .foregroundStyle(isSelected ? Color.black : Color.primary)
-                .background {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(isSelected ? AnyShapeStyle(GlowPalette.color) : AnyShapeStyle(.fill.tertiary))
-                }
-        }
-        .buttonStyle(.plain)
     }
 }
