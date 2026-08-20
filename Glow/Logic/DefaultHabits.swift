@@ -18,20 +18,31 @@ enum DefaultHabits {
         let frequency: Frequency
     }
 
-    /// A deliberate mix of cadences, so both row shapes are on screen at once
-    /// and the difference between seven circles and N pills is visible without
-    /// having to go and create it.
+    /// The set from the design file, in its order, with its icons and cadences.
     ///
-    /// Names are kept short on purpose. The label column is a fixed fraction of
-    /// the width, and "Drink water" truncates to "Drink wa..." on a small phone,
-    /// which is a poor first impression for a screen whose whole claim is that
-    /// it is readable at a glance.
+    /// Taken literally rather than tidied, because these are what the design
+    /// shows and the seed is the first screen anyone sees. Two things in it are
+    /// worth knowing rather than quietly fixing:
+    ///
+    ///  - **Two habits called "Touch Grass"**, one daily and one twice a week.
+    ///    In a mock that is how you show both row shapes side by side; in a real
+    ///    install it is two rows nobody can tell apart.
+    ///  - **"Watch Sunset" carries the `sunrise` symbol** — the arrow in the
+    ///    file's glyph points up. Matched deliberately; `sunset` is one word away.
+    ///
+    /// Names are short on purpose. The label column is a fixed fraction of the
+    /// width, and a long name truncates on a small phone, which is a poor first
+    /// impression for a screen whose whole claim is that it reads at a glance.
+    ///
+    /// Habits, not history: see the note above. Nothing here is pre-completed.
     static let all: [Template] = [
-        Template(name: "Read", icon: "book", frequency: .daily),
-        Template(name: "Water", icon: "drop", frequency: .daily),
-        Template(name: "Exercise", icon: "figure.run", frequency: .timesPerWeek(3)),
-        Template(name: "Stretch", icon: "figure.flexibility", frequency: .timesPerWeek(4)),
-        Template(name: "Outside", icon: "leaf", frequency: .daily),
-        Template(name: "Early night", icon: "bed.double", frequency: .timesPerWeek(5))
+        Template(name: "Workout", icon: "figure.run", frequency: .daily),
+        Template(name: "Stretch", icon: "figure.flexibility", frequency: .daily),
+        Template(name: "Study", icon: "book", frequency: .daily),
+        Template(name: "Early night", icon: "bed.double", frequency: .timesPerWeek(2)),
+        Template(name: "Hydration", icon: "drop", frequency: .daily),
+        Template(name: "Touch Grass", icon: "leaf", frequency: .daily),
+        Template(name: "Touch Grass", icon: "leaf", frequency: .timesPerWeek(2)),
+        Template(name: "Watch Sunset", icon: "sunrise", frequency: .timesPerWeek(1))
     ]
 }

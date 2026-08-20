@@ -34,20 +34,26 @@ Nothing had to migrate. The stored field was a string before and still is:
 `HabitSymbol.isSymbol` decides whether to draw it as a symbol or as text, so a
 habit created with an emoji keeps it.
 
-## 1x and 7x per week: neither is selectable
+## 7x per week is not selectable. 1x now is.
 
-**Question.** Does the frequency picker expose 7 as a valid N? Does a one-pill
+**Question.** Does the frequency picker expose 7 as a valid N? Does a one-slot
 row look broken?
 
-**Decision.** The picker offers 2 through 6.
+**Decision.** The picker offers 1 through 6.
 
 7x a week is `daily` wearing a different hat, and having two ways to express
 the same cadence means two rows that behave identically but render differently,
-which is a bug waiting to be filed. 1x a week is a single pill spanning the
-whole track, which reads as a progress bar rather than as a habit slot.
+which is a bug waiting to be filed. That part has not changed.
 
-This is enforced by construction rather than by the picker: `Frequency(timesPerWeek:)`
-normalizes anything at or above 7 to `.daily` and clamps anything below 2, so a
+**1x was excluded and is not any more** (2026-08-20). The objection was that a
+single shape spanning the whole track reads as a progress bar rather than as a
+habit. Under the design the app now follows, a met goal *is* a single shape
+spanning the whole track, so the thing that made 1x look broken is the same
+thing that makes every completed week look right. The design file also seeds a
+1x habit, which settled it.
+
+Enforced by construction rather than by the picker: `Frequency(timesPerWeek:)`
+normalizes anything at or above 7 to `.daily` and clamps anything below 1, so a
 degenerate cadence cannot exist even if it arrives from a future sync or a
 future edit screen.
 

@@ -8,12 +8,12 @@ enum Frequency: Equatable, Hashable, Sendable, Codable {
     case timesPerWeek(Int)
 
     /// What the frequency picker offers. 7x a week is `daily` wearing a
-    /// different hat, and 1x a week is a single-pill row that reads as broken,
-    /// so neither is selectable. See docs/decisions.md.
-    static let selectableCounts = 2...6
+    /// different hat, so it is not selectable; 1x is, since the design draws it.
+    /// See docs/decisions.md.
+    static let selectableCounts = 1...6
 
     /// Normalizing initializer, so no caller can construct a degenerate case.
-    /// Anything at or above 7 collapses to `.daily`; anything below 2 clamps up.
+    /// Anything at or above 7 collapses to `.daily`; anything below 1 clamps up.
     init(timesPerWeek count: Int) {
         let clamped = min(max(count, Frequency.selectableCounts.lowerBound), 7)
         self = clamped >= 7 ? .daily : .timesPerWeek(clamped)
