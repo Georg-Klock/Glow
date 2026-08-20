@@ -20,11 +20,15 @@ struct HabitEditorView: View {
     @State private var isConfirmingDelete = false
     @State private var isPickingIcon = false
 
-    /// The height of a platter, and the corner it is cut with — matched to what
-    /// an inset-grouped Form row already looks like, since these sit where one
-    /// would have been.
-    private static let rowHeight: CGFloat = 44
-    private static let platterRadius: CGFloat = 12
+    /// One height and one corner for every platter on this screen.
+    ///
+    /// The icon, the name and the stepper were three different heights: two
+    /// hand-set and one whatever a Form row happened to size itself to. Now all
+    /// three draw their own background at the same numbers, which is the only
+    /// way three rows agree — matching a system row's height by eye works until
+    /// the OS changes its padding.
+    private static let rowHeight: CGFloat = 56
+    private static let platterRadius: CGFloat = 14
 
     private var isEditing: Bool { habit != nil }
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -75,22 +79,28 @@ struct HabitEditorView: View {
 
                 Section {
                     frequencyRow
+                        .frame(height: Self.rowHeight)
+                        .background(platter)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
                 }
 
                 if isEditing {
                     Section {
-                        // Explicitly red. `role: .destructive` would colour it
+                        // No platter and no explanation. The confirmation
+                        // dialog says what deleting costs, at the moment it
+                        // costs it — a sentence under the button says it to
+                        // everyone who is only passing by.
+                        //
+                        // Explicitly red: `role: .destructive` would colour it
                         // for free, except the app sets a white tint at the
-                        // root and that wins — so the one button that must not
-                        // look like every other button looked like every other
-                        // button.
+                        // root and that wins.
                         Button("Delete Habit", role: .destructive) {
                             isConfirmingDelete = true
                         }
                         .foregroundStyle(.red)
                         .frame(maxWidth: .infinity, alignment: .center)
-                    } footer: {
-                        Text("Deleting a habit also removes everything logged against it.")
+                        .listRowBackground(Color.clear)
                     }
                 }
             }
