@@ -22,8 +22,15 @@ struct SlotView: View {
     let onToggle: (Date) -> Void
 
     /// How far past its resting size a press pushes the ring.
-    private static let pressScale: CGFloat = 1.14
-    private static let close = Animation.spring(response: 0.34, dampingFraction: 0.58)
+    private static let pressScale: CGFloat = 1.32
+
+    /// The closing spring, and how long to hold the animating layer afterwards.
+    ///
+    /// Not private: the habit's label dims over exactly this, so the row reads
+    /// as one movement rather than a mark that animates beside a label that
+    /// snaps. Two timings for one event is two events.
+    static let close = Animation.spring(response: 0.34, dampingFraction: 0.58)
+    static let closeDuration: Duration = .milliseconds(600)
 
     /// Non-nil only while a completion is closing. When it is nil the slot draws
     /// its resting truth and nothing else.
@@ -99,7 +106,7 @@ struct SlotView: View {
         // same glowing dot the animation ends on, so nothing moves at the
         // handover, and no animating layer is left alive behind a still one.
         Task {
-            try? await Task.sleep(for: .milliseconds(600))
+            try? await Task.sleep(for: Self.closeDuration)
             if slot.state == .filled { closing = nil }
         }
     }
