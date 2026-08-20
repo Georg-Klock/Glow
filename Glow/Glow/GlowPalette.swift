@@ -37,6 +37,25 @@ enum GlowPalette {
     /// How far the halo carries beyond the slot, as a multiple of slot height.
     static let haloRadius: CGFloat = 0.55
 
+    // MARK: - Brightness tiers
+    //
+    // One rule: today is the only lit column, and everything else recedes.
+    // Emphasis tracks "needs you now", not "went well" — which is why a habit
+    // already done today is dimmer than one still waiting, and why a week of
+    // perfect history sits quieter than a single empty slot.
+    //
+    // The multipliers are measured off the design rather than guessed.
+
+    /// A habit still waiting on today: its icon and name, at full strength.
+    static let labelDue = color
+    /// A habit already handled today. Present, done asking.
+    static let labelResting = color.opacity(0.56)
+    /// A completion on a day already gone.
+    static let markPast = color.opacity(0.81)
+    /// A day that went unlogged, and a day still to come. Both are just texture:
+    /// the grid stays readable as a grid without either one competing.
+    static let markFaint = color.opacity(0.17)
+
     /// Amber, and the only colour in the app that is not the glow. It is used
     /// for exactly one thing: saying that the glow is not available. A warning
     /// rendered in the app's own white would be indistinguishable from the

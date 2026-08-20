@@ -73,16 +73,26 @@ struct HabitRowView: View {
         .frame(height: max(slotSize.height, GridMetrics.minimumRowHeight))
     }
 
+    /// Whether this habit is still waiting on today.
+    ///
+    /// The label follows the slot: a habit with an open slot is the loudest
+    /// thing in its row, and one already handled today steps back. Emphasis
+    /// tracks "needs you now", not "went well" — a perfect week reads quieter
+    /// than a single empty slot, which is the point.
+    private var isDue: Bool {
+        slots.contains { $0.state == .open }
+    }
+
     private var label: some View {
         HStack(spacing: 8) {
             HabitIconView(icon: snapshot.icon)
             Text(snapshot.name)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 0)
         }
+        .font(.subheadline.weight(isDue ? .semibold : .regular))
+        .foregroundStyle(isDue ? GlowPalette.labelDue : GlowPalette.labelResting)
         .frame(width: geometry.labelWidth, alignment: .leading)
         // The whole label column is the edit target, not just the text. Editing
         // used to live only behind a leftward swipe, which is discoverable if

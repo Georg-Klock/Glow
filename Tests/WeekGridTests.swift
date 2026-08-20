@@ -20,15 +20,54 @@ struct WeekGridTests {
         #expect(slots(.fixture()).count == 7)
     }
 
-    @Test("Today's circle is open, past days are inactive, future days are inactive")
+    @Test("Today is open, past days are missed, future days are inactive")
     func dailyStates() {
         let row = slots(.fixture())
 
-        #expect(row[0].state == .inactive)  // Monday, missed
-        #expect(row[1].state == .inactive)  // Tuesday, missed
+        // A day gone by without a completion is a different fact from a day
+        // that has not arrived, and the grid draws them differently. They were
+        // the same state until the states were separated.
+        #expect(row[0].state == .missed)    // Monday, gone
+        #expect(row[1].state == .missed)    // Tuesday, gone
         #expect(row[2].state == .open)      // Wednesday, today
         #expect(row[3].state == .inactive)  // Thursday, not yet
         #expect(row[6].state == .inactive)
+    }
+
+    @Test("A completion today and a completion on Monday are the same state, different marks")
+    func marksSeparateTodayFromHistory() {
+        let habit = HabitSnapshot.fixture(completedDays: [
+            TestCalendar.date(2026, 8, 17),
+            today
+        ])
+        let row = slots(habit)
+
+        #expect(row[0].state == .filled)
+        #expect(row[2].state == .filled)
+        // Only today's completion is lit. This is the whole hierarchy: an
+        // achievement stops asking for attention the moment it is recorded.
+        #expect(row[0].mark == .donePast)
+        #expect(row[2].mark == .doneToday)
+    }
+
+    @Test("Every state maps to exactly one mark")
+    func markCoverage() {
+        let row = slots(.fixture())
+
+        #expect(row[0].mark == .missed)
+        #expect(row[2].mark == .openToday)
+        #expect(row[3].mark == .upcoming)
+    }
+
+    @Test("A habit due a number of times a week can never miss")
+    func frequencyRowsNeverMiss() {
+        // An empty slot on Wednesday is not a failure when the week is still
+        // winnable, so these rows have no past to have missed.
+        for target in 2...6 {
+            let row = slots(.fixture(frequency: .timesPerWeek(target)))
+            #expect(!row.contains { $0.state == .missed }, "\(target)x per week produced a miss")
+            #expect(!row.contains { $0.mark == .missed })
+        }
     }
 
     @Test("A completed day is filled, including today")

@@ -1,48 +1,54 @@
 import SwiftUI
 
-/// One circle or pill, and the completion animation.
+/// One slot, and the completion animation.
 ///
-/// Layering, bottom to top:
-///  1. the empty track, so an inactive slot is a flat quiet shape;
-///  2. the HDR glow, clipped to the slot;
-///  3. the solid filled shape, which fades **in** over the glow.
+/// Completing runs in three beats: the ring holds for a moment, fills solid, and
+/// becomes the checkmark. The hold is what makes it read as an event rather than
+/// as the light going out, and the fill is the payoff — for that one moment the
+/// slot is the brightest thing the screen will show all day.
 ///
-/// Step 3 is the trick of the completion transition. The obvious implementation
-/// is to fade the glow out, but animating opacity on an HDR layer invites the
-/// compositor to flatten it into an offscreen SDR buffer, and a glow that dies
-/// the instant you touch it is the hardest possible bug to diagnose. Fading an
-/// opaque shape in over a glow that never changes looks identical and never
-/// puts the HDR layer through a blend.
+/// Every other transition is instant. Un-completing especially: it is a
+/// correction, and animating a correction dresses a mistake up as an
+/// achievement.
+///
+/// All three beats are the same HDR tile under different masks, cross-faded. The
+/// codebase avoided that for a long time on the belief that animating an HDR
+/// layer's opacity would flatten it into an SDR buffer. Measured on device, it
+/// does not — which is what makes this shape possible at all.
 struct SlotView: View {
     let slot: Slot
     let size: CGSize
     let habitName: String
 
-    /// Hold the glow at full strength for a beat after the tap, so completion
-    /// registers as an event rather than as the glow simply vanishing.
-    private static let holdDuration: Duration = .milliseconds(200)
-    private static let fadeDuration: TimeInterval = 0.75
+    /// Hold the ring at full strength for a beat after the tap.
+    private static let hold: Duration = .milliseconds(200)
+    private static let fill: TimeInterval = 0.35
+    private static let settle: TimeInterval = 0.25
 
-    @State private var isGlowing = false
-    @State private var fillCoverage: Double = 0
+    /// Non-nil only while a completion is playing. When it is nil the slot draws
+    /// its resting truth and nothing else.
+    @State private var beats: Beats?
+
+    /// The opacity of each of the three layers.
+    private struct Beats: Equatable {
+        var ring: Double = 1
+        var capsule: Double = 0
+        var check: Double = 0
+    }
 
     var body: some View {
         ZStack {
-            Capsule(style: .continuous)
-                .fill(.fill.tertiary)
-
-            if isGlowing {
-                GlowImageView(size: size)
+            if let beats {
+                GlowImageView(size: size, shape: .ring).opacity(beats.ring)
+                GlowImageView(size: size, shape: .capsule).opacity(beats.capsule)
+                GlowImageView(size: size, shape: .checkmark).opacity(beats.check)
+            } else {
+                SlotMarkView(mark: slot.mark, size: size)
             }
-
-            Capsule(style: .continuous)
-                .fill(GlowPalette.filled)
-                .opacity(fillCoverage)
         }
         .frame(width: size.width, height: size.height)
         .contentShape(Capsule(style: .continuous))
         .allowsHitTesting(slot.isTappable)
-        .onAppear { settleWithoutAnimation() }
         .onChange(of: slot.state) { previous, next in
             transition(from: previous, to: next)
         }
@@ -53,10 +59,11 @@ struct SlotView: View {
     }
 
     private var accessibilityLabel: String {
-        let state = switch slot.state {
-        case .filled: "done"
-        case .open: "due today"
-        case .inactive: "not done"
+        let state = switch slot.mark {
+        case .doneToday, .donePast: "done"
+        case .openToday: "due today"
+        case .missed: "missed"
+        case .upcoming: "upcoming"
         }
         return "\(habitName), \(state)"
     }
@@ -69,37 +76,31 @@ struct SlotView: View {
         return slot.state == .filled ? "Mark as not done" : "Mark as done"
     }
 
-    /// Settle straight into the current state on first layout, so scrolling a
-    /// row back into view does not replay the completion animation.
-    private func settleWithoutAnimation() {
-        isGlowing = slot.state == .open
-        fillCoverage = slot.state == .filled ? 1 : 0
-    }
-
     private func transition(from previous: SlotState, to next: SlotState) {
         guard previous == .open, next == .filled else {
-            // Every other transition is instant, including un-completing today,
-            // which puts the slot straight back to open with the glow resumed.
-            withAnimation(.easeOut(duration: 0.2)) {
-                fillCoverage = next == .filled ? 1 : 0
-            }
-            isGlowing = next == .open
+            beats = nil
             return
         }
 
-        // Completion: hold, then let the solid fill rise over the glow.
-        isGlowing = true
-        fillCoverage = 0
+        beats = Beats()
         Task {
-            try? await Task.sleep(for: Self.holdDuration)
-            guard slot.state == .filled else { return }
-            withAnimation(.easeOut(duration: Self.fadeDuration)) {
-                fillCoverage = 1
+            try? await Task.sleep(for: Self.hold)
+            guard slot.state == .filled else { return beats = nil }
+            withAnimation(.easeOut(duration: Self.fill)) {
+                beats = Beats(ring: 0, capsule: 1, check: 0)
             }
-            // Drop the HDR layer once it is fully covered, so a settled week
-            // holds no HDR images alive behind opaque shapes.
-            try? await Task.sleep(for: .seconds(Self.fadeDuration))
-            if slot.state == .filled { isGlowing = false }
+
+            try? await Task.sleep(for: .seconds(Self.fill))
+            guard slot.state == .filled else { return beats = nil }
+            withAnimation(.easeInOut(duration: Self.settle)) {
+                beats = Beats(ring: 0, capsule: 0, check: 1)
+            }
+
+            // Hand back to the resting mark, which is the same glowing
+            // checkmark — so a row scrolled away and back does not replay any
+            // of this, and no HDR layers are left alive at zero opacity.
+            try? await Task.sleep(for: .seconds(Self.settle))
+            if slot.state == .filled { beats = nil }
         }
     }
 }

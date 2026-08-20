@@ -82,6 +82,7 @@ targets:
       - path: Glow/Store
       - path: Glow/Glow
       - path: Glow/Views/HabitIconView.swift
+      - path: Glow/Views/SlotMarkView.swift
       - path: Glow/Resources/SymbolCatalog.json
         buildPhase: resources
     configFiles:

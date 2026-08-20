@@ -8,12 +8,15 @@ which in the same session you find it.
 A habit tracker whose weekly overview is the whole app: a grid of habits by
 day, filled when done.
 
-The slot for today, while still incomplete, physically glows on HDR-capable
-screens: the slot is drawn from an image encoded in a colour space with real
-headroom above SDR white, which is what makes HDR photos look brighter than
-white in Photos. The glow is an "unfinished, still actionable today"
-signal, not a reward for completion. It disappears when you complete the habit
-(after a beat) or when the day ends.
+Today's column physically glows on HDR-capable screens: it is drawn from an
+image encoded in a colour space with real headroom above SDR white, which is
+what makes HDR photos look brighter than white in Photos.
+
+The glow marks **today**, and nothing else in the week has headroom. Within
+today, an incomplete habit is louder than a completed one — the signal is
+"still actionable", not a reward — but a completion made today stays lit until
+the day ends, because it is still today's news. Everything outside today is
+flat, whether it went well or not.
 
 ## 2. Goals
 
@@ -85,15 +88,15 @@ space rather than trusting it.
 Each habit is one row: icon and name on the left, a fixed-width status track on
 the right.
 
-- **Daily:** 7 equal circles, Monday to Sunday, day-pinned.
-- **N per week:** N equal pills, the same height as a daily circle, filling the
+- **Daily:** 7 equal slots, Monday to Sunday, day-pinned.
+- **N per week:** N equal slots, the same height as a daily one, filling the
   same total track width.
 
 Given track width `W` and inter-item margin `G`:
 
 ```
-dailyCircleWidth = (W - 6 * G) / 7
-pillWidth(N)     = (W - (N - 1) * G) / N
+dailySlotWidth = (W - 6 * G) / 7
+slotWidth(N)   = (W - (N - 1) * G) / N
 ```
 
 Pills are not pinned to weekdays. They fill left to right in the order
@@ -101,24 +104,25 @@ completions are logged, independent of which weekday each fell on.
 
 ## 7. Slot states
 
-Every slot is in exactly one of three states.
+Every slot is in exactly one of four states.
 
-1. **Inactive.** Not completed and not actionable today. Flat grey, no glow.
-   Also the resting look of unfilled pills.
-2. **Open.** Today's slot, not yet completed. The HDR glow, drawn over the
-   empty track. The only glowing state, and it breathes: the glowing layer eases
-   between 85% and 100% opacity and back, over 2.4 seconds, forever. Reduce
-   Motion switches the pulse off and leaves the glow steady.
-3. **Filled.** Completed. Solid colour, no glow once the animation settles.
+1. **Inactive.** A day still to come.
+2. **Missed.** A past day that went unlogged. Daily habits only — for a habit
+   due a number of times a week, an empty Monday is not a failure on Tuesday,
+   because the week is still winnable.
+3. **Open.** Today's slot, not yet completed. The only glowing state.
+4. **Filled.** Completed.
 
-**Completion transition.** On tap the slot holds the glow for ~200ms, then the
-solid filled colour rises over it across ~750ms, leaving a plain filled shape.
+A completion made today and one made on Monday are the same state and are not
+drawn the same way, so the states above map to five *marks*: today's completion
+is distinguished from the rest of the week's. That mapping lives in
+`Slot.mark` and is tested there.
 
-Implemented as two layers rather than an animated HDR encoding, but note the
-direction: the solid SDR shape fades **in** over a glow that never changes,
-rather than the glow fading out. Animating opacity on the HDR layer invites the
-compositor to flatten it into an SDR buffer, and a glow that dies the instant
-it is touched is the hardest possible bug to diagnose. The two look identical.
+**What any of this looks like is deliberately not written down.** The visual
+design is being worked on directly and prose here would only go stale between
+one experiment and the next; the file above is the truth. What is fixed is the
+hierarchy, and only because it is the product rather than a style: today is the
+only lit column, and emphasis tracks "needs you now" rather than "went well".
 
 **Which slot is open, for a frequency habit.** Count this week's completions.
 If `count < N` and today is not already logged, pill index `count` is open.

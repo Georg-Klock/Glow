@@ -1,13 +1,40 @@
 import Foundation
 
-/// The three states a slot can be in. Exactly one applies to any slot.
+/// The four states a slot can be in. Exactly one applies to any slot.
 enum SlotState: String, Equatable, Sendable {
-    /// Not completed, and not actionable today. Flat, SDR, no glow.
+    /// Nothing has happened here and nothing can yet: a day still to come.
     case inactive
+    /// A past day that went unlogged.
+    ///
+    /// Only daily habits can miss. For a habit due a number of times a week, an
+    /// empty Monday is not a failure on Tuesday — the week is still winnable —
+    /// so those rows never produce this state.
+    case missed
     /// Today's slot, not yet completed. The only steadily glowing state.
     case open
-    /// Completed. Solid colour, SDR, no glow once the animation settles.
+    /// Completed.
     case filled
+}
+
+/// What a slot actually draws.
+///
+/// `SlotState` says what is true; this says what is shown, and the two differ in
+/// one place: a completion today and a completion on Monday are the same state
+/// and not the same mark. Derived here rather than in a view so the mapping is
+/// testable without a renderer, and so the app and the widget cannot disagree
+/// about it.
+enum SlotMark: Equatable, Sendable {
+    /// Today, still undone. A glowing ring — the one thing on screen asking for
+    /// anything.
+    case openToday
+    /// Today, done. A glowing checkmark.
+    case doneToday
+    /// Done, on a day already gone.
+    case donePast
+    /// A daily habit's past day that went unlogged.
+    case missed
+    /// A day still to come.
+    case upcoming
 }
 
 /// One rendered circle or pill.
@@ -21,6 +48,19 @@ struct Slot: Identifiable, Equatable, Sendable {
 
     var id: Int { index }
     var isTappable: Bool { actionDay != nil }
+
+    /// Only today's slot ever carries an action, so this is also what separates
+    /// a completion made today from one made earlier in the week.
+    var isToday: Bool { actionDay != nil }
+
+    var mark: SlotMark {
+        switch state {
+        case .open: .openToday
+        case .filled: isToday ? .doneToday : .donePast
+        case .missed: .missed
+        case .inactive: .upcoming
+        }
+    }
 }
 
 /// A habit reduced to the plain values the grid needs. The views and this
@@ -73,7 +113,13 @@ enum WeekGrid {
         week.days.enumerated().map { index, day in
             let isDone = habit.completedDays.contains(day)
             let isToday = day == today
-            let state: SlotState = isDone ? .filled : (isToday ? .open : .inactive)
+
+            let state: SlotState =
+                if isDone { .filled }
+                else if isToday { .open }
+                else if day < today { .missed }
+                else { .inactive }
+
             // Past days are never editable, so only today carries an action.
             return Slot(index: index, state: state, actionDay: isToday ? day : nil)
         }
