@@ -25,7 +25,7 @@ struct SlotMarkView: View {
             // the row is a record of what happened, and Monday happened.
             glow(spansDays ? .bar : .dot)
         case .missed:
-            glyph("xmark", tint: GlowPalette.missed, scale: GlowShape.dotScale)
+            missedMark
         case .upcoming:
             // Solid, not hollow. It reads as an empty socket waiting to be
             // filled, which is what keeps a nearly-empty row legible as a week.
@@ -42,17 +42,24 @@ struct SlotMarkView: View {
         sized(Capsule(style: .continuous).fill(tint))
     }
 
-    /// The only mark drawn as a glyph, and the only one with no glow at all.
-    /// Sized to the completion dot's footprint, which is what the design does:
-    /// a miss occupies exactly the space the thing it replaces would have.
-    private func glyph(_ name: String, tint: Color, scale: CGFloat) -> some View {
-        sized(
-            Image(systemName: name)
-                .resizable()
-                .scaledToFit()
-                .fontWeight(.medium)
-                .frame(width: size.height * scale, height: size.height * scale)
-                .foregroundStyle(tint)
+    /// The only mark with no glow at all, and the only one that is not a symbol.
+    ///
+    /// Two 1pt bars with 9pt arms, crossed at 45° — the design builds it that
+    /// way, and an SF Symbol `xmark` scaled to the same footprint is visibly
+    /// heavier, because its stroke thickens with its size while this one does
+    /// not. Nothing carrying grey has an effect: a miss is an absence, and
+    /// absence does not light up.
+    private var missedMark: some View {
+        let arm = size.height * GlowShape.missedArm
+        let thickness = size.height * GlowShape.missedThickness
+        return sized(
+            ZStack {
+                Rectangle().frame(width: thickness, height: arm)
+                    .rotationEffect(.degrees(45))
+                Rectangle().frame(width: thickness, height: arm)
+                    .rotationEffect(.degrees(-45))
+            }
+            .foregroundStyle(GlowPalette.missed)
         )
     }
 

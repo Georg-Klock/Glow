@@ -3,6 +3,10 @@ import SwiftUI
 /// A habit's icon, as a symbol or as whatever text was stored before symbols.
 struct HabitIconView: View {
     let icon: String
+    /// The widget draws its glyphs at 14 against 12pt names — a deliberate
+    /// step up, so the icon holds the column without the name growing with it.
+    /// The app has no frame in the design and keeps the body size.
+    var size: CGFloat?
 
     /// The icon does not change with its row's state.
     ///
@@ -19,7 +23,7 @@ struct HabitIconView: View {
                 Text(icon)
             }
         }
-        .font(.body.weight(.regular))
+        .font(size.map { .system(size: $0, weight: .regular) } ?? .body.weight(.regular))
         .frame(width: 24, alignment: .center)
     }
 }

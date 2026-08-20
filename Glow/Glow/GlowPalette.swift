@@ -52,7 +52,12 @@ enum GlowPalette {
     static let labelResting = grey
 
     /// A weekday letter that is not today.
-    static let headerRest = grey.opacity(0.6)
+    ///
+    /// The same grey at the same strength as a resting habit name. It was 60%
+    /// here, taken from generated CSS that had folded a node opacity into the
+    /// colour; the file's own paint is 100% and there is no 60% anywhere in the
+    /// subtree. See docs/widget-large-spec.md §10.
+    static let headerRest = grey
     /// A day that went unlogged.
     static let missed = grey.opacity(0.5)
     /// A day still to come. Dark enough to be a socket rather than a mark, which
@@ -65,13 +70,31 @@ enum GlowPalette {
     // blur is roughly twice a SwiftUI shadow radius, so these are half the
     // published number at 1x.
 
-    /// The halo around a mark, as a multiple of slot height.
-    /// 18px blur on a 35px slot at 2x.
-    static let haloRadius: CGFloat = (18.0 / 2) / 35.0
+    // Radii are the file's own numbers, not halved.
+    //
+    // A Figma shadow radius is roughly half a CSS blur and roughly equal to a
+    // SwiftUI `.shadow(radius:)`. The generated CSS doubles every one of them,
+    // and halving those doubled numbers — which is what this used to do — landed
+    // every glow at a quarter of its intended reach.
 
-    /// The ring's halo is softer and offset, and it is drawn at half strength.
-    static let ringHaloRadius: CGFloat = (10.0 / 2) / 35.0
+    /// The halo around a completion, as a multiple of slot height. 9 on 17.5.
+    static let haloRadius: CGFloat = 9.0 / 17.5
+
+    /// The ring's halo: wider than the stroke suggests, offset above and below,
+    /// and drawn at half strength. 5 on 17.5, offset 1.25.
+    static let ringHaloRadius: CGFloat = 5.0 / 17.5
+    static let ringHaloOffset: CGFloat = 1.25 / 17.5
+    /// The offset as a fraction of the halo's own radius: 1.25 of 5.
+    static let ringHaloOffsetRatio: CGFloat = 1.25 / 5.0
     static let ringHaloOpacity: Double = 0.5
+
+    /// The ring's inner pair, which thickens the stroke's apparent brightness at
+    /// top and bottom. 2.5 on 17.5, same offset.
+    static let ringInnerRadius: CGFloat = 2.5 / 17.5
+
+    /// A 1% white wash inside the ring. Almost nothing, and the file is explicit
+    /// about it being non-zero.
+    static let ringWash = Color.white.opacity(0.01)
 
     /// Halo reach for glowing text, in points. Tighter than a mark's and not
     /// proportional to it: a glyph is thin, and a mark's halo turns a word into
