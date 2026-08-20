@@ -20,6 +20,16 @@ struct HabitStore {
 
     // MARK: - Habits
 
+    /// Adds a habit, filling the first blank row if there is one.
+    ///
+    /// A blank row is a position waiting to be used, so a new habit takes it
+    /// rather than landing past it — the row count stays put and whatever
+    /// clustering the rows were expressing survives. Appending is what happens
+    /// when there are none left.
+    ///
+    /// The mirror of `delete`, which leaves a blank row behind rather than
+    /// collapsing one. Between them a row's existence is stable and only its
+    /// contents change, which is what makes the grid something you can arrange.
     @discardableResult
     func addHabit(
         name: String,
@@ -27,8 +37,20 @@ struct HabitStore {
         frequency: Frequency,
         now: Date = Date()
     ) throws -> Habit {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let blank = try firstBlankRow() {
+            blank.name = trimmed
+            blank.icon = icon
+            blank.frequency = frequency
+            blank.createdAt = now
+            blank.isSpacer = false
+            try context.save()
+            return blank
+        }
+
         let habit = Habit(
-            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            name: trimmed,
             icon: icon,
             frequency: frequency,
             createdAt: now,
@@ -37,6 +59,16 @@ struct HabitStore {
         context.insert(habit)
         try context.save()
         return habit
+    }
+
+    /// The topmost blank row, or nil when the grid has none.
+    private func firstBlankRow() throws -> Habit? {
+        var descriptor = FetchDescriptor<Habit>(
+            predicate: #Predicate { $0.isSpacer },
+            sortBy: [SortDescriptor(\.sortOrder)]
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
     }
 
     /// A blank row, held in the order so habits can be grouped around it.

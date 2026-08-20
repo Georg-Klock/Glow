@@ -24,6 +24,14 @@ struct WeeklyGridView: View {
     private var week: Week { WeekCalendar.week(containing: today) }
     private var store: HabitStore { HabitStore(context: context) }
 
+    /// Whether the grid has outgrown the widget.
+    ///
+    /// Rows, not habits: a blank row occupies a slot on the home screen exactly
+    /// as a habit does, so it counts against the same eleven.
+    private var showsWidgetBoundary: Bool {
+        habits.count > WidgetMetrics.largeRowCapacity
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -102,7 +110,7 @@ struct WeeklyGridView: View {
             let geometry = RowGeometry(totalWidth: proxy.size.width)
             List {
                 Section {
-                    ForEach(habits) { habit in
+                    ForEach(Array(habits.enumerated()), id: \.element.id) { index, habit in
                         HabitRowView(
                             snapshot: habit.snapshot(),
                             week: week,
@@ -122,6 +130,21 @@ struct WeeklyGridView: View {
                             bottom: 6, trailing: GridMetrics.horizontalPadding
                         ))
                         .listRowSeparator(.hidden)
+                        // Everything above this line is what the large widget
+                        // shows. Below it a habit exists only in the app, and
+                        // without the line nothing would say so.
+                        //
+                        // Drawn only once there is a row beneath it, so it never
+                        // appears on a fresh install and never explains a limit
+                        // nobody has reached.
+                        .overlay(alignment: .bottom) {
+                            if showsWidgetBoundary, index == WidgetMetrics.largeRowCapacity - 1 {
+                                Rectangle()
+                                    .fill(GlowPalette.grey)
+                                    .frame(height: 0.5)
+                                    .offset(y: 6)
+                            }
+                        }
                         // Swipe actions rather than a long-press menu: this is
                         // where iOS users already reach for edit and delete.
                         .swipeActions(edge: .trailing) {

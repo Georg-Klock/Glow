@@ -132,7 +132,6 @@ targets:
     platform: iOS
     sources:
       - path: Tests
-      - path: GlowWidget/WidgetMetrics.swift
     dependencies:
       - target: Glow
     settings:
