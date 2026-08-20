@@ -40,12 +40,16 @@ enum GlowPalette {
 
     /// A habit already handled today.
     ///
-    /// The design puts this at full strength, and on the device that is too
-    /// dim — not an error in the file. A flat render holds nothing brighter than
-    /// white, while here these sit beside marks running at six times SDR white
-    /// and the eye rescales against those. Every SDR value in this app reads
-    /// darker than its mock predicts, so this one is lifted and the hue kept.
-    static let labelResting = Color(.sRGB, red: 0.78, green: 0.78, blue: 0.80, opacity: 1)
+    /// Asked for as "between the ✕ and the label as it was". The ✕ composites to
+    /// rgb(70, 70, 74) on black and the label was rgb(199, 199, 204), putting the
+    /// midpoint at #87878B — and the grey above is #8D8D93, 4.7% off it. So this
+    /// is the grey at full strength, which lands where the eye asked and costs
+    /// the palette nothing: no bespoke value, just the one grey again.
+    ///
+    /// It was briefly lifted well above this on the grounds that SDR reads dark
+    /// beside HDR. That is still true, and it stopped mattering once the glows
+    /// went to pure white with a single halo pass instead of three.
+    static let labelResting = grey
 
     /// A weekday letter that is not today.
     static let headerRest = grey.opacity(0.6)
