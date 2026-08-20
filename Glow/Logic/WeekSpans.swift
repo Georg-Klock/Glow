@@ -29,10 +29,12 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
 
 /// Turns a habit due N times a week into the spans to draw.
 ///
-/// **The rule is inferred, not specified.** It was read off three examples in
-/// the design file and reproduces all three exactly; the edges beyond them are
-/// this file's own reasoning, and are the first thing to check if a row ever
-/// looks wrong:
+/// **The rule is inferred, not specified.** It was read off the design file's
+/// two large-widget frames — six examples across two different weekdays — and
+/// reproduces five of them exactly. The sixth is a two-a-week row that spans one
+/// day more than the rule gives; the identical row in the other frame follows
+/// the rule, so it reads as a slip in the mock rather than a different rule.
+/// Worth re-checking if a row ever looks wrong:
 ///
 ///  - **The goal met** is one bright span across the whole week. Nothing is
 ///    outstanding, so the week stops being divided at all.
