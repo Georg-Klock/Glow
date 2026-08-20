@@ -31,8 +31,20 @@ enum GlowPalette {
         opacity: 1
     )
 
-    /// #8D8D93. Everything that is not lit, at one opacity or another.
-    static let grey = Color(.sRGB, red: 141 / 255, green: 141 / 255, blue: 147 / 255, opacity: 1)
+    /// Everything that is not lit.
+    ///
+    /// **White at 55%, not the design's solid #8D8D93** — and the difference is
+    /// invisible here but load-bearing in the widget. On black the two are the
+    /// same colour to within six levels of blue out of 255.
+    ///
+    /// What they are not the same at is *accented* rendering, which is what a
+    /// Home Screen set to Clear or Tinted puts a widget into. There the system
+    /// tints content a single white and keeps only the alpha. A solid grey comes
+    /// out identical to a lit mark and the entire hierarchy collapses into one
+    /// tone; white at 55% stays 55% and the grid still reads.
+    ///
+    /// So the alpha is the thing being stored, and the colour is incidental.
+    static let grey = Color.white.opacity(0.553)
 
     // MARK: - The grey, by weight
     //

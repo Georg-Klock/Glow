@@ -20,16 +20,24 @@ it glows and, failing that, where it sits on the grey scale.
 | Token | Value | Used for |
 | --- | --- | --- |
 | `color` | `#FFFFFF` | every glow: marks, due labels, today's letter |
-| `grey` | `#8D8D93` | the base for everything below |
-| `labelResting` | `#8D8D93` | a habit already handled today |
-| `headerRest` | `#8D8D93` | weekday letters other than today |
-| `missed` | `#8D8D93` @ 50% | a day that went unlogged |
-| `upcoming` | `#8D8D93` @ 16% | a day still to come |
+| `grey` | `#FFFFFF` @ 55% | the base for everything below |
+| `labelResting` | `#FFFFFF` @ 55% | a habit already handled today |
+| `headerRest` | `#FFFFFF` @ 55% | weekday letters other than today |
+| `missed` | `#FFFFFF` @ 55% | a day that went unlogged |
+| `upcoming` | `#FFFFFF` @ 55% | a day still to come |
 | `warning` | `#FFB838` | Low Power Mode only — see below |
 
-**One grey at three strengths, and no fourth colour anywhere.** 100% for a
-resting label *and* a weekday letter, 50% for a miss, 16% for a day still to
-come.
+**One value for everything unlit.** A resting label, a weekday letter that is
+not today, a missed day and a day still to come are all the same.
+
+**It is white at 55%, not the design's solid `#8D8D93`.** On black the two match
+to within six levels of blue out of 255, so nothing changes in the app — but they
+are not the same thing in a widget. A Home Screen set to Tinted or Clear renders
+widgets in *accented* mode, where the system tints content a single white and
+keeps only the alpha. A solid grey arrives identical to a lit mark and the
+hierarchy collapses to one tone; white at 55% stays 55% and the grid still reads.
+
+The alpha is what is being stored. The colour is incidental.
 
 The weekday letters were 60% here, taken from generated CSS that had folded a
 node opacity into the colour. `docs/widget-large-spec.md` §10 is a census of all
@@ -116,6 +124,36 @@ Three effects exist in the app and nowhere in the design:
   every completion glowing, a full week of pulsing dots is unreadable.
 - **Completion animation.** Ring holds 0.2s, fills solid 0.35s, collapses to the
   dot 0.25s.
+
+### Widget appearance
+
+A widget does not choose whether it has a background — the person does, in
+**Home Screen → Edit → Customize**:
+
+| Appearance | Rendering mode | Background |
+| --- | --- | --- |
+| Default | `fullColor` | ours, drawn opaquely — black |
+| Tinted / Clear | `accented` | **removed**, replaced with system glass |
+
+Under `fullColor` every alpha in a container background resolves against black,
+so a `.clear` background measures as black. That is a real observation about one
+appearance and was briefly written up here as a platform limit, which it is not.
+
+Three rules follow, and the code obeys all three:
+
+1. Declare the background with `containerBackground`, never `.background` — that
+   modifier is the signal that the view may be dropped.
+2. Leave `containerBackgroundRemovable` alone. It defaults to true; false opts
+   out of glass, out of the StandBy and iPad Lock Screen galleries, and out of
+   foreground tinting.
+3. Expect content to be flattened to white, and store hierarchy in **alpha**,
+   which survives. Hence the grey above.
+
+The glow tile carries `.widgetAccentedRenderingMode(.fullColor)` so its headroom
+is not tinted away. Apple reserves that for media like album art; the argument
+here is that the light is the content rather than a treatment applied to it.
+**Unverified on a Tinted or Clear home screen** — worth checking before it is
+relied on.
 
 ### Not reproduced
 

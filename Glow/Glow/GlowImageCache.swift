@@ -108,6 +108,13 @@ private struct GlowTile: View {
                 // Without this the image is tone-mapped to SDR and the whole
                 // exercise is a slightly bright rectangle.
                 .allowedDynamicRange(.high)
+                // And without this, a widget on a Tinted or Clear home screen
+                // renders in accented mode, which tints an opaque image to a
+                // single flat white — discarding the headroom that is the entire
+                // point of this file. Apple reserves `.fullColor` for media like
+                // album art; the argument for it here is that the light *is* the
+                // content, not a decoration applied to it.
+                .widgetAccentedRenderingMode(.fullColor)
         } else {
             GlowPalette.color
         }
