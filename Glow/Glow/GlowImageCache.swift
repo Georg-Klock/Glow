@@ -56,16 +56,26 @@ final class GlowImageCache {
 /// at all, so anything that can be a mask can be a glow. That is the whole
 /// reason a glowing checkmark costs no more than a glowing pill.
 enum GlowShape: Equatable {
-    /// Solid, edge to edge.
+    /// Solid, edge to edge. The middle beat of a completion, and nothing at
+    /// rest — for one moment the slot is the brightest thing the screen shows.
     case capsule
-    /// A hollow outline. The line width is a fraction of the slot's height, so
-    /// it holds its weight as the grid resizes.
+    /// A hollow outline: today, still open.
     case ring
-    /// Today's completion.
-    case checkmark
+    /// A completion. Small and solid, the same mark whatever day it fell on.
+    case dot
+    /// A completion on a row that spans days rather than filling one — thinner
+    /// than a dot, because it is carrying width instead of weight.
+    case bar
 
-    /// Line width for `.ring`, as a fraction of height.
-    static let ringWeight: CGFloat = 0.13
+    // Proportions of the slot's height, measured from the design rather than
+    // guessed, so the whole grid scales from one number.
+
+    /// Stroke width of `.ring`.
+    static let ringWeight: CGFloat = 0.088
+    /// Diameter of `.dot`.
+    static let dotScale: CGFloat = 0.41
+    /// Thickness of `.bar`.
+    static let barScale: CGFloat = 0.235
 }
 
 /// A lit slot: the HDR core, and the halo around it.
@@ -164,17 +174,16 @@ struct GlowImageView: View {
         case .ring:
             Capsule(style: .continuous)
                 .strokeBorder(style: StrokeStyle(lineWidth: size.height * GlowShape.ringWeight))
-        case .checkmark:
-            // Resizable rather than weighted: `fontWeight` is ignored once an
-            // SF Symbol is resizable, so the stroke weight comes from the
-            // scale, which is the behaviour wanted anyway — the mark thickens
-            // with the grid instead of drifting thin on a large widget.
-            Image(systemName: "checkmark")
-                .resizable()
-                .scaledToFit()
-                // A checkmark drawn to the full slot height sits heavier than
-                // the pill it replaces; the inset keeps the row's rhythm.
-                .padding(.vertical, size.height * 0.08)
+        case .dot:
+            // Centred rather than inset, so a dot sits on the column's centre
+            // line whatever the slot around it is doing.
+            Circle().frame(
+                width: size.height * GlowShape.dotScale,
+                height: size.height * GlowShape.dotScale
+            )
+        case .bar:
+            Capsule(style: .continuous)
+                .frame(height: size.height * GlowShape.barScale)
         }
     }
 

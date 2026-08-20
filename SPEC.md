@@ -12,11 +12,11 @@ Today's column physically glows on HDR-capable screens: it is drawn from an
 image encoded in a colour space with real headroom above SDR white, which is
 what makes HDR photos look brighter than white in Photos.
 
-The glow marks **today**, and nothing else in the week has headroom. Within
-today, an incomplete habit is louder than a completed one — the signal is
-"still actionable", not a reward — but a completion made today stays lit until
-the day ends, because it is still today's news. Everything outside today is
-flat, whether it went well or not.
+**Light means something happened.** Every completion glows, whatever day of the
+week it fell on, and so does today's open slot. What does not glow is anything
+merely absent: a missed day and a day still to come are both flat. So a good
+week is a row of lights and a bad one is nearly dark, which is the whole product
+in one sentence.
 
 ## 2. Goals
 
@@ -113,16 +113,18 @@ Every slot is in exactly one of four states.
 3. **Open.** Today's slot, not yet completed. The only glowing state.
 4. **Filled.** Completed.
 
-A completion made today and one made on Monday are the same state and are not
-drawn the same way, so the states above map to five *marks*: today's completion
-is distinguished from the rest of the week's. That mapping lives in
-`Slot.mark` and is tested there.
+The states map to *marks* via `Slot.mark`, which is where the rendering
+distinctions live and where they are tested.
+
+A habit due a number of times a week is not day-pinned, so it is not drawn as
+seven columns at all: `WeekSpans` divides the week into N shapes that stretch
+across it, with the open one always containing today. **That rule is inferred
+from the design rather than specified** — see the note on the type.
 
 **What any of this looks like is deliberately not written down.** The visual
 design is being worked on directly and prose here would only go stale between
-one experiment and the next; the file above is the truth. What is fixed is the
-hierarchy, and only because it is the product rather than a style: today is the
-only lit column, and emphasis tracks "needs you now" rather than "went well".
+one experiment and the next; the code is the truth. What is fixed is the
+hierarchy in §1, and only because it is the product rather than a style.
 
 **Which slot is open, for a frequency habit.** Count this week's completions.
 If `count < N` and today is not already logged, pill index `count` is open.

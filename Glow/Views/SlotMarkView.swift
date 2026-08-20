@@ -12,39 +12,55 @@ struct SlotMarkView: View {
     /// Widget slots are distributed by their `HStack` and must not be pinned to
     /// a width; the app's are measured by `SlotLayout` and want one.
     var fillsWidth = false
+    /// A span covering several days draws its completion as a bar rather than a
+    /// dot — the mark has width to carry, so it does not need weight.
+    var spansDays = false
 
     var body: some View {
         switch mark {
         case .openToday:
-            GlowImageView(size: size, shape: .ring, fillsWidth: fillsWidth)
-        case .doneToday:
-            GlowImageView(size: size, shape: .checkmark, fillsWidth: fillsWidth)
-        case .donePast:
-            glyph("checkmark", tint: GlowPalette.markPast)
+            glow(.ring)
+        case .doneToday, .donePast:
+            // The same mark either way. A completion does not fade with age:
+            // the row is a record of what happened, and Monday happened.
+            glow(spansDays ? .bar : .dot)
         case .missed:
-            glyph("xmark", tint: GlowPalette.markFaint)
+            glyph("xmark", tint: GlowPalette.missed, scale: 0.42)
         case .upcoming:
-            // Hollow, not filled: a day still to come has nothing in it yet, and
-            // a solid dot reads as a quiet completion.
-            glyph("circle", tint: GlowPalette.markFaint, scale: 0.45)
+            // Solid, not hollow. It reads as an empty socket waiting to be
+            // filled, which is what keeps a nearly-empty row legible as a week.
+            shape(GlowPalette.upcoming)
         }
     }
 
-    /// Past and future marks are flat SDR glyphs. Only today gets headroom —
-    /// that is the entire hierarchy, and spending HDR anywhere else would flatten
-    /// it.
-    @ViewBuilder
-    private func glyph(_ name: String, tint: Color, scale: CGFloat = 0.72) -> some View {
-        let icon = Image(systemName: name)
-            .resizable()
-            .scaledToFit()
-            .frame(height: size.height * scale)
-            .foregroundStyle(tint)
+    private func glow(_ shape: GlowShape) -> some View {
+        GlowImageView(size: size, shape: shape, fillsWidth: fillsWidth)
+    }
 
+    /// A flat filled slot, at the full size of its column or span.
+    private func shape(_ tint: Color) -> some View {
+        sized(Capsule(style: .continuous).fill(tint))
+    }
+
+    /// The only mark drawn as a glyph. Past and future marks are flat SDR —
+    /// headroom is spent on things that happened, and nothing else.
+    private func glyph(_ name: String, tint: Color, scale: CGFloat) -> some View {
+        sized(
+            Image(systemName: name)
+                .resizable()
+                .scaledToFit()
+                .fontWeight(.medium)
+                .frame(width: size.height * scale, height: size.height * scale)
+                .foregroundStyle(tint)
+        )
+    }
+
+    @ViewBuilder
+    private func sized(_ content: some View) -> some View {
         if fillsWidth {
-            icon.frame(maxWidth: .infinity).frame(height: size.height)
+            content.frame(maxWidth: .infinity).frame(height: size.height)
         } else {
-            icon.frame(width: size.width, height: size.height)
+            content.frame(width: size.width, height: size.height)
         }
     }
 }

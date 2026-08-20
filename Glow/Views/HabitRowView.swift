@@ -45,21 +45,34 @@ struct HabitRowView: View {
         WeekGrid.slots(for: snapshot, in: week, today: today)
     }
 
-    private var slotSize: CGSize {
-        SlotLayout.slotSize(
-            trackWidth: geometry.trackWidth,
-            slotCount: snapshot.frequency.slotCount
-        )
+    /// A habit due a number of times a week is not day-pinned, so it is drawn as
+    /// shapes that stretch across the week rather than as seven columns.
+    private var spans: [SlotSpan] {
+        guard case .timesPerWeek(let target) = snapshot.frequency else { return [] }
+        return WeekSpans.spans(for: snapshot, in: week, today: today, target: target)
+    }
+
+    private var slotHeight: CGFloat {
+        SlotLayout.slotHeight(trackWidth: geometry.trackWidth)
     }
 
     var body: some View {
         HStack(spacing: GridMetrics.labelSpacing) {
             label
-            HStack(spacing: SlotLayout.gap) {
+            track
+                .frame(width: geometry.trackWidth, alignment: .leading)
+        }
+        .frame(height: max(slotHeight, GridMetrics.minimumRowHeight))
+    }
+
+    @ViewBuilder
+    private var track: some View {
+        HStack(spacing: SlotLayout.gap(trackWidth: geometry.trackWidth)) {
+            if spans.isEmpty {
                 ForEach(slots) { slot in
                     SlotView(
                         slot: slot,
-                        size: slotSize,
+                        size: CGSize(width: slotHeight, height: slotHeight),
                         habitName: snapshot.name
                     )
                     .onTapGesture {
@@ -67,10 +80,38 @@ struct HabitRowView: View {
                         onToggle(day)
                     }
                 }
+            } else {
+                ForEach(spans) { span in
+                    SlotMarkView(
+                        mark: span.mark,
+                        size: CGSize(
+                            width: SlotLayout.spanWidth(
+                                trackWidth: geometry.trackWidth,
+                                dayCount: span.dayCount
+                            ),
+                            height: slotHeight
+                        ),
+                        spansDays: span.dayCount > 1
+                    )
+                    .contentShape(Capsule(style: .continuous))
+                    .onTapGesture {
+                        guard let day = span.actionDay else { return }
+                        onToggle(day)
+                    }
+                    .accessibilityElement()
+                    .accessibilityLabel("\(snapshot.name), \(spanLabel(span))")
+                    .accessibilityAddTraits(span.isTappable ? .isButton : [])
+                }
             }
-            .frame(width: geometry.trackWidth, alignment: .leading)
         }
-        .frame(height: max(slotSize.height, GridMetrics.minimumRowHeight))
+    }
+
+    private func spanLabel(_ span: SlotSpan) -> String {
+        switch span.state {
+        case .filled: "done"
+        case .open: "due today"
+        case .missed, .inactive: "still to come"
+        }
     }
 
     /// Whether this habit is still waiting on today.
