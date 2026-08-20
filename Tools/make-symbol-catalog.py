@@ -196,7 +196,7 @@ def main():
 
     # Pass two: keep what an emoji would have said, in the emoji keyboard's
     # own categories.
-    groups, matched, unmatched = emoji_groups(browsable)
+    groups, matched, unmatched = emoji_groups(browsable, symbol_categories)
 
     payload = {
         "groups": groups,
@@ -276,7 +276,34 @@ def match_symbol(name, browsable):
     return None
 
 
-def emoji_groups(browsable):
+# SF Symbols' activity family, added whole rather than matched.
+#
+# Emoji cannot reach these: 🏀 is called "basketball" and matches the *ball*,
+# so `figure.basketball` — a person playing it — is unreachable by name, and
+# the same goes for climbing, boxing, yoga, rowing and a hundred more. They
+# are the most habit-shaped symbols Apple ships, and a habit tracker that
+# cannot offer "person running" has thinned past the point of the exercise.
+#
+# Scoped by Apple's own `fitness` category rather than by the `figure.` prefix.
+# The prefix alone drags in CarPlay: dozens of `figure.seated.seatbelt.…` seat
+# occupancy icons and `figure.seated.side.windshield.front.and.heat.waves.…`
+# climate controls, all of which are a person in a car rather than a person
+# doing something. Excluding those by keyword was a list that kept growing;
+# Apple had already drawn the line.
+#
+# `.circle` variants are the same drawings in a ring, dropped the way fills are.
+def activity_figures(browsable, symbol_categories):
+    return sorted(
+        n for n in browsable
+        if n.startswith("figure.")
+        and not n.endswith(".circle")
+        and "fitness" in symbol_categories.get(n, [])
+        # Wayfinding, not exercise.
+        and "trianglebadge" not in n
+    )
+
+
+def emoji_groups(browsable, symbol_categories):
     """The emoji catalogue's categories, rendered in SF Symbols."""
     if not EMOJI.exists():
         sys.exit(f"error: {EMOJI} not found. Run make-emoji-catalog.py first.")
@@ -310,6 +337,31 @@ def emoji_groups(browsable):
                 "icon": symbols[0],
                 "symbols": symbols,
             })
+
+    # Every `figure.` symbol lives in Activity, wherever it was matched. A
+    # person running arrives through the "person running" emoji, which is a
+    # People emoji — but the picture is an activity, and splitting the family
+    # across two categories by how each one happened to be reached is an
+    # accident rather than a grouping.
+    activity = next((g for g in groups if g["title"] == "Activity"), None)
+    if activity is not None:
+        moved = []
+        for group in groups:
+            if group is activity:
+                continue
+            keep = [n for n in group["symbols"] if not n.startswith("figure.")]
+            moved += [n for n in group["symbols"] if n.startswith("figure.")]
+            group["symbols"] = keep
+        activity["symbols"] += moved
+        activity["symbols"] += [
+            n for n in activity_figures(browsable, symbol_categories)
+            if n not in used and n not in activity["symbols"]
+        ]
+        used.update(activity["symbols"])
+
+    groups = [g for g in groups if g["symbols"]]
+    for group in groups:
+        group["icon"] = group["symbols"][0]
     return groups, len(used), unmatched
 
 
