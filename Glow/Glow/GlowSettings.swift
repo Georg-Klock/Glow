@@ -11,8 +11,18 @@ enum GlowSettings {
 
     /// Multiples of SDR white. 1x is no headroom at all, which is a legitimate
     /// "off": the slot renders as a flat capsule and the app stops glowing.
-    static let range: ClosedRange<Double> = 1...12
-    static let defaultValue: Double = 6
+    ///
+    /// The top is 24 because the PQ encoding carries it — Rec. 2100 PQ runs to
+    /// 10,000 nits, which is about 40x a 250-nit SDR white. **What the screen
+    /// grants is a different question.** `UIScreen.potentialEDRHeadroom` is the
+    /// ceiling, it is a property of the panel and the moment, and asking for
+    /// more than it simply tone-maps back down. Settings shows both numbers so
+    /// the difference is visible rather than argued about.
+    static let range: ClosedRange<Double> = 1...24
+
+    /// The top of the range. The glow is the product; there is no reason for it
+    /// to open at half strength.
+    static let defaultValue: Double = 24
 
     /// The App Group's defaults, so app and widget agree. Falls back to the
     /// app's own when the entitlement is unavailable, exactly as the store does.
@@ -35,11 +45,18 @@ enum GlowSettings {
 
     /// How large the halo is relative to its default, given a peak.
     ///
-    /// Zero at 1x, one at the default, and capped above it. Without this the
-    /// slider would do nothing visible on a screen with no headroom, and
-    /// nothing at all in a screenshot.
+    /// Zero at 1x, one at 6x, and capped above that. Without this the slider
+    /// would do nothing visible on a screen with no headroom, and nothing at
+    /// all in a screenshot.
+    ///
+    /// Pinned to 6 rather than to `defaultValue`: the halo is drawn in SDR, so
+    /// it stops gaining anything long before the encode does, and tying it to a
+    /// default that has since moved to 24 would have shrunk every halo to a
+    /// quarter of itself.
+    static let haloReference: Double = 6
+
     static func haloScale(for peak: Double) -> Double {
-        let normalised = (clamp(peak) - range.lowerBound) / (defaultValue - range.lowerBound)
+        let normalised = (clamp(peak) - range.lowerBound) / (haloReference - range.lowerBound)
         return min(max(normalised, 0), 1.7)
     }
 }

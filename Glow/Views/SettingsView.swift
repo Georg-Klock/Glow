@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Settings: how hard the glow pushes, and what shape a week is.
 ///
@@ -49,7 +50,8 @@ struct SettingsView: View {
                     }
                     .tint(GlowPalette.color)
 
-                    LabeledContent("Brightness", value: label)
+                    LabeledContent("Asking for", value: label)
+                    LabeledContent("Screen allows", value: ceiling)
                 } header: {
                     Text("Glow")
                 } footer: {
@@ -58,7 +60,7 @@ struct SettingsView: View {
 
                 if peak <= GlowSettings.range.lowerBound {
                     Section {
-                        Label("The glow is off. Today's slot still shows, just without any light.", systemImage: "info.circle")
+                        Label("Glow off. Today's slot still shows, unlit.", systemImage: "info.circle")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -73,7 +75,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Week")
                 } footer: {
-                    Text("Which day the grid starts on. It also decides which seven days a weekly goal is counted over, so changing it can move a habit's progress between weeks.")
+                    Text("Also sets which seven days a weekly goal counts over.")
                 }
 
                 Section {
@@ -86,7 +88,7 @@ struct SettingsView: View {
                         }
                     }
                 } footer: {
-                    Text("A rest day is never counted as missed and never asks for anything. Logging a habit on one still counts — it is permission, not a rule.")
+                    Text("Never counted as missed. Anything logged on one still counts.")
                 }
             }
             .navigationTitle("Settings")
@@ -112,22 +114,21 @@ struct SettingsView: View {
     }
 
     private var label: String {
-        peak <= GlowSettings.range.lowerBound
-            ? "Off"
-            : String(format: "%.1f× brighter than white", peak)
+        peak <= GlowSettings.range.lowerBound ? "Off" : String(format: "%.0f×", peak)
+    }
+
+    /// What the display will actually grant, right now.
+    ///
+    /// Asking for more than this is not an error and not wasted — it is simply
+    /// tone-mapped back down. Showing both numbers is the only honest way to
+    /// answer "can it be 24× brighter", which depends on the panel, the ambient
+    /// light and the thermal state, not on the app.
+    private var ceiling: String {
+        String(format: "%.1f×", UIScreen.main.potentialEDRHeadroom)
     }
 
     private var footer: String {
-        """
-        Today's unfinished slot is drawn as an HDR image, so it can be brighter \
-        than the white the screen normally allows. This sets how far above that \
-        it aims for.
-
-        How bright it actually gets is not up to the app: it depends on ambient \
-        light, display brightness, thermal state, and whether Low Power Mode is \
-        on. Expect it to be dramatic outdoors and subtle in a dim room. On a \
-        screen without extended dynamic range, and in the widget, the slot \
-        falls back to flat colour with a soft halo.
-        """
+        "How far above normal white the glow aims. The screen decides what it "
+            + "grants — that varies with ambient light, brightness and heat."
     }
 }
