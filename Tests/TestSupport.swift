@@ -26,14 +26,16 @@ extension HabitSnapshot {
     static func fixture(
         name: String = "Read",
         frequency: Frequency = .daily,
-        completedDays: Set<Date> = []
+        completedDays: Set<Date> = [],
+        isSpacer: Bool = false
     ) -> HabitSnapshot {
         HabitSnapshot(
             id: UUID(),
             name: name,
             icon: "📖",
             frequency: frequency,
-            completedDays: completedDays
+            completedDays: completedDays,
+            isSpacer: isSpacer
         )
     }
 }

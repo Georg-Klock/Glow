@@ -71,19 +71,24 @@ struct HabitSnapshot: Identifiable, Equatable, Sendable {
     var icon: String
     var frequency: Frequency
     var completedDays: Set<Date>
+    /// A blank row held in the order to group the habits around it. Draws
+    /// nothing and is never counted as due, done or missed.
+    var isSpacer: Bool
 
     init(
         id: UUID,
         name: String,
         icon: String,
         frequency: Frequency,
-        completedDays: Set<Date>
+        completedDays: Set<Date>,
+        isSpacer: Bool = false
     ) {
         self.id = id
         self.name = name
         self.icon = icon
         self.frequency = frequency
         self.completedDays = completedDays
+        self.isSpacer = isSpacer
     }
 }
 
@@ -98,6 +103,7 @@ enum WeekGrid {
         today: Date,
         calendar: Calendar = WeekCalendar.calendar
     ) -> [Slot] {
+        guard !habit.isSpacer else { return [] }
         let todayStart = WeekCalendar.day(today, calendar: calendar)
 
         switch habit.frequency {

@@ -154,6 +154,15 @@ private struct WidgetRow: View {
     }
 
     var body: some View {
+        if habit.isSpacer {
+            // Holds its height and nothing else. It is a gap the user placed.
+            Color.clear.frame(height: side)
+        } else {
+            row
+        }
+    }
+
+    private var row: some View {
         HStack(spacing: labelGap) {
             if showsLabel { label }
 

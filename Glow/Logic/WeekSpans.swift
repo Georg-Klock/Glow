@@ -52,6 +52,7 @@ enum WeekSpans {
         target: Int,
         calendar: Calendar = WeekCalendar.calendar
     ) -> [SlotSpan] {
+        guard !habit.isSpacer else { return [] }
         let todayStart = WeekCalendar.day(today, calendar: calendar)
         let dayCount = week.days.count
         guard target > 0, dayCount == 7 else { return [] }

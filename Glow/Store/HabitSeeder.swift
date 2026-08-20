@@ -39,6 +39,10 @@ struct HabitSeeder {
 
         let today = WeekCalendar.day(now)
         for template in DefaultHabits.all {
+            guard !template.isSpacer else {
+                try store.addSpacer(now: now)
+                continue
+            }
             let habit = try store.addHabit(
                 name: template.name,
                 icon: template.icon,

@@ -53,13 +53,16 @@ struct YearView: View {
         Dictionary(uniqueKeysWithValues: habits.map { ($0.id, $0.snapshot().completedDays) })
     }
 
+    /// Spacers hold a position in the grid and nothing else.
+    private var realHabits: [Habit] { habits.filter { !$0.isSpacer } }
+
     private let cell: CGFloat = 10
     private let gap: CGFloat = 3
 
     var body: some View {
         NavigationStack {
             Group {
-                if habits.isEmpty {
+                if realHabits.isEmpty {
                     ContentUnavailableView {
                         Label("No Habits", systemImage: "square.grid.3x3")
                     } description: {
@@ -189,7 +192,7 @@ struct YearView: View {
         let all = completions
         var expected = 0
         var met = 0
-        for habit in habits {
+        for habit in habits where !habit.isSpacer {
             let done = all[habit.id]?.contains(day) ?? false
             // Only daily habits pin to a day, so only they can be expected on
             // one. A habit due three times a week has no opinion about Tuesday.
