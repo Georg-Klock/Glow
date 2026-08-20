@@ -233,6 +233,13 @@ extension View {
 struct GlowImageView: View {
     let size: CGSize
     var shape: GlowShape = .capsule
+    /// Overrides the ring's stroke, which is otherwise a fraction of the height.
+    ///
+    /// Exists so a ring can shrink without its stroke shrinking with it. Hold
+    /// the stroke at 1.5 and close the diameter, and the hole — diameter minus
+    /// twice the stroke — reaches zero at exactly 3pt: the ring *becomes* the
+    /// dot. No cross-fade, no second layer, one shape and one number.
+    var ringLineWidth: CGFloat?
     /// When true the tile takes whatever width the layout offers and
     /// `size.width` is ignored; only the height is honoured. The app's slots are
     /// measured by `SlotLayout` and want a fixed width, but the widget's are
@@ -270,7 +277,7 @@ struct GlowImageView: View {
                     GlowPalette.color
                         .shadow(.inner(color: GlowPalette.color, radius: inner, y: innerOffset))
                         .shadow(.inner(color: GlowPalette.color, radius: inner, y: -innerOffset)),
-                    lineWidth: size.height * GlowShape.ringWeight
+                    lineWidth: ringLineWidth ?? (size.height * GlowShape.ringWeight)
                 )
         case .dot:
             // Centred rather than inset, so a dot sits on the column's centre
