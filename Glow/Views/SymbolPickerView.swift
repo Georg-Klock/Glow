@@ -25,14 +25,19 @@ struct SymbolPickerView: View {
     /// screen. A fixed count divides the width exactly, and a 1:1 aspect ratio
     /// makes each cell a square — which is what a grid of pictograms wants to
     /// be when there is no card behind them to define the shape.
-    private static let symbolColumnCount = 6
+    /// One grid for both tabs. Switching between them should change what is in
+    /// the cells, not where the cells are.
+    private static let columnCount = 6
+    private static let gridSpacing: CGFloat = 10
+    /// An emoji is a picture with its own margins; a symbol is a stroke drawn
+    /// to its box. Matching the numbers would leave the emoji looking smaller
+    /// than the symbol beside it, so the emoji is set larger to land the same.
+    private static let symbolSize: CGFloat = 24
+    private static let emojiSize: CGFloat = 30
     private let columns = Array(
-        repeating: GridItem(.flexible(), spacing: 10),
-        count: symbolColumnCount
+        repeating: GridItem(.flexible(), spacing: gridSpacing),
+        count: columnCount
     )
-    /// Tighter and chrome-free, like the emoji keyboard: glyphs sit next to
-    /// each other rather than each in its own tile.
-    private let emojiColumns = [GridItem(.adaptive(minimum: 44), spacing: 4)]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -107,23 +112,17 @@ struct SymbolPickerView: View {
             selection = symbol
             dismiss()
         } label: {
-            // A clear square carrying the glyph, rather than the glyph carrying
-            // a frame. It is what makes the cell exactly square regardless of
-            // how wide or tall the symbol inside it happens to draw.
-            Color.clear
-                .aspectRatio(1, contentMode: .fit)
-                .overlay {
-                    let glyph = Image(systemName: symbol).font(.system(size: 24))
-                    // Selection is the glow, because the card that used to
-                    // carry it is gone — and a glow is what this app says
-                    // "chosen" with everywhere else.
-                    if selection == symbol {
-                        glyph.glowing(halo: GlowPalette.labelHalo)
-                    } else {
-                        glyph.foregroundStyle(GlowPalette.color)
-                    }
+            squareCell {
+                let glyph = Image(systemName: symbol).font(.system(size: Self.symbolSize))
+                // Selection is the glow, because the card that used to carry it
+                // is gone — and a glow is what this app says "chosen" with
+                // everywhere else.
+                if selection == symbol {
+                    glyph.glowing(halo: GlowPalette.labelHalo)
+                } else {
+                    glyph.foregroundStyle(GlowPalette.color)
                 }
-                .contentShape(Rectangle())
+            }
         }
         .buttonStyle(.plain)
     }
@@ -162,28 +161,48 @@ struct SymbolPickerView: View {
     }
 
     private func emojiGrid(_ items: [(glyph: String, name: String)]) -> some View {
-        LazyVGrid(columns: emojiColumns, spacing: 4) {
+        LazyVGrid(columns: columns, spacing: Self.gridSpacing) {
             ForEach(items, id: \.glyph) { item in
-                Button {
-                    selection = item.glyph
-                    dismiss()
-                } label: {
-                    Text(item.glyph)
-                        .font(.system(size: 30))
-                        .frame(width: 44, height: 44)
-                        .background {
-                            // Only the selected glyph gets any chrome at all.
-                            if selection == item.glyph {
-                                Circle().fill(GlowPalette.color.opacity(0.28))
-                            }
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(item.name)
-                .accessibilityAddTraits(selection == item.glyph ? [.isSelected, .isButton] : .isButton)
+                emojiTile(item)
+                    .accessibilityLabel(item.name)
+                    .accessibilityAddTraits(
+                        selection == item.glyph ? [.isSelected, .isButton] : .isButton
+                    )
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 16)
+    }
+
+    private func emojiTile(_ item: (glyph: String, name: String)) -> some View {
+        Button {
+            selection = item.glyph
+            dismiss()
+        } label: {
+            squareCell {
+                Text(item.glyph).font(.system(size: Self.emojiSize))
+            }
+            // A ring rather than a glow. `glowing` masks the HDR tile to the
+            // shape it is given and tints it white, which is exactly right for
+            // a line drawing and would strip an emoji of the only thing it has.
+            .overlay {
+                if selection == item.glyph {
+                    Circle()
+                        .strokeBorder(GlowPalette.color, lineWidth: 1.5)
+                        .glowing(halo: GlowPalette.labelHalo)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// A clear square carrying its content, rather than content carrying a
+    /// frame. It is what keeps a cell square whatever is inside it —
+    /// `figure.walk.treadmill` and `circle` are very different shapes.
+    private func squareCell(@ViewBuilder content: () -> some View) -> some View {
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay(content())
+            .contentShape(Rectangle())
     }
 
     // MARK: - Shared
