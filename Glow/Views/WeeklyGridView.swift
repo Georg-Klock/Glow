@@ -245,19 +245,21 @@ struct WeekdayHeader: View {
         HStack(spacing: GridMetrics.labelSpacing) {
             Color.clear
                 .frame(width: geometry.labelWidth, height: 1)
-            HStack(spacing: SlotLayout.gap) {
+            // Letters only. The date numbers went with them for a while and
+            // were carrying nothing: the week is always the current one, so a
+            // number never answers a question the letter had not already.
+            HStack(spacing: SlotLayout.gap(trackWidth: geometry.trackWidth)) {
                 ForEach(0..<7, id: \.self) { index in
                     let isToday = week.days[index] == today
-                    VStack(spacing: 2) {
-                        Text(initials[index])
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(isToday ? Color.primary : .secondary)
-                        Text(numbers[index])
-                            .font(.caption.weight(isToday ? .semibold : .regular))
-                            .foregroundStyle(isToday ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
-                            .monospacedDigit()
-                    }
-                    .frame(width: SlotLayout.slotWidth(trackWidth: geometry.trackWidth, slotCount: 7))
+                    Text(initials[index])
+                        .font(.caption.weight(isToday ? .semibold : .regular))
+                        .foregroundStyle(isToday ? GlowPalette.headerToday : GlowPalette.headerRest)
+                        .frame(
+                            width: SlotLayout.slotWidth(
+                                trackWidth: geometry.trackWidth,
+                                slotCount: 7
+                            )
+                        )
                 }
             }
             .frame(width: geometry.trackWidth, alignment: .leading)

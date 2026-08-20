@@ -39,10 +39,13 @@ enum GlowPalette {
 
     // MARK: - Brightness tiers
     //
-    // One rule: today is the only lit column, and everything else recedes.
-    // Emphasis tracks "needs you now", not "went well" — which is why a habit
-    // already done today is dimmer than one still waiting, and why a week of
-    // perfect history sits quieter than a single empty slot.
+    // Light means something happened. Every completion glows, whatever day it
+    // fell on, and so does today's open slot — so a good week is a row of lights
+    // and a bad one is nearly dark. What does *not* glow is anything that is
+    // merely absent: a missed day and a day still to come are both flat.
+    //
+    // The one place emphasis still tracks "needs you now" is the label, which
+    // steps back once its habit has been handled today.
     //
     // The multipliers are measured off the design rather than guessed.
 
@@ -50,11 +53,19 @@ enum GlowPalette {
     static let labelDue = color
     /// A habit already handled today. Present, done asking.
     static let labelResting = color.opacity(0.56)
-    /// A completion on a day already gone.
-    static let markPast = color.opacity(0.81)
-    /// A day that went unlogged, and a day still to come. Both are just texture:
-    /// the grid stays readable as a grid without either one competing.
-    static let markFaint = color.opacity(0.17)
+
+    /// A day that went unlogged. Faint, and the only mark drawn as a glyph
+    /// rather than a shape — a miss should read as an absence, not an entry.
+    static let missed = color.opacity(0.17)
+    /// A day still to come: a solid disc, dark enough to be a socket rather
+    /// than a mark. It is what makes the row legible as seven days when most of
+    /// them are empty.
+    static let upcoming = color.opacity(0.125)
+
+    /// Today's letter in the weekday header.
+    static let headerToday = color
+    /// Every other letter.
+    static let headerRest = color.opacity(0.35)
 
     /// Amber, and the only colour in the app that is not the glow. It is used
     /// for exactly one thing: saying that the glow is not available. A warning
