@@ -67,9 +67,33 @@ struct HabitStore {
         try context.save()
     }
 
+    /// Deleting a habit leaves a blank row where it was. Deleting a blank row
+    /// removes it.
+    ///
+    /// The grid is a layout the user arranges, and collapsing a row pulls
+    /// everything below it up a line — so removing one habit silently rewrites
+    /// the grouping of every habit under it. Leaving a gap keeps what they
+    /// arranged, and the gap is a real thing they can then delete or drag.
+    ///
+    /// The habit itself is genuinely gone either way: name, icon, cadence and
+    /// every completion. What survives is the position.
     func delete(_ habit: Habit) throws {
-        // Completions cascade, so this does not leave orphans behind.
-        context.delete(habit)
+        guard !habit.isSpacer else {
+            context.delete(habit)
+            try context.save()
+            return
+        }
+
+        // Completions are removed explicitly rather than left to cascade: the
+        // row is not being deleted, so nothing would cascade off it.
+        for completion in habit.completions ?? [] {
+            context.delete(completion)
+        }
+        habit.completions = []
+        habit.name = ""
+        habit.icon = ""
+        habit.frequency = .daily
+        habit.isSpacer = true
         try context.save()
     }
 

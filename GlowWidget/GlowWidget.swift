@@ -22,7 +22,7 @@ struct GlowWidget: Widget {
                 .padding(.leading, WidgetMetrics.padLeading)
                 .padding(.trailing, WidgetMetrics.padTrailing)
                 .padding(.vertical, WidgetMetrics.padVertical)
-                .containerBackground(.ultraThinMaterial, for: .widget)
+                .containerBackground(.black, for: .widget)
                 // **A home screen widget cannot be transparent.** Measured on
                 // a simulator against a bright wallpaper, all three ways:
                 //
@@ -36,9 +36,19 @@ struct GlowWidget: Widget {
                 // it is black — and the design's 3% gradient was black too, for
                 // the same reason. Only a Material samples what is behind it.
                 //
-                // So this is as close to no background as the platform allows.
+                // A Material was tried and is not the answer either: a widget
+                // renders out of process into a snapshot, so it cannot sample
+                // the wallpaper, and the material comes out as flat dark grey
+                // rather than as anything see-through.
+                //
+                // So the background is not removable, and the only real choice
+                // is which one. Black: it is what every other surface in this
+                // app is, and it is the one value that guarantees the marks
+                // keep their contrast whatever the wallpaper is doing. A grey
+                // card on a bright photo would take the glow with it.
+                //
                 // Widgets that really are transparent were built against a
-                // pre-iOS-17 SDK and are grandfathered; a build made today
+                // pre-iOS-17 SDK and are grandfathered. A build made today
                 // cannot opt out.
         }
         // WidgetKit's own margins are close to the design's but not equal, and
