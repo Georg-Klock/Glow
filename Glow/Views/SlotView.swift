@@ -21,8 +21,9 @@ struct SlotView: View {
     let habitName: String
     let onToggle: (Date) -> Void
 
-    /// How far past its resting size a press pushes the ring.
-    private static let pressScale: CGFloat = 1.32
+    /// How far past its resting size a press pushes the ring. Shared with the
+    /// spanning rows, which do the same thing at a different shape.
+    static let pressScale: CGFloat = 1.32
 
     /// The closing spring, and how long to hold the animating layer afterwards.
     ///
@@ -117,7 +118,7 @@ struct SlotView: View {
 /// A `ButtonStyle` rather than a gesture, because this is exactly what the type
 /// is for: it is handed `isPressed` and does not have to track touches, and it
 /// keeps the button's own hit testing and accessibility intact.
-private struct PressStyle: ButtonStyle {
+struct PressStyle: ButtonStyle {
     let scale: CGFloat
 
     func makeBody(configuration: Configuration) -> some View {
