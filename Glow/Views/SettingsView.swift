@@ -51,7 +51,7 @@ struct SettingsView: View {
                     .tint(GlowPalette.color)
 
                     LabeledContent("Asking for", value: label)
-                    LabeledContent("Screen allows", value: ceiling)
+                    LabeledContent("Screen currently allows", value: ceiling)
                 } header: {
                     Text("Glow")
                 } footer: {
@@ -117,18 +117,23 @@ struct SettingsView: View {
         peak <= GlowSettings.range.lowerBound ? "Off" : String(format: "%.0f×", peak)
     }
 
-    /// What the display will actually grant, right now.
+    /// What the display will grant right now — and "now" is load-bearing.
+    ///
+    /// `potentialEDRHeadroom` moves with ambient light, display brightness and
+    /// thermal state, so the same phone reports different numbers indoors and
+    /// outdoors, and again once it is warm. Hence "currently": a reading, not a
+    /// specification.
     ///
     /// Asking for more than this is not an error and not wasted — it is simply
     /// tone-mapped back down. Showing both numbers is the only honest way to
-    /// answer "can it be 24× brighter", which depends on the panel, the ambient
-    /// light and the thermal state, not on the app.
+    /// answer how bright it can get, which depends on the panel and the moment
+    /// rather than on the app.
     private var ceiling: String {
         String(format: "%.1f×", UIScreen.main.potentialEDRHeadroom)
     }
 
     private var footer: String {
-        "How far above normal white the glow aims. The screen decides what it "
-            + "grants — that varies with ambient light, brightness and heat."
+        "How far above normal white the glow aims. What the screen grants "
+            + "changes with ambient light, brightness and heat."
     }
 }

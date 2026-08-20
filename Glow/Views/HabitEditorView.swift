@@ -28,7 +28,11 @@ struct HabitEditorView: View {
     /// way three rows agree — matching a system row's height by eye works until
     /// the OS changes its padding.
     private static let rowHeight: CGFloat = 56
-    private static let platterRadius: CGFloat = 14
+    /// 26, which is what the Form's own section corner measured at before the
+    /// platters were drawn by hand: inset 36px at 12px down from the top edge,
+    /// which solves to a 78px radius. On a 56pt row that is nearly a capsule,
+    /// and it is what the stepper looked like when it was still a system row.
+    private static let platterRadius: CGFloat = 26
 
     private var isEditing: Bool { habit != nil }
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
