@@ -1,20 +1,27 @@
 import SwiftUI
 
-/// The app's one colour.
+/// Every colour and every effect in the grid.
 ///
-/// A slot is not identified by hue any more. It is identified by brightness:
-/// empty, lit, or done. Committing to a single colour is what makes that
-/// legible, because when six accents were in play the eye read colour first and
-/// the glow second, which is backwards for an app whose whole signal is the
-/// glow.
+/// **Two colours.** White is anything lit; grey is anything that is not. There
+/// is no third. A slot is never identified by hue — only by whether it is
+/// glowing and, if not, how far down the grey scale it sits. That is what makes
+/// the glow readable: when several accents were in play the eye read colour
+/// first and the glow second, which is backwards for an app whose whole signal
+/// is the glow.
 ///
-/// Slightly blue-ish white rather than pure white, because light sources read
-/// as cool. A neutral white glow looks like a blown-out highlight; a cool one
-/// looks lit.
+/// The values are the design file's own, not approximations of a render. See
+/// docs/design-system.md for the full table and for the four places this
+/// deliberately differs.
 enum GlowPalette {
+    // MARK: - The two colours
+
     /// sRGB components, shared by the SwiftUI colour and the Core Image render
     /// so the solid shape and the HDR shape are the same colour.
-    static let components: (red: CGFloat, green: CGFloat, blue: CGFloat) = (0.85, 0.91, 1.0)
+    ///
+    /// Pure white. It was a slightly blue-ish white for a long while, on the
+    /// reasoning that light sources read as cool — the design file is #FFFFFF
+    /// throughout, and matching it is worth more than the theory.
+    static let components: (red: CGFloat, green: CGFloat, blue: CGFloat) = (1.0, 1.0, 1.0)
 
     static let color = Color(
         .sRGB,
@@ -24,65 +31,65 @@ enum GlowPalette {
         opacity: 1
     )
 
-    /// The completed state. The same colour held back from full brightness, so
-    /// done reads as "was lit" rather than as a different thing entirely.
-    static let filled = Color(
-        .sRGB,
-        red: components.red * 0.82,
-        green: components.green * 0.82,
-        blue: components.blue * 0.82,
-        opacity: 1
-    )
+    /// #8D8D93. Everything that is not lit, at one opacity or another.
+    static let grey = Color(.sRGB, red: 141 / 255, green: 141 / 255, blue: 147 / 255, opacity: 1)
 
-    /// How far the halo carries beyond the slot, as a multiple of slot height.
-    static let haloRadius: CGFloat = 0.55
+    // MARK: - The grey, by weight
+    //
+    // Four steps, and each one is a different kind of "not now".
 
-    /// Halo reach for glowing text, in points.
+    /// A habit already handled today.
     ///
-    /// Tighter than a slot's, and not proportional to it: a glyph is thin, and a
-    /// halo sized like a slot's turns a word into a smear.
-    static let labelHalo: CGFloat = 5
-    static let headerHalo: CGFloat = 4
+    /// The design puts this at full strength, and on the device that is too
+    /// dim — not an error in the file. A flat render holds nothing brighter than
+    /// white, while here these sit beside marks running at six times SDR white
+    /// and the eye rescales against those. Every SDR value in this app reads
+    /// darker than its mock predicts, so this one is lifted and the hue kept.
+    static let labelResting = Color(.sRGB, red: 0.78, green: 0.78, blue: 0.80, opacity: 1)
 
-    // MARK: - Brightness tiers
+    /// A weekday letter that is not today.
+    static let headerRest = grey.opacity(0.6)
+    /// A day that went unlogged.
+    static let missed = grey.opacity(0.5)
+    /// A day still to come. Dark enough to be a socket rather than a mark, which
+    /// is what keeps a nearly-empty row legible as a week.
+    static let upcoming = grey.opacity(0.16)
+
+    // MARK: - Glow reach
     //
-    // Light means something happened. Every completion glows, whatever day it
-    // fell on, and so does today's open slot — so a good week is a row of lights
-    // and a bad one is nearly dark. What does *not* glow is anything that is
-    // merely absent: a missed day and a day still to come are both flat.
+    // Blur radii in points, converted from the design's CSS-style shadows: a CSS
+    // blur is roughly twice a SwiftUI shadow radius, so these are half the
+    // published number at 1x.
+
+    /// The halo around a mark, as a multiple of slot height.
+    /// 18px blur on a 35px slot at 2x.
+    static let haloRadius: CGFloat = (18.0 / 2) / 35.0
+
+    /// The ring's halo is softer and offset, and it is drawn at half strength.
+    static let ringHaloRadius: CGFloat = (10.0 / 2) / 35.0
+    static let ringHaloOpacity: Double = 0.5
+
+    /// Halo reach for glowing text, in points. Tighter than a mark's and not
+    /// proportional to it: a glyph is thin, and a mark's halo turns a word into
+    /// a smear. 3px and 4px blur at 2x.
+    static let labelHalo: CGFloat = 3.0 / 2 / 2
+    static let headerHalo: CGFloat = 4.0 / 2 / 2
+
+    // MARK: - Type
     //
-    // The one place emphasis still tracks "needs you now" is the label, which
-    // steps back once its habit has been handled today.
-    //
-    // The multipliers are measured off the design rather than guessed.
+    // One family, one weight. The design uses SF Pro Regular at 24px on a 2x
+    // widget — 12pt — for the habit name and for every weekday letter, and
+    // nothing anywhere is bold. A label that is due is white with a glow, not
+    // heavier; the weight never changes, so the row does not reflow when a habit
+    // is completed.
 
-    /// A habit still waiting on today: its icon and name, at full strength.
-    static let labelDue = color
-    /// A habit already handled today. Present, done asking.
-    ///
-    /// The design file measures 0.56 here and that is too dim on the device.
-    /// Not a mistake in the file — a flat render has nothing brighter than white
-    /// in it, while on a real screen these labels sit next to marks running at
-    /// six times SDR white, and the eye rescales everything else against that.
-    /// Any SDR value in this app reads darker than its mock predicts.
-    static let labelResting = color.opacity(0.75)
+    /// The widget's text size, matching the design exactly.
+    static let widgetTextSize: CGFloat = 12
 
-    /// A day that went unlogged. Faint, and the only mark drawn as a glyph
-    /// rather than a shape — a miss should read as an absence, not an entry.
-    static let missed = color.opacity(0.17)
-    /// A day still to come: a solid disc, dark enough to be a socket rather
-    /// than a mark. It is what makes the row legible as seven days when most of
-    /// them are empty.
-    static let upcoming = color.opacity(0.125)
+    // MARK: - Outside the grid
 
-    /// Today's letter in the weekday header.
-    static let headerToday = color
-    /// Every other letter.
-    static let headerRest = color.opacity(0.35)
-
-    /// Amber, and the only colour in the app that is not the glow. It is used
-    /// for exactly one thing: saying that the glow is not available. A warning
-    /// rendered in the app's own white would be indistinguishable from the
-    /// thing it is warning about.
+    /// Amber, and the only colour in the app that is not white or grey. Used for
+    /// exactly one thing: saying that the glow is unavailable. A warning in the
+    /// app's own white would be indistinguishable from the thing it warns about.
     static let warning = Color(.sRGB, red: 1.0, green: 0.72, blue: 0.22, opacity: 1)
 }
