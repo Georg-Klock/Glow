@@ -100,7 +100,7 @@ private struct WidgetHeader: View {
                 ForEach(0..<7, id: \.self) { index in
                     let isToday = week.days[index] == today
                     let letter = Text(initials[index])
-                        .font(.caption2.weight(isToday ? .semibold : .regular))
+                        .font(.system(size: GlowPalette.widgetTextSize))
 
                     Group {
                         if isToday {
@@ -154,7 +154,7 @@ private struct WidgetRow: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
-                .font(.caption.weight(isDue ? .semibold : .regular))
+                .font(.system(size: GlowPalette.widgetTextSize))
 
                 Group {
                     // Full white with a drop shadow in the design means a real

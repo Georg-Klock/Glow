@@ -133,7 +133,7 @@ struct HabitRowView: View {
                 .truncationMode(.tail)
             Spacer(minLength: 0)
         }
-        .font(.subheadline.weight(isDue ? .semibold : .regular))
+        .font(.subheadline)
 
         Group {
             // A due label is full white with a drop shadow in the design, which

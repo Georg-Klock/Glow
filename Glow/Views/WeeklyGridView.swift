@@ -251,8 +251,7 @@ struct WeekdayHeader: View {
             HStack(spacing: SlotLayout.gap(trackWidth: geometry.trackWidth)) {
                 ForEach(0..<7, id: \.self) { index in
                     let isToday = week.days[index] == today
-                    let letter = Text(initials[index])
-                        .font(.caption.weight(isToday ? .semibold : .regular))
+                    let letter = Text(initials[index]).font(.caption)
 
                     Group {
                         // Today's letter is white with a drop shadow in the

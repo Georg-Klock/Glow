@@ -121,9 +121,17 @@ private struct GlowTile: View {
 struct GlowModifier: ViewModifier {
     /// Halo reach in points before the intensity setting scales it.
     let halo: CGFloat
+    /// The design draws the ring's halo softer, offset above and below, and at
+    /// half strength; every other glow is one plain shadow at full strength.
+    var style: Style = .plain
     /// Only what is asking for something should pulse. Every completion glows
     /// now, and a screen of breathing dots is a screen nobody can read.
     var breathes: Bool
+
+    enum Style: Equatable {
+        case plain
+        case ring
+    }
 
     @AppStorage(GlowSettings.key, store: GlowSettings.store)
     private var peak: Double = GlowSettings.defaultValue
@@ -145,17 +153,35 @@ struct GlowModifier: ViewModifier {
         halo * CGFloat(GlowSettings.haloScale(for: peak))
     }
 
+    @ViewBuilder
+    private func caster(_ content: Content) -> some View {
+        let base = content.foregroundStyle(GlowPalette.color)
+        switch style {
+        case .plain:
+            base.shadow(color: GlowPalette.color, radius: haloRadius)
+        case .ring:
+            // Two passes offset up and down rather than one centred: it is what
+            // the file specifies, and it reads as a tube of light rather than a
+            // disc behind a hole.
+            base
+                .shadow(
+                    color: GlowPalette.color.opacity(GlowPalette.ringHaloOpacity),
+                    radius: haloRadius, y: haloRadius * 0.25
+                )
+                .shadow(
+                    color: GlowPalette.color.opacity(GlowPalette.ringHaloOpacity),
+                    radius: haloRadius, y: -haloRadius * 0.25
+                )
+        }
+    }
+
     func body(content: Content) -> some View {
         ZStack {
             // The shadow caster sits under the core and is never seen directly.
-            // Three passes at increasing radius: one shadow falls off far too
-            // fast to read as a bloom, and stacking them approximates the long
-            // tail a real light source has.
-            content
-                .foregroundStyle(GlowPalette.color)
-                .shadow(color: GlowPalette.color.opacity(0.55), radius: haloRadius * 0.35)
-                .shadow(color: GlowPalette.color.opacity(0.35), radius: haloRadius * 0.8)
-                .shadow(color: GlowPalette.color.opacity(0.22), radius: haloRadius * 1.6)
+            // One shadow, not the three this used to stack: the design specifies
+            // a single blur per mark, and three passes were an invention to
+            // approximate a long tail that the file never asked for.
+            caster(content)
 
             GlowTile(peak: peak).mask { content }
         }
@@ -174,8 +200,12 @@ struct GlowModifier: ViewModifier {
 
 extension View {
     /// Draw this view as a real glow rather than as bright colour.
-    func glowing(halo: CGFloat, breathes: Bool = false) -> some View {
-        modifier(GlowModifier(halo: halo, breathes: breathes))
+    func glowing(
+        halo: CGFloat,
+        style: GlowModifier.Style = .plain,
+        breathes: Bool = false
+    ) -> some View {
+        modifier(GlowModifier(halo: halo, style: style, breathes: breathes))
     }
 }
 
@@ -192,7 +222,10 @@ struct GlowImageView: View {
     var body: some View {
         sized(silhouette)
             .glowing(
-                halo: size.height * GlowPalette.haloRadius,
+                halo: size.height * (shape == .ring
+                    ? GlowPalette.ringHaloRadius
+                    : GlowPalette.haloRadius),
+                style: shape == .ring ? .ring : .plain,
                 // Only today's open slot pulses. Completions are records, and a
                 // record has nothing to ask for.
                 breathes: shape == .ring

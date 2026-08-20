@@ -25,7 +25,7 @@ struct SlotMarkView: View {
             // the row is a record of what happened, and Monday happened.
             glow(spansDays ? .bar : .dot)
         case .missed:
-            glyph("xmark", tint: GlowPalette.missed, scale: 0.42)
+            glyph("xmark", tint: GlowPalette.missed, scale: GlowShape.dotScale)
         case .upcoming:
             // Solid, not hollow. It reads as an empty socket waiting to be
             // filled, which is what keeps a nearly-empty row legible as a week.
@@ -42,8 +42,9 @@ struct SlotMarkView: View {
         sized(Capsule(style: .continuous).fill(tint))
     }
 
-    /// The only mark drawn as a glyph. Past and future marks are flat SDR —
-    /// headroom is spent on things that happened, and nothing else.
+    /// The only mark drawn as a glyph, and the only one with no glow at all.
+    /// Sized to the completion dot's footprint, which is what the design does:
+    /// a miss occupies exactly the space the thing it replaces would have.
     private func glyph(_ name: String, tint: Color, scale: CGFloat) -> some View {
         sized(
             Image(systemName: name)
