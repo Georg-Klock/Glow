@@ -18,14 +18,6 @@ struct WeekWidgetView: View {
 
     @Environment(\.widgetFamily) private var family
 
-    private var rowLimit: Int {
-        switch family {
-        case .systemSmall: 3
-        case .systemMedium: 4
-        default: 8
-        }
-    }
-
     private var showsLabels: Bool { family != .systemSmall }
     /// Only the large family has the height to spend a row on the header.
     private var showsHeader: Bool { family == .systemLarge }
@@ -50,6 +42,14 @@ struct WeekWidgetView: View {
             GeometryReader { proxy in
                 let track = max(0, proxy.size.width - labelWidth - labelGap)
                 let side = SlotLayout.slotHeight(trackWidth: track)
+                // As many as fit. Reserve a row for the overflow line when
+                // there is one, or "+3 more" pushes the last habit off the
+                // bottom edge it was counted into.
+                let capacity = WidgetMetrics.rowCapacity(
+                    height: proxy.size.height, slot: side, hasHeader: showsHeader
+                )
+                let overflows = entry.habits.count > capacity
+                let shown = Array(entry.habits.prefix(overflows ? capacity - 1 : capacity))
 
                 VStack(alignment: .leading, spacing: WidgetMetrics.rowGap) {
                     if showsHeader {
@@ -64,7 +64,7 @@ struct WeekWidgetView: View {
                         // rows stand from each other.
                         .padding(.bottom, WidgetMetrics.headerGap - WidgetMetrics.rowGap)
                     }
-                    ForEach(Array(entry.habits.prefix(rowLimit))) { habit in
+                    ForEach(shown) { habit in
                         WidgetRow(
                             habit: habit,
                             week: entry.week,
@@ -77,8 +77,8 @@ struct WeekWidgetView: View {
                             burst: entry.burstHabit == habit.id ? entry.coverage : nil
                         )
                     }
-                    if entry.habits.count > rowLimit {
-                        Text("+\(entry.habits.count - rowLimit) more")
+                    if overflows {
+                        Text("+\(entry.habits.count - shown.count) more")
                             .font(.system(size: WidgetMetrics.textSize))
                             .foregroundStyle(GlowPalette.headerRest)
                     }
