@@ -148,8 +148,13 @@ struct SeedingTests {
         try seeder(context, defaults).seedIfNeeded(now: today)
 
         let store = HabitStore(context: context, calendar: calendar)
-        for habit in try context.fetch(FetchDescriptor<Habit>()) {
-            try store.delete(habit)
+        // Twice: the first pass turns every habit into a blank row, the second
+        // removes the rows. Emptying the list is two steps now, which is the
+        // point — a deleted habit leaves its position behind.
+        for _ in 0..<2 {
+            for habit in try context.fetch(FetchDescriptor<Habit>()) {
+                try store.delete(habit)
+            }
         }
 
         #expect(try seeder(context, defaults).seedIfNeeded(now: today) == 0)
@@ -225,5 +230,67 @@ struct SpacerTests {
             #expect(template.name.isEmpty)
             #expect(template.icon.isEmpty)
         }
+    }
+}
+
+@Suite("Deleting")
+@MainActor
+struct DeletionTests {
+    private func makeContext() throws -> ModelContext {
+        let container = try ModelContainer(
+            for: Habit.self, Completion.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        return ModelContext(container)
+    }
+
+    @Test("Deleting a habit leaves a blank row where it was")
+    func deleteLeavesASpacer() throws {
+        // The grid is a layout the user arranged. Collapsing a row pulls
+        // everything below it up a line, so removing one habit would silently
+        // regroup every habit under it.
+        let context = try makeContext()
+        let store = HabitStore(context: context)
+        let first = try store.addHabit(name: "One", icon: "book", frequency: .daily)
+        let second = try store.addHabit(name: "Two", icon: "drop", frequency: .daily)
+
+        try store.delete(first)
+
+        let rows = try context.fetch(
+            FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder)])
+        )
+        #expect(rows.count == 2)
+        #expect(rows[0].isSpacer)
+        #expect(rows[0].name.isEmpty)
+        #expect(rows[1].id == second.id)
+    }
+
+    @Test("The habit itself is gone, completions and all")
+    func deleteRemovesEverythingButThePosition() throws {
+        let context = try makeContext()
+        let store = HabitStore(context: context)
+        let habit = try store.addHabit(name: "One", icon: "book", frequency: .daily)
+        _ = try store.toggleCompletion(for: habit, on: Date())
+        #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 1)
+
+        try store.delete(habit)
+
+        // Removed explicitly rather than left to cascade — the row survives, so
+        // there is nothing for a cascade to hang off.
+        #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
+        #expect(habit.completedDays.isEmpty)
+    }
+
+    @Test("Deleting a blank row removes it")
+    func deleteSpacerRemovesTheRow() throws {
+        // Otherwise a gap could never be closed, and the grid would only ever
+        // grow more of them.
+        let context = try makeContext()
+        let store = HabitStore(context: context)
+        let spacer = try store.addSpacer()
+
+        try store.delete(spacer)
+
+        #expect(try context.fetchCount(FetchDescriptor<Habit>()) == 0)
     }
 }

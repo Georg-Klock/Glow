@@ -276,10 +276,18 @@ private struct WidgetSlot: View {
     @ViewBuilder
     private var shape: some View {
         if let burst, slot.state == .filled {
-            // The app's three beats, sampled. A widget cannot cross-fade across
-            // a snapshot boundary, so the burst arrives as a coverage value per
-            // entry and the beats snap instead.
-            GlowImageView(size: size, shape: burstShape)
+            // The app's closing ring, sampled. Each entry is one frame of the
+            // same transformation: the diameter shrinks while the stroke holds
+            // at its resting width, so the hole shuts and the ring becomes the
+            // dot. A widget cannot run a spring, so the easing is whatever
+            // `WidgetBurst.coverage` gives — but it is the same movement, not a
+            // different one approximating it.
+            let diameter = size.height + (GlowShape.dotDiameter - size.height) * burst
+            GlowImageView(
+                size: CGSize(width: diameter, height: diameter),
+                shape: .ring,
+                ringLineWidth: size.height * GlowShape.ringWeight
+            )
         } else {
             // The widget glows. Worth stating plainly, because this project
             // assumed the opposite for a long time and wrote it into the spec as
@@ -290,16 +298,4 @@ private struct WidgetSlot: View {
         }
     }
 
-    /// Which of the app's three beats this entry is on.
-    ///
-    /// `WidgetBurst.coverage` is flat at 0 through the hold and then eases to 1,
-    /// so zero is the ring still waiting and the rest splits at the halfway
-    /// point. Snapping between three shapes rather than cross-fading is not a
-    /// compromise made for the widget — a snapshot cannot cross-fade at all, and
-    /// at 10fps over one second the beats are what reads anyway.
-    private var burstShape: GlowShape {
-        guard let burst else { return .dot }
-        if burst <= 0 { return .ring }
-        return burst < 0.5 ? .capsule : .dot
-    }
 }
