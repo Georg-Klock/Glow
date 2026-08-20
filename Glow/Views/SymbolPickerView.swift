@@ -29,6 +29,10 @@ struct SymbolPickerView: View {
     /// the cells, not where the cells are.
     private static let columnCount = 6
     private static let gridSpacing: CGFloat = 10
+    /// Between one section and the next. Shared, because the two tabs are the
+    /// same grid: anything that differs is something that shifts under your
+    /// thumb when you switch between them.
+    private static let sectionSpacing: CGFloat = 20
     /// An emoji is a picture with its own margins; a symbol is a stroke drawn
     /// to its box. Matching the numbers would leave the emoji looking smaller
     /// than the symbol beside it, so the emoji is set larger to land the same.
@@ -74,20 +78,20 @@ struct SymbolPickerView: View {
     @ViewBuilder
     private var symbolContent: some View {
         if query.isEmpty {
-            LazyVStack(alignment: .leading, spacing: 20, pinnedViews: [.sectionHeaders]) {
+            LazyVStack(alignment: .leading, spacing: Self.sectionSpacing, pinnedViews: [.sectionHeaders]) {
                 // The same shortcut the emoji tab opens with, in symbols: one
                 // for each suggested emoji, hand-paired. Nobody browsing three
                 // hundred pictograms for "the running one" should have to.
                 Section {
                     symbolGrid(HabitSymbol.suggested)
                 } header: {
-                    header("Suggested", systemImage: nil)
+                    header("Suggested")
                 }
                 ForEach(HabitSymbol.groups) { group in
                     Section {
                         symbolGrid(group.symbols)
                     } header: {
-                        header(group.title, systemImage: group.icon)
+                        header(group.title)
                     }
                 }
             }
@@ -103,7 +107,7 @@ struct SymbolPickerView: View {
     }
 
     private func symbolGrid(_ symbols: [String]) -> some View {
-        LazyVGrid(columns: columns, spacing: 10) {
+        LazyVGrid(columns: columns, spacing: Self.gridSpacing) {
             ForEach(symbols, id: \.self) { symbol in
                 symbolTile(symbol)
                     .accessibilityLabel(symbol.replacingOccurrences(of: ".", with: " "))
@@ -140,19 +144,19 @@ struct SymbolPickerView: View {
     @ViewBuilder
     private var emojiContent: some View {
         if query.isEmpty {
-            LazyVStack(alignment: .leading, spacing: 14, pinnedViews: [.sectionHeaders]) {
+            LazyVStack(alignment: .leading, spacing: Self.sectionSpacing, pinnedViews: [.sectionHeaders]) {
                 // The habit-relevant ones first, since this is a habit tracker
                 // and nobody opens this screen looking for a flag.
                 Section {
                     emojiGrid(HabitEmoji.suggested.map { ($0.emoji, $0.name) })
                 } header: {
-                    header("Suggested", systemImage: nil)
+                    header("Suggested")
                 }
                 ForEach(HabitEmoji.categories) { category in
                     Section {
                         emojiGrid(category.emoji.map { ($0.glyph, $0.name) })
                     } header: {
-                        header(category.title, systemImage: nil)
+                        header(category.title)
                     }
                 }
             }
@@ -215,15 +219,18 @@ struct SymbolPickerView: View {
 
     // MARK: - Shared
 
-    private func header(_ title: String, systemImage: String?) -> some View {
-        HStack(spacing: 6) {
-            if let systemImage { Image(systemName: systemImage) }
-            Text(title)
-        }
-        .font(.subheadline.weight(.semibold))
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
-        .background(.bar)
+    /// Text only, on both tabs.
+    ///
+    /// The symbol headers used to carry an icon — the group's own first symbol,
+    /// which is arbitrary — and the emoji headers did not. That made the two
+    /// headers different heights, so every section below them sat at a
+    /// different offset and the whole grid stepped sideways when you switched
+    /// tabs. The icon was decoration; the alignment was not.
+    private func header(_ title: String) -> some View {
+        Text(title)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .background(.bar)
     }
 }
