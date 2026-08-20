@@ -66,6 +66,10 @@ struct HabitRowView: View {
                 .frame(width: geometry.trackWidth, alignment: .leading)
         }
         .frame(height: max(slotHeight, GridMetrics.minimumRowHeight))
+        .onAppear { lit = isDue ? 1 : 0 }
+        .onChange(of: isDue) { _, due in
+            withAnimation(SlotView.close) { lit = due ? 1 : 0 }
+        }
     }
 
     @ViewBuilder
@@ -127,7 +131,10 @@ struct HabitRowView: View {
         slots.contains { $0.state == .open }
     }
 
-    @ViewBuilder
+    /// How lit the label is, 1 through 0. Driven by `isDue` on the same spring
+    /// the slot closes on, so the row dims as the ring shuts rather than after.
+    @State private var lit: Double = 1
+
     private var label: some View {
         let text = HStack(spacing: 8) {
             HabitIconView(icon: snapshot.icon)
@@ -141,16 +148,16 @@ struct HabitRowView: View {
         }
         .font(.subheadline)
 
-        Group {
-            // A due label is full white with a drop shadow in the design, which
-            // is the same thing the marks are — so it gets the same treatment.
-            // Rendered as bright text it was the one part of the screen
-            // pretending to be lit.
-            if isDue {
-                text.glowing(halo: GlowPalette.labelHalo)
-            } else {
-                text.foregroundStyle(GlowPalette.labelResting)
-            }
+        // The lit label sits over the resting one and its opacity is what
+        // moves, rather than the two swapping — a swap is instant, and this has
+        // to take exactly as long as the ring takes to close beside it.
+        //
+        // A due label is full white with a drop shadow in the design, the same
+        // thing the marks are. Rendered as bright text it was the one part of
+        // the screen pretending to be lit.
+        return ZStack {
+            text.foregroundStyle(GlowPalette.labelResting)
+            text.glowing(halo: GlowPalette.labelHalo).opacity(lit)
         }
         .frame(width: geometry.labelWidth, alignment: .leading)
         // The whole label column is the edit target, not just the text. Editing
