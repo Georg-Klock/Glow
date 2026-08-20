@@ -12,7 +12,11 @@ enum SlotLayout {
     /// this ratio the marks read as a constellation rather than a progress bar,
     /// and a fixed gap in points loses that the moment the track width changes
     /// between the phone and a large widget.
-    static let gapRatio: CGFloat = 0.735
+    ///
+    /// The design file lays a large widget out as seven 35pt slots on a 59pt
+    /// pitch, so the gap is 24 on 35. Taken from the frame's own numbers rather
+    /// than measured off a render, which is where an earlier 0.735 came from.
+    static let gapRatio: CGFloat = 24.0 / 35.0
 
     /// The gap for a given track, shared by every row so the columns line up.
     static func gap(trackWidth: CGFloat) -> CGFloat {

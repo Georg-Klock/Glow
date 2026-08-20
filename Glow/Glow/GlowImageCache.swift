@@ -70,34 +70,60 @@ enum GlowShape: Equatable {
     // Proportions of the slot's height, measured from the design rather than
     // guessed, so the whole grid scales from one number.
 
-    /// Stroke width of `.ring`.
-    static let ringWeight: CGFloat = 0.088
-    /// Diameter of `.dot`.
-    static let dotScale: CGFloat = 0.41
-    /// Thickness of `.bar`.
-    static let barScale: CGFloat = 0.235
+    /// Stroke width of `.ring`. 3pt on a 35pt slot in the design file.
+    static let ringWeight: CGFloat = 3.0 / 35.0
+    /// Diameter of `.dot`. 14 on 35.
+    static let dotScale: CGFloat = 14.0 / 35.0
+    /// Thickness of `.bar`. 8 on 35.
+    static let barScale: CGFloat = 8.0 / 35.0
 }
 
-/// A lit slot: the HDR core, and the halo around it.
+/// The HDR tile itself, sized by whatever it is put inside.
+///
+/// Falls back to flat colour when the tile cannot be rendered, which is also
+/// what a screen with no headroom shows — so there is no visually broken state
+/// either way.
+private struct GlowTile: View {
+    let peak: Double
+
+    var body: some View {
+        if let tile = GlowImageCache.shared.litTile(peak: peak) {
+            Image(uiImage: tile)
+                .resizable()
+                // Without this the image is tone-mapped to SDR and the whole
+                // exercise is a slightly bright rectangle.
+                .allowedDynamicRange(.high)
+        } else {
+            GlowPalette.color
+        }
+    }
+}
+
+/// Renders anything as a real glow: the HDR tile masked to its shape, with the
+/// halo cast underneath.
+///
+/// Applies to *any* view, not just the slot shapes, because the rule it serves
+/// is a rule about the design file rather than about geometry: full white plus a
+/// drop shadow means headroom. That covers the marks, and it also covers the
+/// label of a habit still due and today's letter in the header, both of which
+/// are drawn exactly that way and were rendering as merely bright text.
 ///
 /// The halo is an ordinary SwiftUI shadow rather than part of the image. Two
 /// reasons. The image is opaque, because the PQ encoder drops alpha, so a halo
 /// baked into it would arrive as a black square covering its neighbours. And a
-/// shadow composites against whatever is behind it, which an opaque tile
-/// cannot. The core is what has to be HDR; a halo is dimmer than its source by
+/// shadow composites against whatever is behind it, which an opaque tile cannot.
+/// The core is what has to be HDR; a halo is dimmer than its source by
 /// definition, so nothing is lost by drawing it in SDR.
 ///
-/// The caster is cut to the same silhouette as the core, which matters for
-/// `.ring`: a solid caster under a hollow core shows through the hole as a
-/// grey lozenge, and the slot stops reading as an outline.
-struct GlowImageView: View {
-    let size: CGSize
-    var shape: GlowShape = .capsule
-    /// When true the tile takes whatever width the layout offers and
-    /// `size.width` is ignored; only the height is honoured. The app's slots
-    /// are measured by `SlotLayout` and want a fixed width, but the widget's
-    /// are distributed by an HStack and must not be pinned.
-    var fillsWidth = false
+/// The caster is the same view as the mask, which matters for a hollow shape: a
+/// solid caster under a ring shows through the hole as a grey lozenge, and the
+/// slot stops reading as an outline.
+struct GlowModifier: ViewModifier {
+    /// Halo reach in points before the intensity setting scales it.
+    let halo: CGFloat
+    /// Only what is asking for something should pulse. Every completion glows
+    /// now, and a screen of breathing dots is a screen nobody can read.
+    var breathes: Bool
 
     @AppStorage(GlowSettings.key, store: GlowSettings.store)
     private var peak: Double = GlowSettings.defaultValue
@@ -116,56 +142,65 @@ struct GlowImageView: View {
     private static let breathPeriod: Double = 1.2
 
     private var haloRadius: CGFloat {
-        size.height * GlowPalette.haloRadius * CGFloat(GlowSettings.haloScale(for: peak))
+        halo * CGFloat(GlowSettings.haloScale(for: peak))
     }
 
-    var body: some View {
+    func body(content: Content) -> some View {
         ZStack {
             // The shadow caster sits under the core and is never seen directly.
             // Three passes at increasing radius: one shadow falls off far too
             // fast to read as a bloom, and stacking them approximates the long
             // tail a real light source has.
-            sized(silhouette.foregroundStyle(GlowPalette.color))
+            content
+                .foregroundStyle(GlowPalette.color)
                 .shadow(color: GlowPalette.color.opacity(0.55), radius: haloRadius * 0.35)
                 .shadow(color: GlowPalette.color.opacity(0.35), radius: haloRadius * 0.8)
                 .shadow(color: GlowPalette.color.opacity(0.22), radius: haloRadius * 1.6)
 
-            core
+            GlowTile(peak: peak).mask { content }
         }
         // The whole glowing layer breathes together, so the halo and the core
         // never drift out of step.
         .opacity(isBreathing ? 1.0 : Self.breathLow)
         .animation(
-            reduceMotion
+            reduceMotion || !breathes
                 ? nil
                 : .easeInOut(duration: Self.breathPeriod).repeatForever(autoreverses: true),
             value: isBreathing
         )
-        .onAppear { if !reduceMotion { isBreathing = true } }
-        .accessibilityHidden(true)
+        .onAppear { if breathes && !reduceMotion { isBreathing = true } }
     }
+}
 
-    @ViewBuilder
-    private var core: some View {
-        if let tile = GlowImageCache.shared.litTile(peak: peak) {
-            sized(
-                Image(uiImage: tile)
-                    .resizable()
-                    // Without this the image is tone-mapped to SDR and the
-                    // whole exercise is a slightly bright capsule.
-                    .allowedDynamicRange(.high)
+extension View {
+    /// Draw this view as a real glow rather than as bright colour.
+    func glowing(halo: CGFloat, breathes: Bool = false) -> some View {
+        modifier(GlowModifier(halo: halo, breathes: breathes))
+    }
+}
+
+/// A lit slot: one of the mark silhouettes, glowing.
+struct GlowImageView: View {
+    let size: CGSize
+    var shape: GlowShape = .capsule
+    /// When true the tile takes whatever width the layout offers and
+    /// `size.width` is ignored; only the height is honoured. The app's slots are
+    /// measured by `SlotLayout` and want a fixed width, but the widget's are
+    /// distributed by an HStack and must not be pinned.
+    var fillsWidth = false
+
+    var body: some View {
+        sized(silhouette)
+            .glowing(
+                halo: size.height * GlowPalette.haloRadius,
+                // Only today's open slot pulses. Completions are records, and a
+                // record has nothing to ask for.
+                breathes: shape == .ring
             )
-            // The tile is a plain square, so the slot's shape comes from here
-            // rather than from anything baked into the image. A mask rather
-            // than a clip, because a checkmark is not a Shape and a ring has a
-            // hole; neither survives clipShape.
-            .mask { sized(silhouette) }
-        } else {
-            sized(silhouette.foregroundStyle(GlowPalette.color))
-        }
+            .accessibilityHidden(true)
     }
 
-    /// The shape, as a view that can serve as both mask and shadow caster.
+    /// The shape, as a view that serves as both mask and shadow caster.
     @ViewBuilder
     private var silhouette: some View {
         switch shape {

@@ -124,8 +124,9 @@ struct HabitRowView: View {
         slots.contains { $0.state == .open }
     }
 
+    @ViewBuilder
     private var label: some View {
-        HStack(spacing: 8) {
+        let text = HStack(spacing: 8) {
             HabitIconView(icon: snapshot.icon)
             Text(snapshot.name)
                 .lineLimit(1)
@@ -133,7 +134,18 @@ struct HabitRowView: View {
             Spacer(minLength: 0)
         }
         .font(.subheadline.weight(isDue ? .semibold : .regular))
-        .foregroundStyle(isDue ? GlowPalette.labelDue : GlowPalette.labelResting)
+
+        Group {
+            // A due label is full white with a drop shadow in the design, which
+            // is the same thing the marks are — so it gets the same treatment.
+            // Rendered as bright text it was the one part of the screen
+            // pretending to be lit.
+            if isDue {
+                text.glowing(halo: GlowPalette.labelHalo)
+            } else {
+                text.foregroundStyle(GlowPalette.labelResting)
+            }
+        }
         .frame(width: geometry.labelWidth, alignment: .leading)
         // The whole label column is the edit target, not just the text. Editing
         // used to live only behind a leftward swipe, which is discoverable if

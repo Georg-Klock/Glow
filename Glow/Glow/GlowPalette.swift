@@ -37,6 +37,13 @@ enum GlowPalette {
     /// How far the halo carries beyond the slot, as a multiple of slot height.
     static let haloRadius: CGFloat = 0.55
 
+    /// Halo reach for glowing text, in points.
+    ///
+    /// Tighter than a slot's, and not proportional to it: a glyph is thin, and a
+    /// halo sized like a slot's turns a word into a smear.
+    static let labelHalo: CGFloat = 5
+    static let headerHalo: CGFloat = 4
+
     // MARK: - Brightness tiers
     //
     // Light means something happened. Every completion glows, whatever day it
@@ -52,7 +59,13 @@ enum GlowPalette {
     /// A habit still waiting on today: its icon and name, at full strength.
     static let labelDue = color
     /// A habit already handled today. Present, done asking.
-    static let labelResting = color.opacity(0.56)
+    ///
+    /// The design file measures 0.56 here and that is too dim on the device.
+    /// Not a mistake in the file — a flat render has nothing brighter than white
+    /// in it, while on a real screen these labels sit next to marks running at
+    /// six times SDR white, and the eye rescales everything else against that.
+    /// Any SDR value in this app reads darker than its mock predicts.
+    static let labelResting = color.opacity(0.75)
 
     /// A day that went unlogged. Faint, and the only mark drawn as a glyph
     /// rather than a shape — a miss should read as an absence, not an entry.

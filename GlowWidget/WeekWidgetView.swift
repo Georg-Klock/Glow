@@ -99,10 +99,17 @@ private struct WidgetHeader: View {
             HStack(spacing: SlotLayout.gap(trackWidth: track)) {
                 ForEach(0..<7, id: \.self) { index in
                     let isToday = week.days[index] == today
-                    Text(initials[index])
+                    let letter = Text(initials[index])
                         .font(.caption2.weight(isToday ? .semibold : .regular))
-                        .foregroundStyle(isToday ? GlowPalette.headerToday : GlowPalette.headerRest)
-                        .frame(width: SlotLayout.slotWidth(trackWidth: track, slotCount: 7))
+
+                    Group {
+                        if isToday {
+                            letter.glowing(halo: GlowPalette.headerHalo)
+                        } else {
+                            letter.foregroundStyle(GlowPalette.headerRest)
+                        }
+                    }
+                    .frame(width: SlotLayout.slotWidth(trackWidth: track, slotCount: 7))
                 }
             }
         }
@@ -141,14 +148,23 @@ private struct WidgetRow: View {
     var body: some View {
         HStack(spacing: labelSpacing) {
             if showsLabel {
-                HStack(spacing: 5) {
+                let text = HStack(spacing: 5) {
                     HabitIconView(icon: habit.icon)
                     Text(habit.name)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
                 .font(.caption.weight(isDue ? .semibold : .regular))
-                .foregroundStyle(isDue ? GlowPalette.labelDue : GlowPalette.labelResting)
+
+                Group {
+                    // Full white with a drop shadow in the design means a real
+                    // glow, the same rule the marks follow.
+                    if isDue {
+                        text.glowing(halo: GlowPalette.labelHalo)
+                    } else {
+                        text.foregroundStyle(GlowPalette.labelResting)
+                    }
+                }
                 .frame(width: labelWidth, alignment: .leading)
             }
 

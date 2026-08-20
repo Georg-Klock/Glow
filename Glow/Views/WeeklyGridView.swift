@@ -251,15 +251,24 @@ struct WeekdayHeader: View {
             HStack(spacing: SlotLayout.gap(trackWidth: geometry.trackWidth)) {
                 ForEach(0..<7, id: \.self) { index in
                     let isToday = week.days[index] == today
-                    Text(initials[index])
+                    let letter = Text(initials[index])
                         .font(.caption.weight(isToday ? .semibold : .regular))
-                        .foregroundStyle(isToday ? GlowPalette.headerToday : GlowPalette.headerRest)
-                        .frame(
-                            width: SlotLayout.slotWidth(
-                                trackWidth: geometry.trackWidth,
-                                slotCount: 7
-                            )
+
+                    Group {
+                        // Today's letter is white with a drop shadow in the
+                        // design, so it is a glow and not just a brighter grey.
+                        if isToday {
+                            letter.glowing(halo: GlowPalette.headerHalo)
+                        } else {
+                            letter.foregroundStyle(GlowPalette.headerRest)
+                        }
+                    }
+                    .frame(
+                        width: SlotLayout.slotWidth(
+                            trackWidth: geometry.trackWidth,
+                            slotCount: 7
                         )
+                    )
                 }
             }
             .frame(width: geometry.trackWidth, alignment: .leading)
