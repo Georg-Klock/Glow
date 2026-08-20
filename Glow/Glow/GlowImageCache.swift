@@ -72,15 +72,25 @@ enum GlowShape: Equatable {
 
     /// Stroke width of `.ring`. 3pt on a 35pt slot in the design file.
     static let ringWeight: CGFloat = 3.0 / 35.0
-    /// Diameter of `.dot`. 14 on 35.
-    static let dotScale: CGFloat = 14.0 / 35.0
-    /// Thickness of `.bar`. 4 on 17.5.
-    static let barScale: CGFloat = 4.0 / 17.5
+    /// Diameter of `.dot`, in points.
+    ///
+    /// Fixed rather than a fraction of the slot: a day is a day, and the mark
+    /// for one should not grow because the grid it sits in got wider. The slot
+    /// still sets the pitch and the ring; only the marks inside it are absolute.
+    static let dotDiameter: CGFloat = 3
+    /// Thickness of `.bar`, in points. A run of days is a line, not a lozenge.
+    static let barThickness: CGFloat = 2
 
     /// The missed ✕: 1pt bars with 9pt arms, crossed. Not a glyph — see
     /// SlotMarkView.
     static let missedThickness: CGFloat = 1.0 / 17.5
     static let missedArm: CGFloat = 9.0 / 17.5
+
+    /// The upcoming day, and an upcoming run of them. The same shapes as a
+    /// completion, so the only difference between a day that happened and a day
+    /// that has not is whether it is lit.
+    static let upcomingDiameter: CGFloat = 3
+    static let upcomingThickness: CGFloat = 2
 }
 
 /// The HDR tile itself, sized by whatever it is put inside.
@@ -265,17 +275,14 @@ struct GlowImageView: View {
         case .dot:
             // Centred rather than inset, so a dot sits on the column's centre
             // line whatever the slot around it is doing.
-            Circle().frame(
-                width: size.height * GlowShape.dotScale,
-                height: size.height * GlowShape.dotScale
-            )
+            Circle().frame(width: GlowShape.dotDiameter, height: GlowShape.dotDiameter)
         case .bar:
             // Inset to the dot's own margin at each end, so a bar starts where
             // the first day's dot would start and ends where the last one's
             // would — a run of completions, not a shape covering the columns.
             Capsule(style: .continuous)
-                .frame(height: size.height * GlowShape.barScale)
-                .padding(.horizontal, size.height * (1 - GlowShape.dotScale) / 2)
+                .frame(height: GlowShape.barThickness)
+                .padding(.horizontal, (size.height - GlowShape.dotDiameter) / 2)
         }
     }
 

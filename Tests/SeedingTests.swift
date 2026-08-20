@@ -42,20 +42,24 @@ struct SeedingTests {
         #expect(habits.map(\.frequency) == DefaultHabits.all.map(\.frequency))
     }
 
-    @Test("Nothing is pre-completed")
-    func seedsNoHistory() throws {
-        // The whole signal of the app is that today's slot is unfinished.
-        // Seeding a completion would be inventing behaviour the user never had.
+    @Test("A past is seeded, and today is never part of it")
+    func seedsHistoryButNotToday() throws {
+        // The reverse of what this asserted until 2026-08-20. The history is
+        // invented — SeededHistory says so and says how to switch it off — but
+        // today staying empty is not negotiable: the open slot is the one thing
+        // the app is for, and a seed that filled it would hide the feature on
+        // the first screen anyone sees.
         let context = try makeContext()
         try seeder(context, makeDefaults()).seedIfNeeded(now: today)
 
-        #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<Completion>()) > 0)
         for habit in try context.fetch(FetchDescriptor<Habit>()) {
-            #expect(habit.completedDays.isEmpty)
+            #expect(!habit.completedDays.isEmpty, "\(habit.name) has no history")
+            #expect(!habit.completedDays.contains(today), "\(habit.name) was pre-completed today")
         }
     }
 
-    @Test("Every seeded habit is open today and nothing else is filled")
+    @Test("Every seeded habit is open today")
     func seededHabitsAreOpenToday() throws {
         let context = try makeContext()
         try seeder(context, makeDefaults()).seedIfNeeded(now: today)
@@ -63,8 +67,63 @@ struct SeedingTests {
         let week = WeekCalendar.week(containing: today, calendar: calendar)
         for habit in try context.fetch(FetchDescriptor<Habit>()) {
             let slots = WeekGrid.slots(for: habit.snapshot(), in: week, today: today, calendar: calendar)
-            #expect(slots.filter { $0.state == .open }.count == 1)
-            #expect(slots.allSatisfy { $0.state != .filled })
+            #expect(slots.filter { $0.state == .open }.count == 1, "\(habit.name)")
+        }
+    }
+
+    @Test("The seeded past is the same on every install")
+    func historyIsDeterministic() throws {
+        // A system generator would make each install different, which defeats
+        // the point: this is demo content, the tests assert against it, and
+        // "it looked different on my phone" should not be possible.
+        func seed() throws -> [String: Set<Date>] {
+            let context = try makeContext()
+            try seeder(context, makeDefaults()).seedIfNeeded(now: today)
+            var result: [String: Set<Date>] = [:]
+            for habit in try context.fetch(FetchDescriptor<Habit>()) {
+                result["\(habit.name) \(habit.frequency)"] = habit.completedDays
+            }
+            return result
+        }
+        #expect(try seed() == seed())
+    }
+
+    @Test("A perfect habit really is perfect, and an uneven one is not")
+    func formsProduceTheirRates() throws {
+        // The point of the seed is that a full streak is visible and a missed
+        // day is visible. If every habit came out the same these would be eight
+        // rows of identical noise.
+        let perfect = SeededHistory.completions(
+            for: .daily, form: .perfect, seed: 1, today: today, calendar: calendar
+        )
+        let uneven = SeededHistory.completions(
+            for: .daily, form: .uneven, seed: 1, today: today, calendar: calendar
+        )
+        #expect(perfect.count > uneven.count)
+
+        // Perfect means every day back to the start, with none skipped.
+        let days = Set(perfect)
+        var cursor = perfect.min() ?? today
+        while cursor < today {
+            #expect(days.contains(cursor), "perfect run has a hole at \(cursor)")
+            cursor = calendar.date(byAdding: .day, value: 1, to: cursor) ?? today
+        }
+    }
+
+    @Test("An N-times-a-week habit is seeded by the week, not by the day")
+    func frequencyHistoryRespectsTheGoal() throws {
+        // Seeded per day, a 2x-a-week habit lands six completions in one week
+        // and none in the next, and every row reads as broken.
+        let days = SeededHistory.completions(
+            for: .timesPerWeek(2), form: .perfect, seed: 5, today: today, calendar: calendar
+        )
+        let byWeek = Dictionary(grouping: days) {
+            WeekCalendar.startOfWeek(containing: $0, calendar: calendar)
+        }
+        // The current week is partial, so only the whole ones are checked.
+        let thisWeek = WeekCalendar.startOfWeek(containing: today, calendar: calendar)
+        for (start, completions) in byWeek where start != thisWeek {
+            #expect(completions.count == 2, "week of \(start) has \(completions.count)")
         }
     }
 
