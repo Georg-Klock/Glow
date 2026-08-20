@@ -183,13 +183,16 @@ private struct WidgetRow: View {
         let text = HStack(spacing: WidgetMetrics.iconGap) {
             HabitIconView(icon: habit.icon, size: WidgetMetrics.iconSize)
                 .frame(width: WidgetMetrics.iconWidth)
+            // Never shrunk. A name longer than the label column runs on into the
+            // gap before the track, which is what the design does: seven of its
+            // eight labels clip and the eighth — the only one long enough to
+            // need it — does not, so "Watch Sunset" simply overflows and stops
+            // short of the grid. Text at 12pt that quietly becomes 9pt is worse
+            // than text that uses the space next to it.
             Text(habit.name)
                 .lineLimit(1)
-                // Shrink before truncating. The design's 98pt label leaves
-                // 69.5pt for the name once the icon has its column, and at 12pt
-                // that is about eleven characters — so "Touch Grass" clips in
-                // the file too. The mock just never rendered a name that long.
-                .minimumScaleFactor(0.75)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(maxWidth: WidgetMetrics.nameMaxWidth, alignment: .leading)
             Spacer(minLength: 0)
         }
         .font(.system(size: WidgetMetrics.textSize))
@@ -204,6 +207,9 @@ private struct WidgetRow: View {
             }
         }
         .frame(width: labelWidth, alignment: .leading)
+        // No clipping: the overflow is the point. The frame reserves the
+        // column so the track still starts where the design says it does.
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
 
