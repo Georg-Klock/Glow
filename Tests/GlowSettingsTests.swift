@@ -28,9 +28,13 @@ struct GlowSettingsTests {
         // Without this the slider would do nothing visible on a screen with no
         // headroom, and nothing at all in a screenshot.
         #expect(GlowSettings.haloScale(for: GlowSettings.range.lowerBound) == 0)
-        #expect(GlowSettings.haloScale(for: GlowSettings.defaultValue) == 1)
+        // Pinned to 6x, not to the default. The halo is drawn in SDR and stops
+        // gaining anything long before the encode does, so when the default
+        // moved to the top of the range this had to stay where it was — tying
+        // it to the default would have shrunk every halo to a quarter.
+        #expect(GlowSettings.haloScale(for: GlowSettings.haloReference) == 1)
         #expect(GlowSettings.haloScale(for: 12) > 1)
-        #expect(GlowSettings.haloScale(for: 12) <= 1.7)
+        #expect(GlowSettings.haloScale(for: GlowSettings.range.upperBound) <= 1.7)
     }
 
     @Test("Intensity drives the encoded headroom", arguments: [2.0, 4.0, 8.0])

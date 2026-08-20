@@ -35,7 +35,6 @@ struct TodayView: View {
     }
 
     private var open: [Entry] { entries.filter { $0.slot.state != .filled } }
-    private var done: [Entry] { entries.filter { $0.slot.state == .filled } }
     /// Nothing was expected today, so nothing is missing.
     private var resting: Bool {
         !habits.isEmpty && entries.isEmpty
@@ -68,20 +67,18 @@ struct TodayView: View {
         }
     }
 
+    /// One list, in the habits' own order.
+    ///
+    /// It used to split into "left" and "done" and re-sort as you tapped, which
+    /// meant a row moved out from under your thumb the moment you touched it,
+    /// and the list you were reading was never the same list twice. The order is
+    /// yours; only the marks change.
     private var list: some View {
         List {
             Section {
-                ForEach(open) { entry in row(entry) }
+                ForEach(entries) { entry in row(entry) }
             } header: {
                 Text(open.count == 1 ? "1 left" : "\(open.count) left")
-            }
-
-            if !done.isEmpty {
-                Section {
-                    ForEach(done) { entry in row(entry) }
-                } header: {
-                    Text("Done")
-                }
             }
         }
         .listStyle(.insetGrouped)
