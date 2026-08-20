@@ -14,6 +14,16 @@ import Foundation
 enum HabitSymbol {
     static let `default` = "checkmark.circle"
 
+    /// A symbol for a habit nobody has named yet.
+    ///
+    /// Drawn from the curated habit set rather than from all nine thousand, so
+    /// a new habit opens with something plausibly about a life — not
+    /// `car.side.rear.tow.hitch`. It is a starting point and one tap from being
+    /// changed, which is the whole reason it can afford to be arbitrary.
+    static func random() -> String {
+        HabitEmoji.all.randomElement()?.symbol ?? `default`
+    }
+
     struct Group: Decodable, Identifiable {
         let key: String
         let title: String
