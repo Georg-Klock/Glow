@@ -73,15 +73,15 @@ struct HabitRowView: View {
         HStack(spacing: SlotLayout.gap(trackWidth: geometry.trackWidth)) {
             if spans.isEmpty {
                 ForEach(slots) { slot in
+                    // The tap lives inside the slot now: it needs touch-down to
+                    // grow the ring, and an onTapGesture out here only ever
+                    // hears about touch-up.
                     SlotView(
                         slot: slot,
                         size: CGSize(width: slotHeight, height: slotHeight),
-                        habitName: snapshot.name
+                        habitName: snapshot.name,
+                        onToggle: onToggle
                     )
-                    .onTapGesture {
-                        guard let day = slot.actionDay else { return }
-                        onToggle(day)
-                    }
                 }
             } else {
                 ForEach(spans) { span in

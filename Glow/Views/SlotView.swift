@@ -2,53 +2,43 @@ import SwiftUI
 
 /// One slot, and the completion animation.
 ///
-/// Completing runs in three beats: the ring holds for a moment, fills solid, and
-/// collapses to the dot. The hold is what makes it read as an event rather than
-/// as the light going out, and the fill is the payoff — for that one moment the
-/// slot is the brightest thing the screen will show all day.
+/// **One shape, one number, no cross-fade.** The open ring and the completed dot
+/// are the same circle at two diameters: hold the stroke at 1.5pt and close the
+/// ring, and its hole — diameter minus twice the stroke — reaches zero exactly
+/// when the diameter reaches 3. The ring does not become a dot by fading into
+/// one, it becomes a dot by closing.
+///
+/// It grows first. A press pushes it slightly past its resting size, and letting
+/// go springs it shut past the dot and back — so a completion feels like
+/// something snapping closed rather than a value being set.
 ///
 /// Every other transition is instant. Un-completing especially: it is a
 /// correction, and animating a correction dresses a mistake up as an
 /// achievement.
-///
-/// All three beats are the same HDR tile under different masks, cross-faded. The
-/// codebase avoided that for a long time on the belief that animating an HDR
-/// layer's opacity would flatten it into an SDR buffer. Measured on device, it
-/// does not — which is what makes this shape possible at all.
 struct SlotView: View {
     let slot: Slot
     let size: CGSize
     let habitName: String
+    let onToggle: (Date) -> Void
 
-    /// Hold the ring at full strength for a beat after the tap.
-    private static let hold: Duration = .milliseconds(200)
-    private static let fill: TimeInterval = 0.35
-    private static let settle: TimeInterval = 0.25
+    /// How far past its resting size a press pushes the ring.
+    private static let pressScale: CGFloat = 1.14
+    private static let close = Animation.spring(response: 0.34, dampingFraction: 0.58)
 
-    /// Non-nil only while a completion is playing. When it is nil the slot draws
+    /// Non-nil only while a completion is closing. When it is nil the slot draws
     /// its resting truth and nothing else.
-    @State private var beats: Beats?
-
-    /// The opacity of each of the three layers.
-    private struct Beats: Equatable {
-        var ring: Double = 1
-        var capsule: Double = 0
-        var dot: Double = 0
-    }
+    @State private var closing: CGFloat?
 
     var body: some View {
-        ZStack {
-            if let beats {
-                GlowImageView(size: size, shape: .ring).opacity(beats.ring)
-                GlowImageView(size: size, shape: .capsule).opacity(beats.capsule)
-                GlowImageView(size: size, shape: .dot).opacity(beats.dot)
+        Group {
+            if slot.isTappable {
+                Button { tap() } label: { mark }
+                    .buttonStyle(PressStyle(scale: Self.pressScale))
             } else {
-                SlotMarkView(mark: slot.mark, size: size)
+                mark
             }
         }
         .frame(width: size.width, height: size.height)
-        .contentShape(Capsule(style: .continuous))
-        .allowsHitTesting(slot.isTappable)
         .onChange(of: slot.state) { previous, next in
             transition(from: previous, to: next)
         }
@@ -56,6 +46,21 @@ struct SlotView: View {
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint(accessibilityHint)
         .accessibilityAddTraits(slot.isTappable ? .isButton : [])
+    }
+
+    @ViewBuilder
+    private var mark: some View {
+        if let closing {
+            // Mid-flight: the ring at whatever diameter it has reached, with its
+            // stroke pinned to the resting width so the hole can close.
+            GlowImageView(
+                size: CGSize(width: closing, height: closing),
+                shape: .ring,
+                ringLineWidth: size.height * GlowShape.ringWeight
+            )
+        } else {
+            SlotMarkView(mark: slot.mark, size: size)
+        }
     }
 
     private var accessibilityLabel: String {
@@ -76,31 +81,41 @@ struct SlotView: View {
         return slot.state == .filled ? "Mark as not done" : "Mark as done"
     }
 
+    private func tap() {
+        guard let day = slot.actionDay else { return }
+        onToggle(day)
+    }
+
     private func transition(from previous: SlotState, to next: SlotState) {
         guard previous == .open, next == .filled else {
-            beats = nil
+            closing = nil
             return
         }
 
-        beats = Beats()
+        closing = size.height
+        withAnimation(Self.close) { closing = GlowShape.dotDiameter }
+
+        // Hand back to the resting mark once it has settled. That mark is the
+        // same glowing dot the animation ends on, so nothing moves at the
+        // handover, and no animating layer is left alive behind a still one.
         Task {
-            try? await Task.sleep(for: Self.hold)
-            guard slot.state == .filled else { return beats = nil }
-            withAnimation(.easeOut(duration: Self.fill)) {
-                beats = Beats(ring: 0, capsule: 1, dot: 0)
-            }
-
-            try? await Task.sleep(for: .seconds(Self.fill))
-            guard slot.state == .filled else { return beats = nil }
-            withAnimation(.easeInOut(duration: Self.settle)) {
-                beats = Beats(ring: 0, capsule: 0, dot: 1)
-            }
-
-            // Hand back to the resting mark, which is the same glowing dot —
-            // so a row scrolled away and back does not replay any of this, and
-            // no HDR layers are left alive at zero opacity.
-            try? await Task.sleep(for: .seconds(Self.settle))
-            if slot.state == .filled { beats = nil }
+            try? await Task.sleep(for: .milliseconds(600))
+            if slot.state == .filled { closing = nil }
         }
+    }
+}
+
+/// Grows on touch-down and springs back on release.
+///
+/// A `ButtonStyle` rather than a gesture, because this is exactly what the type
+/// is for: it is handed `isPressed` and does not have to track touches, and it
+/// keeps the button's own hit testing and accessibility intact.
+private struct PressStyle: ButtonStyle {
+    let scale: CGFloat
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? scale : 1)
+            .animation(.spring(response: 0.22, dampingFraction: 0.55), value: configuration.isPressed)
     }
 }

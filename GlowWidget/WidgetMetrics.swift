@@ -54,13 +54,8 @@ enum WidgetMetrics {
     /// and a slot does not.
     static let headerHeight: CGFloat = 14
 
-    /// The container gradient, running straight down over the full height.
-    ///
-    /// Both stops carry the same 3% alpha — a 15% stop alpha inside a paint at
-    /// 20% opacity — and only the hue changes, from a near-black warm grey to
-    /// true black. On a black wallpaper that lightens the top edge by about two
-    /// levels out of 255, which is the point: it separates the widget's corner
-    /// from the wallpaper without reading as a panel.
-    static let backgroundTop = (red: 70.0 / 255, green: 70.0 / 255, blue: 73.0 / 255, alpha: 0.03)
-    static let backgroundBottom = (red: 0.0, green: 0.0, blue: 0.0, alpha: 0.03)
+    // No background constants any more. The design draws a gradient container
+    // and the widget followed it for a while; on a real home screen it read as
+    // a panel sitting on the wallpaper rather than marks floating on it. See
+    // GlowWidget.swift.
 }

@@ -22,33 +22,13 @@ struct GlowWidget: Widget {
                 .padding(.leading, WidgetMetrics.padLeading)
                 .padding(.trailing, WidgetMetrics.padTrailing)
                 .padding(.vertical, WidgetMetrics.padVertical)
-                // The design's gradient, and it is very nearly nothing: five
-                // percent of a light grey falling to fifteen percent of a
-                // near-black. It replaces a fully transparent background, which
-                // was right when the widget was slots on a black wallpaper and
-                // is wrong now that the design draws a container.
-                .containerBackground(for: .widget) {
-                    LinearGradient(
-                        colors: [
-                            Color(
-                                .sRGB,
-                                red: WidgetMetrics.backgroundTop.red,
-                                green: WidgetMetrics.backgroundTop.green,
-                                blue: WidgetMetrics.backgroundTop.blue,
-                                opacity: WidgetMetrics.backgroundTop.alpha
-                            ),
-                            Color(
-                                .sRGB,
-                                red: WidgetMetrics.backgroundBottom.red,
-                                green: WidgetMetrics.backgroundBottom.green,
-                                blue: WidgetMetrics.backgroundBottom.blue,
-                                opacity: WidgetMetrics.backgroundBottom.alpha
-                            ),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                }
+                // No background at all. The design draws a container and this
+                // followed it for a while; on a real home screen it read as a
+                // panel sitting on the wallpaper rather than marks floating on
+                // it, which is the opposite of the point. iOS 17 and later still
+                // require a container background to be declared — declaring it
+                // clear is how you opt out, not omitting it.
+                .containerBackground(.clear, for: .widget)
         }
         // WidgetKit's own margins are close to the design's but not equal, and
         // they are applied inside the container — so the padding above only
