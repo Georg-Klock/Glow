@@ -16,13 +16,29 @@ enum WidgetBurst {
 
     /// How long the burst runs. Matches SlotView's completion transition: a
     /// beat at full glow, then the solid fill rising over it.
-    static let hold: TimeInterval = 0.2
-    static let fade: TimeInterval = 0.8
+    static let hold: TimeInterval = 0.06
+    static let fade: TimeInterval = 0.4
     static var duration: TimeInterval { hold + fade }
 
-    /// Sampled at 10fps. Finer looks no better through a widget's snapshot
-    /// pipeline and only makes the timeline longer.
-    static let step: TimeInterval = 0.1
+    /// The app's spring, as numbers this file can evaluate.
+    ///
+    /// `SlotView.close` is `.spring(response: 0.34, dampingFraction: 0.58)`. A
+    /// widget cannot run a spring — it is handed still frames — so the curve is
+    /// sampled instead of animated, and these are the same two values that
+    /// SwiftUI would have used. The overshoot matters: without it the ring eases
+    /// politely shut in the widget while it snaps in the app, and the two read
+    /// as different gestures.
+    static let response: Double = 0.34
+    static let damping: Double = 0.58
+
+    /// Sampled at 40fps.
+    ///
+    /// It was 10, on the reasoning that finer looked no better through a
+    /// snapshot pipeline. It does: at 10fps across a second the close reads as a
+    /// handful of stills rather than a movement. The cost of more is nothing —
+    /// **entries inside a timeline are free, only reloads are budgeted**, and
+    /// this whole burst rides inside the reload a tap already paid for.
+    static let step: TimeInterval = 0.025
 
     private static var store: UserDefaults { GlowSettings.store }
 
@@ -49,13 +65,23 @@ enum WidgetBurst {
 
     /// How far the solid fill has risen over the glow, 0 through 1.
     ///
-    /// Flat at 0 through the hold, then eased, so the glow is held for a beat
-    /// before it is covered — the completion reads as an event rather than as
-    /// the light simply going out.
+    /// How far through the close this frame is, 0 through 1 and briefly past it.
+    ///
+    /// Flat at 0 through the hold, then a damped spring — the same one the app
+    /// runs, evaluated rather than animated. It **overshoots past 1**, which is
+    /// the point: the ring closes past the dot and settles back, and a caller
+    /// mapping this onto a diameter gets the snap rather than a fade.
     static func coverage(at elapsed: TimeInterval) -> Double {
         guard elapsed > hold else { return 0 }
-        let t = min(max((elapsed - hold) / fade, 0), 1)
-        // easeOut, matching the app's .easeOut on the same transition.
-        return 1 - pow(1 - t, 2)
+        let t = elapsed - hold
+        guard t < fade else { return 1 }
+
+        // Standard second-order step response. omega is the undamped frequency
+        // SwiftUI derives from `response`; omegaD is what is left after damping.
+        let omega = 2 * Double.pi / response
+        let zeta = damping
+        let omegaD = omega * (1 - zeta * zeta).squareRoot()
+        let decay = exp(-zeta * omega * t)
+        return 1 - decay * (cos(omegaD * t) + (zeta * omega / omegaD) * sin(omegaD * t))
     }
 }

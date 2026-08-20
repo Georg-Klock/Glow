@@ -127,6 +127,14 @@ enum GlowPalette {
 
     // MARK: - Outside the grid
 
+    /// The widget's background under Default appearance: true black, declared
+    /// explicitly rather than as `Color.black`, which is a system colour and
+    /// free to be something other than 0,0,0.
+    ///
+    /// Under Tinted or Clear this is removed and replaced with glass, so it is
+    /// only ever what Default sees.
+    static let widgetBackground = Color(.sRGB, red: 0, green: 0, blue: 0, opacity: 1)
+
     /// Amber, and the only colour in the app that is not white or grey. Used for
     /// exactly one thing: saying that the glow is unavailable. A warning in the
     /// app's own white would be indistinguishable from the thing it warns about.

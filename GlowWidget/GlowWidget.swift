@@ -40,7 +40,7 @@ struct GlowWidget: Widget {
                 // default is true, and passing false opts out of glass, out of
                 // the StandBy and iPad Lock Screen galleries, and out of
                 // foreground tinting with it.
-                .containerBackground(.black, for: .widget)
+                .containerBackground(GlowPalette.widgetBackground, for: .widget)
         }
         // WidgetKit's own margins are close to the design's but not equal, and
         // they are applied inside the container — so the padding above only
