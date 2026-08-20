@@ -34,6 +34,14 @@ struct HabitEditorView: View {
     /// and it is what the stepper looked like when it was still a system row.
     private static let platterRadius: CGFloat = 26
 
+    /// The icon's own size, passed rather than set with `.font` on the outside.
+    /// `HabitIconView` sets its own font, so an outer `.font(.title3)` here did
+    /// nothing at all and the glyph had been rendering at body size.
+    private static let iconSize: CGFloat = 24
+
+    /// How far the name sits from the platter's edge.
+    private static let namePadding: CGFloat = 20
+
     private var isEditing: Bool { habit != nil }
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var frequency: Frequency { Frequency(timesPerWeek: timesPerWeek) }
@@ -53,20 +61,14 @@ struct HabitEditorView: View {
                 VStack(spacing: 16) {
                     HStack(spacing: 10) {
                         Button { isPickingIcon = true } label: {
-                            HabitIconView(icon: icon)
-                                .font(.title3)
+                            // No chevron badge. It was there to say the icon
+                            // could be changed, back when the glyph sat loose
+                            // inside the name field and read as decoration. On
+                            // its own platter it is plainly a control, and the
+                            // badge was a label on something already labelled.
+                            HabitIconView(icon: icon, size: Self.iconSize)
                                 .frame(width: Self.rowHeight, height: Self.rowHeight)
                                 .background(platter)
-                                .overlay(alignment: .bottomTrailing) {
-                                    // Something has to say it can be changed. A
-                                    // bare glyph beside a text field reads as
-                                    // decoration.
-                                    Image(systemName: "chevron.down.circle.fill")
-                                        .font(.caption2)
-                                        .symbolRenderingMode(.palette)
-                                        .foregroundStyle(GlowPalette.color, .black)
-                                        .offset(x: -2, y: -2)
-                                }
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Icon")
@@ -77,7 +79,7 @@ struct HabitEditorView: View {
                             .textInputAutocapitalization(.sentences)
                             .focused($isNameFocused)
                             .submitLabel(.done)
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, Self.namePadding)
                             .frame(maxWidth: .infinity)
                             .frame(height: Self.rowHeight)
                             .background(platter)
