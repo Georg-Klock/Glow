@@ -86,11 +86,43 @@ struct FrequencyTests {
         #expect(Frequency(timesPerWeek: 9) == .daily)
     }
 
+    @Test("Once a week is a real cadence")
+    func onceAWeekIsSelectable() {
+        // Excluded until 2026-08-20 on the grounds that a single shape spanning
+        // the track read as a progress bar. It is now what every met goal looks
+        // like. See docs/decisions.md.
+        #expect(Frequency(timesPerWeek: 1) == .timesPerWeek(1))
+        #expect(Frequency.selectableCounts.contains(1))
+    }
+
     @Test("Counts below the selectable range clamp up")
     func lowCountsClamp() {
-        #expect(Frequency(timesPerWeek: 1) == .timesPerWeek(2))
-        #expect(Frequency(timesPerWeek: 0) == .timesPerWeek(2))
-        #expect(Frequency(timesPerWeek: -3) == .timesPerWeek(2))
+        #expect(Frequency(timesPerWeek: 0) == .timesPerWeek(1))
+        #expect(Frequency(timesPerWeek: -3) == .timesPerWeek(1))
+    }
+
+    @Test("The defaults are all constructible cadences")
+    func defaultsAreValid() {
+        // A template naming a cadence the type normalizes away would seed a
+        // habit that silently is not what the design asked for.
+        for template in DefaultHabits.all {
+            switch template.frequency {
+            case .daily:
+                continue
+            case .timesPerWeek(let n):
+                #expect(Frequency(timesPerWeek: n) == template.frequency, "\(template.name): \(n)x")
+            }
+        }
+    }
+
+    @Test("Every default habit's icon is one the app can draw")
+    func defaultIconsExist() {
+        // The icons come from glyphs in a design file, resolved by hand. A name
+        // that never existed renders as literal text on the first screen anyone
+        // sees.
+        for template in DefaultHabits.all {
+            #expect(HabitSymbol.isSymbol(template.icon), "\(template.name) -> \(template.icon)")
+        }
     }
 
     @Test("Slot count matches the cadence")
