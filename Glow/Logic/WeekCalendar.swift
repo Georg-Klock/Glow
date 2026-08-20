@@ -16,12 +16,16 @@ struct Week: Equatable, Sendable {
 /// Every date question in the app goes through here, so "what day is it" is
 /// answered one way rather than five.
 enum WeekCalendar {
-    /// The user's own calendar, forced to a Monday week start to match the
-    /// M T W T F S S header. Locale decides the week start otherwise, and in
-    /// the US that is Sunday, which would silently shift every column.
+    /// The user's own calendar, with the week start taken from settings rather
+    /// than from locale.
+    ///
+    /// Locale would say Sunday in the US. The week start is not a formatting
+    /// detail here — it decides which seven days a "week" of habits is, and so
+    /// which completions count toward a weekly goal — so it is a setting, and
+    /// it defaults to Monday.
     static var calendar: Calendar {
         var calendar = Calendar.current
-        calendar.firstWeekday = 2
+        calendar.firstWeekday = WeekPreferences.firstWeekday
         return calendar
     }
 
@@ -62,7 +66,8 @@ enum WeekCalendar {
         }
     }
 
-    /// Single-letter column headers in the user's locale, Monday first.
+    /// Single-letter column headers in the user's locale, in the calendar's own
+    /// week order.
     static func weekdayInitials(calendar: Calendar = WeekCalendar.calendar) -> [String] {
         let symbols = calendar.veryShortStandaloneWeekdaySymbols
         guard symbols.count == 7 else { return ["M", "T", "W", "T", "F", "S", "S"] }

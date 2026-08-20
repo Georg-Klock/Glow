@@ -25,7 +25,10 @@ struct RowGeometry: Equatable {
 }
 
 enum GridMetrics {
-    static let baseLabelWidth: CGFloat = 116
+    /// Wide enough for the longest seeded name at the body size. "Touch Grass"
+    /// and "Watch Sunset" both truncated at 116, and a habit tracker whose first
+    /// screen shows "Watch S..." has failed at the one thing it does.
+    static let baseLabelWidth: CGFloat = 140
     static let labelSpacing: CGFloat = 10
     static let horizontalPadding: CGFloat = 20
     static let rowSpacing: CGFloat = 16
@@ -130,7 +133,10 @@ struct HabitRowView: View {
             HabitIconView(icon: snapshot.icon)
             Text(snapshot.name)
                 .lineLimit(1)
-                .truncationMode(.tail)
+                // Shrink before truncating. A width picked for the longest
+                // seeded name is a guess that a longer name, a larger Dynamic
+                // Type setting or another language will beat.
+                .minimumScaleFactor(0.8)
             Spacer(minLength: 0)
         }
         .font(.subheadline)

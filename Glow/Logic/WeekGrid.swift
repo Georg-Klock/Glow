@@ -102,26 +102,38 @@ enum WeekGrid {
 
         switch habit.frequency {
         case .daily:
-            return dailySlots(habit: habit, week: week, today: todayStart)
+            return dailySlots(habit: habit, week: week, today: todayStart, calendar: calendar)
         case .timesPerWeek(let target):
             return frequencySlots(habit: habit, week: week, today: todayStart, target: target)
         }
     }
 
     /// Daily rows are day-pinned: column N is weekday N, always.
-    private static func dailySlots(habit: HabitSnapshot, week: Week, today: Date) -> [Slot] {
+    private static func dailySlots(
+        habit: HabitSnapshot,
+        week: Week,
+        today: Date,
+        calendar: Calendar
+    ) -> [Slot] {
         week.days.enumerated().map { index, day in
             let isDone = habit.completedDays.contains(day)
             let isToday = day == today
+            // A rest day is never open and never missed. Nothing was expected,
+            // so nothing was skipped — it draws as an empty socket whether it
+            // is behind or ahead. A completion logged on one still counts and
+            // still shows; resting is permission, not a prohibition.
+            let isRest = WeekPreferences.isRestDay(day, calendar: calendar)
 
             let state: SlotState =
                 if isDone { .filled }
+                else if isRest { .inactive }
                 else if isToday { .open }
                 else if day < today { .missed }
                 else { .inactive }
 
-            // Past days are never editable, so only today carries an action.
-            return Slot(index: index, state: state, actionDay: isToday ? day : nil)
+            // Past days are never editable, and a rest day has nothing to
+            // toggle toward, so only an expectant today carries an action.
+            return Slot(index: index, state: state, actionDay: isToday && !isRest ? day : nil)
         }
     }
 
