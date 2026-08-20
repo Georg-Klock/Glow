@@ -12,17 +12,23 @@ enum GlowSettings {
     /// Multiples of SDR white. 1x is no headroom at all, which is a legitimate
     /// "off": the slot renders as a flat capsule and the app stops glowing.
     ///
-    /// The top is 24 because the PQ encoding carries it — Rec. 2100 PQ runs to
-    /// 10,000 nits, which is about 40x a 250-nit SDR white. **What the screen
-    /// grants is a different question.** `UIScreen.potentialEDRHeadroom` is the
-    /// ceiling, it is a property of the panel and the moment, and asking for
-    /// more than it simply tone-maps back down. Settings shows both numbers so
-    /// the difference is visible rather than argued about.
-    static let range: ClosedRange<Double> = 1...24
+    /// The top is 12, not the 24 the encoding could carry.
+    ///
+    /// PQ runs to 10,000 nits — about 40x a 250-nit SDR white — so the encode
+    /// was never the limit. `UIScreen.potentialEDRHeadroom` is, and it is a
+    /// property of the panel *and the moment*: it moves with ambient light,
+    /// display brightness and thermal state. Asking for more than it grants is
+    /// not an error, it simply tone-maps back down — which makes the top of
+    /// the range a slider position that does nothing, and a control that stops
+    /// responding halfway is worse than one with a lower ceiling.
+    ///
+    /// Settings shows both numbers, so the gap is visible rather than argued
+    /// about.
+    static let range: ClosedRange<Double> = 1...12
 
     /// The top of the range. The glow is the product; there is no reason for it
     /// to open at half strength.
-    static let defaultValue: Double = 24
+    static let defaultValue: Double = 12
 
     /// The App Group's defaults, so app and widget agree. Falls back to the
     /// app's own when the entitlement is unavailable, exactly as the store does.
