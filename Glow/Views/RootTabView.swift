@@ -29,7 +29,10 @@ struct RootTabView: View {
             Tab("Today", systemImage: "circle.dotted", value: Screen.today) {
                 TodayView()
             }
-            Tab("Settings", systemImage: "gearshape", value: Screen.settings) {
+            // `gear` rather than `gearshape`: the cog with teeth and a hole,
+            // not the rounded outline. Every other tab icon here is a drawing
+            // of a thing rather than a stylised glyph.
+            Tab("Settings", systemImage: "gear", value: Screen.settings) {
                 SettingsView()
             }
         }
