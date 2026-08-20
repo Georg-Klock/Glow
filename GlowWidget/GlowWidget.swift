@@ -22,13 +22,24 @@ struct GlowWidget: Widget {
                 .padding(.leading, WidgetMetrics.padLeading)
                 .padding(.trailing, WidgetMetrics.padTrailing)
                 .padding(.vertical, WidgetMetrics.padVertical)
-                // No background at all. The design draws a container and this
-                // followed it for a while; on a real home screen it read as a
-                // panel sitting on the wallpaper rather than marks floating on
-                // it, which is the opposite of the point. iOS 17 and later still
-                // require a container background to be declared — declaring it
-                // clear is how you opt out, not omitting it.
-                .containerBackground(.clear, for: .widget)
+                .containerBackground(.ultraThinMaterial, for: .widget)
+                // **A home screen widget cannot be transparent.** Measured on
+                // a simulator against a bright wallpaper, all three ways:
+                //
+                //   .clear              opaque black
+                //   omitted entirely    opaque black
+                //   .red                red — so this is ours, not the system's
+                //   .ultraThinMaterial  translucent, wallpaper showing through
+                //
+                // Alpha in a container background composites against black
+                // rather than against the wallpaper, so "clear" is not nothing,
+                // it is black — and the design's 3% gradient was black too, for
+                // the same reason. Only a Material samples what is behind it.
+                //
+                // So this is as close to no background as the platform allows.
+                // Widgets that really are transparent were built against a
+                // pre-iOS-17 SDK and are grandfathered; a build made today
+                // cannot opt out.
         }
         // WidgetKit's own margins are close to the design's but not equal, and
         // they are applied inside the container — so the padding above only
