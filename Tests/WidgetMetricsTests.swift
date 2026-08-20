@@ -5,8 +5,8 @@ import Testing
 @Suite("Widget row capacity")
 struct WidgetMetricsTests {
     /// The large widget, from docs/widget-large-spec.md §1 and §3.4.
-    private let largeHeight: CGFloat = 354
-    private let largeWidth: CGFloat = 338
+    private var largeHeight: CGFloat { WidgetMetrics.largeHeight }
+    private var largeWidth: CGFloat { WidgetMetrics.largeWidth }
 
     /// The content box, inside the vertical padding.
     private var contentHeight: CGFloat { largeHeight - WidgetMetrics.padVertical * 2 }
@@ -27,6 +27,16 @@ struct WidgetMetricsTests {
         #expect(WidgetMetrics.rowCapacity(
             height: contentHeight, slot: largeSlot, hasHeader: true
         ) == 11)
+    }
+
+    @Test("The shared capacity is the same eleven")
+    func sharedCapacityAgrees() {
+        // The app reads this to decide where to draw the line marking what the
+        // widget can show. A second copy of the figure would be one that drifts.
+        #expect(WidgetMetrics.largeRowCapacity == 11)
+        #expect(WidgetMetrics.largeRowCapacity == WidgetMetrics.rowCapacity(
+            height: contentHeight, slot: largeSlot, hasHeader: true
+        ))
     }
 
     @Test("Eleven rows actually fit, and twelve do not")

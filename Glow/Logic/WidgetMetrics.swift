@@ -2,6 +2,11 @@ import CoreGraphics
 
 /// The large widget's layout, in the design file's own numbers.
 ///
+/// Lives in `Glow/Logic` rather than in the widget target because the app needs
+/// one number out of it: how many rows the widget can show. The grid marks that
+/// boundary, and a second copy of the figure in the app would be a copy that
+/// could drift.
+///
 /// Node `83:1676` is authored at 1x — 338 × 354, which is the real point size of
 /// a large widget on this phone — so these are read straight off it rather than
 /// halved from a 2x frame or measured off a render.
@@ -10,6 +15,25 @@ import CoreGraphics
 /// and nothing is rounded to something tidier; where the file is on a half point
 /// this is too, because half a point is a real pixel at 2x and two of them at 3x.
 enum WidgetMetrics {
+    /// The large widget's own size, on a 6.1" iPhone. The design file is
+    /// authored at exactly this, at 1x.
+    static let largeWidth: CGFloat = 338
+    static let largeHeight: CGFloat = 354
+
+    /// How many rows a large widget shows.
+    ///
+    /// Eleven, and derived rather than written down — every input to it has
+    /// moved at least once. The app reads this to mark where its grid stops
+    /// being visible on the home screen.
+    static var largeRowCapacity: Int {
+        let track = largeWidth - padLeading - padTrailing - labelWidth - labelGap
+        return rowCapacity(
+            height: largeHeight - padVertical * 2,
+            slot: SlotLayout.slotHeight(trackWidth: track),
+            hasHeader: true
+        )
+    }
+
     /// Content inset. Not symmetric in the file, and left alone rather than
     /// averaged: the extra point on the right is what stops the last column
     /// sitting hard against the widget's rounded corner.

@@ -294,3 +294,69 @@ struct DeletionTests {
         #expect(try context.fetchCount(FetchDescriptor<Habit>()) == 0)
     }
 }
+
+@Suite("Adding fills blank rows")
+@MainActor
+struct AddingTests {
+    private func makeContext() throws -> ModelContext {
+        let container = try ModelContainer(
+            for: Habit.self, Completion.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        return ModelContext(container)
+    }
+
+    private func rows(_ context: ModelContext) throws -> [Habit] {
+        try context.fetch(FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder)]))
+    }
+
+    @Test("A new habit takes the first blank row rather than landing past it")
+    func addFillsTheFirstBlank() throws {
+        let context = try makeContext()
+        let store = HabitStore(context: context)
+        try store.addHabit(name: "One", icon: "book", frequency: .daily)
+        try store.addSpacer()
+        try store.addSpacer()
+
+        try store.addHabit(name: "Two", icon: "drop", frequency: .timesPerWeek(3))
+
+        // Three rows, not four: the count is stable and the clustering the rows
+        // were expressing survives.
+        let all = try rows(context)
+        #expect(all.count == 3)
+        #expect(all[1].name == "Two")
+        #expect(all[1].isSpacer == false)
+        #expect(all[1].frequency == .timesPerWeek(3))
+        #expect(all[2].isSpacer)
+    }
+
+    @Test("With no blank rows it appends, as it always did")
+    func addAppendsWhenFull() throws {
+        let context = try makeContext()
+        let store = HabitStore(context: context)
+        try store.addHabit(name: "One", icon: "book", frequency: .daily)
+
+        try store.addHabit(name: "Two", icon: "drop", frequency: .daily)
+
+        let all = try rows(context)
+        #expect(all.count == 2)
+        #expect(all.map(\.name) == ["One", "Two"])
+    }
+
+    @Test("Delete then add reuses the same row")
+    func deleteThenAddIsStable() throws {
+        // The two halves of one idea: a row's existence is stable and only its
+        // contents change. Deleting leaves the position, adding takes it back.
+        let context = try makeContext()
+        let store = HabitStore(context: context)
+        let first = try store.addHabit(name: "One", icon: "book", frequency: .daily)
+        try store.addHabit(name: "Two", icon: "drop", frequency: .daily)
+
+        try store.delete(first)
+        try store.addHabit(name: "Three", icon: "leaf", frequency: .daily)
+
+        let all = try rows(context)
+        #expect(all.count == 2)
+        #expect(all.map(\.name) == ["Three", "Two"])
+    }
+}
