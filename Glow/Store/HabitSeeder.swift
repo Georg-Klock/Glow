@@ -37,13 +37,24 @@ struct HabitSeeder {
         defaults.set(true, forKey: Self.seededKey)
         guard existing == 0 else { return 0 }
 
+        let today = WeekCalendar.day(now)
         for template in DefaultHabits.all {
-            try store.addHabit(
+            let habit = try store.addHabit(
                 name: template.name,
                 icon: template.icon,
                 frequency: template.frequency,
                 now: now
             )
+            // Invented, deterministic, and never touching today. See
+            // SeededHistory for what that costs and how to switch it off.
+            for day in SeededHistory.completions(
+                for: template.frequency,
+                form: template.form,
+                seed: template.seed,
+                today: today
+            ) {
+                _ = try store.toggleCompletion(for: habit, on: day)
+            }
         }
 
         Self.log.info("Seeded \(DefaultHabits.all.count) default habits")

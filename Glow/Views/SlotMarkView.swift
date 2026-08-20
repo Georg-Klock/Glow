@@ -27,9 +27,11 @@ struct SlotMarkView: View {
         case .missed:
             missedMark
         case .upcoming:
-            // Solid, not hollow. It reads as an empty socket waiting to be
-            // filled, which is what keeps a nearly-empty row legible as a week.
-            shape(GlowPalette.upcoming)
+            // The same shape and size as a completion, only unlit. A day that
+            // has not happened and a day that has differ by exactly one thing —
+            // whether there is light in it — which is the whole app stated as a
+            // pair of marks.
+            upcomingMark
         }
     }
 
@@ -37,9 +39,25 @@ struct SlotMarkView: View {
         GlowImageView(size: size, shape: shape, fillsWidth: fillsWidth)
     }
 
-    /// A flat filled slot, at the full size of its column or span.
-    private func shape(_ tint: Color) -> some View {
-        sized(Capsule(style: .continuous).fill(tint))
+    @ViewBuilder
+    private var upcomingMark: some View {
+        if spansDays {
+            sized(
+                Capsule(style: .continuous)
+                    .fill(GlowPalette.upcoming)
+                    .frame(height: GlowShape.upcomingThickness)
+                    .padding(.horizontal, (size.height - GlowShape.upcomingDiameter) / 2)
+            )
+        } else {
+            sized(
+                Circle()
+                    .fill(GlowPalette.upcoming)
+                    .frame(
+                        width: GlowShape.upcomingDiameter,
+                        height: GlowShape.upcomingDiameter
+                    )
+            )
+        }
     }
 
     /// The only mark with no glow at all, and the only one that is not a symbol.
