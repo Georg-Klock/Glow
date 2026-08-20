@@ -50,6 +50,24 @@ final class GlowImageCache {
     }
 }
 
+/// The silhouette a glow is cut to.
+///
+/// The tile itself is a flat square of uniform HDR colour and carries no shape
+/// at all, so anything that can be a mask can be a glow. That is the whole
+/// reason a glowing checkmark costs no more than a glowing pill.
+enum GlowShape: Equatable {
+    /// Solid, edge to edge.
+    case capsule
+    /// A hollow outline. The line width is a fraction of the slot's height, so
+    /// it holds its weight as the grid resizes.
+    case ring
+    /// Today's completion.
+    case checkmark
+
+    /// Line width for `.ring`, as a fraction of height.
+    static let ringWeight: CGFloat = 0.13
+}
+
 /// A lit slot: the HDR core, and the halo around it.
 ///
 /// The halo is an ordinary SwiftUI shadow rather than part of the image. Two
@@ -58,8 +76,13 @@ final class GlowImageCache {
 /// shadow composites against whatever is behind it, which an opaque tile
 /// cannot. The core is what has to be HDR; a halo is dimmer than its source by
 /// definition, so nothing is lost by drawing it in SDR.
+///
+/// The caster is cut to the same silhouette as the core, which matters for
+/// `.ring`: a solid caster under a hollow core shows through the hole as a
+/// grey lozenge, and the slot stops reading as an outline.
 struct GlowImageView: View {
     let size: CGSize
+    var shape: GlowShape = .capsule
     /// When true the tile takes whatever width the layout offers and
     /// `size.width` is ignored; only the height is honoured. The app's slots
     /// are measured by `SlotLayout` and want a fixed width, but the widget's
@@ -82,7 +105,6 @@ struct GlowImageView: View {
     /// Half a breath: in and out is twice this.
     private static let breathPeriod: Double = 1.2
 
-    private var shape: Capsule { Capsule(style: .continuous) }
     private var haloRadius: CGFloat {
         size.height * GlowPalette.haloRadius * CGFloat(GlowSettings.haloScale(for: peak))
     }
@@ -93,7 +115,7 @@ struct GlowImageView: View {
             // Three passes at increasing radius: one shadow falls off far too
             // fast to read as a bloom, and stacking them approximates the long
             // tail a real light source has.
-            sized(shape.fill(GlowPalette.color))
+            sized(silhouette.foregroundStyle(GlowPalette.color))
                 .shadow(color: GlowPalette.color.opacity(0.55), radius: haloRadius * 0.35)
                 .shadow(color: GlowPalette.color.opacity(0.35), radius: haloRadius * 0.8)
                 .shadow(color: GlowPalette.color.opacity(0.22), radius: haloRadius * 1.6)
@@ -124,10 +146,35 @@ struct GlowImageView: View {
                     .allowedDynamicRange(.high)
             )
             // The tile is a plain square, so the slot's shape comes from here
-            // rather than from anything baked into the image.
-            .clipShape(shape)
+            // rather than from anything baked into the image. A mask rather
+            // than a clip, because a checkmark is not a Shape and a ring has a
+            // hole; neither survives clipShape.
+            .mask { sized(silhouette) }
         } else {
-            sized(shape.fill(GlowPalette.color))
+            sized(silhouette.foregroundStyle(GlowPalette.color))
+        }
+    }
+
+    /// The shape, as a view that can serve as both mask and shadow caster.
+    @ViewBuilder
+    private var silhouette: some View {
+        switch shape {
+        case .capsule:
+            Capsule(style: .continuous)
+        case .ring:
+            Capsule(style: .continuous)
+                .strokeBorder(style: StrokeStyle(lineWidth: size.height * GlowShape.ringWeight))
+        case .checkmark:
+            // Resizable rather than weighted: `fontWeight` is ignored once an
+            // SF Symbol is resizable, so the stroke weight comes from the
+            // scale, which is the behaviour wanted anyway — the mark thickens
+            // with the grid instead of drifting thin on a large widget.
+            Image(systemName: "checkmark")
+                .resizable()
+                .scaledToFit()
+                // A checkmark drawn to the full slot height sits heavier than
+                // the pill it replaces; the inset keeps the row's rhythm.
+                .padding(.vertical, size.height * 0.08)
         }
     }
 

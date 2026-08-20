@@ -70,17 +70,22 @@ private struct WidgetRow: View {
         WeekGrid.slots(for: habit, in: week, today: today)
     }
 
+    /// Still waiting on today. The label follows the slot, same rule as the app.
+    private var isDue: Bool {
+        slots.contains { $0.state == .open }
+    }
+
     var body: some View {
         HStack(spacing: 6) {
             if showsLabel {
                 HStack(spacing: 5) {
                     HabitIconView(icon: habit.icon)
-                        .font(.caption)
                     Text(habit.name)
-                        .font(.caption)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
+                .font(.caption.weight(isDue ? .semibold : .regular))
+                .foregroundStyle(isDue ? GlowPalette.labelDue : GlowPalette.labelResting)
                 .frame(width: 74, alignment: .leading)
             }
 
@@ -105,14 +110,6 @@ private struct WidgetSlot: View {
     /// Set only on the slot that was just tapped.
     let burst: Double?
 
-    private var fill: AnyShapeStyle {
-        switch slot.state {
-        case .open: AnyShapeStyle(GlowPalette.color)
-        case .filled: AnyShapeStyle(GlowPalette.filled)
-        case .inactive: AnyShapeStyle(.fill.secondary)
-        }
-    }
-
     var body: some View {
         // Only today's slot is a button, which is the same rule the app
         // enforces: past days are not editable, so they are not tappable here
@@ -130,33 +127,41 @@ private struct WidgetSlot: View {
         }
     }
 
+    /// fillsWidth throughout: the widget's slots are distributed by the HStack,
+    /// and pinning a width here would fight the layout.
+    private static let slotSize = CGSize(width: 0, height: 14)
+
     @ViewBuilder
     private var shape: some View {
         if let burst, slot.state == .filled {
-            // The same direction as the app: the solid fill rises over a glow
-            // that never changes, rather than the glow fading out.
+            // The app's three beats, sampled. The widget cannot cross-fade
+            // across a snapshot boundary, so the burst arrives as a coverage
+            // value per entry: the ring gives way to the solid capsule, and the
+            // capsule to the checkmark, at the two thirds of the way through.
             ZStack {
-                GlowImageView(size: CGSize(width: 0, height: 14), fillsWidth: true)
-                Capsule(style: .continuous)
-                    .fill(GlowPalette.filled)
-                    .frame(height: 14)
-                    .opacity(burst)
+                GlowImageView(size: Self.slotSize, shape: burstShape, fillsWidth: true)
             }
-            .frame(height: 14)
-        } else if slot.state == .open {
-            // The widget glows. This is worth stating plainly because this
-            // project assumed the opposite for a long time and wrote it into
-            // the spec as a non-goal: WidgetKit renders out-of-process and
-            // archives the result, so HDR was supposed to be impossible here.
-            // Measured on an iPhone 14 Pro running the real PQ tile, it is not.
-            //
-            // fillsWidth because the widget's slots are distributed by the
-            // HStack; pinning a width here would fight the layout.
-            GlowImageView(size: CGSize(width: 0, height: 14), fillsWidth: true)
+            .frame(height: Self.slotSize.height)
         } else {
-            Capsule(style: .continuous)
-                .fill(fill)
-                .frame(height: 14)
+            // The widget glows. Worth stating plainly, because this project
+            // assumed the opposite for a long time and wrote it into the spec
+            // as a non-goal: WidgetKit renders out-of-process and archives the
+            // result, so HDR was supposed to be impossible here. Measured on an
+            // iPhone 14 Pro running the real PQ tile, it is not.
+            SlotMarkView(mark: slot.mark, size: Self.slotSize, fillsWidth: true)
         }
+    }
+
+    /// Which of the app's three beats this entry is on.
+    ///
+    /// `WidgetBurst.coverage` is flat at 0 through the hold and then eases to 1,
+    /// so zero is the ring still waiting and the rest splits at the halfway
+    /// point. Snapping between three shapes rather than cross-fading is not a
+    /// compromise made for the widget — a snapshot cannot cross-fade at all, and
+    /// at 10fps over one second the beats are what reads anyway.
+    private var burstShape: GlowShape {
+        guard let burst else { return .checkmark }
+        if burst <= 0 { return .ring }
+        return burst < 0.5 ? .capsule : .checkmark
     }
 }
