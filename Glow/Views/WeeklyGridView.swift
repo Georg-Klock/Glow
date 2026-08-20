@@ -48,8 +48,18 @@ struct WeeklyGridView: View {
                     if !habits.isEmpty {
                         EditButton()
                     }
-                    Button("Add habit", systemImage: "plus") {
-                        isAddingHabit = true
+                    // A menu rather than a second button: adding a blank row
+                    // is rare next to adding a habit, and two icons in a toolbar
+                    // to distinguish "new thing" from "new gap" is a puzzle.
+                    Menu {
+                        Button("New Habit", systemImage: "plus") {
+                            isAddingHabit = true
+                        }
+                        Button("Blank Row", systemImage: "rectangle.dashed") {
+                            addSpacer()
+                        }
+                    } label: {
+                        Label("Add", systemImage: "plus")
                     }
                 }
             }
@@ -101,6 +111,10 @@ struct WeeklyGridView: View {
                         ) { day in
                             toggle(habit, on: day)
                         } onEdit: {
+                            // A blank row has nothing to edit. Opening the sheet
+                            // on one would offer a name, an icon and a cadence
+                            // for something that is only a position.
+                            guard !habit.isSpacer else { return }
                             editingHabit = habit
                         }
                         .listRowInsets(EdgeInsets(
@@ -114,10 +128,12 @@ struct WeeklyGridView: View {
                             Button("Delete", systemImage: "trash", role: .destructive) {
                                 delete(habit)
                             }
-                            Button("Edit", systemImage: "pencil") {
-                                editingHabit = habit
+                            if !habit.isSpacer {
+                                Button("Edit", systemImage: "pencil") {
+                                    editingHabit = habit
+                                }
+                                .tint(.indigo)
                             }
-                            .tint(.indigo)
                         }
                     }
                     .onMove(perform: move)
@@ -160,6 +176,16 @@ struct WeeklyGridView: View {
 
     /// First launch starts with habits rather than an empty state. Nothing is
     /// pre-completed: see DefaultHabits.
+    /// A blank row, appended at the end and dragged into place from there.
+    private func addSpacer() {
+        do {
+            try store.addSpacer()
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            HabitStore.report(error, operation: "addSpacer")
+        }
+    }
+
     private func seedIfNeeded() {
         do {
             let added = try HabitSeeder(context: context).seedIfNeeded()

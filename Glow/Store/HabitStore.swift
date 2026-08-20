@@ -39,6 +39,22 @@ struct HabitStore {
         return habit
     }
 
+    /// A blank row, held in the order so habits can be grouped around it.
+    @discardableResult
+    func addSpacer(now: Date = Date()) throws -> Habit {
+        let spacer = Habit(
+            name: "",
+            icon: "",
+            frequency: .daily,
+            createdAt: now,
+            sortOrder: try nextSortOrder(),
+            isSpacer: true
+        )
+        context.insert(spacer)
+        try context.save()
+        return spacer
+    }
+
     func update(
         _ habit: Habit,
         name: String,

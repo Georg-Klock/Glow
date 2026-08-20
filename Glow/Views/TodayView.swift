@@ -27,7 +27,7 @@ struct TodayView: View {
     }
 
     private var entries: [Entry] {
-        habits.compactMap { habit in
+        habits.filter { !$0.isSpacer }.compactMap { habit in
             let slots = WeekGrid.slots(for: habit.snapshot(), in: week, today: today)
             guard let slot = slots.first(where: \.isTappable) else { return nil }
             return Entry(habit: habit, slot: slot)
@@ -43,7 +43,7 @@ struct TodayView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if habits.isEmpty {
+                if habits.allSatisfy(\.isSpacer) {
                     ContentUnavailableView {
                         Label("No Habits", systemImage: "circle.dotted")
                     } description: {

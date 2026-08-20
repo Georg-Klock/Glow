@@ -26,6 +26,20 @@ final class Habit {
     var createdAt: Date = Date.distantPast
     var sortOrder: Int = 0
 
+    /// A blank row: no name, no icon, no track, nothing to complete.
+    ///
+    /// A row rather than a setting, because what it is for is *position* — it
+    /// holds a gap in the order so habits can be clustered into morning, midday
+    /// and evening without inventing sections, headers or a second axis of
+    /// grouping to keep in step with the first.
+    ///
+    /// Stored on `Habit` rather than as its own model so it inherits sortOrder,
+    /// reordering and deletion for free — a second sorted list merged against
+    /// this one is more machinery than a flag. The cost is that every query
+    /// that means "real habits" has to say so; `HabitStore.habits` and the
+    /// snapshot's `isSpacer` are how that stays honest.
+    var isSpacer: Bool = false
+
     @Relationship(deleteRule: .cascade, inverse: \Completion.habit)
     var completions: [Completion]? = []
 
@@ -35,13 +49,15 @@ final class Habit {
         icon: String,
         frequency: Frequency,
         createdAt: Date,
-        sortOrder: Int
+        sortOrder: Int,
+        isSpacer: Bool = false
     ) {
         self.id = id
         self.name = name
         self.icon = icon
         self.createdAt = createdAt
         self.sortOrder = sortOrder
+        self.isSpacer = isSpacer
         self.completions = []
         self.frequency = frequency
     }
@@ -69,7 +85,8 @@ final class Habit {
             name: name,
             icon: icon,
             frequency: frequency,
-            completedDays: completedDays
+            completedDays: completedDays,
+            isSpacer: isSpacer
         )
     }
 }

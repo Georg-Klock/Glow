@@ -105,7 +105,7 @@ struct FrequencyTests {
     func defaultsAreValid() {
         // A template naming a cadence the type normalizes away would seed a
         // habit that silently is not what the design asked for.
-        for template in DefaultHabits.all {
+        for template in DefaultHabits.all where !template.isSpacer {
             switch template.frequency {
             case .daily:
                 continue
@@ -120,7 +120,7 @@ struct FrequencyTests {
         // The icons come from glyphs in a design file, resolved by hand. A name
         // that never existed renders as literal text on the first screen anyone
         // sees.
-        for template in DefaultHabits.all {
+        for template in DefaultHabits.all where !template.isSpacer {
             #expect(HabitSymbol.isSymbol(template.icon), "\(template.name) -> \(template.icon)")
         }
     }

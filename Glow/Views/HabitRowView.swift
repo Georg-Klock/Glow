@@ -61,9 +61,16 @@ struct HabitRowView: View {
 
     var body: some View {
         HStack(spacing: GridMetrics.labelSpacing) {
-            label
-            track
-                .frame(width: geometry.trackWidth, alignment: .leading)
+            if snapshot.isSpacer {
+                // Nothing to draw, but the row still has to exist: it is holding
+                // a position in the order, and it needs its height to be
+                // draggable and its place to be visible as a gap.
+                Color.clear
+            } else {
+                label
+                track
+                    .frame(width: geometry.trackWidth, alignment: .leading)
+            }
         }
         .frame(height: max(slotHeight, GridMetrics.minimumRowHeight))
         .onAppear { lit = isDue ? 1 : 0 }

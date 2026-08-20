@@ -17,6 +17,8 @@ import Foundation
 /// state and a plus button.
 enum DefaultHabits {
     struct Template {
+        /// A blank row rather than a habit. Everything else is ignored.
+        var isSpacer = false
         let name: String
         let icon: String
         let frequency: Frequency
@@ -63,6 +65,15 @@ enum DefaultHabits {
         Template(name: "Touch Grass", icon: "leaf", frequency: .timesPerWeek(2),
                  form: .perfect, seed: 77),
         Template(name: "Watch Sunset", icon: "sunrise", frequency: .timesPerWeek(1),
-                 form: .strong, seed: 88)
+                 form: .strong, seed: 88),
+
+        // Three blank rows, which take the set to the eleven a large widget
+        // holds. They are here to be *moved*: drag one between two habits and
+        // the grid clusters into morning, midday and evening without the app
+        // needing sections, headers, or a second kind of grouping to keep in
+        // step with the order.
+        Template(isSpacer: true, name: "", icon: "", frequency: .daily, form: .perfect, seed: 0),
+        Template(isSpacer: true, name: "", icon: "", frequency: .daily, form: .perfect, seed: 0),
+        Template(isSpacer: true, name: "", icon: "", frequency: .daily, form: .perfect, seed: 0)
     ]
 }

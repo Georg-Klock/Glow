@@ -53,7 +53,8 @@ struct SeedingTests {
         try seeder(context, makeDefaults()).seedIfNeeded(now: today)
 
         #expect(try context.fetchCount(FetchDescriptor<Completion>()) > 0)
-        for habit in try context.fetch(FetchDescriptor<Habit>()) {
+        // Blank rows are positions, not habits: no history and nothing due.
+        for habit in try context.fetch(FetchDescriptor<Habit>()) where !habit.isSpacer {
             #expect(!habit.completedDays.isEmpty, "\(habit.name) has no history")
             #expect(!habit.completedDays.contains(today), "\(habit.name) was pre-completed today")
         }
@@ -65,7 +66,7 @@ struct SeedingTests {
         try seeder(context, makeDefaults()).seedIfNeeded(now: today)
 
         let week = WeekCalendar.week(containing: today, calendar: calendar)
-        for habit in try context.fetch(FetchDescriptor<Habit>()) {
+        for habit in try context.fetch(FetchDescriptor<Habit>()) where !habit.isSpacer {
             let slots = WeekGrid.slots(for: habit.snapshot(), in: week, today: today, calendar: calendar)
             #expect(slots.filter { $0.state == .open }.count == 1, "\(habit.name)")
         }
@@ -80,7 +81,7 @@ struct SeedingTests {
             let context = try makeContext()
             try seeder(context, makeDefaults()).seedIfNeeded(now: today)
             var result: [String: Set<Date>] = [:]
-            for habit in try context.fetch(FetchDescriptor<Habit>()) {
+            for habit in try context.fetch(FetchDescriptor<Habit>()) where !habit.isSpacer {
                 result["\(habit.name) \(habit.frequency)"] = habit.completedDays
             }
             return result
@@ -170,7 +171,7 @@ struct SeedingTests {
     func defaultsUseRealSymbols() {
         // A seeded habit whose icon is not in the catalogue would render as
         // literal text, which is how a typo here would reach a first launch.
-        for template in DefaultHabits.all {
+        for template in DefaultHabits.all where !template.isSpacer {
             #expect(HabitSymbol.isSymbol(template.icon), "\(template.icon) is not a known symbol")
         }
     }
@@ -180,5 +181,49 @@ struct SeedingTests {
         let cadences = Set(DefaultHabits.all.map(\.frequency))
         #expect(cadences.contains(.daily))
         #expect(cadences.contains { if case .timesPerWeek = $0 { true } else { false } })
+    }
+}
+
+@Suite("Blank rows")
+struct SpacerTests {
+    private let calendar = TestCalendar.monday
+    private let today = TestCalendar.date(2026, 8, 19)
+    private var week: Week { WeekCalendar.week(containing: today, calendar: calendar) }
+
+    @Test("A blank row draws nothing at all")
+    func spacerHasNoSlots() {
+        // Not "draws an empty state" — draws nothing. It is a position in the
+        // order, and anything rendered in it would be a mark for a habit that
+        // does not exist.
+        let spacer = HabitSnapshot.fixture(isSpacer: true)
+        #expect(WeekGrid.slots(for: spacer, in: week, today: today, calendar: calendar).isEmpty)
+    }
+
+    @Test("A blank row draws nothing on a spanning cadence either")
+    func spacerHasNoSpans() {
+        let spacer = HabitSnapshot.fixture(frequency: .timesPerWeek(3), isSpacer: true)
+        let spans = WeekSpans.spans(
+            for: spacer, in: week, today: today, target: 3, calendar: calendar
+        )
+        #expect(spans.isEmpty)
+    }
+
+    @Test("The defaults fill a large widget exactly")
+    func defaultsFillTheWidget() {
+        // Eight habits and three blank rows is eleven, which is what a large
+        // widget holds — see WidgetMetricsTests. The blank rows are there to be
+        // moved between habits, and they only work as a grouping device if
+        // there is room for them.
+        #expect(DefaultHabits.all.count == 11)
+        #expect(DefaultHabits.all.count(where: \.isSpacer) == 3)
+        #expect(DefaultHabits.all.count(where: { !$0.isSpacer }) == 8)
+    }
+
+    @Test("Blank rows come with no habit fields and no history")
+    func spacersAreEmpty() {
+        for template in DefaultHabits.all where template.isSpacer {
+            #expect(template.name.isEmpty)
+            #expect(template.icon.isEmpty)
+        }
     }
 }
