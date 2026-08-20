@@ -20,6 +20,12 @@ struct HabitEditorView: View {
     @State private var isConfirmingDelete = false
     @State private var isPickingIcon = false
 
+    /// The height of a platter, and the corner it is cut with — matched to what
+    /// an inset-grouped Form row already looks like, since these sit where one
+    /// would have been.
+    private static let rowHeight: CGFloat = 44
+    private static let platterRadius: CGFloat = 12
+
     private var isEditing: Bool { habit != nil }
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var frequency: Frequency { Frequency(timesPerWeek: timesPerWeek) }
@@ -28,25 +34,26 @@ struct HabitEditorView: View {
         NavigationStack {
             Form {
                 Section {
-                    HStack(spacing: 12) {
-                        // The icon leads the row, so a habit is a picture and a
-                        // name in that order — the same order the grid reads in.
-                        //
-                        // On a filled circle with a chevron, because a bare
-                        // glyph beside a text field reads as decoration and
-                        // nothing about it says it can be changed. This is the
-                        // same shape Reminders and Calendar use for the job.
+                    // Two platters rather than one row, so the icon reads as
+                    // its own control instead of as an ornament sitting inside
+                    // the name field. The row's own background is cleared and
+                    // each half brings its own, which is the only way a Form
+                    // row can be two things.
+                    HStack(spacing: 10) {
                         Button { isPickingIcon = true } label: {
                             HabitIconView(icon: icon)
                                 .font(.title3)
-                                .frame(width: 36, height: 36)
-                                .background(Circle().fill(.fill.tertiary))
+                                .frame(width: Self.rowHeight, height: Self.rowHeight)
+                                .background(platter)
                                 .overlay(alignment: .bottomTrailing) {
+                                    // Something has to say it can be changed. A
+                                    // bare glyph beside a text field reads as
+                                    // decoration.
                                     Image(systemName: "chevron.down.circle.fill")
                                         .font(.caption2)
                                         .symbolRenderingMode(.palette)
                                         .foregroundStyle(GlowPalette.color, .black)
-                                        .offset(x: 2, y: 2)
+                                        .offset(x: -2, y: -2)
                                 }
                         }
                         .buttonStyle(.plain)
@@ -58,7 +65,12 @@ struct HabitEditorView: View {
                             .textInputAutocapitalization(.sentences)
                             .focused($isNameFocused)
                             .submitLabel(.done)
+                            .padding(.horizontal, 14)
+                            .frame(height: Self.rowHeight)
+                            .background(platter)
                     }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                 }
 
                 Section {
@@ -67,9 +79,15 @@ struct HabitEditorView: View {
 
                 if isEditing {
                     Section {
+                        // Explicitly red. `role: .destructive` would colour it
+                        // for free, except the app sets a white tint at the
+                        // root and that wins — so the one button that must not
+                        // look like every other button looked like every other
+                        // button.
                         Button("Delete Habit", role: .destructive) {
                             isConfirmingDelete = true
                         }
+                        .foregroundStyle(.red)
                         .frame(maxWidth: .infinity, alignment: .center)
                     } footer: {
                         Text("Deleting a habit also removes everything logged against it.")
@@ -108,6 +126,13 @@ struct HabitEditorView: View {
         }
     }
 
+    /// The background a Form row draws for itself, drawn by hand because these
+    /// rows have had theirs cleared to make room for two of them.
+    private var platter: some View {
+        RoundedRectangle(cornerRadius: Self.platterRadius, style: .continuous)
+            .fill(Color(.secondarySystemGroupedBackground))
+    }
+
     /// Minus, the reading, plus — in that order across the row.
     ///
     /// Hand-rolled rather than a `Stepper`, which always puts its label on one
@@ -124,9 +149,12 @@ struct HabitEditorView: View {
             }
 
             HStack(spacing: 0) {
+                // The number glows. It is the one thing on this row that
+                // changes, and white text on a dark platter beside white
+                // buttons was not saying so.
                 Text("\(timesPerWeek)")
                     .monospacedDigit()
-                    .foregroundStyle(GlowPalette.color)
+                    .glowing(halo: GlowPalette.labelHalo)
                 Text("x per week")
                     .foregroundStyle(.secondary)
             }
@@ -136,6 +164,9 @@ struct HabitEditorView: View {
                 timesPerWeek += 1
             }
         }
+        // Inset from the platter's edges. Hard against them the controls read
+        // as part of the container rather than as things inside it.
+        .padding(.horizontal, 10)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Times per week")
         .accessibilityValue("\(timesPerWeek)")
