@@ -18,17 +18,21 @@ it glows and, failing that, where it sits on the grey scale.
 | --- | --- | --- |
 | `color` | `#FFFFFF` | every glow: marks, due labels, today's letter |
 | `grey` | `#8D8D93` | the base for everything below |
-| `labelResting` | `#C7C7CC`¹ | a habit already handled today |
+| `labelResting` | `#8D8D93` | a habit already handled today |
 | `headerRest` | `#8D8D93` @ 60% | weekday letters other than today |
 | `missed` | `#8D8D93` @ 50% | a day that went unlogged |
 | `upcoming` | `#8D8D93` @ 16% | a day still to come |
 | `warning` | `#FFB838` | Low Power Mode only — see below |
 
-¹ The one deliberate departure. **File:** `#8D8D93` at full strength. On the
-device that reads too dim, because a flat render holds nothing brighter than
-white while here these sit beside marks at six times SDR white and the eye
-rescales against those. Every SDR value in this app reads darker than its mock
-predicts — worth knowing before matching any more of them.
+**One grey at four strengths, and no fifth colour anywhere.** 100% for a resting
+label, 60% for a weekday letter, 50% for a miss, 16% for a day still to come.
+
+The resting label was briefly a bespoke `#C7C7CC`, lifted on the grounds that an
+SDR value reads dark beside HDR. That is still true in general — worth knowing
+before matching any more values off a flat render — but it stopped mattering here
+once the glows went to pure white with a single halo pass. Asked for as "between
+the ✕ and where the label was": the ✕ composites to rgb(70, 70, 74) and the label
+was rgb(199, 199, 204), so the midpoint is `#87878B`, and the grey is 4.7% off it.
 
 ## Type
 
@@ -121,7 +125,10 @@ warning about.
 Now that it is all in one place:
 
 - `.secondary` and `labelResting` are two greys doing one job in different
-  places. They could be the same token.
+  places. They could be the same token — `.secondary` only appears on screens
+  built from system controls, where a custom grey stops them looking systemic.
+- `headerRest` at 60% and `missed` at 50% are within ten percent of each other
+  and could merge, taking the grey from four steps to three.
 - `haloRadius` and `ringHaloRadius` differ only because the file draws the ring's
   halo softer. If the ring is going to keep its offset pair anyway, one radius
   would do.
