@@ -156,6 +156,19 @@ about what a tap means. From the home screen the same tap goes through
 `TapHabitIntent` without opening the app; the Today widget that will use it
 arrives with #19.
 
+**Both screens create and edit their own habits, through one editor.** Today
+and This Week carry the same trailing pair — Edit, then add — so the two tabs
+wear one piece of chrome rather than two that resemble each other. Adding from
+a screen opens the editor on that screen's kind, so what you make appears
+where you made it: Today opens on Per Day, This Week on Per Week. Today's add
+is a plain button rather than This Week's menu, because a blank row holds a
+position in the week grid and there is no grid here to hold one in.
+
+**Edit changes what a ring's tap means** rather than adding a second control
+beside it: out of edit mode a tap counts, in edit mode it opens that habit in
+the editor, where renaming, re-targeting and deleting already live. Today is a
+grid of rings, not a `List`, so there is nothing for edit mode to reorder.
+
 ## 8. Acceptance criteria
 
 - [x] A daily habit shows exactly 7 circles for the current Monday-Sunday week.

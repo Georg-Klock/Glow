@@ -6,6 +6,14 @@ import WidgetKit
 struct HabitEditorView: View {
     let habit: Habit?
 
+    /// Which kind a *new* habit starts as.
+    ///
+    /// Each screen opens the editor on its own kind, so adding from a screen
+    /// produces a habit that appears on it: Today makes rings, This Week makes
+    /// week rows. Editing an existing habit ignores this and loads the kind
+    /// the habit already has.
+    var newHabitKind: Kind = .week
+
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
 
@@ -273,6 +281,7 @@ struct HabitEditorView: View {
             // icon. The icon is a starting point rather than a suggestion —
             // something is always better than a placeholder tick, and it is one
             // tap from being changed.
+            kind = newHabitKind
             icon = HabitSymbol.random()
             isNameFocused = true
             return
