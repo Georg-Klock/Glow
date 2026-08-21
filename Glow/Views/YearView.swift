@@ -1,7 +1,9 @@
 import SwiftData
 import SwiftUI
 
-/// The year, as one screen of days.
+/// The year, as one screen of days. This is History, reached from Settings —
+/// the long view is context, not a peer of the week, so it does not spend a
+/// tab. It moved here intact; nothing about the drawing changed.
 ///
 /// Columns are weeks, rows are the days of the week in the same order the grid
 /// uses, so a horizontal streak is a habit holding and a vertical band is a good
@@ -11,6 +13,9 @@ import SwiftUI
 /// Nothing here is tappable. The year is for looking at — editing a day from
 /// four months ago is not a thing this app does, and a grid that responds to
 /// touch would promise that it is.
+///
+/// No `NavigationStack` of its own: it is pushed inside Settings' stack, and
+/// a nested stack would swallow the push animation and the back button.
 struct YearView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Query(filter: Habit.countedPerWeek, sort: [SortDescriptor(\Habit.sortOrder)])
@@ -61,20 +66,18 @@ struct YearView: View {
     private let gap: CGFloat = 3
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if realHabits.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Habits", systemImage: "square.grid.3x3")
-                    } description: {
-                        Text("A year of days appears here once you are tracking something.")
-                    }
-                } else {
-                    grid
+        Group {
+            if realHabits.isEmpty {
+                ContentUnavailableView {
+                    Label("No Habits", systemImage: "square.grid.3x3")
+                } description: {
+                    Text("A year of days appears here once you are tracking something.")
                 }
+            } else {
+                grid
             }
-            .navigationTitle(String(calendar.component(.year, from: today)))
         }
+        .navigationTitle(String(calendar.component(.year, from: today)))
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { today = WeekCalendar.day(Date()) }
         }

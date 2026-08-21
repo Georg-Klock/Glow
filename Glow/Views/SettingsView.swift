@@ -1,7 +1,9 @@
 import SwiftUI
 import UIKit
 
-/// Settings: how hard the glow pushes, and what shape a week is.
+/// Settings: how hard the glow pushes, what shape a week is — and History,
+/// the long view, which is neither today nor this week and so lives here
+/// rather than spending a tab.
 ///
 /// A tab now rather than a sheet, so there is no Done button and nothing to
 /// dismiss — the changes are live and the way out is the tab bar.
@@ -21,6 +23,17 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // The long view. First because it is the one row here that is
+                // not configuration — it is the rest of the app's story, filed
+                // where the things that are neither today nor this week live.
+                Section {
+                    NavigationLink {
+                        YearView()
+                    } label: {
+                        Label("History", systemImage: "square.grid.3x3")
+                    }
+                }
+
                 Section {
                     // A live slot, rendered by the same code path the grid
                     // uses, so the slider is judged against the real thing
