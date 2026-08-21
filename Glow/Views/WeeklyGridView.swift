@@ -127,8 +127,8 @@ struct WeeklyGridView: View {
                             editingHabit = habit
                         }
                         .listRowInsets(EdgeInsets(
-                            top: 6, leading: GridMetrics.horizontalPadding,
-                            bottom: 6, trailing: GridMetrics.horizontalPadding
+                            top: geometry.rowInset, leading: geometry.horizontalPadding,
+                            bottom: geometry.rowInset, trailing: geometry.horizontalPadding
                         ))
                         .listRowSeparator(.hidden)
                         // Everything above this line is what the large widget
@@ -165,8 +165,11 @@ struct WeeklyGridView: View {
                 } header: {
                     WeekdayHeader(geometry: geometry, week: week, today: today)
                         .listRowInsets(EdgeInsets(
-                            top: 0, leading: GridMetrics.horizontalPadding,
-                            bottom: 8, trailing: GridMetrics.horizontalPadding
+                            top: 0, leading: geometry.horizontalPadding,
+                            // The widget's header stands further from the first
+                            // row than the rows stand from each other.
+                            bottom: (WidgetMetrics.headerGap - WidgetMetrics.rowGap / 2) * geometry.scale,
+                            trailing: geometry.horizontalPadding
                         ))
                 }
             }
@@ -286,22 +289,23 @@ struct WeekdayHeader: View {
     private var numbers: [String] { WeekCalendar.dayNumbers(in: week) }
 
     var body: some View {
-        HStack(spacing: GridMetrics.labelSpacing) {
+        HStack(spacing: geometry.labelGap) {
             Color.clear
                 .frame(width: geometry.labelWidth, height: 1)
-            // Letters only. The date numbers went with them for a while and
-            // were carrying nothing: the week is always the current one, so a
-            // number never answers a question the letter had not already.
             HStack(spacing: SlotLayout.gap(trackWidth: geometry.trackWidth)) {
                 ForEach(0..<7, id: \.self) { index in
                     let isToday = week.days[index] == today
                     // Letter and date, in the app only. The widget has no room
                     // for a second line and does not need one: you read the
                     // widget for a second, and the app when you want to know
-                    // which Tuesday.
+                    // which Tuesday. The letter is the widget's letter at the
+                    // screen's scale; the date steps down from it.
                     let column = VStack(spacing: 1) {
-                        Text(initials[index]).font(.caption)
-                        Text(numbers[index]).font(.caption2).monospacedDigit()
+                        Text(initials[index])
+                            .font(.system(size: geometry.textSize))
+                        Text(numbers[index])
+                            .font(.system(size: geometry.textSize - 2))
+                            .monospacedDigit()
                     }
 
                     Group {
