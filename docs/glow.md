@@ -156,6 +156,33 @@ slot still reads as HDR while breathing. That theory can now be retired for the
 opacity case, though the completion transition keeps its approach, which is
 correct for its own reasons.
 
+### The breath moved the ring, and only the ring
+
+For as long as Today had rings, the per-day rings walked: about 15pt sideways
+and back, in time with the breath. Measured on a 3x screen, the Water ring's
+left edge swung between x=62 and x=107 while its width stayed at 271px — a
+translation, not a halo growing under a threshold. The completed ring, with no
+open arcs and so no glowing layer, never moved a pixel in the same frames.
+
+`.animation(_:value:)` animates every animatable value beneath it, not the one
+the modifier it sits above happens to name. `GlowModifier` builds the glow from
+its content twice — once as the caster, once as the mask inside the overlay —
+and where that content is a greedy shape it is measured twice. `DayRingView`'s
+arcs are `Circle().trim()`, which take whatever size they are proposed, so the
+second measurement lands after the repeating breath is installed. The breath
+takes it for a change to interpolate and repeats it forever.
+
+The marks never showed it because a mark is a fixed-size image with nothing
+left to measure, which is why This Week looked right the whole time.
+
+The fix is `geometryGroup()` on the content, in `GlowModifier`, before either
+the caster or the mask is built from it. **Placement is the whole fix**: the
+same call written above `.opacity`, where it reads just as sensibly, was
+measured still drifting — by that point both measurements have already
+happened. Verified on the simulator, which cannot show the glow but shows
+geometry perfectly well: pinned at x=107 across twelve frames while mean
+brightness still cycles 238 → 234 → 238.
+
 ### Breathing in the widget: measured, then removed
 
 A widget cannot run a continuous animation — WidgetKit renders one snapshot per

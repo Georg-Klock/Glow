@@ -176,7 +176,7 @@ struct GlowModifier: ViewModifier {
     }
 
     @ViewBuilder
-    private func caster(_ content: Content) -> some View {
+    private func caster(_ content: some View) -> some View {
         let base = content.foregroundStyle(GlowPalette.color)
         switch style {
         case .plain:
@@ -210,8 +210,28 @@ struct GlowModifier: ViewModifier {
         // The caster is one shadow, not the three this used to stack: the design
         // specifies a single blur per mark, and three passes were an invention
         // approximating a long tail the file never asked for.
-        caster(content)
-            .overlay { GlowTile(peak: peak).mask { content } }
+        //
+        // The content settles its own geometry *before* the glow is built on
+        // it, and both the caster and the mask are built on the settled copy.
+        //
+        // `.animation(_:value:)` animates every animatable value beneath it,
+        // not just the one the modifier it sits above happens to name. Where
+        // the glowing content is a greedy shape — `DayRingView`'s arcs are
+        // `Circle().trim()`, which take whatever size they are proposed — the
+        // shape is measured once for the caster and again for the mask, and
+        // that second measurement lands after the repeating breath is already
+        // installed. The breath takes it for something to interpolate and then
+        // repeats it forever: the ring walked 15pt sideways and back on the
+        // breath's own cycle, 45px on a 3x screen.
+        //
+        // It has to be here rather than above `.opacity`, which is where this
+        // was first written and measured *still drifting*: by that point the
+        // two measurements have already happened. The marks never showed any
+        // of it, because a mark is a fixed-size image with nothing left to
+        // measure — which is why This Week was fine while Today was not.
+        let settled = content.geometryGroup()
+        return caster(settled)
+            .overlay { GlowTile(peak: peak).mask { settled } }
         // The whole glowing layer breathes together, so the halo and the core
         // never drift out of step.
         .opacity(isBreathing ? 1.0 : Self.breathLow)
