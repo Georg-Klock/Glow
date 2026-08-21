@@ -75,6 +75,23 @@ The implementation makes this automatic rather than a rule to enforce: slot
 state is computed from the completions falling inside the displayed week, so
 last week's are not consulted at all. `WeekGridTests` covers it.
 
+## Seeded history: Debug builds only
+
+**Question.** A fresh install seeded ten weeks of invented completions so the
+grid could be judged with something in it. Issue #3 offered two ways out: gate
+it behind `#if DEBUG`, or clear it on first edit.
+
+**Decision** (2026-08-20). The gate. A real install opens with the default
+habits and an empty grid; Debug builds keep the demo past, so the design stays
+judgeable during development. Clear-on-first-edit was the larger change and
+carried a moment where history vanishes unasked — the exact kind of silent
+surprise the rest of the app is built to avoid. The cost is the first-run
+demo, and the app's own argument decided it: a tracker that opens showing a
+streak you did not earn is lying on the first screen.
+
+Today is never pre-filled in either mode, and the tests pin both shapes
+explicitly rather than inheriting whichever configuration they compile under.
+
 ## Appearance: follow the system
 
 **Question.** Not in the spec's list. It arrived from the implementation, twice.
