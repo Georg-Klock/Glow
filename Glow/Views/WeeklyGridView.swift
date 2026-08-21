@@ -10,7 +10,8 @@ import WidgetKit
 struct WeeklyGridView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
-    @Query(sort: [SortDescriptor(\Habit.sortOrder)]) private var habits: [Habit]
+    @Query(filter: Habit.countedPerWeek, sort: [SortDescriptor(\Habit.sortOrder)])
+    private var habits: [Habit]
 
     @State private var today = WeekCalendar.day(Date())
     @State private var editingHabit: Habit?

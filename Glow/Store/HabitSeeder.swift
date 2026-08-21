@@ -57,7 +57,10 @@ struct HabitSeeder {
                 seed: template.seed,
                 today: today
             ) {
-                _ = try store.toggleCompletion(for: habit, on: day)
+                // Added, not toggled. The seed for a per-day habit names the
+                // same day once per repetition, and a toggle would take the
+                // second one back off again.
+                _ = try store.addCompletion(for: habit, on: day)
             }
         }
 

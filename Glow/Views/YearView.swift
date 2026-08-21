@@ -13,7 +13,8 @@ import SwiftUI
 /// touch would promise that it is.
 struct YearView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @Query(sort: [SortDescriptor(\Habit.sortOrder)]) private var habits: [Habit]
+    @Query(filter: Habit.countedPerWeek, sort: [SortDescriptor(\Habit.sortOrder)])
+    private var habits: [Habit]
 
     @State private var today = WeekCalendar.day(Date())
 

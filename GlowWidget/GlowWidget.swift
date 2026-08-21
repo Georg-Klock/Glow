@@ -152,7 +152,10 @@ struct WeekProvider: TimelineProvider {
             return WeekEntry(date: today, week: week, habits: [])
         }
         let context = ModelContext(container)
-        let descriptor = FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder)])
+        let descriptor = FetchDescriptor<Habit>(
+            predicate: Habit.countedPerWeek,
+            sortBy: [SortDescriptor(\.sortOrder)]
+        )
         let habits = (try? context.fetch(descriptor))?.map { $0.snapshot() } ?? []
 
         return WeekEntry(date: today, week: week, habits: habits)

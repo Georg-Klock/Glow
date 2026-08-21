@@ -70,7 +70,12 @@ struct HabitSnapshot: Identifiable, Equatable, Sendable {
     var name: String
     var icon: String
     var frequency: Frequency
-    var completedDays: Set<Date>
+    /// How many completions fall on each day that has any.
+    ///
+    /// A count rather than a set of days, because a per-day habit can be logged
+    /// several times on one. Everything week-shaped reads `completedDays` and
+    /// cannot tell the difference.
+    var completionCounts: [Date: Int]
     /// A blank row held in the order to group the habits around it. Draws
     /// nothing and is never counted as due, done or missed.
     var isSpacer: Bool
@@ -80,16 +85,41 @@ struct HabitSnapshot: Identifiable, Equatable, Sendable {
         name: String,
         icon: String,
         frequency: Frequency,
-        completedDays: Set<Date>,
+        completionCounts: [Date: Int],
         isSpacer: Bool = false
     ) {
         self.id = id
         self.name = name
         self.icon = icon
         self.frequency = frequency
-        self.completedDays = completedDays
+        self.completionCounts = completionCounts
         self.isSpacer = isSpacer
     }
+
+    /// A habit whose days are done or not done, which is every weekly cadence.
+    init(
+        id: UUID,
+        name: String,
+        icon: String,
+        frequency: Frequency,
+        completedDays: Set<Date>,
+        isSpacer: Bool = false
+    ) {
+        self.init(
+            id: id,
+            name: name,
+            icon: icon,
+            frequency: frequency,
+            completionCounts: completedDays.reduce(into: [:]) { $0[$1] = 1 },
+            isSpacer: isSpacer
+        )
+    }
+
+    /// Every day with at least one completion.
+    var completedDays: Set<Date> { Set(completionCounts.keys) }
+
+    /// How many times the habit was logged on `day`.
+    func count(on day: Date) -> Int { completionCounts[day] ?? 0 }
 }
 
 /// Turns a habit plus a week into the row of slots to draw.
@@ -111,6 +141,12 @@ enum WeekGrid {
             return dailySlots(habit: habit, week: week, today: todayStart, calendar: calendar)
         case .timesPerWeek(let target):
             return frequencySlots(habit: habit, week: week, today: todayStart, target: target)
+        case .timesPerDay:
+            // A per-day habit has no week row. It is one ring on Today, and the
+            // week-shaped screens filter it out before reaching here — this is
+            // the backstop, so a missed filter draws nothing rather than drawing
+            // a week the habit does not have.
+            return []
         }
     }
 

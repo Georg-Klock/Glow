@@ -172,6 +172,51 @@ struct HabitStore {
         return true
     }
 
+    // MARK: - Counts
+    //
+    // A per-day habit is logged several times on one day, so these are the
+    // storage primitives `toggleCompletion` cannot express. The *rule* about
+    // what a tap does — one more, and a full ring resets to zero — deliberately
+    // lives elsewhere (#18); all this knows is how to add one and how to clear
+    // a day.
+
+    /// How many times the habit is logged on `date`.
+    func count(for habit: Habit, on date: Date) -> Int {
+        let day = WeekCalendar.day(date, calendar: calendar)
+        return (habit.completions ?? []).count { $0.day == day }
+    }
+
+    /// Records one more completion on `date`, and returns the new count.
+    ///
+    /// A repetition is its own row rather than a number on a shared one, so two
+    /// devices logging the same habit merge into two completions instead of
+    /// overwriting each other's counter.
+    @discardableResult
+    func addCompletion(for habit: Habit, on date: Date) throws -> Int {
+        let day = WeekCalendar.day(date, calendar: calendar)
+        let completion = Completion(day: day, habit: habit)
+        context.insert(completion)
+        habit.completions?.append(completion)
+        try context.save()
+        return (habit.completions ?? []).count { $0.day == day }
+    }
+
+    /// Removes every completion on `date`, and returns how many there were.
+    @discardableResult
+    func clearDay(for habit: Habit, on date: Date) throws -> Int {
+        let day = WeekCalendar.day(date, calendar: calendar)
+        let doomed = (habit.completions ?? []).filter { $0.day == day }
+        guard !doomed.isEmpty else { return 0 }
+
+        let ids = Set(doomed.map(\.id))
+        habit.completions?.removeAll { ids.contains($0.id) }
+        for completion in doomed {
+            context.delete(completion)
+        }
+        try context.save()
+        return doomed.count
+    }
+
     /// Logs a failure without taking down the screen. A habit tracker that
     /// crashes on a write is worse than one that misses a tap, and the log is
     /// where a real store problem would show up.

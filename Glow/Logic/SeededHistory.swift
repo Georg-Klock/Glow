@@ -109,6 +109,20 @@ enum SeededHistory {
                 guard let next = calendar.date(byAdding: .day, value: 7, to: weekStart) else { break }
                 weekStart = next
             }
+
+        case .timesPerDay(let target):
+            // The one kind that returns a day more than once: a habit done four
+            // times on Tuesday is four entries for Tuesday, because that is how
+            // it is stored. A day that fell short gets fewer, never more — an
+            // overshoot would draw a ring past full.
+            var day = firstDay
+            while day < today {
+                let hit = Double.random(in: 0..<1, using: &generator) < form.rate
+                let count = hit ? target : Int.random(in: 0...target, using: &generator)
+                days.append(contentsOf: repeatElement(day, count: count))
+                guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+                day = next
+            }
         }
 
         return days

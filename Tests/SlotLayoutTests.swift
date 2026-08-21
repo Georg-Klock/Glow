@@ -111,6 +111,8 @@ struct FrequencyTests {
                 continue
             case .timesPerWeek(let n):
                 #expect(Frequency(timesPerWeek: n) == template.frequency, "\(template.name): \(n)x")
+            case .timesPerDay(let n):
+                #expect(Frequency(timesPerDay: n) == template.frequency, "\(template.name): \(n)/day")
             }
         }
     }
