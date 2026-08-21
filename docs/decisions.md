@@ -120,6 +120,26 @@ own id, so off-and-on-again shows the same demo; the first habit's past is
 perfect so a full streak is on screen, and the rest cycle down so a missed day
 is too.
 
+## The breath: in, then out
+
+**Question.** Should the open glow pulse, so a live day reads as live?
+
+**First decision.** Yes, asked for directly: the glowing layer's opacity eased
+between 85% and 100%, 1.2s each way — shallow on purpose, to catch the eye in
+peripheral vision rather than blink at anyone. Reduce Motion switched it off.
+
+**Now** (2026-08-21, #46). Removed, as a reversal rather than a fix — the
+breath worked as designed. The app has exactly one signal, and that signal is
+brightness, not movement. The glow already says *still open* by being brighter
+than white; pulsing said the same thing a second time, in a register nothing
+else in the app uses — everything else is a state, drawn once, that changes
+only when you change it. The breath was also the only element that moved on
+its own, and it could not do that for free: it is what walked Today's rings
+sideways (#45), and its removal is what lets the widget and the app agree that
+a lit mark holds still. The measurements it produced — the compositor does not
+flatten an animated HDR layer, and `.animation(_:value:)` reaches everything
+beneath it — are kept in [glow.md](glow.md).
+
 ## Appearance: follow the system
 
 **Question.** Not in the spec's list. It arrived from the implementation, twice.
