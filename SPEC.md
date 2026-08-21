@@ -146,7 +146,15 @@ ring of arcs, one per repetition — see `DayRing` and docs/vision.md. The ring
 starts full and glowing and each completion quiets one arc, clockwise from the
 top, so the glow is always exactly what is left to do. At a target of 1 the
 ring is a single unbroken circle. At the goal the ring is quiet but present,
-in the same grey as a habit already handled. Tapping arrives with #18.
+in the same grey as a habit already handled.
+
+**A tap on the ring is one more.** Once the ring is full, the next tap resets
+the day to zero — the reset is the whole undo, and the day's completion rows
+are genuinely deleted, not marked over. The rule is `DayRing.countAfterTap`,
+applied by `HabitStore.recordTap`, so the app and the widget cannot disagree
+about what a tap means. From the home screen the same tap goes through
+`TapHabitIntent` without opening the app; the Today widget that will use it
+arrives with #19.
 
 ## 8. Acceptance criteria
 

@@ -173,6 +173,66 @@ struct DailyCountTests {
         #expect(try store.clearDay(for: habit, on: friday) == 0)
     }
 
+    // MARK: - The tap
+
+    @MainActor
+    @Test("A tap adds one, and a tap on the full ring clears the day")
+    func tapCycle() throws {
+        let container = try ModelContainer(
+            for: Habit.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let store = HabitStore(context: container.mainContext, calendar: calendar)
+        let habit = try store.addHabit(
+            name: "Water", icon: "drop", frequency: Frequency(timesPerDay: 3), now: friday
+        )
+
+        #expect(try store.recordTap(for: habit, on: friday) == 1)
+        #expect(try store.recordTap(for: habit, on: friday) == 2)
+        #expect(try store.recordTap(for: habit, on: friday) == 3)
+        // The ring is full; the next tap is the reset, and the reset is the
+        // undo — the day's rows are genuinely gone, not marked over.
+        #expect(try store.recordTap(for: habit, on: friday) == 0)
+        #expect((habit.completions ?? []).isEmpty)
+        // And the cycle begins again.
+        #expect(try store.recordTap(for: habit, on: friday) == 1)
+    }
+
+    @MainActor
+    @Test("A count stranded past its target resets like a full ring")
+    func tapAfterTargetEdit() throws {
+        let container = try ModelContainer(
+            for: Habit.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let store = HabitStore(context: container.mainContext, calendar: calendar)
+        let habit = try store.addHabit(
+            name: "Water", icon: "drop", frequency: Frequency(timesPerDay: 8), now: friday
+        )
+        for _ in 0..<5 { try store.addCompletion(for: habit, on: friday) }
+
+        habit.frequency = Frequency(timesPerDay: 3)
+        #expect(try store.recordTap(for: habit, on: friday) == 0)
+        #expect(store.count(for: habit, on: friday) == 0)
+    }
+
+    @MainActor
+    @Test("A weekly habit has no ring, so a stray tap changes nothing")
+    func tapOnWeeklyIsInert() throws {
+        let container = try ModelContainer(
+            for: Habit.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let store = HabitStore(context: container.mainContext, calendar: calendar)
+        let habit = try store.addHabit(
+            name: "Read", icon: "book", frequency: Frequency(timesPerWeek: 3), now: friday
+        )
+        try store.toggleCompletion(for: habit, on: friday)
+
+        #expect(try store.recordTap(for: habit, on: friday) == 1)
+        #expect((habit.completions ?? []).count == 1)
+    }
+
     // MARK: - The snapshot
 
     @Test("A weekly habit's snapshot counts one per day, so nothing week-shaped can tell the difference")

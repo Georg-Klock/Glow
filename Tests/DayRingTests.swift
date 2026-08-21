@@ -72,6 +72,26 @@ struct DayRingTests {
         #expect(DayRing.arcs(target: 40, done: 0).count == 12)
     }
 
+    @Test("A tap adds one until the ring is full, and then resets to zero", arguments: [
+        // (count, target) -> what the tap leaves the day at
+        (0, 3, 1), (1, 3, 2), (2, 3, 3), (3, 3, 0),
+        (0, 1, 1), (1, 1, 0),
+        (11, 12, 12), (12, 12, 0),
+    ])
+    func tapRule(count: Int, target: Int, expected: Int) {
+        #expect(DayRing.countAfterTap(count: count, target: target) == expected)
+    }
+
+    @Test("A count past its target resets like a full ring, not past it")
+    func overshootResets() {
+        // Reachable by editing a habit from 8x down to 3x with five logged.
+        #expect(DayRing.countAfterTap(count: 5, target: 3) == 0)
+        // And degenerate inputs stay in range rather than crashing.
+        #expect(DayRing.countAfterTap(count: -2, target: 3) == 1)
+        #expect(DayRing.countAfterTap(count: 0, target: -1) == 1)
+        #expect(DayRing.countAfterTap(count: 1, target: -1) == 0)
+    }
+
     @Test("The gap for a stroke is measured along its centreline")
     func gapFraction() {
         // A 4pt stroke kept inside a 40pt circle runs along a 36pt centreline:

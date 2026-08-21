@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import WidgetKit
 
 /// Today: the several-times-a-day habits, and nothing else.
 ///
@@ -15,8 +16,11 @@ struct TodayView: View {
     @Query(filter: Habit.countedPerDay, sort: [SortDescriptor(\Habit.sortOrder)])
     private var habits: [Habit]
 
+    @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     @State private var today = WeekCalendar.day(Date())
+
+    private var store: HabitStore { HabitStore(context: context) }
 
     /// Three rings to a row, like the medium widget. Sized so a full row sits
     /// inside an iPhone's width with the margins the widget would have.
@@ -77,26 +81,48 @@ struct TodayView: View {
         let done = habit.snapshot().count(on: today)
         let isOpen = done < target
 
-        return VStack(spacing: 10) {
-            ZStack {
-                DayRingView(target: target, done: done, diameter: Self.ringDiameter)
-                HabitIconView(icon: habit.icon, size: Self.ringDiameter * 0.3)
+        return Button {
+            tap(habit, done: done, target: target)
+        } label: {
+            VStack(spacing: 10) {
+                ZStack {
+                    DayRingView(target: target, done: done, diameter: Self.ringDiameter)
+                    HabitIconView(icon: habit.icon, size: Self.ringDiameter * 0.3)
+                }
+                // The same rule as everywhere: a due name glows, a handled one
+                // rests. The weight never changes, so completing does not
+                // reflow.
+                let name = Text(habit.name)
+                    .font(.subheadline)
+                    .lineLimit(1)
+                if isOpen {
+                    name.glowing(halo: GlowPalette.labelHalo)
+                } else {
+                    name.foregroundStyle(GlowPalette.labelResting)
+                }
             }
-            // The same rule as everywhere: a due name glows, a handled one
-            // rests. The weight never changes, so completing does not reflow.
-            let name = Text(habit.name)
-                .font(.subheadline)
-                .lineLimit(1)
-            if isOpen {
-                name.glowing(halo: GlowPalette.labelHalo)
-            } else {
-                name.foregroundStyle(GlowPalette.labelResting)
-            }
+            .frame(width: Self.ringDiameter + 8)
+            .contentShape(Rectangle())
         }
-        .frame(width: Self.ringDiameter + 8)
+        .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(habit.name)
         .accessibilityValue("\(done) of \(target) done today")
+        .accessibilityHint(isOpen ? "Adds one" : "Starts the day over")
+    }
+
+    /// A tap is one more; a tap on a full ring starts the day over. The rule
+    /// is `DayRing.countAfterTap`, applied by the store — this only reports
+    /// what happened to a thumb that cannot see under itself.
+    private func tap(_ habit: Habit, done: Int, target: Int) {
+        do {
+            let count = try store.recordTap(for: habit, on: today)
+            // A reset is a correction, and should not feel like progress.
+            if count == 0 && done > 0 { Haptics.uncompleted() } else { Haptics.completed() }
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            HabitStore.report(error, operation: "recordTap")
+        }
     }
 
     private var title: String {

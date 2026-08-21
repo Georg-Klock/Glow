@@ -59,6 +59,22 @@ enum DayRing {
         }
     }
 
+    /// What a tap leaves the day's count at: one more, or zero from a full ring.
+    ///
+    /// The reset is the whole undo. It is cheap at a target of 3 and costs
+    /// eleven taps at 12, which is the accepted trade: the arcs make a mis-tap
+    /// visible at a glance, and a separate undo affordance would be a second
+    /// control on a surface whose argument is that it has one.
+    ///
+    /// A count past the target — reachable by editing a habit from 8x down to
+    /// 3x — resets the same way a full ring does: the ring was quiet, so the
+    /// tap asked for a fresh start, not a ninth repetition.
+    static func countAfterTap(count: Int, target: Int) -> Int {
+        let goal = max(1, min(target, Frequency.selectableDailyCounts.upperBound))
+        let current = max(0, count)
+        return current >= goal ? 0 : current + 1
+    }
+
     /// The gap that keeps two round-capped arcs reading as separate.
     ///
     /// A round cap extends the stroke by half its width at each end, so two
