@@ -127,13 +127,18 @@ struct HabitEditorView: View {
                             .background(platter)
                     }
 
-                    kindRow
-                        .frame(height: Self.rowHeight)
-                        .background(platter)
-
-                    frequencyRow
-                        .frame(height: Self.rowHeight)
-                        .background(platter)
+                    // One platter, not two. The kind and the count are a
+                    // single decision read top to bottom — what this habit is
+                    // counted against, then how many — and the page showing
+                    // through between two platters made them read as two
+                    // unrelated settings that happened to sit near each other.
+                    VStack(spacing: 0) {
+                        kindRow
+                            .frame(height: Self.rowHeight)
+                        frequencyRow
+                            .frame(height: Self.rowHeight)
+                    }
+                    .background(platter)
 
                     if isEditing {
                         // No platter and no explanation. The confirmation
@@ -224,13 +229,14 @@ struct HabitEditorView: View {
             }
 
             HStack(spacing: 0) {
-                // The number glows. It is the one thing on this row that
-                // changes, and white text on a dark platter beside white
-                // buttons was not saying so.
-                Text("\(count.wrappedValue)")
+                // The count glows, and the `x` is part of the count rather
+                // than part of the sentence: "7x" is the value the steppers
+                // move, and splitting the multiplier off into the grey left
+                // the lit part reading as a bare number.
+                Text("\(count.wrappedValue)x")
                     .monospacedDigit()
                     .glowing(halo: GlowPalette.labelHalo)
-                Text(kind == .day ? "x per day" : "x per week")
+                Text(kind == .day ? " per day" : " per week")
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
