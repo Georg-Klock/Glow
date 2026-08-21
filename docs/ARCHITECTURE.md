@@ -210,6 +210,13 @@ ship without an Apple ID in Xcode. The key's `.p8` lives in
 `Tools/local.env` (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `TEAM_ID`) — the script says
 so and stops when either is missing.
 
+The script regenerates the project before archiving, and that line is
+load-bearing: everything it archives — the project, both entitlements files,
+both Info.plists — is generated from `project.yml`, so archiving whatever is
+on disk ships whatever state the disk was left in. One build went up with a
+stale `Glow/Info.plist` and lost the compliance declaration that plist exists
+to carry.
+
 The build number is stamped from the UTC clock at upload (`YYYYMMDDHHmm`), so
 every upload is unique without a commit per upload; `MARKETING_VERSION` stays
 where `project.yml` puts it and stays Georg's call. The first upload verified

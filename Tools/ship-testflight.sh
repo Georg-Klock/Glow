@@ -47,6 +47,17 @@ ARCHIVE="$BUILD_DIR/Glow.xcarchive"
 EXPORT_DIR="$BUILD_DIR/export"
 BUILD_NUMBER=$(date -u +%Y%m%d%H%M)
 
+# Regenerate before archiving, always.
+#
+# The project, the entitlements and both Info.plists are build artifacts
+# generated from project.yml, and archiving whatever happens to be on disk
+# ships whatever state that disk was left in. It has already cost one build:
+# a stale Glow/Info.plist went up without ITSAppUsesNonExemptEncryption and
+# TestFlight asked for the compliance answer the plist exists to pre-empt.
+# Generating here costs a second and removes the whole class.
+echo "==> Generating the project"
+Tools/generate.sh
+
 echo "==> Archiving (build $BUILD_NUMBER)"
 xcodebuild \
   -project Glow.xcodeproj \
