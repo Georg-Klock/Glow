@@ -15,8 +15,13 @@ import WidgetKit
 /// which is the same rule the app uses.
 struct WeekWidgetView: View {
     let entry: WeekEntry
+    /// The render harness's way in: `widgetFamily` is read-only outside
+    /// WidgetKit, so a view rendered by `ImageRenderer` always reports medium
+    /// and drops the header. Nothing in the widget passes this.
+    var familyOverride: WidgetFamily?
 
-    @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetFamily) private var environmentFamily
+    private var family: WidgetFamily { familyOverride ?? environmentFamily }
 
     private var showsLabels: Bool { family != .systemSmall }
     /// Only the large family has the height to spend a row on the header.

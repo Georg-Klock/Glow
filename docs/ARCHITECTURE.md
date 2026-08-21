@@ -161,6 +161,16 @@ completion histories of a week, asserting R1 and R2 hold for every one. That is
 cheap here because the logic is pure, and it is the reason those invariants can
 be stated as facts rather than as intentions.
 
+`GlowRenderTests` is a second test target: it renders the real `WeekWidgetView`
+at the design frame's own 338 × 354 and, once a design export is committed
+(`RenderTests/DesignReference/`), diffs the two and reports where they disagree
+(#6). Its own target because `GlowTests` reaches the app module and the
+widget's view is not in it — so it compiles the widget's sources directly, the
+same sharing the widget target itself uses, hosted by the app so `Bundle.main`
+carries the symbol catalogue. `Tools/test.sh` sums the counts across both
+targets; taking the last summary line would silently shrink the number to
+whichever target finished last.
+
 CI runs the same script on pull requests and on merges to `main`.
 
 ## The App Group

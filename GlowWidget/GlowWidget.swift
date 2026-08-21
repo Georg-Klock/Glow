@@ -55,17 +55,6 @@ struct GlowWidget: Widget {
     }
 }
 
-struct WeekEntry: TimelineEntry {
-    let date: Date
-    let week: Week
-    let habits: [HabitSnapshot]
-    /// The habit whose completion is mid-animation, if any.
-    var burstHabit: UUID?
-    /// How far through the completion cross-fade this frame is, 0 through 1:
-    /// the dot's opacity, and the ring's complement.
-    var progress: Double = 1
-}
-
 struct WeekProvider: TimelineProvider {
     func placeholder(in context: Context) -> WeekEntry {
         let today = WeekCalendar.day(Date())
