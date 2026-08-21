@@ -75,22 +75,27 @@ The implementation makes this automatic rather than a rule to enforce: slot
 state is computed from the completions falling inside the displayed week, so
 last week's are not consulted at all. `WeekGridTests` covers it.
 
-## Seeded history: Debug builds only
+## Seeded history: a Settings toggle
 
 **Question.** A fresh install seeded ten weeks of invented completions so the
 grid could be judged with something in it. Issue #3 offered two ways out: gate
 it behind `#if DEBUG`, or clear it on first edit.
 
-**Decision** (2026-08-20). The gate. A real install opens with the default
-habits and an empty grid; Debug builds keep the demo past, so the design stays
-judgeable during development. Clear-on-first-edit was the larger change and
-carried a moment where history vanishes unasked — the exact kind of silent
-surprise the rest of the app is built to avoid. The cost is the first-run
-demo, and the app's own argument decided it: a tracker that opens showing a
-streak you did not earn is lying on the first screen.
+**First decision** (2026-08-20). The gate: real installs opened empty, Debug
+builds kept the demo past.
 
-Today is never pre-filled in either mode, and the tests pin both shapes
-explicitly rather than inheriting whichever configuration they compile under.
+**Now** (2026-08-21). A toggle in Settings, asked for directly. Every install
+— Debug included — opens with the habits and an empty grid, and the invented
+past goes in and out on demand. The gate's flaw was that it left untracked
+invented data in Debug builds that nothing could remove; the toggle is one
+mechanism with a full contract: `DemoHistory` records what it seeds by id and
+removal deletes exactly that, never a completion the user logged themselves,
+even on days the demo also filled.
+
+Today is never pre-filled, as always. Each habit's past is rebuilt from its
+own id, so off-and-on-again shows the same demo; the first habit's past is
+perfect so a full streak is on screen, and the rest cycle down so a missed day
+is too.
 
 ## Appearance: follow the system
 

@@ -27,15 +27,16 @@ struct SeedingTests {
         return defaults
     }
 
-    /// History on, explicitly — what a Debug build does. The release shape has
-    /// its own test below, so neither depends on which configuration the tests
-    /// happen to compile under.
     private func seeder(_ context: ModelContext, _ defaults: UserDefaults) -> HabitSeeder {
-        HabitSeeder(context: context, defaults: defaults, calendar: calendar, seedsHistory: true)
+        HabitSeeder(context: context, defaults: defaults, calendar: calendar)
     }
 
-    @Test("A fresh install starts with the default habits")
+    @Test("A fresh install starts with the default habits and an empty grid")
     func seedsOnFirstLaunch() throws {
+        // Habits only, in every configuration: a tracker that opens showing a
+        // streak you did not earn is lying on the first screen. The invented
+        // past is DemoHistory's, behind the Settings toggle, and has its own
+        // suite.
         let context = try makeContext()
         let added = try seeder(context, makeDefaults()).seedIfNeeded(now: today)
 
@@ -43,38 +44,7 @@ struct SeedingTests {
         let habits = try context.fetch(FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder)]))
         #expect(habits.map(\.name) == DefaultHabits.all.map(\.name))
         #expect(habits.map(\.frequency) == DefaultHabits.all.map(\.frequency))
-    }
-
-    @Test("A real install starts with the habits and an empty grid")
-    func releaseSeedsNoHistory() throws {
-        // The release shape: a tracker that opens showing a streak you did not
-        // earn is lying on the first screen, so the invented past is a Debug
-        // affordance and nothing else.
-        let context = try makeContext()
-        let added = try HabitSeeder(
-            context: context, defaults: makeDefaults(), calendar: calendar, seedsHistory: false
-        ).seedIfNeeded(now: today)
-
-        #expect(added == DefaultHabits.all.count)
         #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
-    }
-
-    @Test("With history on, a past is seeded and today is never part of it")
-    func seedsHistoryButNotToday() throws {
-        // The reverse of what this asserted until 2026-08-20. The history is
-        // invented — SeededHistory says so and says how to switch it off — but
-        // today staying empty is not negotiable: the open slot is the one thing
-        // the app is for, and a seed that filled it would hide the feature on
-        // the first screen anyone sees.
-        let context = try makeContext()
-        try seeder(context, makeDefaults()).seedIfNeeded(now: today)
-
-        #expect(try context.fetchCount(FetchDescriptor<Completion>()) > 0)
-        // Blank rows are positions, not habits: no history and nothing due.
-        for habit in try context.fetch(FetchDescriptor<Habit>()) where !habit.isSpacer {
-            #expect(!habit.completedDays.isEmpty, "\(habit.name) has no history")
-            #expect(!habit.completedDays.contains(today), "\(habit.name) was pre-completed today")
-        }
     }
 
     @Test("Every seeded habit is open today")
@@ -87,23 +57,6 @@ struct SeedingTests {
             let slots = WeekGrid.slots(for: habit.snapshot(), in: week, today: today, calendar: calendar)
             #expect(slots.filter { $0.state == .open }.count == 1, "\(habit.name)")
         }
-    }
-
-    @Test("The seeded past is the same on every install")
-    func historyIsDeterministic() throws {
-        // A system generator would make each install different, which defeats
-        // the point: this is demo content, the tests assert against it, and
-        // "it looked different on my phone" should not be possible.
-        func seed() throws -> [String: Set<Date>] {
-            let context = try makeContext()
-            try seeder(context, makeDefaults()).seedIfNeeded(now: today)
-            var result: [String: Set<Date>] = [:]
-            for habit in try context.fetch(FetchDescriptor<Habit>()) where !habit.isSpacer {
-                result["\(habit.name) \(habit.frequency)"] = habit.completedDays
-            }
-            return result
-        }
-        #expect(try seed() == seed())
     }
 
     @Test("A perfect habit really is perfect, and an uneven one is not")

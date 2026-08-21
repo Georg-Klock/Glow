@@ -1,20 +1,20 @@
 import Foundation
 
-/// The past that a fresh install starts with.
+/// The invented past behind the demo-history toggle in Settings.
 ///
-/// **This is invented history, and that is a real cost.** `DefaultHabits` used
-/// to say so plainly: a tracker that opens showing a streak you did not earn is
-/// lying to you on the first screen. It is here because an empty grid shows none
-/// of what the app is for — no streak, no run of light, no shape to a week — and
-/// judging the design against a blank slate is judging a different app.
+/// **This is invented history, and that is a real cost.** A tracker that opens
+/// showing a streak you did not earn is lying to you on the first screen. It
+/// exists because an empty grid shows none of what the app is for — no streak,
+/// no run of light, no shape to a week — and judging the design against a
+/// blank slate is judging a different app.
 ///
-/// It does not ship. `HabitSeeder.seedsHistoryByDefault` gates it to Debug
-/// builds: a real install opens with the habits and an empty grid, and the
-/// design stays judgeable during development. See docs/decisions.md.
+/// So it is asked for, never assumed: no install seeds it on first launch, and
+/// `DemoHistory` puts it in and takes exactly it back out when the toggle
+/// moves. See docs/decisions.md.
 ///
-/// Deterministic on purpose. A fixed generator means every install shows the
-/// same past, the tests can assert against it, and "it looked different on my
-/// phone" cannot happen.
+/// Deterministic on purpose. Each habit's past is generated from a fixed
+/// per-habit seed, so toggling the demo off and on rebuilds the same days and
+/// the tests can assert against it.
 enum SeededHistory {
     /// How far back the invented past runs.
     static let weeks = 10
@@ -33,6 +33,26 @@ enum SeededHistory {
             state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
             return state
         }
+    }
+
+    /// The shape of a habit's past, by its position in the list.
+    ///
+    /// The first habit is perfect, because a full streak is the thing the demo
+    /// most needs on screen; the rest cycle down to patchy so a missed day is
+    /// on screen too. Position rather than anything about the habit itself, so
+    /// the variety survives renames and edits.
+    static func form(at position: Int) -> Form {
+        let cycle: [Form] = [.perfect, .strong, .steady, .uneven]
+        return cycle[((position % cycle.count) + cycle.count) % cycle.count]
+    }
+
+    /// A stable per-habit seed, from the habit's own id, so switching the demo
+    /// off and on rebuilds the same past for the same habit.
+    static func seed(for id: UUID) -> UInt64 {
+        let b = id.uuid
+        return UInt64(b.0) << 56 | UInt64(b.1) << 48 | UInt64(b.2) << 40
+            | UInt64(b.3) << 32 | UInt64(b.4) << 24 | UInt64(b.5) << 16
+            | UInt64(b.6) << 8 | UInt64(b.7)
     }
 
     /// How a habit has been going.

@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import WidgetKit
 
 /// Settings: how hard the glow pushes, what shape a week is — and History,
 /// the long view, which is neither today nor this week and so lives here
@@ -8,8 +9,14 @@ import UIKit
 /// A tab now rather than a sheet, so there is no Done button and nothing to
 /// dismiss — the changes are live and the way out is the tab bar.
 struct SettingsView: View {
+    @Environment(\.modelContext) private var context
+
     @AppStorage(GlowSettings.key, store: GlowSettings.store)
     private var peak: Double = GlowSettings.defaultValue
+
+    /// Mirrors `DemoHistory.isSeeded`. State rather than a computed binding so
+    /// the toggle animates the flip it caused instead of waiting on a re-read.
+    @State private var isDemoSeeded = false
 
     @AppStorage(WeekPreferences.firstWeekdayKey, store: GlowSettings.store)
     private var firstWeekday: Int = WeekPreferences.defaultFirstWeekday
@@ -103,9 +110,49 @@ struct SettingsView: View {
                 } footer: {
                     Text("Never counted as missed. Anything logged on one still counts.")
                 }
+
+                // Last, because it is the one control here that is not about
+                // the real data. The footer says the whole contract: what goes
+                // in is invented, and what comes out is exactly that.
+                Section {
+                    Toggle("Demo history", isOn: demoBinding)
+                } header: {
+                    Text("Demo")
+                } footer: {
+                    Text(
+                        "Fills the past ten weeks with an invented history, so the "
+                            + "app can be seen with something in it. Today is never "
+                            + "touched. Switching it off removes exactly what it "
+                            + "added — nothing you logged yourself."
+                    )
+                }
             }
             .navigationTitle("Settings")
         }
+        .onAppear { isDemoSeeded = DemoHistory(context: context).isSeeded }
+    }
+
+    /// Seeds or removes the invented past. Errors leave the toggle where the
+    /// truth is: the state is re-read from the record rather than assumed.
+    private var demoBinding: Binding<Bool> {
+        Binding(
+            get: { isDemoSeeded },
+            set: { wantsDemo in
+                let demo = DemoHistory(context: context)
+                do {
+                    if wantsDemo {
+                        try demo.seed()
+                    } else {
+                        try demo.remove()
+                    }
+                } catch {
+                    HabitStore.report(error, operation: wantsDemo ? "seedDemo" : "removeDemo")
+                }
+                isDemoSeeded = demo.isSeeded
+                // The widgets read the same store and are not told it changed.
+                WidgetCenter.shared.reloadAllTimelines()
+            }
+        )
     }
 
     /// The toggle turns the sentinel into a real day and back, defaulting to
