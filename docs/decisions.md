@@ -120,6 +120,65 @@ own id, so off-and-on-again shows the same demo; the first habit's past is
 perfect so a full streak is on screen, and the rest cycle down so a missed day
 is too.
 
+## The breath: in, then out
+
+**Question.** Should the open glow pulse, so a live day reads as live?
+
+**First decision.** Yes, asked for directly: the glowing layer's opacity eased
+between 85% and 100%, 1.2s each way — shallow on purpose, to catch the eye in
+peripheral vision rather than blink at anyone. Reduce Motion switched it off.
+
+**Now** (2026-08-21, #46). Removed, as a reversal rather than a fix — the
+breath worked as designed. The app has exactly one signal, and that signal is
+brightness, not movement. The glow already says *still open* by being brighter
+than white; pulsing said the same thing a second time, in a register nothing
+else in the app uses — everything else is a state, drawn once, that changes
+only when you change it. The breath was also the only element that moved on
+its own, and it could not do that for free: it is what walked Today's rings
+sideways (#45), and its removal is what lets the widget and the app agree that
+a lit mark holds still. The measurements it produced — the compositor does not
+flatten an animated HDR layer, and `.animation(_:value:)` reaches everything
+beneath it — are kept in [glow.md](glow.md).
+## The rest day: permission, then prohibition
+
+**Question.** What does the rest day mean? `WeekPreferences.restDay` arrived
+as a day nothing was expected on.
+
+**First decision.** Permission. The comment in `WeekGrid.dailySlots` said it
+out loud: never open and never missed, but a completion logged on one still
+counted — "resting is permission, not a prohibition."
+
+**Now** (2026-08-21, #39). Prohibition, as a reversal. A rest day is true
+rest: nothing can be logged on it, nothing un-logged, and the week is not made
+up around it — you trust that you will do it next week, and ideally the phone
+stays down too. Permission to skip is not the same thing as being asked to
+stop, and only the second one is restful. The refusal lives in
+`HabitStore.toggleCompletion` (`.refused`), the write path the app and the
+widget's intent share, so a stale widget surface cannot write around it.
+Frequency rows stop with the day: nothing opens and nothing glows on it.
+
+What does not reverse: a completion already stored on a rest day still draws
+and still counts — a record of what happened stays a record of what happened —
+and per-day habits are untouched, because water and a walk are bodily and not
+the thing the rest is from. The grid marks the cut as one vertical line down
+the rest day's column, in the missed cross's grey.
+## Two greys, on purpose
+
+**Question** (#7). The grid's unlit text is `GlowPalette.labelResting`; the
+system-control screens — Settings, the editor, the pickers — use `.secondary`.
+Two answers to "what colour is text that is not shouting": unify, or accept?
+
+**Decision** (2026-08-21). Accepted, and documented as the answer rather than
+carried as a cleanup. The grid is the design file's surface and takes the
+file's grey, which also has to survive the widget's accented rendering as
+stored alpha; the system screens are built from `List` and `Form`, and a
+system control tinted with a custom grey stops looking like the system. The
+border between the two greys is the border between "designed here" and
+"designed by Apple" — a real line in this app, worth keeping visible. The
+same reasoning already governs type: the grid's sizes are the file's 12pt
+scaled (#32), the system screens keep the system's text styles. Full
+rationale in [design-system.md](design-system.md), "Outside the grid".
+
 ## Appearance: follow the system
 
 **Question.** Not in the spec's list. It arrived from the implementation, twice.

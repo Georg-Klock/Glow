@@ -72,6 +72,9 @@ enum GlowPalette {
     static let headerRest = grey
     /// A day that went unlogged.
     static let missed = grey.opacity(0.5)
+    /// The rest day's cut: the line down its column. It marks absence, and
+    /// absence does not glow — the missed cross's grey, turned vertical.
+    static let restCut = missed
     /// A day still to come. Dark enough to be a socket rather than a mark, which
     /// is what keeps a nearly-empty row legible as a week.
     static let upcoming = grey.opacity(0.16)

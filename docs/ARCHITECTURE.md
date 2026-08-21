@@ -33,6 +33,12 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
 - `DeepLink` is the widget-to-screen mapping: each widget's inert surface
   carries one URL, and the app lands on that widget's own screen. Unknown
   URLs map to nil and change nothing.
+- `MonthGrid.cells(for:today:)` is the month widget's grid: a weekly-cadence
+  habit's calendar month as marks on weekday columns. It does not re-decide
+  anything — a daily habit's weeks are handed to `WeekGrid.slots` and read
+  off day by day, and whether today is open or undoable is the week row's
+  own verdict, asked rather than derived — so a change to the week's rules
+  reaches the month without a second edit.
 - `DayRing.arcs(target:done:gap:)` is the Today ring: one arc per repetition
   as trim fractions of a circle, the first `done` of them quiet. The ring
   starts full and glowing and closes clockwise from the top — the inverse of
@@ -72,6 +78,11 @@ it: the grid uses `@Query`, so SwiftData drives updates.
 `toggleCompletion(for:on:)` normalizes the day itself, which is what makes R3
 and R4 hold no matter who calls it. Tapping twice quickly cannot create a
 duplicate, because the second call finds the first completion and removes it.
+It returns a `ToggleOutcome` rather than a Bool, because a third thing can
+happen: a write landing on the rest day is `.refused` — nothing logged, nothing
+removed. The refusal lives here, on the one write path the app and the widget's
+intent share, rather than in trust that no surface offered a button; the grid
+withholding the rest-day tap is the same rule at the surface.
 
 `recordTap(for:on:)` is the per-day counterpart: it asks `DayRing.countAfterTap`
 what the tap means and translates the answer into rows — one more `Completion`,
@@ -100,10 +111,10 @@ transition, which is documented in place and in [glow.md](glow.md).
 
 `TodayView` shows the per-day habits as rings — the small and medium widget at
 app size, per docs/vision.md — and nothing week-shaped. `DayRingView` draws the
-arcs `DayRing` lays out, with the open arcs glowing as one layer: one HDR tile,
-one halo pass, one breathing animation, rather than a dozen lights drifting out
-of phase. The tile is shape-free and cached per intensity, so an arc is a mask
-like any other and costs the cache nothing.
+arcs `DayRing` lays out, with the open arcs glowing as one layer: one HDR tile
+and one halo pass, rather than a dozen separately composited lights. The tile is
+shape-free and cached per intensity, so an arc is a mask like any other and
+costs the cache nothing.
 
 Width flows down rather than being measured per row: `WeeklyGridView` reads the
 screen width once, builds a `RowGeometry`, and hands the same value to the

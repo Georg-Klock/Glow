@@ -141,6 +141,20 @@ If `count < N` and today is not already logged, pill index `count` is open.
 Otherwise no slot is open: everything filled stays filled, unfilled pills stay
 inactive.
 
+**A rest day stops the week.** One optional weekday, set in Settings
+(`WeekPreferences.restDay`), is true rest: its slot is never open, never
+missed, and never writable. Nothing can be logged on it and nothing un-logged
+— `HabitStore.toggleCompletion` refuses the write, which holds in the widget's
+process too, where a stale surface can still offer a button — and the week is
+not made up around it: an unreachable weekly goal on a rest week is stopped,
+not excused. Frequency rows stop with it: on the rest day nothing is open, so
+nothing glows. A completion already on record still draws and still counts,
+whichever day it fell on. The grid draws the cut as one vertical line down the
+rest day's column, in the missed cross's grey — absence, which does not glow.
+Per-day habits are untouched: Today's rings stay tappable, because water and a
+walk are not the thing the rest is from. This reverses "resting is permission,
+not a prohibition" — see docs/decisions.md.
+
 **A per-day habit has no slots and no week row.** It is drawn on Today as a
 ring of arcs, one per repetition — see `DayRing` and docs/vision.md. The ring
 starts full and glowing and each completion quiets one arc, clockwise from the
@@ -197,12 +211,28 @@ Two widgets, reading the same store through an App Group.
 **The week widget**: three families. Today's slot is a button backed by an
 `AppIntent`, so a habit can be logged from the home screen without launching
 the app. Past days are not buttons, which is R2 holding in a second process.
+Rows are as many as fit, then a hard cut — no "+N more" row, per
+docs/vision.md: a row spent saying how much is missing is a row not showing a
+habit. The app's own grid marks the boundary, where there is room to say it.
 
 **The Today widget**: small and medium, and deliberately no large — three
 rings already say everything it could. Small is one habit's ring, and the
 person picks which habit per widget, so several small widgets can sit on one
 home screen showing different habits. Medium is the first three per-day
 habits in the user's own order, all the same size, with nothing to configure.
+
+**The month widget**: small only, one weekly-cadence habit's calendar month
+as marks on weekday columns — the same marks the week draws, decided by
+`MonthGrid` asking `WeekGrid`, so the two surfaces cannot disagree about a
+day. The 1st sits under the weekday it really falls on, so the first and last
+rows are ragged. The habit is chosen per widget; per-day habits are not
+selectable, because their day is a count, not a yes. Today's dot is a button
+through `ToggleHabitIntent` — no other day is, which is R2 in a third grid —
+and everything else opens This Week. Two readings held deliberately small
+until decided otherwise (#41): an N×/week habit's empty days are sockets,
+never crosses — the week grid's own rule, not a per-week verdict — and rest
+days get no month-specific treatment beyond what `WeekGrid` already says
+about them.
 Each ring is a button backed by `TapHabitIntent`: one more repetition, or the
 reset from a full ring, without leaving the home screen.
 
@@ -213,10 +243,12 @@ rings, `glow://week` from the grid, mapped by `DeepLink` in `Logic/`. There
 is no fixed landing tab; a cold launch opens This Week, since the app icon
 has no widget to ask.
 
-The widget glows but does not breathe. The pulse was built, measured working
+Nothing breathes, anywhere. The widget's pulse was built, measured working
 (WidgetKit renders sub-minute entries, contrary to its reputation), and removed:
 it costs the day's entire refresh allowance, and a stale widget is worse than a
-still one. See docs/glow.md.
+still one. The app's own breath followed, for a different reason — brightness is
+the one signal, and movement said it twice. A lit mark is lit and holds still.
+See docs/glow.md.
 
 The store therefore lives in the App Group container rather than the app's
 private one, and `StoreLocation` migrates a pre-widget store into it on first
