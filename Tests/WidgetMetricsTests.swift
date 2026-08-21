@@ -4,7 +4,7 @@ import Testing
 
 @Suite("Widget row capacity")
 struct WidgetMetricsTests {
-    /// The large widget, from docs/widget-large-spec.md §1 and §3.4.
+    /// The large widget's own size, as `WidgetMetrics` declares it.
     private var largeHeight: CGFloat { WidgetMetrics.largeHeight }
     private var largeWidth: CGFloat { WidgetMetrics.largeWidth }
 
@@ -21,9 +21,9 @@ struct WidgetMetricsTests {
 
     @Test("The large widget holds eleven habits")
     func largeHoldsEleven() {
-        // The spec does this by hand in §4 — "n ≤ 11.09, so the widget holds 11
-        // rows at this pitch" — and this is the same arithmetic done by the code
-        // that lays it out. If the two ever disagree, one of them has drifted.
+        // Eleven is not a stored number anywhere: it falls out of the content
+        // height, the derived slot and the row gap. Asserting it here is what
+        // stops a change to any of those three quietly changing the capacity.
         #expect(WidgetMetrics.rowCapacity(
             height: contentHeight, slot: largeSlot, hasHeader: true
         ) == 11)
