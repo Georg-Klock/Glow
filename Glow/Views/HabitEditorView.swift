@@ -204,10 +204,18 @@ struct HabitEditorView: View {
     /// A segmented control rather than anything cleverer, because this is a
     /// genuine either/or — the model has no habit that is both — and two
     /// segments is the honest drawing of that.
+    /// **Two senses of "daily" meet here, and they are not the same thing.**
+    /// The segment labelled `Daily` means *counted within a day* — `Kind.day`,
+    /// `Frequency.timesPerDay`, the habit that draws a ring on Today. The
+    /// model's own `Frequency.daily` means something else: a seven-times-a-week
+    /// cadence, which is a *weekly* habit here and lives under `Weekly`. The
+    /// label is what the person reads and it wins on screen; renaming the model
+    /// to match would collide with `Habit.countedPerDay` / `countedPerWeek` and
+    /// every caller of both, so it is deliberately not renamed.
     private var kindRow: some View {
         Picker("Counted", selection: $kind) {
-            Text("Per Week").tag(Kind.week)
-            Text("Per Day").tag(Kind.day)
+            Text("Daily").tag(Kind.day)
+            Text("Weekly").tag(Kind.week)
         }
         .pickerStyle(.segmented)
         .padding(.horizontal, 10)

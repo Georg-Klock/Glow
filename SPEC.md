@@ -174,9 +174,17 @@ arrives with #19.
 and This Week carry the same trailing pair — Edit, then add — so the two tabs
 wear one piece of chrome rather than two that resemble each other. Adding from
 a screen opens the editor on that screen's kind, so what you make appears
-where you made it: Today opens on Per Day, This Week on Per Week. Today's add
-is a plain button rather than This Week's menu, because a blank row holds a
-position in the week grid and there is no grid here to hold one in.
+where you made it: Today opens on **Daily**, This Week on **Weekly**. Today's
+add is a plain button rather than This Week's menu, because a blank row holds
+a position in the week grid and there is no grid here to hold one in.
+
+**"Daily" means two different things, and only one of them is on screen.** The
+editor's `Daily` segment means *counted within a day* — a ring on Today, N
+repetitions that reset at midnight. The model's `Frequency.daily` means a
+seven-times-a-week cadence, which is a *weekly* habit and sits under `Weekly`;
+it is why "7x per week" is the wording for the everyday case rather than a
+separate mode. The label is what the person reads; the enum keeps its name
+because `Habit.countedPerDay` and `countedPerWeek` are built on it.
 
 **Edit changes what a ring's tap means** rather than adding a second control
 beside it: out of edit mode a tap counts, in edit mode it opens that habit in
