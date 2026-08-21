@@ -191,15 +191,24 @@ with the Apple ID would remove that dependency and let automatic signing work.
 Verify the whole chain with `Tools/check-app-group.sh`, which reports which
 profiles grant the group and whether the last device build actually carries it.
 
-## The widget
+## The widgets
 
-Small, medium and large, reading the same store through the App Group, with
-today's slot as an `AppIntent` button. Past days are not buttons, which is R2
-holding in a second process.
+The week widget: small, medium and large, reading the same store through the
+App Group, with today's slot as an `AppIntent` button. Past days are not
+buttons, which is R2 holding in a second process.
 
 It renders the same HDR tile as the app, via the same `GlowImageView`, with
 `fillsWidth` set because the widget's slots are distributed by an HStack rather
 than measured by `SlotLayout`.
+
+The Today widget: small (one habit, chosen per widget through a configuration
+intent) and medium (the first three per-day habits, static), drawing the same
+`DayRingView` as the app, each ring a `TapHabitIntent` button. The
+configuration intent, its entity and its query live in the shared sources
+(`TodayWidgetConfig.swift`), not the widget target — the app exports AppIntents
+metadata of its own, the system consolidates metadata under the app, and with
+the intent defined only in the extension the stored habit choice never resolved
+when the provider ran. The note on the type carries the symptom in full.
 
 ## What is deliberately absent
 
