@@ -61,8 +61,9 @@ struct WeekEntry: TimelineEntry {
     let habits: [HabitSnapshot]
     /// The habit whose completion is mid-animation, if any.
     var burstHabit: UUID?
-    /// How far the solid fill has risen over the glow, 0 through 1.
-    var coverage: Double = 1
+    /// How far through the completion cross-fade this frame is, 0 through 1:
+    /// the dot's opacity, and the ring's complement.
+    var progress: Double = 1
 }
 
 struct WeekProvider: TimelineProvider {
@@ -79,13 +80,8 @@ struct WeekProvider: TimelineProvider {
         completion(loadEntry())
     }
 
-    /// How long a breath takes, and how finely it is sampled.
-    ///
-    /// Deliberately bounded: this is an experiment in whether WidgetKit honours
-    /// sub-minute entries at all. Every entry is free, but the reload at the end
-    /// of the window is not — widgets get a limited refresh budget per day, and
-    /// spending it on a pulse would leave the widget stale by evening. If the
-    /// pulse works, the window length is the dial to trade against that budget.
+    /// One still entry and a midnight refresh — plus, after a tap, the few
+    /// cross-fade frames that ride inside the reload the tap already paid for.
     func getTimeline(in context: Context, completion: @escaping (Timeline<WeekEntry>) -> Void) {
         // One entry, and a refresh at midnight. The open slot is defined as
         // "today", so the day rolling over is the only moment the widget goes
@@ -113,17 +109,21 @@ struct WeekProvider: TimelineProvider {
             return
         }
 
+        // The cross-fade's few stills, skipping any the reload latency has
+        // already spent. This used to sample the app's closing spring at
+        // 40fps — seventeen entries — and on a real home screen it read as a
+        // stutter rather than a snap: entries do not arrive at the rate they
+        // were sampled at. See WidgetBurst and docs/glow.md.
         var entries: [WeekEntry] = []
-        var t = now.timeIntervalSince(burst.startedAt)
-        while t < WidgetBurst.duration {
+        let elapsed = now.timeIntervalSince(burst.startedAt)
+        for frame in WidgetBurst.frames where frame.offset >= elapsed {
             entries.append(WeekEntry(
-                date: burst.startedAt.addingTimeInterval(t),
+                date: burst.startedAt.addingTimeInterval(frame.offset),
                 week: entry.week,
                 habits: entry.habits,
                 burstHabit: burst.habitID,
-                coverage: WidgetBurst.coverage(at: t)
+                progress: frame.progress
             ))
-            t += WidgetBurst.step
         }
         // Settle, and then nothing until the day turns over. The burst rides
         // inside this one timeline, so it spends no reloads of its own.

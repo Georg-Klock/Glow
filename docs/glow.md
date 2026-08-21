@@ -237,10 +237,23 @@ so a second's worth of entries can ride inside the timeline that reload
 produces. It spends nothing extra.
 
 `WidgetBurst` is the note the intent leaves for the provider — which habit, and
-when. The provider turns that into ten frames at 10fps and then one settled
-entry, animating the same direction the app does: the solid fill rises over a
-glow that never changes, after a 0.2s hold. Only completing animates.
+when. The provider turns that into a **cross-fade**: three still entries, ring
+fading out as the dot fades in, then the settle. Only completing animates.
 Un-completing is a correction and should not be celebrated.
+
+It did not start as a cross-fade, and the history is worth keeping. The first
+version was ten frames at 10fps of the solid fill rising over the glow; that
+read as a handful of stills, so it became a sampling of the app's own closing
+spring — `response: 0.34, dampingFraction: 0.58`, evaluated as a second-order
+step response at 40fps, roughly seventeen entries — on the theory that the two
+surfaces should read as the same snap. On a real home screen it read as a
+stutter instead (#40): **timeline entries do not arrive at the rate they were
+sampled at**, and a curve played back at the wrong rate is not the curve.
+Sampling a spring assumes the render clock is ours to spend, and it is not.
+The app's `SlotView` keeps its spring — one shape, one number, no cross-fade —
+so the two surfaces now read as different gestures for the same act. Accepted:
+a gesture that reads wrong is worse than one that reads different, and a
+widget is a sequence of stills either way.
 
 The note expires. Without that, a midnight rollover or an edit made in the app
 would replay somebody's last tap hours later, and there is a test for exactly
@@ -262,12 +275,12 @@ not. Measured on an iPhone 14 Pro, driving the burst from a tethered Mac with
 burst timeline built. Reload latency is not the problem, and the expiry window
 has fifteen times the margin it needs.
 
-**What is still unconfirmed is the rendering.** Nobody has watched the burst
-animate under a thumb, and "the timeline was built" is exactly the kind of
-evidence the masked `ProgressView` sweep also had. If a real tap produces these
-two lines and nothing visibly moves, the failure is WidgetKit declining to
-render sub-second entries during a burst, and the burst comes out the same way
-the sweep did.
+**The rendering has since been watched, and it half-works** (#40): the entries
+render — this is not the sweep's failure — but not at the rate they were
+sampled at, so the sampled spring came out as a stutter rather than a close.
+That observation is what turned the burst into the cross-fade above: frames
+few enough that arrival rate has nothing left to ruin. The cross-fade itself
+has not yet been watched on a device; when it is, this line should say so.
 
 ## How to see inside a widget at all
 
@@ -306,8 +319,8 @@ A still widget reads:
 14:55:01.649  timeline: 1 entry, still (burst none pending)
 ```
 
-and a tap should add the intent's write followed by a burst timeline of about
-eleven entries.
+and a tap should add the intent's write followed by a burst timeline of a few
+entries — the cross-fade's stills and the settle.
 
 ## When the glow will not appear
 
