@@ -108,7 +108,11 @@ struct SettingsView: View {
                         }
                     }
                 } footer: {
-                    Text("Never counted as missed. Anything logged on one still counts.")
+                    Text(
+                        "True rest: nothing can be logged on it, nothing counts as "
+                            + "missed, and the week is not made up around it. "
+                            + "Anything already on record still counts."
+                    )
                 }
 
                 // Last, because it is the one control here that is not about
@@ -130,6 +134,10 @@ struct SettingsView: View {
             .navigationTitle("Settings")
         }
         .onAppear { isDemoSeeded = DemoHistory(context: context).isSeeded }
+        // Covers the toggle and the day picker both: the widget draws the same
+        // week and withholds the same taps, and it is not told when the
+        // setting moves.
+        .onChange(of: restDay) { _, _ in WidgetCenter.shared.reloadAllTimelines() }
     }
 
     /// Seeds or removes the invented past. Errors leave the toggle where the

@@ -140,7 +140,9 @@ enum WeekGrid {
         case .daily:
             return dailySlots(habit: habit, week: week, today: todayStart, calendar: calendar)
         case .timesPerWeek(let target):
-            return frequencySlots(habit: habit, week: week, today: todayStart, target: target)
+            return frequencySlots(
+                habit: habit, week: week, today: todayStart, target: target, calendar: calendar
+            )
         case .timesPerDay:
             // A per-day habit has no week row. It is one ring on Today, and the
             // week-shaped screens filter it out before reaching here — this is
@@ -160,10 +162,14 @@ enum WeekGrid {
         week.days.enumerated().map { index, day in
             let isDone = habit.completedDays.contains(day)
             let isToday = day == today
-            // A rest day is never open and never missed. Nothing was expected,
-            // so nothing was skipped — it draws as an empty socket whether it
-            // is behind or ahead. A completion logged on one still counts and
-            // still shows; resting is permission, not a prohibition.
+            // A rest day is never open, never missed, and never writable. It
+            // is true rest — the week stops there rather than being made up
+            // around it — so it draws as an empty socket whether it is behind
+            // or ahead, and it never carries an action. A completion already
+            // on record still counts and still shows: a record of what
+            // happened stays a record of what happened. Only new writes are
+            // refused, and the refusal itself is `HabitStore.toggleCompletion`'s;
+            // withholding the tap here is the same rule at the surface.
             let isRest = WeekPreferences.isRestDay(day, calendar: calendar)
 
             let state: SlotState =
@@ -186,7 +192,8 @@ enum WeekGrid {
         habit: HabitSnapshot,
         week: Week,
         today: Date,
-        target: Int
+        target: Int,
+        calendar: Calendar
     ) -> [Slot] {
         let completionsThisWeek = habit.completedDays.count { week.contains($0) }
         // A habit edited from 5x down to 3x can hold more completions than it
@@ -195,12 +202,19 @@ enum WeekGrid {
 
         let todayIsInWeek = week.contains(today)
         let doneToday = habit.completedDays.contains(today)
+        // A rest day stops frequency rows too: the pill that would be open
+        // waits, unlit, and the undo waits with it. Not day-pinned does not
+        // mean not day-bound — the only day a tap can ever touch is today,
+        // and on the rest day today refuses.
+        let todayRests = WeekPreferences.isRestDay(today, calendar: calendar)
 
         // Open only when the goal is still reachable and today is unspent.
-        let openIndex: Int? = (todayIsInWeek && !doneToday && filledCount < target) ? filledCount : nil
+        let openIndex: Int? =
+            (todayIsInWeek && !todayRests && !doneToday && filledCount < target) ? filledCount : nil
         // If today is already logged, its pill is the last filled one, since
         // pills fill in completion order and today is the most recent day.
-        let undoIndex: Int? = (todayIsInWeek && doneToday && filledCount > 0) ? filledCount - 1 : nil
+        let undoIndex: Int? =
+            (todayIsInWeek && !todayRests && doneToday && filledCount > 0) ? filledCount - 1 : nil
 
         return (0..<target).map { index in
             let state: SlotState =

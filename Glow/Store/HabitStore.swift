@@ -148,28 +148,47 @@ struct HabitStore {
 
     // MARK: - Completions
 
+    /// What a toggle attempt did.
+    ///
+    /// A refusal is an outcome rather than an error, because it is the rule
+    /// working: the rest day refusing a write is not a failure of anything.
+    enum ToggleOutcome: Equatable {
+        case completed
+        case uncompleted
+        /// The day is the rest day. Nothing was logged and nothing removed.
+        case refused
+    }
+
     /// Marks the habit done on `date`, or un-marks it if it already is.
     ///
-    /// Returns true if the habit ended up completed. Idempotent in the sense
-    /// that the stored state only ever has zero or one completion per day: a
-    /// duplicate cannot be created by tapping twice quickly, because the second
-    /// tap finds the first one and removes it.
+    /// Idempotent in the sense that the stored state only ever has zero or one
+    /// completion per day: a duplicate cannot be created by tapping twice
+    /// quickly, because the second tap finds the first one and removes it.
     @discardableResult
-    func toggleCompletion(for habit: Habit, on date: Date) throws -> Bool {
+    func toggleCompletion(for habit: Habit, on date: Date) throws -> ToggleOutcome {
         let day = WeekCalendar.day(date, calendar: calendar)
+
+        // A rest day is true rest: nothing can be logged on it and nothing
+        // un-logged. The grid withholds the tap, but the widget runs in a
+        // second process and can hold a surface rendered before the setting
+        // changed — so the rule lives here, on the one write path both
+        // processes share, rather than in trust that no button was offered.
+        // A completion already stored on a rest day stays: records of what
+        // happened remain records of what happened.
+        guard !WeekPreferences.isRestDay(day, calendar: calendar) else { return .refused }
 
         if let existing = (habit.completions ?? []).first(where: { $0.day == day }) {
             habit.completions?.removeAll { $0.id == existing.id }
             context.delete(existing)
             try context.save()
-            return false
+            return .uncompleted
         }
 
         let completion = Completion(day: day, habit: habit)
         context.insert(completion)
         habit.completions?.append(completion)
         try context.save()
-        return true
+        return .completed
     }
 
     // MARK: - Counts

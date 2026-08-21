@@ -141,6 +141,20 @@ If `count < N` and today is not already logged, pill index `count` is open.
 Otherwise no slot is open: everything filled stays filled, unfilled pills stay
 inactive.
 
+**A rest day stops the week.** One optional weekday, set in Settings
+(`WeekPreferences.restDay`), is true rest: its slot is never open, never
+missed, and never writable. Nothing can be logged on it and nothing un-logged
+— `HabitStore.toggleCompletion` refuses the write, which holds in the widget's
+process too, where a stale surface can still offer a button — and the week is
+not made up around it: an unreachable weekly goal on a rest week is stopped,
+not excused. Frequency rows stop with it: on the rest day nothing is open, so
+nothing glows. A completion already on record still draws and still counts,
+whichever day it fell on. The grid draws the cut as one vertical line down the
+rest day's column, in the missed cross's grey — absence, which does not glow.
+Per-day habits are untouched: Today's rings stay tappable, because water and a
+walk are not the thing the rest is from. This reverses "resting is permission,
+not a prohibition" — see docs/decisions.md.
+
 **A per-day habit has no slots and no week row.** It is drawn on Today as a
 ring of arcs, one per repetition — see `DayRing` and docs/vision.md. The ring
 starts full and glowing and each completion quiets one arc, clockwise from the

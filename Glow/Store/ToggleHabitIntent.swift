@@ -34,19 +34,30 @@ struct ToggleHabitIntent: AppIntent {
         let descriptor = FetchDescriptor<Habit>(predicate: #Predicate { $0.id == id })
 
         guard let habit = try context.fetch(descriptor).first else { return .result() }
-        let isNowComplete = try HabitStore(context: context).toggleCompletion(for: habit, on: Date())
+        let result = try HabitStore(context: context).toggleCompletion(for: habit, on: Date())
 
         // A tap already costs a timeline reload, so the completion can animate
         // inside the timeline that reload produces. This is the note the
         // provider reads. Only completing animates; un-completing is a
-        // correction and should not be celebrated.
-        if isNowComplete { WidgetBurst.record(habitID: id) }
+        // correction and a refusal is nothing at all — neither is celebrated.
+        //
+        // A refusal can genuinely arrive here: this process runs against a
+        // surface that may have been rendered before the rest day was set, so
+        // a stale widget can offer a button the store will not honour. The
+        // store's answer wins, and the reload below replaces the stale surface.
+        if result == .completed { WidgetBurst.record(habitID: id) }
 
-        let outcome = "tap \(id.uuidString): \(isNowComplete ? "done" : "undone"), burst \(isNowComplete ? "recorded" : "skipped")"
+        let verdict = switch result {
+        case .completed: "done"
+        case .uncompleted: "undone"
+        case .refused: "refused, rest day"
+        }
+        let outcome = "tap \(id.uuidString): \(verdict), burst \(result == .completed ? "recorded" : "skipped")"
         GlowLog.widget.notice("\(outcome, privacy: .public)")
         WidgetTrace.record(outcome)
 
-        // The widget's own timeline is now stale by definition.
+        // The widget's own timeline is now stale by definition — and after a
+        // refusal it was stale before the tap, which is how the tap happened.
         WidgetCenter.shared.reloadAllTimelines()
         return .result()
     }

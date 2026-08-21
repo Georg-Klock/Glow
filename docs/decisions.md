@@ -120,6 +120,30 @@ own id, so off-and-on-again shows the same demo; the first habit's past is
 perfect so a full streak is on screen, and the rest cycle down so a missed day
 is too.
 
+## The rest day: permission, then prohibition
+
+**Question.** What does the rest day mean? `WeekPreferences.restDay` arrived
+as a day nothing was expected on.
+
+**First decision.** Permission. The comment in `WeekGrid.dailySlots` said it
+out loud: never open and never missed, but a completion logged on one still
+counted — "resting is permission, not a prohibition."
+
+**Now** (2026-08-21, #39). Prohibition, as a reversal. A rest day is true
+rest: nothing can be logged on it, nothing un-logged, and the week is not made
+up around it — you trust that you will do it next week, and ideally the phone
+stays down too. Permission to skip is not the same thing as being asked to
+stop, and only the second one is restful. The refusal lives in
+`HabitStore.toggleCompletion` (`.refused`), the write path the app and the
+widget's intent share, so a stale widget surface cannot write around it.
+Frequency rows stop with the day: nothing opens and nothing glows on it.
+
+What does not reverse: a completion already stored on a rest day still draws
+and still counts — a record of what happened stays a record of what happened —
+and per-day habits are untouched, because water and a walk are bodily and not
+the thing the rest is from. The grid marks the cut as one vertical line down
+the rest day's column, in the missed cross's grey.
+
 ## Appearance: follow the system
 
 **Question.** Not in the spec's list. It arrived from the implementation, twice.
