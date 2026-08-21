@@ -177,12 +177,21 @@ granted EDR headroom rises from 1.2 to 6.0, matching what the renderer asks for.
 What no test and no measurement can answer is whether it *reads* as lit in a
 given room, which stays a matter of looking at it.
 
-## 9. The widget
+## 9. The widgets
 
-One widget, three families, reading the same store through an App Group.
-Today's slot is a button backed by an `AppIntent`, so a habit can be logged from
-the home screen without launching the app. Past days are not buttons, which is
-R2 holding in a second process.
+Two widgets, reading the same store through an App Group.
+
+**The week widget**: three families. Today's slot is a button backed by an
+`AppIntent`, so a habit can be logged from the home screen without launching
+the app. Past days are not buttons, which is R2 holding in a second process.
+
+**The Today widget**: small and medium, and deliberately no large — three
+rings already say everything it could. Small is one habit's ring, and the
+person picks which habit per widget, so several small widgets can sit on one
+home screen showing different habits. Medium is the first three per-day
+habits in the user's own order, all the same size, with nothing to configure.
+Each ring is a button backed by `TapHabitIntent`: one more repetition, or the
+reset from a full ring, without leaving the home screen.
 
 The widget glows but does not breathe. The pulse was built, measured working
 (WidgetKit renders sub-minute entries, contrary to its reputation), and removed:

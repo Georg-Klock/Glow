@@ -166,5 +166,7 @@ struct WeekProvider: TimelineProvider {
 struct GlowWidgetBundle: WidgetBundle {
     var body: some Widget {
         GlowWidget()
+        TodaySmallWidget()
+        TodayMediumWidget()
     }
 }
