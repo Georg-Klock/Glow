@@ -17,6 +17,10 @@ struct SpanView: View {
     let span: SlotSpan
     let size: CGSize
     let habitName: String
+    /// The rest day's column inside this span, in the span's own coordinates,
+    /// or nil when the span does not cross one. Computed by the row from the
+    /// track — see `RestWindow` — because the row is what knows the track.
+    var restWindow: ClosedRange<CGFloat>?
     let onToggle: (Date) -> Void
 
     /// Non-nil only while a completion is closing.
@@ -49,10 +53,24 @@ struct SpanView: View {
             GlowImageView(
                 size: closing,
                 shape: .ring,
-                ringLineWidth: size.height * GlowShape.ringWeight
+                ringLineWidth: size.height * GlowShape.ringWeight,
+                // The window does not go away for the 600ms — a bar flashing
+                // across the cut and then being taken back is worse than never
+                // cutting it. It is re-expressed, though: the closing shape is
+                // centred in the span's frame and narrower than it, so the
+                // window has to be measured from *its* leading edge.
+                restWindow: restWindow.map { window in
+                    let shift = (size.width - closing.width) / 2
+                    return (window.lowerBound - shift)...(window.upperBound - shift)
+                }
             )
         } else {
-            SlotMarkView(mark: span.mark, size: size, spansDays: span.dayCount > 1)
+            SlotMarkView(
+                mark: span.mark,
+                size: size,
+                spansDays: span.dayCount > 1,
+                restWindow: restWindow
+            )
         }
     }
 

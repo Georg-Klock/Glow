@@ -98,6 +98,17 @@ struct HabitRowView: View {
         SlotLayout.slotHeight(trackWidth: geometry.trackWidth)
     }
 
+    /// Which column the rest day falls in, or nil for none.
+    ///
+    /// Reads `restDayStorage` rather than `WeekPreferences.restDay` for the
+    /// same reason `restDayCut` does: the raw value is what this view observes,
+    /// and a row whose slots did not change has to redraw when Settings moves
+    /// the day. Called from `body`, which is what registers the dependency.
+    private var restIndex: Int? {
+        guard restDayStorage != 0 else { return nil }
+        return week.days.firstIndex { WeekPreferences.isRestDay($0) }
+    }
+
     var body: some View {
         HStack(spacing: geometry.labelGap) {
             if snapshot.isSpacer {
@@ -180,6 +191,12 @@ struct HabitRowView: View {
                             height: slotHeight
                         ),
                         habitName: snapshot.name,
+                        restWindow: RestWindow.inSpan(
+                            firstDay: span.firstDay,
+                            lastDay: span.lastDay,
+                            restIndex: restIndex,
+                            trackWidth: geometry.trackWidth
+                        ),
                         onToggle: onToggle
                     )
                 }

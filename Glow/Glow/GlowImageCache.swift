@@ -226,6 +226,48 @@ extension View {
     }
 }
 
+/// Everything except one vertical window: the mask that takes the rest day's
+/// column out of a span.
+///
+/// A `Shape` rather than a stack of rectangles, because the window is given in
+/// points and the thing being masked may be sized by its container — a shape is
+/// handed the resolved rect and can clamp against it. Clamping is what makes
+/// one number cover both cases: a window in the middle of a span is a hole, and
+/// a window at either end is a shortening.
+struct RestWindowMask: Shape {
+    let window: ClosedRange<CGFloat>
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let low = min(max(window.lowerBound, rect.minX), rect.maxX)
+        let high = min(max(window.upperBound, rect.minX), rect.maxX)
+        if low > rect.minX {
+            path.addRect(CGRect(
+                x: rect.minX, y: rect.minY, width: low - rect.minX, height: rect.height
+            ))
+        }
+        if high < rect.maxX {
+            path.addRect(CGRect(
+                x: high, y: rect.minY, width: rect.maxX - high, height: rect.height
+            ))
+        }
+        return path
+    }
+}
+
+extension View {
+    /// Take the rest day's column out of this view. A no-op when there is none,
+    /// so the common case adds no layer.
+    @ViewBuilder
+    func restWindowRemoved(_ window: ClosedRange<CGFloat>?) -> some View {
+        if let window {
+            mask { RestWindowMask(window: window).fill(.black) }
+        } else {
+            self
+        }
+    }
+}
+
 /// A lit slot: one of the mark silhouettes, glowing.
 struct GlowImageView: View {
     let size: CGSize
@@ -242,9 +284,19 @@ struct GlowImageView: View {
     /// measured by `SlotLayout` and want a fixed width, but the widget's are
     /// distributed by an HStack and must not be pinned.
     var fillsWidth = false
+    /// The rest day's column, in this view's own coordinates, taken out of the
+    /// shape. See `RestWindow`.
+    var restWindow: ClosedRange<CGFloat>?
 
     var body: some View {
+        // Subtracted from the *silhouette*, before `glowing` sees it — which is
+        // the whole trap. The halo is generated from whatever shape is handed
+        // in, so masking the rendered result instead would slice the glow flat
+        // at the window's edges rather than letting it wrap the new open ends.
+        // The halo reaches `slotHeight * GlowPalette.haloRadius`, far wider
+        // than the gap being punched, so the difference is not subtle.
         sized(silhouette)
+            .restWindowRemoved(restWindow)
             .glowing(
                 halo: size.height * (shape == .ring
                     ? GlowPalette.ringHaloRadius

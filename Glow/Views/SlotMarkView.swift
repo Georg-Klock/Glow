@@ -15,6 +15,9 @@ struct SlotMarkView: View {
     /// A span covering several days draws its completion as a bar rather than a
     /// dot — the mark has width to carry, so it does not need weight.
     var spansDays = false
+    /// The rest day's column, in this mark's own coordinates, taken out of the
+    /// shape. Nil on every mark that does not cross one. See `RestWindow`.
+    var restWindow: ClosedRange<CGFloat>?
 
     var body: some View {
         switch mark {
@@ -36,7 +39,9 @@ struct SlotMarkView: View {
     }
 
     private func glow(_ shape: GlowShape) -> some View {
-        GlowImageView(size: size, shape: shape, fillsWidth: fillsWidth)
+        GlowImageView(
+            size: size, shape: shape, fillsWidth: fillsWidth, restWindow: restWindow
+        )
     }
 
     @ViewBuilder
@@ -48,6 +53,11 @@ struct SlotMarkView: View {
                     .frame(height: GlowShape.upcomingThickness)
                     .padding(.horizontal, (size.height - GlowShape.upcomingDiameter) / 2)
             )
+            // Safe to mask out here rather than inside the shape: nothing
+            // unlit casts a halo, so there is none to cut. The lit marks go
+            // through `GlowImageView`, which subtracts the window before the
+            // glow is generated from the shape.
+            .restWindowRemoved(restWindow)
         } else {
             sized(
                 Circle()
