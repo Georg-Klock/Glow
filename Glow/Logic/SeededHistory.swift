@@ -8,8 +8,9 @@ import Foundation
 /// of what the app is for — no streak, no run of light, no shape to a week — and
 /// judging the design against a blank slate is judging a different app.
 ///
-/// If it ships, it ships as a demo. Two ways out, whichever is wanted: gate it
-/// behind `#if DEBUG`, or clear it the first time a habit is edited.
+/// It does not ship. `HabitSeeder.seedsHistoryByDefault` gates it to Debug
+/// builds: a real install opens with the habits and an empty grid, and the
+/// design stays judgeable during development. See docs/decisions.md.
 ///
 /// Deterministic on purpose. A fixed generator means every install shows the
 /// same past, the tests can assert against it, and "it looked different on my

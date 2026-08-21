@@ -27,8 +27,11 @@ struct SeedingTests {
         return defaults
     }
 
+    /// History on, explicitly — what a Debug build does. The release shape has
+    /// its own test below, so neither depends on which configuration the tests
+    /// happen to compile under.
     private func seeder(_ context: ModelContext, _ defaults: UserDefaults) -> HabitSeeder {
-        HabitSeeder(context: context, defaults: defaults, calendar: calendar)
+        HabitSeeder(context: context, defaults: defaults, calendar: calendar, seedsHistory: true)
     }
 
     @Test("A fresh install starts with the default habits")
@@ -42,7 +45,21 @@ struct SeedingTests {
         #expect(habits.map(\.frequency) == DefaultHabits.all.map(\.frequency))
     }
 
-    @Test("A past is seeded, and today is never part of it")
+    @Test("A real install starts with the habits and an empty grid")
+    func releaseSeedsNoHistory() throws {
+        // The release shape: a tracker that opens showing a streak you did not
+        // earn is lying on the first screen, so the invented past is a Debug
+        // affordance and nothing else.
+        let context = try makeContext()
+        let added = try HabitSeeder(
+            context: context, defaults: makeDefaults(), calendar: calendar, seedsHistory: false
+        ).seedIfNeeded(now: today)
+
+        #expect(added == DefaultHabits.all.count)
+        #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
+    }
+
+    @Test("With history on, a past is seeded and today is never part of it")
     func seedsHistoryButNotToday() throws {
         // The reverse of what this asserted until 2026-08-20. The history is
         // invented — SeededHistory says so and says how to switch it off — but

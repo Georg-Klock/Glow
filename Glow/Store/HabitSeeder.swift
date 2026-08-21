@@ -19,10 +19,31 @@ struct HabitSeeder {
     private let defaults: UserDefaults
     private static let log = Logger(subsystem: "com.georgklock.glow", category: "seed")
 
-    init(context: ModelContext, defaults: UserDefaults = .standard, calendar: Calendar = WeekCalendar.calendar) {
+    /// Whether the invented past is seeded alongside the habits.
+    ///
+    /// Debug builds keep it: an empty grid shows none of what the app is for,
+    /// and the design has to be judged with something in it. A real install
+    /// opens with the habits and an empty grid, because a tracker that opens
+    /// showing a streak you did not earn is lying on the first screen. Today
+    /// is never pre-filled in either mode.
+    #if DEBUG
+    static let seedsHistoryByDefault = true
+    #else
+    static let seedsHistoryByDefault = false
+    #endif
+
+    private let seedsHistory: Bool
+
+    init(
+        context: ModelContext,
+        defaults: UserDefaults = .standard,
+        calendar: Calendar = WeekCalendar.calendar,
+        seedsHistory: Bool = HabitSeeder.seedsHistoryByDefault
+    ) {
         self.context = context
         self.defaults = defaults
         self.store = HabitStore(context: context, calendar: calendar)
+        self.seedsHistory = seedsHistory
     }
 
     /// Inserts the defaults if this install has never been seeded and the store
@@ -49,8 +70,9 @@ struct HabitSeeder {
                 frequency: template.frequency,
                 now: now
             )
-            // Invented, deterministic, and never touching today. See
-            // SeededHistory for what that costs and how to switch it off.
+            // Invented, deterministic, and never touching today. Debug builds
+            // only — see `seedsHistoryByDefault` and SeededHistory.
+            guard seedsHistory else { continue }
             for day in SeededHistory.completions(
                 for: template.frequency,
                 form: template.form,
