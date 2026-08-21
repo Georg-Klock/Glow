@@ -25,7 +25,9 @@ in one sentence.
 - Logging a habit is one tap from the weekly grid.
 - The glow renders on EDR-capable devices and degrades to plain colour where it
   cannot, with no broken state either way.
-- Two cadences only: daily, and N-times-per-week with no day pinning.
+- Two kinds of habit, never mixed: counted across a week (daily, or
+  N-times-per-week with no day pinning), or counted within a day (N times
+  today, resetting with the day). See docs/vision.md.
 
 ## 3. Non-goals (v1)
 
@@ -33,7 +35,11 @@ in one sentence.
   the model is normalized now, which is why it is.
 - **No fixed-weekday schedules.** "Every Mon/Wed/Fri" is out of scope.
   Frequency habits are pure count-based; any day counts.
-- **No multiple completions per day.** A habit is done or not done for a day.
+- ~~**No multiple completions per day.** A habit is done or not done for a
+  day.~~ **A per-day habit holds several.** The vision added a second kind of
+  habit — done several times within one day — and each repetition is its own
+  `Completion` row. For weekly-cadence habits the old sentence still holds,
+  enforced by `toggleCompletion`.
 - **No notifications or reminders.**
 - ~~**The home screen widget does not glow.**~~ **It does.** This was written as
   a non-goal on the reasoning that WidgetKit renders in a separate process and
@@ -47,7 +53,9 @@ in one sentence.
 ## 4. Data model
 
 ```swift
-enum Frequency { case daily, timesPerWeek(Int) }   // 2...6 selectable
+enum Frequency { case daily, timesPerWeek(Int), timesPerDay(Int) }
+// timesPerWeek: 1...6 selectable, 7 collapses to .daily
+// timesPerDay: 1...12, one ring arc per repetition
 
 struct Habit    { id, name, icon, frequency, accent, createdAt, sortOrder }
 struct Completion { id, habitId, day }             // day, not a timestamp
@@ -69,7 +77,9 @@ A build that violates one of these is broken regardless of what else works.
 - **R1.** At most one slot per habit is open at a time, and only ever for the
   current day.
 - **R2.** Only today's slot responds to taps. Past days are never editable.
-- **R3.** A day holds zero or one completion per habit. Never two.
+- **R3.** For a weekly-cadence habit, a day holds zero or one completion.
+  Never two. A per-day habit stores one completion row per repetition, so a
+  day holds up to its target.
 - **R4.** `Completion.day` is always midnight in the user's calendar.
 - **R5.** A daily row draws exactly 7 slots; an N-times row draws exactly N.
 - **R6.** Every row spans the same track width, whatever its slot count.
@@ -130,6 +140,13 @@ hierarchy in §1, and only because it is the product rather than a style.
 If `count < N` and today is not already logged, pill index `count` is open.
 Otherwise no slot is open: everything filled stays filled, unfilled pills stay
 inactive.
+
+**A per-day habit has no slots and no week row.** It is drawn on Today as a
+ring of arcs, one per repetition — see `DayRing` and docs/vision.md. The ring
+starts full and glowing and each completion quiets one arc, clockwise from the
+top, so the glow is always exactly what is left to do. At a target of 1 the
+ring is a single unbroken circle. At the goal the ring is quiet but present,
+in the same grey as a habit already handled. Tapping arrives with #18.
 
 ## 8. Acceptance criteria
 

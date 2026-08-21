@@ -27,7 +27,13 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
 - `SlotLayout` is the row geometry, as a single formula that a 7-circle row and
   an N-pill row both go through.
 - `Frequency` normalizes cadence at construction, so no caller can build a
-  degenerate one.
+  degenerate one. A habit is counted across a week or within a day, never
+  both; `slotCount` is nil for the per-day kind, so anything week-shaped has
+  to say what it means when there is no week.
+- `DayRing.arcs(target:done:gap:)` is the Today ring: one arc per repetition
+  as trim fractions of a circle, the first `done` of them quiet. The ring
+  starts full and glowing and closes clockwise from the top — the inverse of
+  the fitness rings it resembles, because here the glow is what is still open.
 
 Every function takes its `Calendar` and its `today` as parameters. Nothing here
 reads the clock, which is what lets the tests assert against a fixed Tuesday in
@@ -71,12 +77,23 @@ migration rather than a configuration change.
 
 `Frequency` is stored as `isDaily` plus `timesPerWeek` rather than as an encoded
 enum, so the column stays queryable and a schema change does not hinge on an
-enum's `Codable` representation.
+enum's `Codable` representation. The per-day kind adds `timesPerDay`, with zero
+meaning "counted across a week" — a sentinel no real per-day habit can store,
+because the initializer clamps into 1...12. `Habit.countedPerWeek` and
+`Habit.countedPerDay` are the two fetch predicates, one definition each, so the
+week surfaces and Today cannot drift in how they split the kinds.
 
 ### Views
 
 Mostly layout. The one piece of real behaviour is `SlotView`'s completion
 transition, which is documented in place and in [glow.md](glow.md).
+
+`TodayView` shows the per-day habits as rings — the small and medium widget at
+app size, per docs/vision.md — and nothing week-shaped. `DayRingView` draws the
+arcs `DayRing` lays out, with the open arcs glowing as one layer: one HDR tile,
+one halo pass, one breathing animation, rather than a dozen lights drifting out
+of phase. The tile is shape-free and cached per intensity, so an arc is a mask
+like any other and costs the cache nothing.
 
 Width flows down rather than being measured per row: `WeeklyGridView` reads the
 screen width once, builds a `RowGeometry`, and hands the same value to the
