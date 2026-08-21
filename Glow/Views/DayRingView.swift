@@ -9,9 +9,9 @@ import SwiftUI
 /// shape-free and cached per intensity, so an arc is a mask like any other,
 /// not a new cache entry.
 ///
-/// The open arcs glow as one layer, not one modifier each: one tile, one halo
-/// pass, and one breathing animation, so the remaining share of the day
-/// breathes together instead of as a dozen lights drifting out of phase.
+/// The open arcs glow as one layer, not one modifier each: one tile and one
+/// halo pass for the whole remaining share of the day, instead of a dozen
+/// separately composited lights.
 struct DayRingView: View {
     /// How many repetitions the day asks for, 1 to 12.
     let target: Int
@@ -45,8 +45,7 @@ struct DayRingView: View {
                 layer(open)
                     .glowing(
                         halo: diameter * GlowPalette.ringHaloRadius,
-                        style: .ring,
-                        breathes: true
+                        style: .ring
                     )
             }
         }

@@ -146,9 +146,6 @@ struct GlowModifier: ViewModifier {
     /// The design draws the ring's halo softer, offset above and below, and at
     /// half strength; every other glow is one plain shadow at full strength.
     var style: Style = .plain
-    /// Only what is asking for something should pulse. Every completion glows
-    /// now, and a screen of breathing dots is a screen nobody can read.
-    var breathes: Bool
 
     enum Style: Equatable {
         case plain
@@ -157,19 +154,6 @@ struct GlowModifier: ViewModifier {
 
     @AppStorage(GlowSettings.key, store: GlowSettings.store)
     private var peak: Double = GlowSettings.defaultValue
-
-    /// Pulsing content is exactly what Reduce Motion exists to switch off.
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isBreathing = false
-
-    /// The lit slot breathes: opacity easing between these, forever, on the
-    /// glowing layer only.
-    ///
-    /// Shallow and unhurried on purpose: the job is to catch the eye in
-    /// peripheral vision, not to blink at anyone.
-    static let breathLow = 0.85
-    /// Half a breath: in and out is twice this.
-    private static let breathPeriod: Double = 1.2
 
     private var haloRadius: CGFloat {
         halo * CGFloat(GlowSettings.haloScale(for: peak))
@@ -210,18 +194,14 @@ struct GlowModifier: ViewModifier {
         // The caster is one shadow, not the three this used to stack: the design
         // specifies a single blur per mark, and three passes were an invention
         // approximating a long tail the file never asked for.
+        // Nothing here animates on its own. A lit mark is lit and holds still:
+        // the glow's one signal is brightness, and the breath that used to
+        // pulse this layer said the same thing a second time, in a register
+        // nothing else in the app uses. Removed 2026-08-21; docs/glow.md keeps
+        // the history, including the measurement that the compositor does not
+        // flatten an animated HDR layer.
         caster(content)
             .overlay { GlowTile(peak: peak).mask { content } }
-        // The whole glowing layer breathes together, so the halo and the core
-        // never drift out of step.
-        .opacity(isBreathing ? 1.0 : Self.breathLow)
-        .animation(
-            reduceMotion || !breathes
-                ? nil
-                : .easeInOut(duration: Self.breathPeriod).repeatForever(autoreverses: true),
-            value: isBreathing
-        )
-        .onAppear { if breathes && !reduceMotion { isBreathing = true } }
     }
 }
 
@@ -229,10 +209,9 @@ extension View {
     /// Draw this view as a real glow rather than as bright colour.
     func glowing(
         halo: CGFloat,
-        style: GlowModifier.Style = .plain,
-        breathes: Bool = false
+        style: GlowModifier.Style = .plain
     ) -> some View {
-        modifier(GlowModifier(halo: halo, style: style, breathes: breathes))
+        modifier(GlowModifier(halo: halo, style: style))
     }
 }
 
@@ -259,10 +238,7 @@ struct GlowImageView: View {
                 halo: size.height * (shape == .ring
                     ? GlowPalette.ringHaloRadius
                     : GlowPalette.haloRadius),
-                style: shape == .ring ? .ring : .plain,
-                // Only today's open slot pulses. Completions are records, and a
-                // record has nothing to ask for.
-                breathes: shape == .ring
+                style: shape == .ring ? .ring : .plain
             )
             .accessibilityHidden(true)
     }

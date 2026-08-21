@@ -74,6 +74,15 @@ struct HabitRowView: View {
     let onToggle: (Date) -> Void
     let onEdit: () -> Void
 
+    /// The rest day, observed. The logic reads the same key through
+    /// `WeekPreferences`; the row reads it *here* so the dependency is one
+    /// SwiftUI can see. It is not enough for the property to exist — a row
+    /// whose slots did not change was measured keeping the cut line on the
+    /// old day until relaunch — the value has to be read in `body`, which
+    /// `restDayCut` does.
+    @AppStorage(WeekPreferences.restDayKey, store: GlowSettings.store)
+    private var restDayStorage: Int = 0
+
     private var slots: [Slot] {
         WeekGrid.slots(for: snapshot, in: week, today: today)
     }
@@ -103,9 +112,44 @@ struct HabitRowView: View {
             }
         }
         .frame(height: max(slotHeight, GridMetrics.minimumRowHeight))
+        .background(alignment: .leading) { restDayCut }
         .onAppear { lit = isDue ? 1 : 0 }
         .onChange(of: isDue) { _, due in
             withAnimation(SlotView.close) { lit = due ? 1 : 0 }
+        }
+    }
+
+    /// The rest day cuts the week: one vertical line at that weekday's
+    /// x-position, drawn by every row — blank rows included — at the same x
+    /// and running edge to edge of the row's height, so the segments meet
+    /// across rows and the grid reads as stopped there rather than as seven
+    /// rows each carrying its own mark.
+    ///
+    /// Behind the marks, not over them: a span crossing the rest day is a
+    /// record, and the line marks the day, not the record.
+    @ViewBuilder
+    private var restDayCut: some View {
+        // `restDayStorage`, not `WeekPreferences.restDay`: the raw value is
+        // what this view observes, and reading it here is what makes every
+        // row — including one whose slots are unchanged — redraw the line on
+        // the new day the moment Settings moves it.
+        if restDayStorage != 0,
+           let restIndex = week.days.firstIndex(where: { WeekPreferences.isRestDay($0) }) {
+            let slotWidth = SlotLayout.slotWidth(trackWidth: geometry.trackWidth, slotCount: 7)
+            let gap = SlotLayout.gap(trackWidth: geometry.trackWidth)
+            let x = geometry.labelWidth + geometry.labelGap
+                + CGFloat(restIndex) * (slotWidth + gap) + slotWidth / 2
+            Rectangle()
+                .fill(GlowPalette.restCut)
+                .frame(
+                    // The missed cross's stroke, turned vertical.
+                    width: max(1, slotHeight * GlowShape.missedThickness),
+                    // Past the row's own height by the list inset above and
+                    // below, so adjacent rows' segments touch.
+                    height: max(slotHeight, GridMetrics.minimumRowHeight) + 2 * geometry.rowInset
+                )
+                .offset(x: x)
+                .accessibilityHidden(true)
         }
     }
 
