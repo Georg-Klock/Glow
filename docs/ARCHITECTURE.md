@@ -33,6 +33,12 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
 - `DeepLink` is the widget-to-screen mapping: each widget's inert surface
   carries one URL, and the app lands on that widget's own screen. Unknown
   URLs map to nil and change nothing.
+- `MonthGrid.cells(for:today:)` is the month widget's grid: a weekly-cadence
+  habit's calendar month as marks on weekday columns. It does not re-decide
+  anything — a daily habit's weeks are handed to `WeekGrid.slots` and read
+  off day by day, and whether today is open or undoable is the week row's
+  own verdict, asked rather than derived — so a change to the week's rules
+  reaches the month without a second edit.
 - `DayRing.arcs(target:done:gap:)` is the Today ring: one arc per repetition
   as trim fractions of a circle, the first `done` of them quiet. The ring
   starts full and glowing and closes clockwise from the top — the inverse of

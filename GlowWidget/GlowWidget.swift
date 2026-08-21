@@ -171,5 +171,6 @@ struct GlowWidgetBundle: WidgetBundle {
         GlowWidget()
         TodaySmallWidget()
         TodayMediumWidget()
+        MonthWidget()
     }
 }
