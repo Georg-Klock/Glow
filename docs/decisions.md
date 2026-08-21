@@ -75,6 +75,29 @@ The implementation makes this automatic rather than a rule to enforce: slot
 state is computed from the completions falling inside the displayed week, so
 last week's are not consulted at all. `WeekGridTests` covers it.
 
+## One editor, and the kind decides the screen
+
+**Question.** Both screens create habits now. Does the editor differ by the
+screen that opened it?
+
+**Decision** (2026-08-21). There is **one** editor, `HabitEditorView`, and a
+habit's *kind* decides which screen it lives on — never the screen it was made
+on. `Habit.countedPerDay` and `countedPerWeek` sort every habit by its
+frequency, so switching an existing habit from Per Day to Per Week moves it
+from Today to This Week, carrying the days it has already been logged on.
+Verified by doing it.
+
+The one thing that varies by entry point is **which side the toggle starts on
+for a new habit**: Today opens on Per Day, This Week on Per Week. That is a
+default, not a second editor. The alternative — always starting on Per Week —
+is more obviously neutral, and was rejected because adding from Today would
+then default to making something that appears on the other screen, which is a
+worse first tap than a pre-selected segment the user can see and change.
+
+Worth knowing when reading the code: nothing about the editor is per-screen
+except that one parameter. If a second thing ever becomes per-screen, this
+decision is the one being reopened.
+
 ## Seeded history: a Settings toggle
 
 **Question.** A fresh install seeded ten weeks of invented completions so the

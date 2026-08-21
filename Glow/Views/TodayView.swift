@@ -18,9 +18,22 @@ struct TodayView: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
+    /// Owned here and handed *down*, rather than read from the environment.
+    ///
+    /// `@Environment(\.editMode)` read at this level is always inactive: the
+    /// `EditButton` lives in the toolbar of the `NavigationStack` inside this
+    /// body, so the value it toggles belongs to that container's environment,
+    /// below where this struct reads. The button animated to Done while every
+    /// tap still counted a repetition. Owning the state and injecting it puts
+    /// the button and the rings on the same value.
+    @State private var editMode: EditMode = .inactive
+
     @State private var today = WeekCalendar.day(Date())
+    @State private var isAddingHabit = false
+    @State private var editingHabit: Habit?
 
     private var store: HabitStore { HabitStore(context: context) }
+    private var isEditing: Bool { editMode.isEditing }
 
     /// Three rings to a row, like the medium widget. Sized so a full row sits
     /// inside an iPhone's width with the margins the widget would have.
@@ -33,22 +46,58 @@ struct TodayView: View {
         NavigationStack {
             Group {
                 if habits.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Habits", systemImage: "circle.dotted")
-                    } description: {
-                        Text("A habit done several times a day shows up here as a ring.")
-                    }
+                    emptyState
                 } else {
                     rings
                 }
             }
             .navigationTitle(title)
+            // The same title treatment and the same trailing pair as This
+            // Week, so the two tabs wear one piece of chrome rather than two
+            // that resemble each other.
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    if !habits.isEmpty {
+                        EditButton()
+                    }
+                    // A plain button, not This Week's menu: a blank row holds a
+                    // position in the week grid, and there is no grid here to
+                    // hold a position in.
+                    Button("New Habit", systemImage: "plus") {
+                        isAddingHabit = true
+                    }
+                }
+            }
+            .environment(\.editMode, $editMode)
+        }
+        .sheet(isPresented: $isAddingHabit) {
+            // Opened on the per-day kind, so adding from Today makes something
+            // that appears on Today. The editor is the same one This Week
+            // opens; only the kind it starts on differs.
+            HabitEditorView(habit: nil, newHabitKind: .day)
+        }
+        .sheet(item: $editingHabit) { habit in
+            HabitEditorView(habit: habit)
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
             today = WeekCalendar.day(Date())
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { today = WeekCalendar.day(Date()) }
+        }
+    }
+
+    /// The system's empty state, with the way out of it — the same shape This
+    /// Week uses, so an empty Today is not a dead end.
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label("No Habits", systemImage: "circle.dotted")
+        } description: {
+            Text("A habit done several times a day shows up here as a ring.")
+        } actions: {
+            Button("Add Habit") { isAddingHabit = true }
+                .buttonStyle(.borderedProminent)
         }
     }
 
@@ -81,8 +130,16 @@ struct TodayView: View {
         let done = habit.snapshot().count(on: today)
         let isOpen = done < target
 
+        // Editing changes what the ring is for rather than adding a second
+        // control beside it: out of edit mode a tap counts, in edit mode it
+        // opens the habit. Deleting already lives in that editor, so nothing
+        // here has to invent a delete affordance of its own.
         return Button {
-            tap(habit, done: done, target: target)
+            if isEditing {
+                editingHabit = habit
+            } else {
+                tap(habit, done: done, target: target)
+            }
         } label: {
             VStack(spacing: 10) {
                 ZStack {
@@ -108,7 +165,9 @@ struct TodayView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(habit.name)
         .accessibilityValue("\(done) of \(target) done today")
-        .accessibilityHint(isOpen ? "Adds one" : "Starts the day over")
+        .accessibilityHint(
+            isEditing ? "Edit this habit" : (isOpen ? "Adds one" : "Starts the day over")
+        )
     }
 
     /// A tap is one more; a tap on a full ring starts the day over. The rule
