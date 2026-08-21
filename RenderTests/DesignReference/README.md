@@ -1,23 +1,54 @@
-# The design export the render diff is waiting for
+# The design export the render diff compares against
 
 `WidgetRenderDiffTests` renders the real `WeekWidgetView` at the design frame's
-own 338 × 354 and diffs it against a flat export of the frame. The render half
-runs tonight and always; the diff half waits for one file that only the design
-file's owner can mint:
+own 338 × 354 and diffs it against the flat export committed here.
 
-- **Node:** `83:1676` — the large-widget frame `docs/widget-large-spec.md` is
-  measured from. It depicts the Tuesday of §14, which is exactly the fixture
-  the harness renders.
-- **Export:** PNG at **2x**, giving **676 × 708** pixels.
-- **Filename:** `widget-large-338x354@2x.png`, committed in this directory.
+- **Source:** Figma file `0m9qFcvvUrIgLmqIxE0jtj` ("Glow Up"), page **05 Widgets**.
+- **Node:** `83:1486` — "Widget — Large", authored at **2x**, 676 × 708. The same
+  frame exists at 1x as `58:52`.
+- **Filename:** `widget-large-338x354@2x.png` (committed).
 
-Once the file is here, `Tools/test.sh` starts printing a report on every run:
-how many pixels disagree beyond a small tolerance, and which grid rows carry
-the disagreement, plus a difference map written to the test's temporary
-directory.
+**The node id in `docs/widget-large-spec.md` is stale.** That file measures
+`83:1676`, which resolves to nothing in the current document; the frame it
+describes is the one above. The measurements still hold — only the id moved.
 
-Two disagreements are expected and documented rather than bugs: every glow is
-HDR against the file's clipped 255 white, and the container's Figma `GLASS`
-effect is not reproduced (docs/design-system.md, "Not in the file"). The
-harness deliberately has no pass/fail threshold — it reports, and deciding
-what a disagreement means is a person's job.
+**Which weekday this frame is.** It is the **Friday** frame (issue #4's
+`83:1485` composite): today is F, and Early night's open span runs Mon–Fri.
+That is the frame whose span *follows* `WeekSpans`' rule, so the diff below is
+not contaminated by the one row where the file disagrees with itself.
+
+## What the first run reported
+
+```
+render-diff: 402296/478608 pixels differ (84.06%) beyond ±8
+```
+
+**That number is expected, and it is the harness working.** It is dominated by
+two departures the code has already made deliberately and documented:
+
+1. **The container.** The file draws a near-black gradient (~`#08080D` at the
+   corners); the app draws pure black. The gradient was followed for a while and
+   removed because on a real home screen it read as a panel sitting on the
+   wallpaper rather than marks floating on it (see `GlowWidget.swift`). Every
+   background pixel therefore differs by ~13, just over the ±8 tolerance — which
+   alone accounts for most of the 84%.
+2. **The mark vocabulary.** The file draws a 17.5pt dark disc for an upcoming
+   day and a ~7pt dot for a completion; the app draws a 3pt dot and a 2pt line,
+   absolute rather than proportional, so that "a dot for one day does not grow
+   because the grid got wider" (`GlowShape`). The upcoming *span* is a full-height
+   lozenge in the file and a thin line in the app.
+
+Neither is a regression, and the harness deliberately has **no pass/fail
+threshold** — a gate here would either fail forever or hide behind a number
+nobody derived. What the harness is for is catching the *third* kind of
+difference: the one nobody meant. Read the band report and the difference map,
+not the percentage.
+
+A third, smaller departure is visible and also known: the file's `GLASS` effect
+on the container is not reproduced, because SwiftUI has no equivalent.
+
+## Re-exporting
+
+Via the Figma MCP: `get_screenshot` with `fileKey 0m9qFcvvUrIgLmqIxE0jtj`,
+`nodeId 83:1486`, `maxDimension 708`. Save over the file above at exactly
+676 × 708 — the test asserts the dimensions match the render.
