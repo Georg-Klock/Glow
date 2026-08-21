@@ -42,14 +42,14 @@ struct WeekWidgetView: View {
             GeometryReader { proxy in
                 let track = max(0, proxy.size.width - labelWidth - labelGap)
                 let side = SlotLayout.slotHeight(trackWidth: track)
-                // As many as fit. Reserve a row for the overflow line when
-                // there is one, or "+3 more" pushes the last habit off the
-                // bottom edge it was counted into.
+                // As many as fit, then a hard cut. A row spent saying how much
+                // is missing is a row not showing a habit (docs/vision.md).
+                // The app marks the boundary in its own grid, which is where
+                // there is room to say it.
                 let capacity = WidgetMetrics.rowCapacity(
                     height: proxy.size.height, slot: side, hasHeader: showsHeader
                 )
-                let overflows = entry.habits.count > capacity
-                let shown = Array(entry.habits.prefix(overflows ? capacity - 1 : capacity))
+                let shown = Array(entry.habits.prefix(capacity))
 
                 VStack(alignment: .leading, spacing: WidgetMetrics.rowGap) {
                     if showsHeader {
@@ -76,11 +76,6 @@ struct WeekWidgetView: View {
                             showsLabel: showsLabels,
                             burst: entry.burstHabit == habit.id ? entry.coverage : nil
                         )
-                    }
-                    if overflows {
-                        Text("+\(entry.habits.count - shown.count) more")
-                            .font(.system(size: WidgetMetrics.textSize))
-                            .foregroundStyle(GlowPalette.headerRest)
                     }
                     Spacer(minLength: 0)
                 }
