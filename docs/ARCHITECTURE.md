@@ -200,6 +200,22 @@ with the Apple ID would remove that dependency and let automatic signing work.
 Verify the whole chain with `Tools/check-app-group.sh`, which reports which
 profiles grant the group and whether the last device build actually carries it.
 
+## TestFlight
+
+`Tools/ship-testflight.sh` archives, signs for the App Store and uploads. It
+does not use the manual development profiles above: distribution signing is
+cloud-managed through an App Store Connect API key, which is what lets a build
+ship without an Apple ID in Xcode. The key's `.p8` lives in
+`~/.appstoreconnect/private_keys/`, and its identifiers in the gitignored
+`Tools/local.env` (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `TEAM_ID`) — the script says
+so and stops when either is missing.
+
+The build number is stamped from the UTC clock at upload (`YYYYMMDDHHmm`), so
+every upload is unique without a commit per upload; `MARKETING_VERSION` stays
+where `project.yml` puts it and stays Georg's call. The first upload verified
+the App Groups entitlement survives distribution signing in both the app and
+the widget — checked in the exported IPA, not assumed from the archive.
+
 ## The widgets
 
 The week widget: small, medium and large, reading the same store through the

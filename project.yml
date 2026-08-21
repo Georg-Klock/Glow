@@ -54,6 +54,10 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: com.georgklock.glow
             CFBundleURLSchemes: [glow]
+        # The app has no networking, so no non-exempt encryption. Declared
+        # here so TestFlight never parks a build on "Missing Compliance"
+        # waiting for the same click every upload.
+        ITSAppUsesNonExemptEncryption: false
     dependencies:
       - target: GlowWidget
         embed: true
