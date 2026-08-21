@@ -85,6 +85,12 @@ each one, and since slot *height* is derived from track *width*, that is
 circular. Passing one value down also guarantees the header and the rows divide
 the screen identically, which is the one thing the whole screen is for.
 
+`RowGeometry` is also where This Week becomes the widget: every measurement is
+a `WidgetMetrics` number times one factor, the screen's width over the
+widget's 338pt, so the screen is the large widget scaled up rather than a
+second layout kept in step with it by hand. The deliberate departures are on
+the type.
+
 `RowGeometry` is where the label column's response to Dynamic Type lives. It
 scales with the user's text size and is then clamped to 42% of the screen, so a
 large accessibility size cannot shrink the track until a week stops looking like

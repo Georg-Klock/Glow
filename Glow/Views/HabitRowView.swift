@@ -1,37 +1,67 @@
 import SwiftUI
 
-/// How the screen is divided horizontally.
+/// How the screen is divided and sized: the large widget, scaled to the screen.
+///
+/// Tapping the widget is meant to land on a bigger version of the same thing,
+/// so every measurement here is a `WidgetMetrics` number times one factor —
+/// the screen's width over the widget's 338pt. The widget's spec is measured
+/// from the design file; the screen has no frame of its own, so it borrows
+/// that truth rather than keeping a second set of guesses beside it.
 ///
 /// Computed once per layout and passed to the header and every row, so they
-/// cannot disagree. If they did, the columns would stop lining up, which is the
-/// one thing the whole screen is for.
+/// cannot disagree. If they did, the columns would stop lining up, which is
+/// the one thing the whole screen is for.
+///
+/// Three deliberate departures, each a considered use of room the widget does
+/// not have: text and the label column still grow with Dynamic Type (clamped
+/// so the track never stops being a week), rows never shrink below a tappable
+/// height, and the header carries dates under its letters.
 struct RowGeometry: Equatable {
+    /// The screen's width over the large widget's own.
+    let scale: CGFloat
     let labelWidth: CGFloat
     let trackWidth: CGFloat
+    /// The widget's 12pt, scaled to the screen and then by the user's type
+    /// size.
+    let textSize: CGFloat
+
+    var horizontalPadding: CGFloat { WidgetMetrics.padLeading * scale }
+    var labelGap: CGFloat { WidgetMetrics.labelGap * scale }
+    /// Half the widget's row gap, applied above and below each list row.
+    var rowInset: CGFloat { WidgetMetrics.rowGap * scale / 2 }
+    var iconSize: CGFloat { WidgetMetrics.iconSize / WidgetMetrics.textSize * textSize }
+    var iconWidth: CGFloat { WidgetMetrics.iconWidth * scale }
+    var iconGap: CGFloat { WidgetMetrics.iconGap * scale }
+    /// How far a name may run before truncating: into the gap, never into the
+    /// track. The widget's rule, at the screen's scale.
+    var nameMaxWidth: CGFloat { labelWidth + labelGap - iconWidth - iconGap }
 
     init(totalWidth: CGFloat) {
+        let scale = max(1, totalWidth / WidgetMetrics.largeWidth)
+        self.scale = scale
+
         // The label column grows with the user's text size, but never past a
         // point where the track it is stealing from stops being a week.
-        let scaled = UIFontMetrics(forTextStyle: .subheadline)
-            .scaledValue(for: GridMetrics.baseLabelWidth)
-        labelWidth = min(scaled, max(0, totalWidth * 0.42))
+        let scaledLabel = UIFontMetrics(forTextStyle: .subheadline)
+            .scaledValue(for: WidgetMetrics.labelWidth * scale)
+        labelWidth = min(scaledLabel, max(0, totalWidth * 0.42))
+
+        textSize = UIFontMetrics(forTextStyle: .subheadline)
+            .scaledValue(for: WidgetMetrics.textSize * scale)
 
         let available = totalWidth
-            - GridMetrics.horizontalPadding * 2
+            - WidgetMetrics.padLeading * scale * 2
             - labelWidth
-            - GridMetrics.labelSpacing
+            - WidgetMetrics.labelGap * scale
         trackWidth = max(0, available)
     }
 }
 
 enum GridMetrics {
-    /// Wide enough for the longest seeded name at the body size. "Touch Grass"
-    /// and "Watch Sunset" both truncated at 116, and a habit tracker whose first
-    /// screen shows "Watch S..." has failed at the one thing it does.
-    static let baseLabelWidth: CGFloat = 140
-    static let labelSpacing: CGFloat = 10
+    /// Chrome that exists only in the app — the Low Power banner and the empty
+    /// state — and so has no widget number to scale from.
     static let horizontalPadding: CGFloat = 20
-    static let rowSpacing: CGFloat = 16
+    /// A floor the widget does not need: its rows are read, these are tapped.
     static let minimumRowHeight: CGFloat = 34
 }
 
@@ -60,7 +90,7 @@ struct HabitRowView: View {
     }
 
     var body: some View {
-        HStack(spacing: GridMetrics.labelSpacing) {
+        HStack(spacing: geometry.labelGap) {
             if snapshot.isSpacer {
                 // Nothing to draw, but the row still has to exist: it is holding
                 // a position in the order, and it needs its height to be
@@ -128,17 +158,20 @@ struct HabitRowView: View {
     @State private var lit: Double = 1
 
     private var label: some View {
-        let text = HStack(spacing: 8) {
-            HabitIconView(icon: snapshot.icon)
+        let text = HStack(spacing: geometry.iconGap) {
+            HabitIconView(icon: snapshot.icon, size: geometry.iconSize)
+                .frame(width: geometry.iconWidth)
+            // Never shrunk — the widget's rule, adopted. A long name runs on
+            // into the gap before the track and truncates only where the grid
+            // begins; text that quietly becomes smaller text is worse than
+            // text that uses the space beside it.
             Text(snapshot.name)
                 .lineLimit(1)
-                // Shrink before truncating. A width picked for the longest
-                // seeded name is a guess that a longer name, a larger Dynamic
-                // Type setting or another language will beat.
-                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(maxWidth: geometry.nameMaxWidth, alignment: .leading)
             Spacer(minLength: 0)
         }
-        .font(.subheadline)
+        .font(.system(size: geometry.textSize))
 
         // The lit label sits over the resting one and its opacity is what
         // moves, rather than the two swapping — a swap is instant, and this has
@@ -152,6 +185,9 @@ struct HabitRowView: View {
             text.glowing(halo: GlowPalette.labelHalo).opacity(lit)
         }
         .frame(width: geometry.labelWidth, alignment: .leading)
+        // No clipping: the overflow is the point. The frame reserves the
+        // column so the track still starts where the geometry says it does.
+        .fixedSize(horizontal: true, vertical: false)
         // The whole label column is the edit target, not just the text. Editing
         // used to live only behind a leftward swipe, which is discoverable if
         // you already know it is there and invisible if you do not.

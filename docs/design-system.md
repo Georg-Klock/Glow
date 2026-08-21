@@ -60,11 +60,14 @@ letter. Those are distinguished by white plus a glow, never by weight.
 | --- | --- | --- | --- |
 | Habit name (widget) | 24px | **12pt** | Regular |
 | Weekday letter (widget) | 24px | **12pt** | Regular |
-| Habit name (app) | — | 15pt (`.subheadline`) | Regular |
-| Weekday letter (app) | — | 12pt (`.caption`) | Regular |
+| Habit name (app) | — | 12pt × screen scale | Regular |
+| Weekday letter (app) | — | 12pt × screen scale | Regular |
 
-The app has no frame in this design, so its two sizes are the phone-appropriate
-step up and are not from the file.
+The app has no frame in this design, so This Week is the large widget scaled
+to the screen: every size on it is the widget's number times one factor, the
+screen's width over the widget's 338pt (`RowGeometry`). On a 402pt phone that
+lands the text at ~14pt. Dynamic Type still applies on top, and the header's
+date line steps down 2pt from its letter.
 
 Keeping the weight fixed has a second benefit: completing a habit does not
 reflow its row.
