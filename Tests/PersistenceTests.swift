@@ -42,10 +42,10 @@ struct PersistenceTests {
         let store = makeStore(context)
         let habit = try store.addHabit(name: "Walk", icon: "🚶", frequency: .daily)
 
-        #expect(try store.toggleCompletion(for: habit, on: today) == true)
+        #expect(try store.toggleCompletion(for: habit, on: today) == .completed)
         #expect(try context.fetch(FetchDescriptor<Completion>()).count == 1)
 
-        #expect(try store.toggleCompletion(for: habit, on: today) == false)
+        #expect(try store.toggleCompletion(for: habit, on: today) == .uncompleted)
         #expect(try context.fetch(FetchDescriptor<Completion>()).isEmpty)
         #expect(habit.completedDays.isEmpty)
     }

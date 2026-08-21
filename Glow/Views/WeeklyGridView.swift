@@ -249,11 +249,16 @@ struct WeeklyGridView: View {
 
     private func toggle(_ habit: Habit, on day: Date) {
         do {
-            let isNowComplete = try store.toggleCompletion(for: habit, on: day)
-            if isNowComplete {
+            switch try store.toggleCompletion(for: habit, on: day) {
+            case .completed:
                 Haptics.completed()
-            } else {
+            case .uncompleted:
                 Haptics.uncompleted()
+            case .refused:
+                // The grid never hands out a rest-day tap, so this cannot be
+                // reached from here — but the store's answer is the truth, and
+                // nothing changed, so nothing haptic and nothing to reload.
+                return
             }
             // The widget reads the same store but is not told when it changes.
             WidgetCenter.shared.reloadAllTimelines()

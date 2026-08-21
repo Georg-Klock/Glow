@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import Glow
 
@@ -103,10 +104,10 @@ struct WeekPreferencesTests {
         }
     }
 
-    @Test("A completion on a rest day still counts and still shows")
+    @Test("A completion already stored on a rest day still counts and still shows")
     func restDayCompletionsCount() {
-        // Resting is permission, not a prohibition. Someone who goes for a run
-        // on their rest day should see it.
+        // A record of what happened stays a record of what happened. Only new
+        // writes are refused; nothing already on the books is hidden or lost.
         let calendar = TestCalendar.monday
         let today = TestCalendar.date(2026, 8, 19)
         let week = WeekCalendar.week(containing: today, calendar: calendar)
@@ -117,6 +118,104 @@ struct WeekPreferencesTests {
             let row = WeekGrid.slots(for: habit, in: week, today: today, calendar: calendar)
             #expect(row[0].state == .filled)
             #expect(row[0].mark == .donePast)
+        }
+    }
+
+    @Test("A rest-day today opens nothing on a frequency row")
+    func restDayStopsFrequencyRow() {
+        let calendar = TestCalendar.monday
+        let today = TestCalendar.date(2026, 8, 19)
+        let week = WeekCalendar.week(containing: today, calendar: calendar)
+
+        withPreferences(restDay: calendar.component(.weekday, from: today)) {
+            // The goal is nowhere near met, and still nothing is open: the
+            // pill that would be waits, unlit, for a day that allows it.
+            let habit = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
+            let row = WeekGrid.slots(for: habit, in: week, today: today, calendar: calendar)
+            #expect(!row.contains { $0.state == .open })
+            #expect(row.allSatisfy { !$0.isTappable })
+        }
+    }
+
+    @Test("A rest-day today withholds the undo too")
+    func restDayWithholdsUndo() {
+        let calendar = TestCalendar.monday
+        let today = TestCalendar.date(2026, 8, 19)
+        let week = WeekCalendar.week(containing: today, calendar: calendar)
+
+        withPreferences(restDay: calendar.component(.weekday, from: today)) {
+            // Today already holds a completion — stored before the rest day
+            // was set. It still draws filled, and it cannot be un-logged.
+            let habit = HabitSnapshot.fixture(
+                frequency: .timesPerWeek(3), completedDays: [today]
+            )
+            let row = WeekGrid.slots(for: habit, in: week, today: today, calendar: calendar)
+            #expect(row.contains { $0.state == .filled })
+            #expect(row.allSatisfy { !$0.isTappable })
+        }
+    }
+
+    @Test("A rest-day today stops the spans as well")
+    func restDayStopsSpans() {
+        let calendar = TestCalendar.monday
+        let today = TestCalendar.date(2026, 8, 19)
+        let week = WeekCalendar.week(containing: today, calendar: calendar)
+
+        withPreferences(restDay: calendar.component(.weekday, from: today)) {
+            let habit = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
+            let spans = WeekSpans.spans(
+                for: habit, in: week, today: today, target: 3, calendar: calendar
+            )
+            // The geometry holds — still three spans dividing the week — but
+            // nothing is open and nothing takes a tap.
+            #expect(spans.count == 3)
+            #expect(!spans.contains { $0.state == .open })
+            #expect(spans.allSatisfy { !$0.isTappable })
+
+            // The met goal's whole-week span loses its undo the same way.
+            let met = HabitSnapshot.fixture(
+                frequency: .timesPerWeek(1), completedDays: [today]
+            )
+            let metSpans = WeekSpans.spans(
+                for: met, in: week, today: today, target: 1, calendar: calendar
+            )
+            #expect(metSpans.allSatisfy { !$0.isTappable })
+        }
+    }
+
+    @Test("The store refuses a rest-day write in both directions")
+    @MainActor
+    func restDayRefusesWrites() throws {
+        let calendar = TestCalendar.monday
+        let today = TestCalendar.date(2026, 8, 19)
+
+        try withPreferences(restDay: calendar.component(.weekday, from: today)) {
+            let container = try ModelContainer(
+                for: Habit.self, Completion.self,
+                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+            )
+            let context = ModelContext(container)
+            let store = HabitStore(context: context, calendar: calendar)
+            let habit = try store.addHabit(name: "Run", icon: "🏃", frequency: .daily)
+
+            // This is the write path `ToggleHabitIntent` calls, so the widget
+            // process is refused here too — a stale widget can still offer the
+            // button, and the store rather than the surface is what says no.
+            #expect(try store.toggleCompletion(for: habit, on: today) == .refused)
+            #expect(try context.fetch(FetchDescriptor<Completion>()).isEmpty)
+
+            // A completion already stored on the rest day cannot be un-logged
+            // on it either: refused, and the record stays.
+            let stored = Completion(day: today, habit: habit)
+            context.insert(stored)
+            habit.completions?.append(stored)
+            try context.save()
+            #expect(try store.toggleCompletion(for: habit, on: today) == .refused)
+            #expect(try context.fetch(FetchDescriptor<Completion>()).count == 1)
+
+            // The day beside it writes as ever.
+            let thursday = TestCalendar.date(2026, 8, 20)
+            #expect(try store.toggleCompletion(for: habit, on: thursday) == .completed)
         }
     }
 }

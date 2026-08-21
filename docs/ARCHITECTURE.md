@@ -72,6 +72,11 @@ it: the grid uses `@Query`, so SwiftData drives updates.
 `toggleCompletion(for:on:)` normalizes the day itself, which is what makes R3
 and R4 hold no matter who calls it. Tapping twice quickly cannot create a
 duplicate, because the second call finds the first completion and removes it.
+It returns a `ToggleOutcome` rather than a Bool, because a third thing can
+happen: a write landing on the rest day is `.refused` — nothing logged, nothing
+removed. The refusal lives here, on the one write path the app and the widget's
+intent share, rather than in trust that no surface offered a button; the grid
+withholding the rest-day tap is the same rule at the surface.
 
 `recordTap(for:on:)` is the per-day counterpart: it asks `DayRing.countAfterTap`
 what the tap means and translates the answer into rows — one more `Completion`,
