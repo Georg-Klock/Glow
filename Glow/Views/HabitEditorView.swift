@@ -227,7 +227,12 @@ struct HabitEditorView: View {
         }
         name = habit.name
         icon = habit.icon
-        timesPerWeek = habit.frequency.slotCount
+        // A per-day habit has no weekly count to load, so the stepper keeps the
+        // value it opened with. The editor cannot make one yet — that arrives
+        // with the Today screen — but it must not invent a week for one either.
+        if let weekly = habit.frequency.slotCount {
+            timesPerWeek = weekly
+        }
     }
 
     private func delete() {

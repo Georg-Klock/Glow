@@ -53,6 +53,9 @@ enum WeekSpans {
         calendar: Calendar = WeekCalendar.calendar
     ) -> [SlotSpan] {
         guard !habit.isSpacer else { return [] }
+        // A per-day habit is not spread across a week, so there is nothing here
+        // to divide. Same backstop as in `WeekGrid.slots`.
+        guard !habit.frequency.isCountedPerDay else { return [] }
         let todayStart = WeekCalendar.day(today, calendar: calendar)
         let dayCount = week.days.count
         guard target > 0, dayCount == 7 else { return [] }

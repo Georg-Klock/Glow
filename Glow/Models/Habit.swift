@@ -19,6 +19,15 @@ final class Habit {
     var isDaily: Bool = true
     /// Only meaningful when `isDaily` is false.
     var timesPerWeek: Int = 3
+    /// How many times a day, or **zero for a habit counted across a week**.
+    ///
+    /// A sentinel rather than a third discriminator column beside `isDaily`,
+    /// because two columns that both claim to say which kind a habit is can
+    /// disagree, and then something has to decide which one wins. Zero is safe
+    /// by construction: `Frequency(timesPerDay:)` clamps into 1...12, so no real
+    /// per-day habit can store it, and every row written before this existed
+    /// reads back as exactly what it was.
+    var timesPerDay: Int = 0
     /// Retained so the stored schema does not change. The app committed to a
     /// single colour, so nothing reads this; dropping the column would be a
     /// migration for no gain.
@@ -63,18 +72,51 @@ final class Habit {
     }
 
     var frequency: Frequency {
-        get { isDaily ? .daily : Frequency(timesPerWeek: timesPerWeek) }
+        get {
+            if timesPerDay > 0 { return .timesPerDay(timesPerDay) }
+            return isDaily ? .daily : Frequency(timesPerWeek: timesPerWeek)
+        }
         set {
             switch newValue {
             case .daily:
+                timesPerDay = 0
                 isDaily = true
             case .timesPerWeek(let count):
+                timesPerDay = 0
                 isDaily = false
                 timesPerWeek = count
+            case .timesPerDay(let count):
+                // The weekly columns are left as they were on purpose: a habit
+                // switched to per-day and back should come out of it with the
+                // cadence it went in with.
+                timesPerDay = count
             }
         }
     }
 
+    /// Counted within a day rather than across a week.
+    var isCountedPerDay: Bool { timesPerDay > 0 }
+
+    /// What the week-shaped surfaces fetch: the weekly cadences, plus the blank
+    /// rows that hold their positions. One definition rather than the same
+    /// clause written into the grid, the year view and the widget separately,
+    /// where the three could drift and only two would be noticed.
+    static let countedPerWeek = #Predicate<Habit> { $0.timesPerDay == 0 }
+
+    /// How many completions fall on each day that has any.
+    ///
+    /// A weekly-cadence habit only ever reaches one per day. A per-day habit is
+    /// the reason this is a count and not a set — and the reason a repetition is
+    /// stored as its own row rather than as a number on a single row. Rows merge
+    /// when two devices sync; a counter is last-writer-wins, so two glasses of
+    /// water logged on two devices would come back as one.
+    var completionCounts: [Date: Int] {
+        (completions ?? []).reduce(into: [:]) { counts, completion in
+            counts[completion.day, default: 0] += 1
+        }
+    }
+
+    /// Every day with at least one completion.
     var completedDays: Set<Date> {
         Set((completions ?? []).map(\.day))
     }
@@ -85,7 +127,7 @@ final class Habit {
             name: name,
             icon: icon,
             frequency: frequency,
-            completedDays: completedDays,
+            completionCounts: completionCounts,
             isSpacer: isSpacer
         )
     }
