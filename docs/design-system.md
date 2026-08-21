@@ -86,6 +86,20 @@ reflow its row.
 Everything scales from the slot, so one track measurement drives the whole grid
 and the app and the widget cannot disagree about column positions.
 
+### The Today ring
+
+The design file has no frame for this screen, so the ring borrows the grid's
+own ratios rather than inventing new ones — each is an assumption to revisit if
+a frame arrives:
+
+| Element | Value | Source |
+| --- | --- | --- |
+| Ring diameter (app) | 92pt | chosen: three across an iPhone with margins |
+| Arc stroke | 0.086 × diameter | the slot ring's stroke ratio |
+| Gap between arcs | 2 strokes of trim, centreline | caps eat one, one is clear space |
+| Halo | 0.286 × diameter @ 50%, offset pair | the slot ring's halo, scaled |
+| Quiet (done) arc | `labelResting` | "a habit already handled today" |
+
 ## Effects
 
 A CSS blur is roughly twice a SwiftUI shadow radius, so the code carries half

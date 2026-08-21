@@ -103,6 +103,11 @@ final class Habit {
     /// where the three could drift and only two would be noticed.
     static let countedPerWeek = #Predicate<Habit> { $0.timesPerDay == 0 }
 
+    /// What Today fetches: the several-times-a-day habits, and nothing else.
+    /// The complement of `countedPerWeek` — a spacer holds a position in the
+    /// week grid, so it belongs to that side and never appears here.
+    static let countedPerDay = #Predicate<Habit> { $0.timesPerDay > 0 }
+
     /// How many completions fall on each day that has any.
     ///
     /// A weekly-cadence habit only ever reaches one per day. A per-day habit is
