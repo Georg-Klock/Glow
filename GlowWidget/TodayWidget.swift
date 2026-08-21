@@ -29,6 +29,9 @@ struct TodaySmallWidget: Widget {
                 // with `containerBackground`, left removable, black only under
                 // the Default appearance. See GlowWidget.swift.
                 .containerBackground(GlowPalette.widgetBackground, for: .widget)
+                // The ring acts in place through its intent; everything else
+                // opens the app on Today.
+                .widgetURL(DeepLink.today)
         }
         .contentMarginsDisabled()
         .configurationDisplayName("Glow Up: Today")
@@ -44,6 +47,7 @@ struct TodayMediumWidget: Widget {
         StaticConfiguration(kind: kind, provider: TodayMediumProvider()) { entry in
             TodayMediumView(entry: entry)
                 .containerBackground(GlowPalette.widgetBackground, for: .widget)
+                .widgetURL(DeepLink.today)
         }
         .contentMarginsDisabled()
         .configurationDisplayName("Glow Up: Today")

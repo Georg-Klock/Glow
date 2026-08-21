@@ -30,6 +30,9 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
   degenerate one. A habit is counted across a week or within a day, never
   both; `slotCount` is nil for the per-day kind, so anything week-shaped has
   to say what it means when there is no week.
+- `DeepLink` is the widget-to-screen mapping: each widget's inert surface
+  carries one URL, and the app lands on that widget's own screen. Unknown
+  URLs map to nil and change nothing.
 - `DayRing.arcs(target:done:gap:)` is the Today ring: one arc per repetition
   as trim fractions of a circle, the first `done` of them quiet. The ring
   starts full and glowing and closes clockwise from the top — the inverse of
