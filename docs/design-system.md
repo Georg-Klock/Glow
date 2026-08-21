@@ -195,6 +195,17 @@ one swipe action. That is deliberate: those screens are built from `List`,
 `Form` and `ContentUnavailableView`, and a system control tinted with a custom
 grey stops looking like the system.
 
+**Two greys is the settled answer, not a pending cleanup** (#7,
+[decisions.md](decisions.md)). The grid is the design file's surface and takes
+the file's grey; the system screens are the system's surface and take the
+system's. Unifying the tokens would make one of the two wrong on purpose:
+`labelResting` in a `Form` stops looking systemic, and `.secondary` in the grid
+answers to the platform's appearance instead of the file. The border between
+the two is the border between "designed here" and "designed by Apple", which is
+a real line in this app and worth keeping visible. Same for type: the grid's
+sizes are the file's 12pt scaled (`RowGeometry`, #32), and the system screens
+keep the system's text styles for the same reason they keep its greys.
+
 `warning` is the single exception to the two-colour rule and is used for exactly
 one thing: saying that the glow is unavailable in Low Power Mode. A warning
 rendered in the app's own white would be indistinguishable from the thing it is
@@ -204,12 +215,12 @@ warning about.
 
 Now that it is all in one place:
 
-- `.secondary` and `labelResting` are two greys doing one job in different
-  places. They could be the same token — `.secondary` only appears on screens
-  built from system controls, where a custom grey stops them looking systemic.
 - `headerRest` and `labelResting` are now the same value and could be one name.
 - `haloRadius` and `ringHaloRadius` differ only because the file draws the ring's
   halo softer. If the ring is going to keep its offset pair anyway, one radius
   would do.
-- The app's two type sizes have no source. If the app screen gets a frame, they
-  should come from it rather than from `.subheadline` and `.caption`.
+
+Two earlier candidates resolved rather than lapsed: the two greys are settled
+as deliberate (#7 — see "Outside the grid"), and the grid's type sizes stopped
+being a guess when #32 made every one of them the widget's 12pt times one
+factor.

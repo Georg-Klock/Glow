@@ -162,6 +162,22 @@ and still counts — a record of what happened stays a record of what happened �
 and per-day habits are untouched, because water and a walk are bodily and not
 the thing the rest is from. The grid marks the cut as one vertical line down
 the rest day's column, in the missed cross's grey.
+## Two greys, on purpose
+
+**Question** (#7). The grid's unlit text is `GlowPalette.labelResting`; the
+system-control screens — Settings, the editor, the pickers — use `.secondary`.
+Two answers to "what colour is text that is not shouting": unify, or accept?
+
+**Decision** (2026-08-21). Accepted, and documented as the answer rather than
+carried as a cleanup. The grid is the design file's surface and takes the
+file's grey, which also has to survive the widget's accented rendering as
+stored alpha; the system screens are built from `List` and `Form`, and a
+system control tinted with a custom grey stops looking like the system. The
+border between the two greys is the border between "designed here" and
+"designed by Apple" — a real line in this app, worth keeping visible. The
+same reasoning already governs type: the grid's sizes are the file's 12pt
+scaled (#32), the system screens keep the system's text styles. Full
+rationale in [design-system.md](design-system.md), "Outside the grid".
 
 ## Appearance: follow the system
 
