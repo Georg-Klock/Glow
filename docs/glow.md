@@ -159,13 +159,42 @@ purpose:
   case on an iPhone 14 Pro: the slot still read as HDR while breathing. The
   completion transition keeps its approach, which is correct for its own
   reasons.
-- **The breath moved Today's rings** — a 15pt sideways walk, measured and
-  diagnosed in #45: `.animation(_:value:)` animates every animatable value
-  beneath it, and `GlowModifier` measures greedy content twice, once for the
-  caster and once for the mask. The second measurement landed after the
-  repeating breath was installed and became something to interpolate, forever.
-  With no repeating animation left in the modifier the bug cannot recur, but
-  the mechanism is worth remembering by anyone who animates anything here.
+- **The breath moved Today's rings** — a 15pt sideways walk (#45). The full
+  measurement, the mechanism and the placement lesson are the next section's;
+  the `geometryGroup()` it produced stays in `GlowModifier` as a guard for the
+  next caller who animates anything there.
+
+### The breath moved the ring, and only the ring
+
+For as long as Today had rings, the per-day rings walked: about 15pt sideways
+and back, in time with the breath. Measured on a 3x screen, the Water ring's
+left edge swung between x=62 and x=107 while its width stayed at 271px — a
+translation, not a halo growing under a threshold. The completed ring, with no
+open arcs and so no glowing layer, never moved a pixel in the same frames.
+
+`.animation(_:value:)` animates every animatable value beneath it, not the one
+the modifier it sits above happens to name. `GlowModifier` builds the glow from
+its content twice — once as the caster, once as the mask inside the overlay —
+and where that content is a greedy shape it is measured twice. `DayRingView`'s
+arcs are `Circle().trim()`, which take whatever size they are proposed, so the
+second measurement lands after the repeating breath is installed. The breath
+takes it for a change to interpolate and repeats it forever.
+
+The marks never showed it because a mark is a fixed-size image with nothing
+left to measure, which is why This Week looked right the whole time.
+
+The fix was `geometryGroup()` on the content, in `GlowModifier`, before either
+the caster or the mask is built from it. **Placement is the whole fix**: the
+same call written above `.opacity`, where it reads just as sensibly, was
+measured still drifting — by that point both measurements have already
+happened. Verified on the simulator, which cannot show the glow but shows
+geometry perfectly well: pinned at x=107 across twelve frames while, at the
+time, mean brightness still cycled 238 → 234 → 238 with the breath.
+
+Since #46 removed the breath, nothing animates this geometry and the pin fixes
+no live bug — it stays as a guard, still correct and still cheap, protecting
+whoever animates something here next. The placement lesson is the part that
+must not be lost with it.
 
 ### Breathing in the widget: measured, then removed
 

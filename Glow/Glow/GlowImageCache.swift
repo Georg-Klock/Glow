@@ -160,7 +160,7 @@ struct GlowModifier: ViewModifier {
     }
 
     @ViewBuilder
-    private func caster(_ content: Content) -> some View {
+    private func caster(_ content: some View) -> some View {
         let base = content.foregroundStyle(GlowPalette.color)
         switch style {
         case .plain:
@@ -200,8 +200,19 @@ struct GlowModifier: ViewModifier {
         // nothing else in the app uses. Removed 2026-08-21; docs/glow.md keeps
         // the history, including the measurement that the compositor does not
         // flatten an animated HDR layer.
-        caster(content)
-            .overlay { GlowTile(peak: peak).mask { content } }
+        //
+        // `geometryGroup()` is a guard now, not a fix. The content is measured
+        // twice — once for the caster, once for the mask — and while a
+        // repeating animation lived here, the second measurement became
+        // something to interpolate: the breath walked Today's rings ~15pt
+        // sideways (#45). With the breath gone nothing animates this geometry,
+        // but the pin stays for the next caller who animates anything here —
+        // and it belongs exactly at this line. Written above `.opacity`, where
+        // it reads just as sensibly, it was built and measured *still
+        // drifting*: by that point both measurements have already happened.
+        let settled = content.geometryGroup()
+        return caster(settled)
+            .overlay { GlowTile(peak: peak).mask { settled } }
     }
 }
 
