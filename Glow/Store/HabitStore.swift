@@ -201,6 +201,28 @@ struct HabitStore {
         return (habit.completions ?? []).count { $0.day == day }
     }
 
+    /// Applies one tap to a per-day habit: one more repetition, or — from a
+    /// full ring — a reset to zero. Returns the count the day ends up at.
+    ///
+    /// The rule itself lives in `DayRing.countAfterTap`; this only translates
+    /// its answer into rows. Kept together so the app's ring and the widget's
+    /// cannot disagree about what a tap means.
+    @discardableResult
+    func recordTap(for habit: Habit, on date: Date) throws -> Int {
+        // A weekly habit has no ring to tap; its surface toggles days instead.
+        // Answering with the current count rather than inventing a repetition.
+        guard let target = habit.frequency.dailyTarget else {
+            return count(for: habit, on: date)
+        }
+
+        let next = DayRing.countAfterTap(count: count(for: habit, on: date), target: target)
+        if next == 0 {
+            try clearDay(for: habit, on: date)
+            return 0
+        }
+        return try addCompletion(for: habit, on: date)
+    }
+
     /// Removes every completion on `date`, and returns how many there were.
     @discardableResult
     func clearDay(for habit: Habit, on date: Date) throws -> Int {

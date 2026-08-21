@@ -34,6 +34,8 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
   as trim fractions of a circle, the first `done` of them quiet. The ring
   starts full and glowing and closes clockwise from the top — the inverse of
   the fitness rings it resembles, because here the glow is what is still open.
+  `DayRing.countAfterTap(count:target:)` is the ring's one interaction: a tap
+  is one more, and a full ring resets to zero, which is also the undo.
 
 Every function takes its `Calendar` and its `today` as parameters. Nothing here
 reads the clock, which is what lets the tests assert against a fixed Tuesday in
@@ -67,6 +69,11 @@ it: the grid uses `@Query`, so SwiftData drives updates.
 `toggleCompletion(for:on:)` normalizes the day itself, which is what makes R3
 and R4 hold no matter who calls it. Tapping twice quickly cannot create a
 duplicate, because the second call finds the first completion and removes it.
+
+`recordTap(for:on:)` is the per-day counterpart: it asks `DayRing.countAfterTap`
+what the tap means and translates the answer into rows — one more `Completion`,
+or a cleared day when a full ring resets. The rule lives in `Logic/` and the
+rows live here, so the app's ring and the widget's tap the same behaviour.
 
 ### Models
 
