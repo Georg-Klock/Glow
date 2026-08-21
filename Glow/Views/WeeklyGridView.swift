@@ -149,9 +149,18 @@ struct WeeklyGridView: View {
                         // Swipe actions rather than a long-press menu: this is
                         // where iOS users already reach for edit and delete.
                         .swipeActions(edge: .trailing) {
+                            // Explicitly red: the app's white tint at the root
+                            // beats `role: .destructive`, and a swipe action
+                            // tinted white is a blank pill — white glyph on a
+                            // white background, invisible where it most needs
+                            // to look dangerous. The editor's delete button
+                            // says red out loud for the same reason; the
+                            // confirmation dialog alone keeps its role colour,
+                            // because alert contexts ignore the app tint.
                             Button("Delete", systemImage: "trash", role: .destructive) {
                                 delete(habit)
                             }
+                            .tint(.red)
                             if !habit.isSpacer {
                                 Button("Edit", systemImage: "pencil") {
                                     editingHabit = habit
