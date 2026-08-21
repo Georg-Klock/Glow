@@ -65,9 +65,10 @@ if [ "$STATUS" -ne 0 ]; then
   exit "$STATUS"
 fi
 
-# Swift Testing reports "Test run with N tests passed". Anything that gets here
-# with no tests has a broken scheme, not a green build.
-COUNT=$(grep -oE "Test run with [0-9]+ test" "$LOG" | grep -oE "[0-9]+" | tail -1 || true)
+# Swift Testing reports "Test run with N tests passed" once per test target.
+# Sum them — taking the last line silently shrank the count to whichever
+# target happened to finish last once the scheme grew a second one.
+COUNT=$(grep -oE "Test run with [0-9]+ test" "$LOG" | grep -oE "[0-9]+" | paste -sd+ - | bc || true)
 if [ -z "$COUNT" ] || [ "$COUNT" -eq 0 ]; then
   echo "error: the run reported no tests. The scheme is not running the test target." >&2
   exit 1

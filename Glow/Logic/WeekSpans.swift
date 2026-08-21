@@ -65,6 +65,11 @@ enum WeekSpans {
         // has spans. Clamp rather than draw a row that overflows its own goal.
         let done = min(completions, target)
         let doneToday = habit.completedDays.contains(todayStart)
+        // The rest day stops these rows like any other: nothing can be logged
+        // on it and nothing un-logged, so no span carries an action and the
+        // span that would be open waits, unlit. Same rule as `WeekGrid`, and
+        // the store refuses the write even if a stale surface offers one.
+        let todayRests = WeekPreferences.isRestDay(todayStart, calendar: calendar)
 
         // The goal is met: one span, the whole week, and the only thing left to
         // do with it is undo today.
@@ -74,7 +79,7 @@ enum WeekSpans {
                 firstDay: 0,
                 lastDay: dayCount - 1,
                 state: .filled,
-                actionDay: doneToday ? todayStart : nil
+                actionDay: doneToday && !todayRests ? todayStart : nil
             )]
         }
 
@@ -95,7 +100,7 @@ enum WeekSpans {
                 ) { _ in .inactive }
             }
             // The most recent completion is today's, so it is the one a tap undoes.
-            if let last = spans.indices.last(where: { spans[$0].state == .filled }) {
+            if !todayRests, let last = spans.indices.last(where: { spans[$0].state == .filled }) {
                 let s = spans[last]
                 spans[last] = SlotSpan(
                     index: s.index, firstDay: s.firstDay, lastDay: s.lastDay,
@@ -122,8 +127,10 @@ enum WeekSpans {
             index: spans.count,
             firstDay: openFirst,
             lastDay: max(openFirst, openLast),
-            state: .open,
-            actionDay: todayStart
+            // On the rest day the middle span keeps its place but not its ask:
+            // the geometry is unchanged, only nothing is open and nothing glows.
+            state: todayRests ? .inactive : .open,
+            actionDay: todayRests ? nil : todayStart
         ))
         return spans + futureSpans
     }

@@ -15,8 +15,13 @@ import WidgetKit
 /// which is the same rule the app uses.
 struct WeekWidgetView: View {
     let entry: WeekEntry
+    /// The render harness's way in: `widgetFamily` is read-only outside
+    /// WidgetKit, so a view rendered by `ImageRenderer` always reports medium
+    /// and drops the header. Nothing in the widget passes this.
+    var familyOverride: WidgetFamily?
 
-    @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetFamily) private var environmentFamily
+    private var family: WidgetFamily { familyOverride ?? environmentFamily }
 
     private var showsLabels: Bool { family != .systemSmall }
     /// Only the large family has the height to spend a row on the header.
@@ -42,14 +47,14 @@ struct WeekWidgetView: View {
             GeometryReader { proxy in
                 let track = max(0, proxy.size.width - labelWidth - labelGap)
                 let side = SlotLayout.slotHeight(trackWidth: track)
-                // As many as fit. Reserve a row for the overflow line when
-                // there is one, or "+3 more" pushes the last habit off the
-                // bottom edge it was counted into.
+                // As many as fit, then a hard cut. A row spent saying how much
+                // is missing is a row not showing a habit (docs/vision.md).
+                // The app marks the boundary in its own grid, which is where
+                // there is room to say it.
                 let capacity = WidgetMetrics.rowCapacity(
                     height: proxy.size.height, slot: side, hasHeader: showsHeader
                 )
-                let overflows = entry.habits.count > capacity
-                let shown = Array(entry.habits.prefix(overflows ? capacity - 1 : capacity))
+                let shown = Array(entry.habits.prefix(capacity))
 
                 VStack(alignment: .leading, spacing: WidgetMetrics.rowGap) {
                     if showsHeader {
@@ -74,13 +79,8 @@ struct WeekWidgetView: View {
                             labelWidth: labelWidth,
                             labelGap: labelGap,
                             showsLabel: showsLabels,
-                            burst: entry.burstHabit == habit.id ? entry.coverage : nil
+                            burst: entry.burstHabit == habit.id ? entry.progress : nil
                         )
-                    }
-                    if overflows {
-                        Text("+\(entry.habits.count - shown.count) more")
-                            .font(.system(size: WidgetMetrics.textSize))
-                            .foregroundStyle(GlowPalette.headerRest)
                     }
                     Spacer(minLength: 0)
                 }
@@ -276,18 +276,17 @@ private struct WidgetSlot: View {
     @ViewBuilder
     private var shape: some View {
         if let burst, slot.state == .filled {
-            // The app's closing ring, sampled. Each entry is one frame of the
-            // same transformation: the diameter shrinks while the stroke holds
-            // at its resting width, so the hole shuts and the ring becomes the
-            // dot. A widget cannot run a spring, so the easing is whatever
-            // `WidgetBurst.coverage` gives — but it is the same movement, not a
-            // different one approximating it.
-            let diameter = size.height + (GlowShape.dotDiameter - size.height) * burst
-            GlowImageView(
-                size: CGSize(width: diameter, height: diameter),
-                shape: .ring,
-                ringLineWidth: size.height * GlowShape.ringWeight
-            )
+            // A cross-fade, not the app's closing spring. The app's ring is
+            // one shape whose hole shuts; a widget is a handful of stills,
+            // and stills sampled off a spring play back at whatever rate
+            // WidgetKit chooses — which read as a stutter, not a snap. Ring
+            // out, dot in, still. The two surfaces read as different gestures
+            // for the same act, and that is accepted: a gesture that reads
+            // wrong is worse than one that reads different.
+            ZStack {
+                SlotMarkView(mark: .openToday, size: size).opacity(1 - burst)
+                SlotMarkView(mark: slot.mark, size: size).opacity(burst)
+            }
         } else {
             // The widget glows. Worth stating plainly, because this project
             // assumed the opposite for a long time and wrote it into the spec as

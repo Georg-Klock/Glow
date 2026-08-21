@@ -154,6 +154,36 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.georgklock.glow.tests
 
+  # Renders the widget's real view and diffs it against a committed design
+  # export (#6). Its own target rather than more of GlowTests, because
+  # GlowTests reaches the *app* module and the widget's view is not in it —
+  # so this target compiles the widget's own sources, the same sharing the
+  # widget target itself uses. GlowWidget.swift is excluded for its @main;
+  # WeekEntry lives in its own file for exactly this reason.
+  GlowRenderTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: RenderTests
+      - path: GlowWidget/WeekWidgetView.swift
+      - path: GlowWidget/WeekEntry.swift
+      - path: Glow/Logic
+      - path: Glow/Models
+      - path: Glow/Store
+      - path: Glow/Glow
+      - path: Glow/Views/HabitIconView.swift
+      - path: Glow/Views/SlotMarkView.swift
+    # Hosted by the app, same as GlowTests — hostless, Bundle.main is the
+    # xctest runner and HabitSymbol finds no SymbolCatalog.json, so "sunrise"
+    # quietly renders as the text "s…" instead of a symbol. Measured, not
+    # theorized.
+    dependencies:
+      - target: Glow
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.georgklock.glow.rendertests
+
 schemes:
   Glow:
     build:
@@ -161,6 +191,7 @@ schemes:
         Glow: all
         GlowWidget: all
         GlowTests: [test]
+        GlowRenderTests: [test]
     run:
       config: Debug
     test:
@@ -168,3 +199,4 @@ schemes:
       gatherCoverageData: true
       targets:
         - GlowTests
+        - GlowRenderTests
