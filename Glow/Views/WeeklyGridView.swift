@@ -109,6 +109,14 @@ struct WeeklyGridView: View {
     private var grid: some View {
         GeometryReader { proxy in
             let geometry = RowGeometry(totalWidth: proxy.size.width)
+            // The rest day's line ends on a habit, and it ends where the widget
+            // ends: the same `largeRowCapacity` that decides the boundary
+            // hairline below, so the cut stops on that line rather than running
+            // down a list that scrolls.
+            let cut = RestCut.rows(
+                habits.map { $0.snapshot() },
+                capacity: WidgetMetrics.largeRowCapacity
+            )
             List {
                 Section {
                     ForEach(Array(habits.enumerated()), id: \.element.id) { index, habit in
@@ -116,7 +124,9 @@ struct WeeklyGridView: View {
                             snapshot: habit.snapshot(),
                             week: week,
                             today: today,
-                            geometry: geometry
+                            geometry: geometry,
+                            index: index,
+                            cut: cut
                         ) { day in
                             toggle(habit, on: day)
                         } onEdit: {
