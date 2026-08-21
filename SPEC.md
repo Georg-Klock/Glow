@@ -211,6 +211,9 @@ Two widgets, reading the same store through an App Group.
 **The week widget**: three families. Today's slot is a button backed by an
 `AppIntent`, so a habit can be logged from the home screen without launching
 the app. Past days are not buttons, which is R2 holding in a second process.
+Rows are as many as fit, then a hard cut — no "+N more" row, per
+docs/vision.md: a row spent saying how much is missing is a row not showing a
+habit. The app's own grid marks the boundary, where there is room to say it.
 
 **The Today widget**: small and medium, and deliberately no large — three
 rings already say everything it could. Small is one habit's ring, and the
