@@ -27,7 +27,18 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
 - `SlotLayout` is the row geometry, as a single formula that a 7-circle row and
   an N-pill row both go through.
 - `Frequency` normalizes cadence at construction, so no caller can build a
-  degenerate one.
+  degenerate one. A habit is counted across a week or within a day, never
+  both; `slotCount` is nil for the per-day kind, so anything week-shaped has
+  to say what it means when there is no week.
+- `DeepLink` is the widget-to-screen mapping: each widget's inert surface
+  carries one URL, and the app lands on that widget's own screen. Unknown
+  URLs map to nil and change nothing.
+- `DayRing.arcs(target:done:gap:)` is the Today ring: one arc per repetition
+  as trim fractions of a circle, the first `done` of them quiet. The ring
+  starts full and glowing and closes clockwise from the top — the inverse of
+  the fitness rings it resembles, because here the glow is what is still open.
+  `DayRing.countAfterTap(count:target:)` is the ring's one interaction: a tap
+  is one more, and a full ring resets to zero, which is also the undo.
 
 Every function takes its `Calendar` and its `today` as parameters. Nothing here
 reads the clock, which is what lets the tests assert against a fixed Tuesday in
@@ -62,6 +73,11 @@ it: the grid uses `@Query`, so SwiftData drives updates.
 and R4 hold no matter who calls it. Tapping twice quickly cannot create a
 duplicate, because the second call finds the first completion and removes it.
 
+`recordTap(for:on:)` is the per-day counterpart: it asks `DayRing.countAfterTap`
+what the tap means and translates the answer into rows — one more `Completion`,
+or a cleared day when a full ring resets. The rule lives in `Logic/` and the
+rows live here, so the app's ring and the widget's tap the same behaviour.
+
 ### Models
 
 SwiftData, shaped for a CloudKit future even though v1 is local-only: every
@@ -71,12 +87,23 @@ migration rather than a configuration change.
 
 `Frequency` is stored as `isDaily` plus `timesPerWeek` rather than as an encoded
 enum, so the column stays queryable and a schema change does not hinge on an
-enum's `Codable` representation.
+enum's `Codable` representation. The per-day kind adds `timesPerDay`, with zero
+meaning "counted across a week" — a sentinel no real per-day habit can store,
+because the initializer clamps into 1...12. `Habit.countedPerWeek` and
+`Habit.countedPerDay` are the two fetch predicates, one definition each, so the
+week surfaces and Today cannot drift in how they split the kinds.
 
 ### Views
 
 Mostly layout. The one piece of real behaviour is `SlotView`'s completion
 transition, which is documented in place and in [glow.md](glow.md).
+
+`TodayView` shows the per-day habits as rings — the small and medium widget at
+app size, per docs/vision.md — and nothing week-shaped. `DayRingView` draws the
+arcs `DayRing` lays out, with the open arcs glowing as one layer: one HDR tile,
+one halo pass, one breathing animation, rather than a dozen lights drifting out
+of phase. The tile is shape-free and cached per intensity, so an arc is a mask
+like any other and costs the cache nothing.
 
 Width flows down rather than being measured per row: `WeeklyGridView` reads the
 screen width once, builds a `RowGeometry`, and hands the same value to the
@@ -167,15 +194,24 @@ with the Apple ID would remove that dependency and let automatic signing work.
 Verify the whole chain with `Tools/check-app-group.sh`, which reports which
 profiles grant the group and whether the last device build actually carries it.
 
-## The widget
+## The widgets
 
-Small, medium and large, reading the same store through the App Group, with
-today's slot as an `AppIntent` button. Past days are not buttons, which is R2
-holding in a second process.
+The week widget: small, medium and large, reading the same store through the
+App Group, with today's slot as an `AppIntent` button. Past days are not
+buttons, which is R2 holding in a second process.
 
 It renders the same HDR tile as the app, via the same `GlowImageView`, with
 `fillsWidth` set because the widget's slots are distributed by an HStack rather
 than measured by `SlotLayout`.
+
+The Today widget: small (one habit, chosen per widget through a configuration
+intent) and medium (the first three per-day habits, static), drawing the same
+`DayRingView` as the app, each ring a `TapHabitIntent` button. The
+configuration intent, its entity and its query live in the shared sources
+(`TodayWidgetConfig.swift`), not the widget target — the app exports AppIntents
+metadata of its own, the system consolidates metadata under the app, and with
+the intent defined only in the extension the stored habit choice never resolved
+when the provider ran. The note on the type carries the symptom in full.
 
 ## What is deliberately absent
 

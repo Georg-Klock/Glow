@@ -2,59 +2,44 @@ import SwiftData
 import SwiftUI
 import WidgetKit
 
-/// Today, and nothing else.
+/// Today: the several-times-a-day habits, and nothing else.
 ///
-/// The week grid answers "how am I doing"; this answers "what is left", which is
-/// a different question and the one asked most often. So there is no history on
-/// this screen at all — no past columns, no streak, no count of what went wrong
-/// last Tuesday. Just the habits still open, and under them the ones already
-/// handled, quiet.
+/// This screen is the small and medium widget at app size — rings, one per
+/// habit, each a day's repetitions as arcs. There is no history here and no
+/// week: a per-day habit's count resets with the day, so the only question the
+/// screen answers is "what is left today", asked by the glow.
+///
+/// The weekly cadences live in This Week and never appear here, which is the
+/// either/or the model is built on: a habit is counted across a week or within
+/// a day, never both.
 struct TodayView: View {
+    @Query(filter: Habit.countedPerDay, sort: [SortDescriptor(\Habit.sortOrder)])
+    private var habits: [Habit]
+
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
-    @Query(sort: [SortDescriptor(\Habit.sortOrder)]) private var habits: [Habit]
-
     @State private var today = WeekCalendar.day(Date())
 
-    private var week: Week { WeekCalendar.week(containing: today) }
     private var store: HabitStore { HabitStore(context: context) }
 
-    /// The habit, and the slot that today's tap would toggle.
-    private struct Entry: Identifiable {
-        let habit: Habit
-        let slot: Slot
-        var id: UUID { habit.id }
-    }
-
-    private var entries: [Entry] {
-        habits.filter { !$0.isSpacer }.compactMap { habit in
-            let slots = WeekGrid.slots(for: habit.snapshot(), in: week, today: today)
-            guard let slot = slots.first(where: \.isTappable) else { return nil }
-            return Entry(habit: habit, slot: slot)
-        }
-    }
-
-    private var open: [Entry] { entries.filter { $0.slot.state != .filled } }
-    /// Nothing was expected today, so nothing is missing.
-    private var resting: Bool {
-        !habits.isEmpty && entries.isEmpty
-    }
+    /// Three rings to a row, like the medium widget. Sized so a full row sits
+    /// inside an iPhone's width with the margins the widget would have.
+    private static let ringDiameter: CGFloat = 92
+    private static let columns = 3
+    private static let rowSpacing: CGFloat = 28
+    private static let columnSpacing: CGFloat = 20
 
     var body: some View {
         NavigationStack {
             Group {
-                if habits.allSatisfy(\.isSpacer) {
+                if habits.isEmpty {
                     ContentUnavailableView {
                         Label("No Habits", systemImage: "circle.dotted")
                     } description: {
-                        Text("Add a habit in This Week and it will show up here.")
+                        Text("A habit done several times a day shows up here as a ring.")
                     }
-                } else if resting {
-                    restDayState
-                } else if open.isEmpty {
-                    allDoneState
                 } else {
-                    list
+                    rings
                 }
             }
             .navigationTitle(title)
@@ -67,66 +52,76 @@ struct TodayView: View {
         }
     }
 
-    /// One list, in the habits' own order.
-    ///
-    /// It used to split into "left" and "done" and re-sort as you tapped, which
-    /// meant a row moved out from under your thumb the moment you touched it,
-    /// and the list you were reading was never the same list twice. The order is
-    /// yours; only the marks change.
-    private var list: some View {
-        List {
-            Section {
-                ForEach(entries) { entry in row(entry) }
-            } header: {
-                Text(open.count == 1 ? "1 left" : "\(open.count) left")
+    /// Rows of three, centred — the medium widget's layout, stacked. A plain
+    /// stack rather than a grid so a final row of one or two rings centres the
+    /// way the widget would centre them, instead of hugging the leading edge.
+    private var rings: some View {
+        ScrollView {
+            VStack(spacing: Self.rowSpacing) {
+                ForEach(rows, id: \.first?.id) { row in
+                    HStack(alignment: .top, spacing: Self.columnSpacing) {
+                        ForEach(row) { habit in cell(habit) }
+                    }
+                }
             }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 24)
         }
-        .listStyle(.insetGrouped)
     }
 
-    private func row(_ entry: Entry) -> some View {
-        let isOpen = entry.slot.state != .filled
+    private var rows: [[Habit]] {
+        stride(from: 0, to: habits.count, by: Self.columns).map {
+            Array(habits[$0..<min($0 + Self.columns, habits.count)])
+        }
+    }
+
+    private func cell(_ habit: Habit) -> some View {
+        let target = habit.timesPerDay
+        let done = habit.snapshot().count(on: today)
+        let isOpen = done < target
+
         return Button {
-            toggle(entry)
+            tap(habit, done: done, target: target)
         } label: {
-            HStack(spacing: 14) {
-                HabitIconView(icon: entry.habit.icon)
-                let name = Text(entry.habit.name)
-                    .font(.body)
+            VStack(spacing: 10) {
+                ZStack {
+                    DayRingView(target: target, done: done, diameter: Self.ringDiameter)
+                    HabitIconView(icon: habit.icon, size: Self.ringDiameter * 0.3)
+                }
+                // The same rule as everywhere: a due name glows, a handled one
+                // rests. The weight never changes, so completing does not
+                // reflow.
+                let name = Text(habit.name)
+                    .font(.subheadline)
+                    .lineLimit(1)
                 if isOpen {
                     name.glowing(halo: GlowPalette.labelHalo)
                 } else {
                     name.foregroundStyle(GlowPalette.labelResting)
                 }
-                Spacer(minLength: 12)
-                // The same mark the grid draws, at a size a thumb can find.
-                SlotMarkView(mark: entry.slot.mark, size: CGSize(width: 30, height: 30))
             }
+            .frame(width: Self.ringDiameter + 8)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(entry.habit.name)
-        .accessibilityValue(isOpen ? "due today" : "done")
-        .accessibilityHint(isOpen ? "Mark as done" : "Mark as not done")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(habit.name)
+        .accessibilityValue("\(done) of \(target) done today")
+        .accessibilityHint(isOpen ? "Adds one" : "Starts the day over")
     }
 
-    /// Everything expected today is logged. Says so and stops.
-    private var allDoneState: some View {
-        ContentUnavailableView {
-            VStack(spacing: 14) {
-                GlowImageView(size: CGSize(width: 54, height: 54), shape: .dot)
-                Text("All Done")
-            }
-        } description: {
-            Text("Every habit is logged for today.")
-        }
-    }
-
-    private var restDayState: some View {
-        ContentUnavailableView {
-            Label("Rest Day", systemImage: "moon.zzz")
-        } description: {
-            Text("Nothing is expected today. Anything you log still counts.")
+    /// A tap is one more; a tap on a full ring starts the day over. The rule
+    /// is `DayRing.countAfterTap`, applied by the store — this only reports
+    /// what happened to a thumb that cannot see under itself.
+    private func tap(_ habit: Habit, done: Int, target: Int) {
+        do {
+            let count = try store.recordTap(for: habit, on: today)
+            // A reset is a correction, and should not feel like progress.
+            if count == 0 && done > 0 { Haptics.uncompleted() } else { Haptics.completed() }
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            HabitStore.report(error, operation: "recordTap")
         }
     }
 
@@ -135,16 +130,5 @@ struct TodayView: View {
             .dateTime.weekday(.wide).day().month(.wide)
                 .locale(WeekCalendar.calendar.locale ?? .current)
         )
-    }
-
-    private func toggle(_ entry: Entry) {
-        guard let day = entry.slot.actionDay else { return }
-        do {
-            let isNowComplete = try store.toggleCompletion(for: entry.habit, on: day)
-            if isNowComplete { Haptics.completed() } else { Haptics.uncompleted() }
-            WidgetCenter.shared.reloadAllTimelines()
-        } catch {
-            HabitStore.report(error, operation: "toggleFromToday")
-        }
     }
 }

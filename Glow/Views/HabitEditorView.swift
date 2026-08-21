@@ -15,6 +15,17 @@ struct HabitEditorView: View {
     /// to `.daily`, so the two cadences are one number rather than a switch and
     /// a number that have to agree.
     @State private var timesPerWeek = Frequency.daysInWeek
+    /// The per-day count, kept separately from the weekly one so switching
+    /// kinds back and forth loses neither number.
+    @State private var timesPerDay = 3
+
+    /// A habit is counted across a week or within a day, never both. This is
+    /// the one place that either/or is chosen.
+    enum Kind: Hashable {
+        case week, day
+    }
+
+    @State private var kind: Kind = .week
 
     @FocusState private var isNameFocused: Bool
     @State private var isConfirmingDelete = false
@@ -44,7 +55,30 @@ struct HabitEditorView: View {
 
     private var isEditing: Bool { habit != nil }
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var frequency: Frequency { Frequency(timesPerWeek: timesPerWeek) }
+
+    private var frequency: Frequency {
+        switch kind {
+        case .week: Frequency(timesPerWeek: timesPerWeek)
+        case .day: Frequency(timesPerDay: timesPerDay)
+        }
+    }
+
+    /// The number the stepper is editing, and the bounds it steps inside —
+    /// one control either way, reading and writing whichever count the chosen
+    /// kind owns.
+    private var count: Binding<Int> {
+        switch kind {
+        case .week: $timesPerWeek
+        case .day: $timesPerDay
+        }
+    }
+
+    private var countRange: ClosedRange<Int> {
+        switch kind {
+        case .week: Frequency.selectableCounts
+        case .day: Frequency.selectableDailyCounts
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -84,6 +118,10 @@ struct HabitEditorView: View {
                             .frame(height: Self.rowHeight)
                             .background(platter)
                     }
+
+                    kindRow
+                        .frame(height: Self.rowHeight)
+                        .background(platter)
 
                     frequencyRow
                         .frame(height: Self.rowHeight)
@@ -148,6 +186,20 @@ struct HabitEditorView: View {
             .fill(Color(.secondarySystemGroupedBackground))
     }
 
+    /// Which kind of habit this is: counted across the week, or within a day.
+    ///
+    /// A segmented control rather than anything cleverer, because this is a
+    /// genuine either/or — the model has no habit that is both — and two
+    /// segments is the honest drawing of that.
+    private var kindRow: some View {
+        Picker("Counted", selection: $kind) {
+            Text("Per Week").tag(Kind.week)
+            Text("Per Day").tag(Kind.day)
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 10)
+    }
+
     /// Minus, the reading, plus — in that order across the row.
     ///
     /// Hand-rolled rather than a `Stepper`, which always puts its label on one
@@ -159,38 +211,38 @@ struct HabitEditorView: View {
     /// unlabelled buttons either side of some text.
     private var frequencyRow: some View {
         HStack(spacing: 8) {
-            stepButton("minus", enabled: timesPerWeek > Frequency.selectableCounts.lowerBound) {
-                timesPerWeek -= 1
+            stepButton("minus", enabled: count.wrappedValue > countRange.lowerBound) {
+                count.wrappedValue -= 1
             }
 
             HStack(spacing: 0) {
                 // The number glows. It is the one thing on this row that
                 // changes, and white text on a dark platter beside white
                 // buttons was not saying so.
-                Text("\(timesPerWeek)")
+                Text("\(count.wrappedValue)")
                     .monospacedDigit()
                     .glowing(halo: GlowPalette.labelHalo)
-                Text("x per week")
+                Text(kind == .day ? "x per day" : "x per week")
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
 
-            stepButton("plus", enabled: timesPerWeek < Frequency.selectableCounts.upperBound) {
-                timesPerWeek += 1
+            stepButton("plus", enabled: count.wrappedValue < countRange.upperBound) {
+                count.wrappedValue += 1
             }
         }
         // Inset from the platter's edges. Hard against them the controls read
         // as part of the container rather than as things inside it.
         .padding(.horizontal, 10)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Times per week")
-        .accessibilityValue("\(timesPerWeek)")
+        .accessibilityLabel(kind == .day ? "Times per day" : "Times per week")
+        .accessibilityValue("\(count.wrappedValue)")
         .accessibilityAdjustableAction { direction in
             switch direction {
-            case .increment where timesPerWeek < Frequency.selectableCounts.upperBound:
-                timesPerWeek += 1
-            case .decrement where timesPerWeek > Frequency.selectableCounts.lowerBound:
-                timesPerWeek -= 1
+            case .increment where count.wrappedValue < countRange.upperBound:
+                count.wrappedValue += 1
+            case .decrement where count.wrappedValue > countRange.lowerBound:
+                count.wrappedValue -= 1
             default:
                 break
             }
@@ -227,10 +279,11 @@ struct HabitEditorView: View {
         }
         name = habit.name
         icon = habit.icon
-        // A per-day habit has no weekly count to load, so the stepper keeps the
-        // value it opened with. The editor cannot make one yet — that arrives
-        // with the Today screen — but it must not invent a week for one either.
-        if let weekly = habit.frequency.slotCount {
+        if let daily = habit.frequency.dailyTarget {
+            kind = .day
+            timesPerDay = daily
+        } else if let weekly = habit.frequency.slotCount {
+            kind = .week
             timesPerWeek = weekly
         }
     }

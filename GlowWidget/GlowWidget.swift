@@ -41,6 +41,9 @@ struct GlowWidget: Widget {
                 // the StandBy and iPad Lock Screen galleries, and out of
                 // foreground tinting with it.
                 .containerBackground(GlowPalette.widgetBackground, for: .widget)
+                // The marks act in place through their intents; everything
+                // else opens the app on this widget's own screen.
+                .widgetURL(DeepLink.week)
         }
         // WidgetKit's own margins are close to the design's but not equal, and
         // they are applied inside the container — so the padding above only
@@ -166,5 +169,7 @@ struct WeekProvider: TimelineProvider {
 struct GlowWidgetBundle: WidgetBundle {
     var body: some Widget {
         GlowWidget()
+        TodaySmallWidget()
+        TodayMediumWidget()
     }
 }

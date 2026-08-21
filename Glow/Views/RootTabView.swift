@@ -10,9 +10,14 @@ import SwiftUI
 /// screen with its own habits rather than a filtered view of the week: the
 /// tabs are no longer three depths of one thing. The year moved into Settings
 /// as History, where the things that are neither today nor this week live.
-/// The opening screen is still This Week — the denser screen, with Today one
-/// tap away.
+///
+/// There is no fixed landing tab. A widget opens its own screen — the daily
+/// rings land on Today, the week grid lands on This Week — so you arrive at
+/// the bigger version of what you were just looking at. Only a cold launch
+/// has no widget to ask, and it opens This Week: the denser screen, with
+/// Today one tap away.
 struct RootTabView: View {
+    /// The cold-launch screen. Deep links overwrite it before anything shows.
     @State private var selection: Screen = .week
 
     /// Not named `Tab`: SwiftUI has its own, and shadowing it makes the builder
@@ -37,5 +42,12 @@ struct RootTabView: View {
             }
         }
         .tint(GlowPalette.color)
+        .onOpenURL { url in
+            switch DeepLink.destination(for: url) {
+            case .today: selection = .today
+            case .week: selection = .week
+            case nil: break
+            }
+        }
     }
 }
