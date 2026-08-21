@@ -14,31 +14,34 @@ enum WidgetBurst {
     private static let habitKey = "burstHabitID"
     private static let timeKey = "burstAt"
 
-    /// How long the burst runs. Matches SlotView's completion transition: a
-    /// beat at full glow, then the solid fill rising over it.
-    static let hold: TimeInterval = 0.06
-    static let fade: TimeInterval = 0.4
-    static var duration: TimeInterval { hold + fade }
-
-    /// The app's spring, as numbers this file can evaluate.
+    /// How long the cross-fade runs.
     ///
-    /// `SlotView.close` is `.spring(response: 0.34, dampingFraction: 0.58)`. A
-    /// widget cannot run a spring — it is handed still frames — so the curve is
-    /// sampled instead of animated, and these are the same two values that
-    /// SwiftUI would have used. The overshoot matters: without it the ring eases
-    /// politely shut in the widget while it snaps in the app, and the two read
-    /// as different gestures.
-    static let response: Double = 0.34
-    static let damping: Double = 0.58
-
-    /// Sampled at 40fps.
+    /// This used to sample the app's closing spring — `response: 0.34,
+    /// dampingFraction: 0.58`, evaluated as a second-order step response at
+    /// 40fps, roughly seventeen entries — so the widget would read as the
+    /// app's snap. On a real home screen it did not: timeline entries do not
+    /// arrive at the rate they were sampled at, and a curve played back at
+    /// the wrong rate is not the curve — it is a stutter. Sampling a spring
+    /// assumes the render clock is ours to spend, and it is not.
     ///
-    /// It was 10, on the reasoning that finer looked no better through a
-    /// snapshot pipeline. It does: at 10fps across a second the close reads as a
-    /// handful of stills rather than a movement. The cost of more is nothing —
-    /// **entries inside a timeline are free, only reloads are budgeted**, and
-    /// this whole burst rides inside the reload a tap already paid for.
-    static let step: TimeInterval = 0.025
+    /// So the widget's completion is now the honest version of what a widget
+    /// is — a few stills: the ring fades out as the dot fades in, then it is
+    /// over. The app's `SlotView` keeps its spring, so the two surfaces read
+    /// as different gestures for the same act, which is accepted: a gesture
+    /// that reads wrong is worse than one that reads different. See
+    /// docs/glow.md.
+    static let duration: TimeInterval = 0.3
+
+    /// The cross-fade, as the still frames a timeline carries: evenly spaced,
+    /// linear, done. Offset is from the tap; progress is 0 through 1, the dot's
+    /// opacity and the ring's complement.
+    static var frames: [(offset: TimeInterval, progress: Double)] {
+        let count = 3
+        return (0..<count).map { i in
+            let fraction = Double(i) / Double(count - 1)
+            return (duration * fraction, fraction)
+        }
+    }
 
     private static var store: UserDefaults { GlowSettings.store }
 
@@ -61,27 +64,5 @@ enum WidgetBurst {
         let started = Date(timeIntervalSince1970: stamp)
         guard now.timeIntervalSince(started) < duration else { return nil }
         return (id, started)
-    }
-
-    /// How far the solid fill has risen over the glow, 0 through 1.
-    ///
-    /// How far through the close this frame is, 0 through 1 and briefly past it.
-    ///
-    /// Flat at 0 through the hold, then a damped spring — the same one the app
-    /// runs, evaluated rather than animated. It **overshoots past 1**, which is
-    /// the point: the ring closes past the dot and settles back, and a caller
-    /// mapping this onto a diameter gets the snap rather than a fade.
-    static func coverage(at elapsed: TimeInterval) -> Double {
-        guard elapsed > hold else { return 0 }
-        let t = elapsed - hold
-        guard t < fade else { return 1 }
-
-        // Standard second-order step response. omega is the undamped frequency
-        // SwiftUI derives from `response`; omegaD is what is left after damping.
-        let omega = 2 * Double.pi / response
-        let zeta = damping
-        let omegaD = omega * (1 - zeta * zeta).squareRoot()
-        let decay = exp(-zeta * omega * t)
-        return 1 - decay * (cos(omegaD * t) + (zeta * omega / omegaD) * sin(omegaD * t))
     }
 }

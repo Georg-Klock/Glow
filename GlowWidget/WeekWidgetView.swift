@@ -74,7 +74,7 @@ struct WeekWidgetView: View {
                             labelWidth: labelWidth,
                             labelGap: labelGap,
                             showsLabel: showsLabels,
-                            burst: entry.burstHabit == habit.id ? entry.coverage : nil
+                            burst: entry.burstHabit == habit.id ? entry.progress : nil
                         )
                     }
                     if overflows {
@@ -276,18 +276,17 @@ private struct WidgetSlot: View {
     @ViewBuilder
     private var shape: some View {
         if let burst, slot.state == .filled {
-            // The app's closing ring, sampled. Each entry is one frame of the
-            // same transformation: the diameter shrinks while the stroke holds
-            // at its resting width, so the hole shuts and the ring becomes the
-            // dot. A widget cannot run a spring, so the easing is whatever
-            // `WidgetBurst.coverage` gives — but it is the same movement, not a
-            // different one approximating it.
-            let diameter = size.height + (GlowShape.dotDiameter - size.height) * burst
-            GlowImageView(
-                size: CGSize(width: diameter, height: diameter),
-                shape: .ring,
-                ringLineWidth: size.height * GlowShape.ringWeight
-            )
+            // A cross-fade, not the app's closing spring. The app's ring is
+            // one shape whose hole shuts; a widget is a handful of stills,
+            // and stills sampled off a spring play back at whatever rate
+            // WidgetKit chooses — which read as a stutter, not a snap. Ring
+            // out, dot in, still. The two surfaces read as different gestures
+            // for the same act, and that is accepted: a gesture that reads
+            // wrong is worse than one that reads different.
+            ZStack {
+                SlotMarkView(mark: .openToday, size: size).opacity(1 - burst)
+                SlotMarkView(mark: slot.mark, size: size).opacity(burst)
+            }
         } else {
             // The widget glows. Worth stating plainly, because this project
             // assumed the opposite for a long time and wrote it into the spec as

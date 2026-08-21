@@ -68,51 +68,26 @@ struct GlowSettingsTests {
 
 @Suite("Widget tap burst")
 struct WidgetBurstTests {
-    @Test("The glow is held before the fill starts rising")
-    func holdBeforeFade() {
-        // Completion should read as an event, not as the light going out, so
-        // coverage stays at zero through the hold.
-        #expect(WidgetBurst.coverage(at: 0) == 0)
-        #expect(WidgetBurst.coverage(at: WidgetBurst.hold - 0.01) == 0)
-        #expect(WidgetBurst.coverage(at: WidgetBurst.hold + 0.01) > 0)
+    @Test("The cross-fade runs 0 to 1, in order, inside its duration")
+    func framesCoverTheFade() {
+        // The frames are the animation: whatever their count, the first must
+        // be the untouched ring, the last the settled dot, and every offset
+        // inside the note's expiry so no frame outlives the burst.
+        let frames = WidgetBurst.frames
+        #expect(frames.first?.progress == 0)
+        #expect(frames.last?.progress == 1)
+        #expect(frames.map(\.offset) == frames.map(\.offset).sorted())
+        #expect(frames.allSatisfy { $0.offset <= WidgetBurst.duration })
     }
 
-    @Test("Coverage settles at fully covered")
-    func coverageSettles() {
-        #expect(WidgetBurst.coverage(at: WidgetBurst.duration) == 1)
-        #expect(WidgetBurst.coverage(at: WidgetBurst.duration * 5) == 1)
-    }
-
-    @Test("Coverage overshoots, which is the whole point")
-    func coverageOvershoots() {
-        // It used to be an easeOut, and was asserted never to pass 1. A spring
-        // does pass 1 — the ring closes past the dot and settles back — and
-        // without that the widget eases politely shut while the app snaps, so
-        // the two read as different gestures for the same act.
-        let samples = stride(from: 0.0, through: WidgetBurst.duration, by: 0.005)
-            .map(WidgetBurst.coverage)
-        #expect(samples.max() ?? 0 > 1.02, "no overshoot: peak \(samples.max() ?? 0)")
-        // Bounded, though. A big overshoot would invert the mark it is driving.
-        #expect(samples.max() ?? 0 < 1.25)
-        #expect(samples.allSatisfy { $0 >= 0 })
-    }
-
-    @Test("It settles rather than ringing on")
-    func coverageSettlesQuickly() {
-        // The last third should be within a whisker of 1, or the dot is still
-        // visibly wobbling when the animation is supposed to be over.
-        let tail = stride(from: WidgetBurst.duration * 0.8, through: WidgetBurst.duration, by: 0.005)
-            .map(WidgetBurst.coverage)
-        #expect(tail.allSatisfy { abs($0 - 1) < 0.05 }, "still ringing: \(tail.map { ($0 * 100).rounded() / 100 })")
-    }
-
-    @Test("There are enough frames to read as motion")
-    func frameCount() {
-        // At 10fps across a second this was a handful of stills. Entries inside
-        // a timeline are free — only reloads are budgeted — and this burst rides
-        // inside the reload a tap already paid for.
-        let frames = Int(WidgetBurst.duration / WidgetBurst.step)
-        #expect(frames >= 15, "\(frames) frames is not a movement")
+    @Test("A handful of stills, not a sampled curve")
+    func framesStayFew() {
+        // This used to sample the app's closing spring at 40fps — seventeen
+        // entries — and the playback stuttered: timeline entries do not
+        // arrive at the rate they were sampled at. The cross-fade is a few
+        // stills on purpose; a rising count here is the sampling creeping
+        // back.
+        #expect((2...4).contains(WidgetBurst.frames.count))
     }
 
     @Test("A stale tap does not replay")
@@ -131,14 +106,10 @@ struct WidgetBurstTests {
     @Test("The burst fits inside one timeline, so it spends no extra reloads")
     func burstIsCheap() {
         // The whole point: a tap already costs a reload, and the animation rides
-        // inside the timeline that reload produces.
-        //
-        // The bound here used to be fifteen frames, which confused two things.
-        // Entries are free; it is *reloads* that are budgeted, and this spends
-        // none. What has to stay small is the duration — a long burst would
-        // still be animating when the next tap arrives.
-        let frames = Int(WidgetBurst.duration / WidgetBurst.step)
-        #expect(frames <= 60, "\(frames) frames is more timeline than one gesture needs")
+        // inside the timeline that reload produces. Entries are free; it is
+        // *reloads* that are budgeted, and this spends none. What has to stay
+        // small is the duration — a long burst would still be animating when
+        // the next tap arrives.
         #expect(WidgetBurst.duration <= 0.75)
     }
 }
