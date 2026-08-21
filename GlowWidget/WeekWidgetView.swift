@@ -268,6 +268,14 @@ private struct WidgetSlot: View {
             .buttonStyle(.plain)
             .accessibilityLabel("\(habitName), \(slot.state == .filled ? "done" : "due today")")
             .accessibilityHint(slot.state == .filled ? "Mark as not done" : "Mark as done")
+        } else if slot.state == .rest {
+            // The one untappable slot that still needs a voice. It draws
+            // nothing and the line down its column is hidden, so without this
+            // a VoiceOver user meets a hole in the row and no explanation.
+            // No button trait and no hint: there is nothing to do here.
+            shape
+                .accessibilityElement()
+                .accessibilityLabel("\(habitName), rest day")
         } else {
             shape
         }

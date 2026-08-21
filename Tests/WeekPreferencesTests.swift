@@ -82,8 +82,10 @@ struct WeekPreferencesTests {
                 for: .fixture(), in: week, today: today, calendar: calendar
             )
             // Monday is the rest day and already gone: it would be a miss
-            // otherwise, and a miss is exactly what a rest day is not.
-            #expect(row[0].state == .inactive)
+            // otherwise, and a miss is exactly what a rest day is not. It is
+            // not an upcoming socket either — see `restDayDrawsNothing`.
+            #expect(row[0].state == .rest)
+            #expect(row[0].mark == .rest)
             #expect(row[1].state == .missed)
         }
     }
@@ -98,16 +100,21 @@ struct WeekPreferencesTests {
             let row = WeekGrid.slots(
                 for: .fixture(), in: week, today: today, calendar: calendar
             )
-            #expect(row[2].state == .inactive)
+            #expect(row[2].state == .rest)
+            #expect(row[2].mark == .rest)
             #expect(!row.contains { $0.state == .open })
             #expect(row.allSatisfy { !$0.isTappable })
         }
     }
 
-    @Test("A completion already stored on a rest day still counts and still shows")
+    @Test("A completion already stored on a rest day still counts, and is not drawn")
     func restDayCompletionsCount() {
-        // A record of what happened stays a record of what happened. Only new
-        // writes are refused; nothing already on the books is hidden or lost.
+        // Both halves of the rule in one test, because they are one rule and
+        // asserting either alone lets the other rot: the record survives —
+        // nothing is deleted and nothing stops counting — and the week grid
+        // stops drawing it, because the grid says what is open and a rest day
+        // has nothing open on it. This reverses one clause of #39; see
+        // docs/decisions.md.
         let calendar = TestCalendar.monday
         let today = TestCalendar.date(2026, 8, 19)
         let week = WeekCalendar.week(containing: today, calendar: calendar)
@@ -116,8 +123,54 @@ struct WeekPreferencesTests {
         withPreferences(restDay: calendar.component(.weekday, from: monday)) {
             let habit = HabitSnapshot.fixture(completedDays: [monday])
             let row = WeekGrid.slots(for: habit, in: week, today: today, calendar: calendar)
-            #expect(row[0].state == .filled)
-            #expect(row[0].mark == .donePast)
+            // Not drawn: rest wins over the completion.
+            #expect(row[0].state == .rest)
+            #expect(row[0].mark == .rest)
+            // Still counts. Asserted through a frequency row over the same
+            // week rather than by re-reading `completedDays`, so "counts but
+            // is not drawn" is a claim about the grid rather than about the
+            // fixture.
+            let weekly = HabitSnapshot.fixture(
+                frequency: .timesPerWeek(3), completedDays: [monday]
+            )
+            let spans = WeekGrid.slots(for: weekly, in: week, today: today, calendar: calendar)
+            #expect(spans.count { $0.state == .filled } == 1)
+            #expect(habit.completedDays.contains(monday))
+        }
+    }
+
+    @Test("A rest day draws nothing, whichever way it faces")
+    func restDayDrawsNothing() {
+        // Past, future and today. Before #72 these drew a \u{2715}, a socket and a
+        // ring respectively; a socket says one is coming, and on a rest day
+        // none is.
+        let calendar = TestCalendar.monday
+        let today = TestCalendar.date(2026, 8, 19)
+        let week = WeekCalendar.week(containing: today, calendar: calendar)
+
+        for index in [0, 2, 5] {
+            let weekday = calendar.component(.weekday, from: week.days[index])
+            withPreferences(restDay: weekday) {
+                let row = WeekGrid.slots(
+                    for: .fixture(), in: week, today: today, calendar: calendar
+                )
+                #expect(row[index].mark == .rest, "column \(index) should draw nothing")
+                #expect(row.count { $0.mark == .rest } == 1)
+            }
+        }
+    }
+
+    @Test("No rest day leaves every column drawing something")
+    func noRestDayDrawsNoHole() {
+        let calendar = TestCalendar.monday
+        let today = TestCalendar.date(2026, 8, 19)
+        let week = WeekCalendar.week(containing: today, calendar: calendar)
+
+        withPreferences(restDay: nil) {
+            let row = WeekGrid.slots(
+                for: .fixture(), in: week, today: today, calendar: calendar
+            )
+            #expect(!row.contains { $0.mark == .rest })
         }
     }
 

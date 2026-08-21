@@ -114,7 +114,7 @@ completions are logged, independent of which weekday each fell on.
 
 ## 7. Slot states
 
-Every slot is in exactly one of four states.
+Every slot is in exactly one of five states.
 
 1. **Inactive.** A day still to come.
 2. **Missed.** A past day that went unlogged. Daily habits only — for a habit
@@ -122,6 +122,9 @@ Every slot is in exactly one of four states.
    because the week is still winnable.
 3. **Open.** Today's slot, not yet completed. The only glowing state.
 4. **Filled.** Completed.
+5. **Rest.** The rest day: a day nothing can happen on, which is not the same
+   as a day that has not happened yet. It draws nothing at all. Rest wins over
+   every other state, a stored completion included.
 
 The states map to *marks* via `Slot.mark`, which is where the rendering
 distinctions live and where they are tested.
@@ -148,9 +151,22 @@ missed, and never writable. Nothing can be logged on it and nothing un-logged
 process too, where a stale surface can still offer a button — and the week is
 not made up around it: an unreachable weekly goal on a rest week is stopped,
 not excused. Frequency rows stop with it: on the rest day nothing is open, so
-nothing glows. A completion already on record still draws and still counts,
-whichever day it fell on. The grid draws the cut as one vertical line down the
-rest day's column, in the missed cross's grey — absence, which does not glow.
+nothing glows.
+
+**The rest day's column is empty.** Not dim — empty. No socket, no ✕, no
+completion, on daily rows in the app and in the widget both. A socket says one
+is coming, and on a rest day none is; drawing one was the grid contradicting
+what the write path already enforced. A completion already on record **still
+counts** — `completedDays` is untouched, weekly totals are untouched, History
+still shows it — and is simply not drawn here. That reverses one clause of the
+original rest-day decision; see docs/decisions.md. The month widget inherits it
+without a second edit, because `MonthGrid` asks `WeekGrid`, so the rest
+weekday's column empties there too. VoiceOver still finds the slot, and it
+announces "rest day" with no button trait, because otherwise the hole in the
+row would have nothing explaining it.
+
+The grid draws the cut as one vertical line down the rest day's column, in the
+missed cross's grey — absence, which does not glow.
 Per-day habits are untouched: Today's rings stay tappable, because water and a
 walk are not the thing the rest is from. This reverses "resting is permission,
 not a prohibition" — see docs/decisions.md.

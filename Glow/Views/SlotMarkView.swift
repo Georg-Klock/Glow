@@ -32,6 +32,11 @@ struct SlotMarkView: View {
             // whether there is light in it — which is the whole app stated as a
             // pair of marks.
             upcomingMark
+        case .rest:
+            // Nothing at all — but at the slot's own size, so the column keeps
+            // its width and the other six do not move. A socket here would say
+            // *one is coming*, and on a rest day none is.
+            sized(Color.clear)
         }
     }
 

@@ -157,11 +157,21 @@ stop, and only the second one is restful. The refusal lives in
 widget's intent share, so a stale widget surface cannot write around it.
 Frequency rows stop with the day: nothing opens and nothing glows on it.
 
-What does not reverse: a completion already stored on a rest day still draws
-and still counts — a record of what happened stays a record of what happened —
-and per-day habits are untouched, because water and a walk are bodily and not
-the thing the rest is from. The grid marks the cut as one vertical line down
-the rest day's column, in the missed cross's grey.
+What does not reverse: per-day habits are untouched, because water and a walk
+are bodily and not the thing the rest is from. The grid marks the cut as one
+vertical line down the rest day's column, in the missed cross's grey.
+
+**One clause did reverse, later** (2026-08-21, #72). A completion already
+stored on a rest day was said to "still draw and still count". It still
+*counts* — nothing is deleted, `completedDays` is untouched, weekly totals are
+untouched, and History still shows it — but the week grid stops drawing it, and
+so does the rest of the column: no socket, no ✕, nothing. The reason the
+original clause was right, that a record of what happened stays a record of
+what happened, is satisfied by the count and by History. The week grid's job is
+to say what is open, and on a rest day that is nothing — so `SlotState` gained
+a fifth case, `.rest`, which is not the same as `.inactive`: a socket says one
+is coming, and here none is. It wins over `isDone`, which is what makes "counts
+but is not drawn" a single rule rather than two that can disagree.
 ## Two greys, on purpose
 
 **Question** (#7). The grid's unlit text is `GlowPalette.labelResting`; the
