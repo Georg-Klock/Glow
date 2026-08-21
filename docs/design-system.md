@@ -131,16 +131,18 @@ doubled, and halving them again compounds the error.
 
 ### Not in the file
 
-Three effects exist in the app and nowhere in the design:
+Two effects exist in the app and nowhere in the design:
 
 - **HDR.** Every white above is a real PQ image with headroom, running to 6–12×
   SDR white. The file clips all of them to 255, so the app is deliberately not
   what the render shows. This is the product.
-- **Breathing.** Today's open ring eases between 85% and 100% opacity, 1.2s each
-  way. Requested directly; Reduce Motion switches it off. Open slots only — with
-  every completion glowing, a full week of pulsing dots is unreadable.
 - **Completion animation.** Ring holds 0.2s, fills solid 0.35s, collapses to the
   dot 0.25s.
+
+A third — the breathing, an 85%–100% opacity ease on the open glow — was built
+by request and later removed (#46): brightness is the app's one signal, and the
+breath said it a second time in a register nothing else uses. Nothing in the
+app animates on its own.
 
 ### Widget appearance
 

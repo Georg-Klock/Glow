@@ -135,26 +135,37 @@ but a build. It glows. Measured on an iPhone 14 Pro, iOS 26.
 The lesson is the same one this file already records twice: the assumption was
 load-bearing, cheap to check, and wrong. Check the cheap ones.
 
-## The breathing
+## The breathing: built, then removed
 
-The lit slot pulses: the glowing layer's opacity eases between 0.85 and 1.0 and
-back, forever, over 1.2 seconds each way. Core and halo breathe together, so the two
-never drift out of step.
+The lit slot used to pulse: the glowing layer's opacity eased between 0.85 and
+1.0 and back, forever, over 1.2 seconds each way, core and halo together. It was
+deliberately shallow — the job was to catch the eye in peripheral vision, not to
+blink at anyone — and Reduce Motion switched it off entirely.
 
-It is deliberately shallow. The job is to catch the eye in peripheral vision,
-not to blink at anyone, and a pulse this subtle is the difference between
-"something here is live" and a notification badge.
+It came out on 2026-08-21 (#46), a reversal recorded in
+[decisions.md](decisions.md). The glow already says the one thing it needs to
+say — *still open* — by being brighter than white. The breath said it a second
+time, in a register nothing else in the app uses: everything else here is a
+state, drawn once, that changes only when you change it. With it gone, nothing
+in `GlowModifier` animates, and the Reduce Motion branch that existed only to
+still the breath went with it.
 
-**Reduce Motion switches it off entirely.** Oscillating content is exactly what
-that setting exists for, and an app whose only signal is a glowing shape has to
-survive the glow standing still.
+Two measurements from the breath's lifetime outlive it and are kept here on
+purpose:
 
-Animating opacity on the HDR layer is the thing `SlotView`'s completion
-transition deliberately avoids, on the theory that a compositor might flatten an
-animated HDR layer into SDR. **It does not.** Confirmed on an iPhone 14 Pro: the
-slot still reads as HDR while breathing. That theory can now be retired for the
-opacity case, though the completion transition keeps its approach, which is
-correct for its own reasons.
+- **The compositor does not flatten an animated HDR layer into SDR.** Animating
+  opacity on the HDR layer is the thing `SlotView`'s completion transition
+  deliberately avoids, on exactly that theory. Confirmed wrong for the opacity
+  case on an iPhone 14 Pro: the slot still read as HDR while breathing. The
+  completion transition keeps its approach, which is correct for its own
+  reasons.
+- **The breath moved Today's rings** — a 15pt sideways walk, measured and
+  diagnosed in #45: `.animation(_:value:)` animates every animatable value
+  beneath it, and `GlowModifier` measures greedy content twice, once for the
+  caster and once for the mask. The second measurement landed after the
+  repeating breath was installed and became something to interpolate, forever.
+  With no repeating animation left in the modifier the bug cannot recur, but
+  the mechanism is worth remembering by anyone who animates anything here.
 
 ### Breathing in the widget: measured, then removed
 
@@ -185,8 +196,12 @@ Breathing continuously for a whole day at 1s would need 86,400 entries.
 The 30-minute shape is the only version that fits, and it trades the entire
 day's refresh allowance for a pulse nobody is watching most of the time — while
 risking the system truncating a timeline that large. A widget that is *stale* is
-worse than one that does not breathe, so the widget keeps a steady glow and the
-breathing stays in the app, where there is a real run loop.
+worse than one that does not breathe, so the widget kept a steady glow while the
+breath stayed in the app, where there is a real run loop.
+
+The app's breath has since come out too, for its own reason — one signal,
+brightness, said once — so the two surfaces now agree: a lit mark is lit and
+holds still, everywhere.
 
 **An animated GIF is not a way around this.** WidgetKit renders SwiftUI to a
 static snapshot; animated GIF and APNG do not animate in a widget. The only

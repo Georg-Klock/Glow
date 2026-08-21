@@ -227,10 +227,12 @@ rings, `glow://week` from the grid, mapped by `DeepLink` in `Logic/`. There
 is no fixed landing tab; a cold launch opens This Week, since the app icon
 has no widget to ask.
 
-The widget glows but does not breathe. The pulse was built, measured working
+Nothing breathes, anywhere. The widget's pulse was built, measured working
 (WidgetKit renders sub-minute entries, contrary to its reputation), and removed:
 it costs the day's entire refresh allowance, and a stale widget is worse than a
-still one. See docs/glow.md.
+still one. The app's own breath followed, for a different reason — brightness is
+the one signal, and movement said it twice. A lit mark is lit and holds still.
+See docs/glow.md.
 
 The store therefore lives in the App Group container rather than the app's
 private one, and `StoreLocation` migrates a pre-widget store into it on first

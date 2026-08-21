@@ -105,10 +105,10 @@ transition, which is documented in place and in [glow.md](glow.md).
 
 `TodayView` shows the per-day habits as rings — the small and medium widget at
 app size, per docs/vision.md — and nothing week-shaped. `DayRingView` draws the
-arcs `DayRing` lays out, with the open arcs glowing as one layer: one HDR tile,
-one halo pass, one breathing animation, rather than a dozen lights drifting out
-of phase. The tile is shape-free and cached per intensity, so an arc is a mask
-like any other and costs the cache nothing.
+arcs `DayRing` lays out, with the open arcs glowing as one layer: one HDR tile
+and one halo pass, rather than a dozen separately composited lights. The tile is
+shape-free and cached per intensity, so an arc is a mask like any other and
+costs the cache nothing.
 
 Width flows down rather than being measured per row: `WeeklyGridView` reads the
 screen width once, builds a `RowGeometry`, and hands the same value to the
