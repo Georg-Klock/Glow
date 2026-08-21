@@ -203,6 +203,19 @@ rings already say everything it could. Small is one habit's ring, and the
 person picks which habit per widget, so several small widgets can sit on one
 home screen showing different habits. Medium is the first three per-day
 habits in the user's own order, all the same size, with nothing to configure.
+
+**The month widget**: small only, one weekly-cadence habit's calendar month
+as marks on weekday columns — the same marks the week draws, decided by
+`MonthGrid` asking `WeekGrid`, so the two surfaces cannot disagree about a
+day. The 1st sits under the weekday it really falls on, so the first and last
+rows are ragged. The habit is chosen per widget; per-day habits are not
+selectable, because their day is a count, not a yes. Today's dot is a button
+through `ToggleHabitIntent` — no other day is, which is R2 in a third grid —
+and everything else opens This Week. Two readings held deliberately small
+until decided otherwise (#41): an N×/week habit's empty days are sockets,
+never crosses — the week grid's own rule, not a per-week verdict — and rest
+days get no month-specific treatment beyond what `WeekGrid` already says
+about them.
 Each ring is a button backed by `TapHabitIntent`: one more repetition, or the
 reset from a full ring, without leaving the home screen.
 
