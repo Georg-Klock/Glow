@@ -6,10 +6,13 @@ import SwiftUI
 /// behaviour when a keyboard appears, its accessibility. Three ways of looking
 /// at the same completions, widest to narrowest, and then settings.
 ///
-/// The order is deliberate. Left to right is a zoom: the year, the week, today.
-/// The screen that opens is the middle one, because the week is the app — the
-/// year is context and today is a shortcut.
+/// There is no fixed landing tab. A widget opens its own screen — the daily
+/// rings land on Today, the week grid lands on This Week — so you arrive at
+/// the bigger version of what you were just looking at. Only a cold launch
+/// has no widget to ask, and it opens This Week: the denser screen, with
+/// Today one tap away.
 struct RootTabView: View {
+    /// The cold-launch screen. Deep links overwrite it before anything shows.
     @State private var selection: Screen = .week
 
     /// Not named `Tab`: SwiftUI has its own, and shadowing it makes the builder
@@ -37,5 +40,12 @@ struct RootTabView: View {
             }
         }
         .tint(GlowPalette.color)
+        .onOpenURL { url in
+            switch DeepLink.destination(for: url) {
+            case .today: selection = .today
+            case .week: selection = .week
+            case nil: break
+            }
+        }
     }
 }

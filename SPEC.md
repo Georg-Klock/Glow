@@ -193,6 +193,13 @@ habits in the user's own order, all the same size, with nothing to configure.
 Each ring is a button backed by `TapHabitIntent`: one more repetition, or the
 reset from a full ring, without leaving the home screen.
 
+**The widget chooses the screen.** A widget's surface divides in two: the
+marks act in place through their intents and open nothing, and everything
+else opens the app on that widget's own screen — `glow://today` from the
+rings, `glow://week` from the grid, mapped by `DeepLink` in `Logic/`. There
+is no fixed landing tab; a cold launch opens This Week, since the app icon
+has no widget to ask.
+
 The widget glows but does not breathe. The pulse was built, measured working
 (WidgetKit renders sub-minute entries, contrary to its reputation), and removed:
 it costs the day's entire refresh allowance, and a stale widget is worse than a

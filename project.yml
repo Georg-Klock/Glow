@@ -44,6 +44,16 @@ targets:
       SystemCapabilities:
         com.apple.ApplicationGroups.iOS:
           enabled: 1
+    # The glow:// scheme the widgets deep-link through — a widget opens the
+    # app on its own screen. CFBundleURLTypes is a nested structure, which the
+    # flat INFOPLIST_KEY_ settings below cannot express, so it rides in a
+    # generated plist that Xcode merges with the generated keys.
+    info:
+      path: Glow/Info.plist
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLName: com.georgklock.glow
+            CFBundleURLSchemes: [glow]
     dependencies:
       - target: GlowWidget
         embed: true
