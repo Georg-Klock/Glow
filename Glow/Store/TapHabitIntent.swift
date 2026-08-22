@@ -66,8 +66,10 @@ struct TapHabitIntent: LiveActivityIntent {
         GlowLog.widget.notice("\(outcome, privacy: .public)")
         WidgetTrace.record(outcome)
 
-        // The widget's own timeline is now stale by definition.
-        WidgetCenter.shared.reloadAllTimelines()
+        // The widget's own timeline is now stale by definition. Through
+        // `WidgetRefresh` so it coalesces with the store's own invalidation
+        // rather than asking twice.
+        WidgetRefresh.invalidate()
         return .result()
     }
 }

@@ -85,9 +85,11 @@ struct ToggleHabitIntent: LiveActivityIntent {
         GlowLog.widget.notice("\(outcome, privacy: .public)")
         WidgetTrace.record(outcome)
 
-        // The widget's own timeline is now stale by definition — and after a
-        // refusal it was stale before the tap, which is how the tap happened.
-        WidgetCenter.shared.reloadAllTimelines()
+        // Explicit, and not redundant with the store's own invalidation: a
+        // refusal saves nothing, so nothing would invalidate — and after a
+        // refusal the surface was stale *before* the tap, which is how the tap
+        // happened. Same mechanism, so the two coalesce. See `WidgetRefresh`.
+        WidgetRefresh.invalidate()
         return .result()
     }
 }

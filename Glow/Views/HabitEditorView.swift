@@ -353,7 +353,6 @@ struct HabitEditorView: View {
         guard let habit else { return }
         do {
             try HabitStore(context: context).delete(habit)
-            WidgetCenter.shared.reloadAllTimelines()
             dismiss()
         } catch {
             HabitStore.report(error, operation: "delete")
@@ -368,7 +367,6 @@ struct HabitEditorView: View {
             } else {
                 try store.addHabit(name: trimmedName, icon: icon, frequency: frequency)
             }
-            WidgetCenter.shared.reloadAllTimelines()
             dismiss()
         } catch {
             HabitStore.report(error, operation: isEditing ? "update" : "addHabit")

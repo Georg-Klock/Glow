@@ -993,3 +993,42 @@ directory anyway. That redundancy is the point: deleting either file now fails
 **built** `.app` and every `.appex` inside it rather than the repository,
 because a manifest that exists in the source tree and does not reach the shipped
 bundle is exactly this issue wearing a different hat.
+
+## The reload lives next to the write, and coalesces
+
+**2026-08-22.** "Call `reloadAllTimelines()` at the call site" kept being
+forgotten (#134). Swipe-delete and reorder both saved without one. So did the
+week's first day and the glow level, which are not model writes at all but do
+change what a widget draws. A widget then showed an order, a row or a set of
+columns that no longer existed, until something unrelated happened to reload it.
+
+**So the reload moved next to the write.** Every committed write in `HabitStore`
+now goes through a private `commit()` that saves and then invalidates. A new
+write path cannot forget, because forgetting means not saving. The view-layer
+reloads that followed a store write are gone; the ones that do not follow one —
+the two intents, the seeder, the demo history, and the three preferences — say
+so themselves and say why.
+
+**A refusal still invalidates nothing**, because nothing was saved. The intents
+ask separately in that case, and deliberately: after a rest-day refusal the
+widget's surface was stale *before* the tap, which is how the tap happened.
+
+**Coalescing is the other half.** One gesture is often several writes — a
+reorder rewrites `sortOrder` on every row — and requests made in the same turn
+of the main actor become one reload, so the reload count is proportional to
+gestures rather than to rows. Whether that also helps the delay measured in #121
+is untested and not claimed here; this is about correctness, not latency.
+
+**`WidgetKind` is one source for four strings.** A kind is a persistent
+identifier: WidgetKit stores it against every widget a person has placed, so
+renaming one orphans their widget rather than renaming it. Spelled out at each
+`StaticConfiguration` *and* wherever a reload names a kind, the two drift and
+`reloadTimelines(ofKind:)` quietly does nothing. Each widget's `kind` now reads
+from the enum, so there is no second spelling; the test pins the raw values,
+which is the part a rename would break for people who already have the widget.
+
+**And the week grid observes the week's first day.** `WeekCalendar` read the
+preference, so the value was correct — but a value read only inside
+`WeekCalendar` is a dependency SwiftUI cannot see, and the grid kept its old
+columns until something else redrew it. Read in `week`, the same way
+`HabitRowView` reads the rest day.

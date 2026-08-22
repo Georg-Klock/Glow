@@ -87,7 +87,14 @@ struct SettingsView: View {
             // Covers the toggle and the day picker both: the widget draws the
             // same week and withholds the same taps, and it is not told when
             // the setting moves.
-            .onChange(of: restDay) { _, _ in WidgetCenter.shared.reloadAllTimelines() }
+            // Three preferences, and every one of them changes what a widget
+            // draws: the rest day empties a column and withholds its taps, the
+            // week's first day moves every column, and the glow level is the
+            // brightness the marks are rendered at. Only the first had a reload
+            // (#134).
+            .onChange(of: restDay) { _, _ in WidgetRefresh.invalidate() }
+            .onChange(of: firstWeekday) { _, _ in WidgetRefresh.invalidate() }
+            .onChange(of: peak) { _, _ in WidgetRefresh.invalidate() }
         }
     }
 
@@ -371,8 +378,9 @@ struct SettingsView: View {
                     HabitStore.report(error, operation: wantsDemo ? "seedDemo" : "removeDemo")
                 }
                 isDemoSeeded = demo.isSeeded
-                // The widgets read the same store and are not told it changed.
-                WidgetCenter.shared.reloadAllTimelines()
+                // Demo history writes through `DemoHistory` rather than
+                // `HabitStore`, so it says so itself. See `WidgetRefresh`.
+                WidgetRefresh.invalidate()
             }
         )
     }
