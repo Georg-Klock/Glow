@@ -26,3 +26,7 @@ Local.xcconfig
 
 # Scratch space for drafts and notes that are worth keeping but not shipping.
 private/
+
+# Claude Code, per-machine. Permission grants are a property of this
+# checkout and this operator, not of the project.
+.claude/settings.local.json
