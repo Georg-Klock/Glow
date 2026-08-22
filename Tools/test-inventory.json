@@ -21,7 +21,7 @@
     "and a visual failure has to leave images a person can look at. See #138."
   ],
   "bundles": {
-    "GlowTests": { "minimum": 370 },
+    "GlowTests": { "minimum": 398 },
     "GlowRenderTests": { "minimum": 12 }
   },
   "requiredAttachments": ["render-signatures-actual.json"],
