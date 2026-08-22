@@ -58,6 +58,11 @@ targets:
         # here so TestFlight never parks a build on "Missing Compliance"
         # waiting for the same click every upload.
         ITSAppUsesNonExemptEncryption: false
+        # The Dynamic Island's pop is a Live Activity, and ActivityKit refuses
+        # to start one without this key. It goes here rather than in a plist,
+        # because Glow/Info.plist is generated from this file and untracked —
+        # see #37 / #42.
+        NSSupportsLiveActivities: true
     dependencies:
       - target: GlowWidget
         embed: true

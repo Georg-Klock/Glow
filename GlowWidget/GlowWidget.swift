@@ -190,5 +190,8 @@ struct GlowWidgetBundle: WidgetBundle {
         TodaySmallWidget()
         TodayMediumWidget()
         MonthWidget()
+        // Not a home screen widget: the Dynamic Island's two seconds when a
+        // goal is met. A Live Activity is declared in the same bundle. See #58.
+        GoalPopActivity()
     }
 }

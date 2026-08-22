@@ -65,6 +65,19 @@ sentence with an exception is two sentences.
   transition itself. These were explored as candidate glow moments and cut, to
   keep the interaction model at one rule rather than three.
 
+  **One exception, and it is bounded** (#58). When a goal is met — the day's
+  target for a per-day habit, the week's for a weekly one — the Dynamic Island
+  says so for two seconds. The non-goal above is about the surfaces that
+  *record state*: the grid, the rings, the widgets, all of which say one thing
+  in one register. The pop is outside all of them, it is transient, and nothing
+  it says persists. No streak is counted, no badge is kept, and the grid is
+  identical whether it fired or not. A switch in Settings turns it off, default
+  on.
+
+  The alternative was to rewrite §1 so that light may also mean *well done*.
+  That was declined: it would put a second meaning on the one signal the app
+  has. See docs/decisions.md.
+
 ## 4. Data model
 
 ```swift
