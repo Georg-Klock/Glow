@@ -3,8 +3,26 @@ import Foundation
 
 /// Requests the Dynamic Island's pop, and ends it.
 ///
-/// One place, so the app and the widget's intents cannot disagree about when it
-/// fires or how long it lasts.
+/// One place, so no two callers can disagree about when it fires or how long it
+/// lasts.
+///
+/// **Called from the intents only, never from the app's own taps** (#103). The
+/// Island does not render a Live Activity while its own app is in the
+/// foreground — measured: `Activity.request` succeeds, `chronod` subscribes an
+/// Island renderer with the right metrics, and the Island stays a plain pill
+/// until the app is backgrounded. So a goal met on Today or This Week used to
+/// request an activity nobody could see and end it two seconds later, having
+/// drawn its Lock Screen presentation for the bin.
+///
+/// Not harmful, but a feature whose entire content is two seconds on screen
+/// should not have a path that spends them on nothing. The app has its own
+/// acknowledgement and it is the right one: the ring closes, the label dims,
+/// the row goes quiet. Putting something *else* on that screen would be a new
+/// question, and one §3 was amended once already to allow this much.
+///
+/// The intents run in the app's process but not in its foreground — a widget
+/// tap happens on the home screen, which is exactly where the pop is visible.
+/// That is why the rule reads as "the intents" rather than as "the widget".
 ///
 /// Every path in here fails quietly. A pop is the least important thing the app
 /// does — a habit is logged whether or not the Island says so — and an error
@@ -15,6 +33,9 @@ enum GoalPopCentre {
     ///
     /// Takes the verdict rather than computing it: `GoalMet` is pure and
     /// testable, and the callers already know what they just wrote.
+    ///
+    /// Both callers are intents. See the note on the type before adding a
+    /// third from a view.
     static func popIfMet(
         habit: HabitSnapshot,
         in week: Week,
