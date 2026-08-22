@@ -391,7 +391,27 @@ struct WidgetRenderDiffTests {
              CGSize(width: 158, height: 158)),
             ("today medium", AnyView(TodayMediumView(entry: today)),
              CGSize(width: 338, height: 158)),
+            // The densest family, and the one most likely to lose the ground
+            // claim without anyone noticing: six rows of seven cells, where a
+            // lifted floor reads as "the marks are dim" rather than as "the
+            // background is wrong".
+            ("month small", AnyView(MonthWidgetView(entry: monthEntry())),
+             CGSize(width: 158, height: 158)),
         ]
+    }
+
+    /// A month with something in it: completions, misses, and today still open,
+    /// so the sweep runs against marks rather than an empty grid.
+    private func monthEntry() -> MonthEntry {
+        let week = entry()
+        return MonthEntry(
+            date: week.date,
+            habit: HabitSnapshot(
+                id: UUID(), name: "Workout", icon: "figure.run",
+                frequency: .daily,
+                completedDays: Set(week.week.days.prefix(2))
+            )
+        )
     }
 
     /// Renders with the glow at the bottom of its range, where
