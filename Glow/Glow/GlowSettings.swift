@@ -32,9 +32,51 @@ enum GlowSettings {
 
     /// The App Group's defaults, so app and widget agree. Falls back to the
     /// app's own when the entitlement is unavailable, exactly as the store does.
+    ///
+    /// **Under tests this is a private suite, and that is a correctness fix
+    /// rather than tidiness** (#168). `WeekPreferences.restDay` lives here, one
+    /// value for the whole store, and it *outlives the process*. A test that
+    /// sets one and dies before its `defer` runs — a crash, a cancelled run, or
+    /// a hard trap like the SwiftData precondition #145 is about — leaves the
+    /// value written into the simulator's App Group defaults. Every later run
+    /// on that simulator then inherits it, and a whole weekday quietly
+    /// disappears from generated history.
+    ///
+    /// That is not hypothetical: it was found as `weekRestDay = 7` sitting on
+    /// the simulator `Tools/test.sh` picks, turning 42 tests red while the same
+    /// commit passed on CI and on a second simulator. `TestPreferences`
+    /// restores correctly; restoring is simply not something a dead process
+    /// does.
+    ///
+    /// Keyed by process id, so two test targets running at once cannot share
+    /// one either, and cleared on first use so every process starts from
+    /// nothing. Production is untouched — no test bundle, no override.
     static var store: UserDefaults {
-        UserDefaults(suiteName: StoreLocation.appGroupID) ?? .standard
+        if let testStore { return testStore }
+        return UserDefaults(suiteName: StoreLocation.appGroupID) ?? .standard
     }
+
+    /// A private, per-process defaults suite when running under a test bundle.
+    ///
+    /// `nil` in the app and in the widget, so neither pays for this.
+    /// `nonisolated(unsafe)` because `UserDefaults` is not `Sendable` and this
+    /// is a `let` initialised once: there is no mutable state to race on, and
+    /// `UserDefaults` is itself thread-safe. The same reasoning `store` above
+    /// relies on every time it hands one out.
+    private nonisolated(unsafe) static let testStore: UserDefaults? = {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["XCTestConfigurationFilePath"] != nil
+            || environment["XCTestBundlePath"] != nil
+            || environment["XCTestSessionIdentifier"] != nil
+        else { return nil }
+
+        let suite = "\(StoreLocation.appGroupID).tests.\(ProcessInfo.processInfo.processIdentifier)"
+        guard let defaults = UserDefaults(suiteName: suite) else { return nil }
+        // A recycled process id would otherwise hand this run the last one's
+        // leftovers, which is the bug wearing a smaller hat.
+        defaults.removePersistentDomain(forName: suite)
+        return defaults
+    }()
 
     /// The stored value, clamped. An out-of-range number could otherwise arrive
     /// from a future build, a synced default, or a hand-edited plist, and a
