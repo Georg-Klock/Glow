@@ -127,9 +127,15 @@ enum GlowPalette {
     /// top and bottom. 2.5 on 17.5, same offset.
     static let ringInnerRadius: CGFloat = 2.5 / 17.5
 
-    /// A 1% white wash inside the ring. Almost nothing, and the file is explicit
-    /// about it being non-zero.
-    static let ringWash = Color.white.opacity(0.01)
+    // No `ringWash`. The design file gave the open ring a 1% white fill and this
+    // type carried the token for it, declared and never applied through every
+    // release so far — `GlowImageView` draws the ring with `strokeBorder`, which
+    // paints a border and no fill. Deleted rather than wired up (#65): the
+    // document that specified it no longer exists, the ring's interior is
+    // deliberately clear, and a 1% white is the wrong sign for the only problem
+    // that interior actually has — halo bleed from the neighbouring segments
+    // making it read grey, whose fix is black beneath the glow, not white
+    // inside it. See docs/decisions.md.
 
     /// Halo reach for glowing text, in points. Tighter than a mark's and not
     /// proportional to it: a glyph is thin, and a mark's halo turns a word into
