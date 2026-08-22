@@ -183,7 +183,11 @@ what happened rather than of what was owed.
 at least one column wide and together they cover all seven with no gaps. A rep
 with no day left to land on still gets a column — it stops being the open one
 and draws a ✕ instead, inert and permanent for the week: not tappable, not
-undoable, and it does not take the row down with it. The reps still reachable
+undoable, and it does not take the row down with it. **A lost rep never
+occupies the rest day's column alone**: `RestWindow` subtracts that column from
+whatever shape crosses it, so a span exactly its width would be removed
+entirely, and the ✕ would be drawn and invisible. Such a span takes the next
+column with it and the mark sits in what is left. The reps still reachable
 keep glowing beside it, because a partially lost week is not a finished one.
 This used to produce *fewer* than N shapes, and it did so exactly when the goal
 was running out of room. The rest day enters only through which days count as

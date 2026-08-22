@@ -28,13 +28,13 @@ struct SlotMarkView: View {
             // the row is a record of what happened, and Monday happened.
             glow(spansDays ? .bar : .dot)
         case .missed:
-            missedMark
+            missedMark.offset(x: restOffset(fillsSpan: false))
         case .upcoming:
             // The same shape and size as a completion, only unlit. A day that
             // has not happened and a day that has differ by exactly one thing —
             // whether there is light in it — which is the whole app stated as a
             // pair of marks.
-            upcomingMark
+            upcomingMark.offset(x: restOffset(fillsSpan: spansDays))
         case .rest:
             // Nothing at all — but at the slot's own size, so the column keeps
             // its width and the other six do not move. A socket here would say
@@ -103,5 +103,34 @@ struct SlotMarkView: View {
         } else {
             content.frame(width: size.width, height: size.height)
         }
+    }
+
+    /// Where a small mark sits when the rest day has taken part of its span.
+    ///
+    /// A ✕ and a socket are centred in their frame, and a span whose frame is
+    /// partly removed would centre them into the removed part — drawn, and
+    /// invisible. So they move to the middle of what is left (#100).
+    ///
+    /// Nothing for a bar or a lozenge: those fill their span and are cut by the
+    /// window itself, which is the point of #73. This is only for the marks
+    /// that are smaller than the shape they sit in.
+    ///
+    /// **A ✕ is one of those at any width.** `spansDays` decides bar-versus-dot
+    /// and capsule-versus-circle; it does not reach `missedMark`, which is a
+    /// fixed cross centred in whatever frame it is given. Guarding this on
+    /// `!spansDays` therefore skipped exactly the case #100 is about — the
+    /// two-column lost span — and the cross measured at its frame's centre,
+    /// inside the removed window, rather than in the column left over.
+    private func restOffset(fillsSpan: Bool) -> CGFloat {
+        guard let restWindow, !fillsSpan else { return 0 }
+        let low = max(restWindow.lowerBound, 0)
+        let high = min(restWindow.upperBound, size.width)
+        guard high > low else { return 0 }
+        // Whichever side of the window has more room left.
+        let leftRoom = low
+        let rightRoom = size.width - high
+        guard max(leftRoom, rightRoom) > 0 else { return 0 }
+        let centre = leftRoom >= rightRoom ? leftRoom / 2 : high + rightRoom / 2
+        return centre - size.width / 2
     }
 }

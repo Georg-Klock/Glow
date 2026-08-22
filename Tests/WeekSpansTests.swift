@@ -345,6 +345,86 @@ struct LateWeekSpansTests {
         #expect(spans.first { $0.state == .inactive }?.mark == nil)
     }
 
+    // MARK: - No span is exactly the rest column (#100)
+
+    /// True when the rest day's window covers a span from end to end, so
+    /// nothing of it is drawn.
+    private func isSwallowed(_ span: SlotSpan, restColumn: Int) -> Bool {
+        let track: CGFloat = 194
+        guard let window = RestWindow.inSpan(
+            firstDay: span.firstDay, lastDay: span.lastDay,
+            restIndex: restColumn, trackWidth: track
+        ) else { return false }
+        let width = SlotLayout.spanWidth(trackWidth: track, dayCount: span.dayCount)
+        return window.lowerBound <= 0 && window.upperBound >= width
+    }
+
+    /// Every row this suite can build, as `(rest, target, today, done)`.
+    private func everyRow(_ check: (Int, [SlotSpan], String) -> Void) {
+        for restColumn in 0...6 {
+            withRest(restColumn) {
+                for target in 1...6 {
+                    for todayColumn in 0...6 {
+                        for doneCount in 0..<target where doneCount <= todayColumn {
+                            let done = Array(0..<doneCount)
+                            let spans = row(
+                                target: target, done: done, todayColumn: todayColumn
+                            )
+                            let what = "rest \(restColumn), target \(target), today \(todayColumn), done \(doneCount): \(shape(spans))"
+                            check(restColumn, spans, what)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test("A lost rep never occupies the rest column alone")
+    func noSpanIsSwallowedWhole() {
+        // The bug: a one-column span *on* the rest column has its whole extent
+        // subtracted by `RestWindow`, so the ✕ was drawn and invisible and the
+        // row showed one fewer mark than its goal. 6x/week on Sunday with
+        // Wednesday resting drew four crosses for five lost reps.
+        //
+        // **Only `.missed`.** A `.filled` or `.inactive` span draws as
+        // structure — the same unlit line either way, since #47 — and structure
+        // vanishing in the rest column is not a loss, it is #72: that column
+        // draws nothing at all. A ✕ is the one span-mark that is a *claim*, and
+        // a claim silently not drawn is the thing being ruled out. This sweep
+        // records 78 swallowed structural spans and no crosses, which is the
+        // shape the two rules together should produce.
+        everyRow { restColumn, spans, what in
+            for span in spans
+            where span.state == .missed && isSwallowed(span, restColumn: restColumn) {
+                Issue.record("a cross vanishes — \(what)")
+            }
+        }
+    }
+
+    @Test("The seven columns are still covered, with a rest day anywhere")
+    func coverageSurvivesTheStraddle() {
+        everyRow { _, spans, what in
+            #expect(spans.first?.firstDay == 0, "starts at 0 — \(what)")
+            #expect(spans.last?.lastDay == 6, "ends at 6 — \(what)")
+            for (a, b) in zip(spans, spans.dropFirst()) {
+                #expect(b.firstDay == a.lastDay + 1, "gap — \(what)")
+            }
+        }
+    }
+
+    @Test("The row that reported it draws five crosses, not four")
+    func theReportedRow() {
+        var spans: [SlotSpan] = []
+        withRest(2) { spans = row(target: 6, todayColumn: 6) }
+        let drawn = shape(spans)
+        let crosses = spans.filter { $0.state == .missed }.count
+        #expect(crosses == 5, "\(drawn)")
+        // The one that used to sit on the rest column now takes the next
+        // column with it, so it has somewhere to be seen.
+        let onRest = spans.first { $0.firstDay <= 2 && $0.lastDay >= 2 }
+        #expect(onRest?.dayCount == 2, "\(drawn)")
+    }
+
     @Test("Nothing is tappable on the rest day, and the open span is otherwise")
     func tappability() {
         withRest(3) {
