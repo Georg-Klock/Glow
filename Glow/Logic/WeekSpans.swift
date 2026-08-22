@@ -22,10 +22,13 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
         switch state {
         case .open: .openToday
         case .filled: .donePast
+        // A rep that can no longer happen. Reachable only through #81's `lost`,
+        // and only once the miss is unavoidable — never as a warning.
+        case .missed: .missed
         // `.rest` never arrives here: a span covers a run of days rather than
         // one, so the rest day is a hole *inside* a span rather than a state a
         // whole span can be in. Subtracting that hole from the shape is #73.
-        case .missed, .inactive, .rest: .upcoming
+        case .inactive, .rest: .upcoming
         }
     }
 }
@@ -69,9 +72,11 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
 /// before: it takes everything before today, or everything before the columns
 /// the remaining reps need, whichever is less.
 ///
-/// Those lost spans draw as unlit sockets here, because `SlotSpan.mark` folds
-/// `.inactive` into `.upcoming`. Making them read as a miss is #82, which is a
-/// change of mark and not of geometry.
+/// Those lost spans draw as a ✕ (#82). The strictness matters: `lost` uses
+/// `repsLeft > actionableLeft`, not `>=`, so on Saturday with two reps owed and
+/// Sunday still live the row stays clean and the ✕ arrives on Sunday. The mark
+/// says a miss has *become unavoidable*; it is never a warning and never a
+/// prediction.
 enum WeekSpans {
     static func spans(
         for habit: HabitSnapshot,
@@ -187,13 +192,16 @@ enum WeekSpans {
         // so they divide it — which is also the only way the seven columns stay
         // covered when nothing was ever logged.
         guard live > 0 else {
-            spans += divide(cursor, lastColumn, into: lost, from: spans.count) { _ in .inactive }
+            spans += divide(cursor, lastColumn, into: lost, from: spans.count) { _ in .missed }
             return withUndo(spans, doneToday: doneToday, todayRests: todayRests, today: todayStart)
         }
         for _ in 0..<lost {
             spans.append(SlotSpan(
                 index: spans.count, firstDay: cursor, lastDay: cursor,
-                state: .inactive, actionDay: nil
+                // Inert and permanent for the week: never tappable, never
+                // undoable, and it does not take the row down with it — the
+                // reps still reachable keep glowing beside it.
+                state: .missed, actionDay: nil
             ))
             cursor += 1
         }

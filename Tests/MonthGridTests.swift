@@ -82,26 +82,76 @@ struct MonthGridTests {
         }
     }
 
-    @Test("An N-per-week habit's empty days are sockets, never crosses")
-    func frequencyNeverMisses() {
-        // The open question the issue records — whether a month should carry a
-        // per-week verdict — is deliberately not answered here. What is
-        // asserted is the week grid's own rule carried over: an empty Monday
-        // is not a failure on Tuesday, so no day of an N×/week habit is ever
-        // drawn missed.
+    @Test("An N-per-week habit's winnable week draws no crosses")
+    func frequencyNeverMissesAWinnableWeek() {
+        // Three a week with two logged in the week beginning the 10th, which
+        // ended one short — but *this* week still holds nothing and is still
+        // winnable, so it carries no X. The rule bounds "an empty Monday is
+        // not a failure on Tuesday"; it does not reverse it.
         let habit = HabitSnapshot.fixture(
             frequency: .timesPerWeek(3),
             completedDays: [TestCalendar.date(2026, 8, 10), TestCalendar.date(2026, 8, 12)]
         )
         let cells = MonthGrid.cells(for: habit, today: today, calendar: calendar)
 
-        #expect(!cells.contains { $0.mark == .missed })
         #expect(cells.count { $0.mark == .donePast } == 2)
         // This week holds nothing yet, so today is open by the week row's own
         // verdict, and it is the only tappable cell.
         let todayCell = cells.first { $0.date == today }
         #expect(todayCell?.mark == .openToday)
         #expect(cells.count(where: \.isTappable) == 1)
+
+        // Nothing in this week or later is crossed: today and the days after
+        // it can still be acted on.
+        let thisWeek = WeekCalendar.week(containing: today, calendar: calendar)
+        #expect(!cells.contains { $0.mark == .missed && $0.date >= thisWeek.start })
+    }
+
+    @Test("A lost week Xs its past unlogged days, and nothing else")
+    func lostWeekCrossesItsPast() {
+        // The week beginning Monday the 10th ran out one rep short, so its
+        // unlogged past days are crossed — the week row compresses that loss
+        // to one column, the month says which days it cost.
+        let habit = HabitSnapshot.fixture(
+            frequency: .timesPerWeek(3),
+            completedDays: [TestCalendar.date(2026, 8, 10), TestCalendar.date(2026, 8, 12)]
+        )
+        let cells = MonthGrid.cells(for: habit, today: today, calendar: calendar)
+        let lostWeek = WeekCalendar.week(containing: TestCalendar.date(2026, 8, 10), calendar: calendar)
+
+        let inWeek = cells.filter { lostWeek.contains($0.date) }
+        #expect(inWeek.count == 7)
+        // Two logged, five crossed — every unlogged day of it is in the past.
+        #expect(inWeek.count { $0.mark == .donePast } == 2)
+        #expect(inWeek.count { $0.mark == .missed } == 5)
+        #expect(inWeek.allSatisfy { !$0.isTappable })
+    }
+
+    @Test("A lost week never crosses the rest day")
+    func lostWeekSparesTheRestDay() {
+        withRestDay(calendar.component(.weekday, from: TestCalendar.date(2026, 8, 12))) {
+            let habit = HabitSnapshot.fixture(
+                frequency: .timesPerWeek(3),
+                completedDays: [TestCalendar.date(2026, 8, 10)]
+            )
+            let cells = MonthGrid.cells(for: habit, today: today, calendar: calendar)
+            let rest = cells.filter {
+                WeekPreferences.isRestDay($0.date, calendar: calendar)
+            }
+            #expect(!rest.isEmpty)
+            #expect(!rest.contains { $0.mark == .missed })
+        }
+    }
+
+    @Test("A met week is never crossed")
+    func metWeekIsClean() {
+        let habit = HabitSnapshot.fixture(
+            frequency: .timesPerWeek(2),
+            completedDays: [TestCalendar.date(2026, 8, 10), TestCalendar.date(2026, 8, 12)]
+        )
+        let cells = MonthGrid.cells(for: habit, today: today, calendar: calendar)
+        let lastWeek = WeekCalendar.week(containing: TestCalendar.date(2026, 8, 10), calendar: calendar)
+        #expect(!cells.contains { $0.mark == .missed && lastWeek.contains($0.date) })
     }
 
     @Test("A met week closes today, and a completion today can be undone")

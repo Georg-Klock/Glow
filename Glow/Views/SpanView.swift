@@ -78,8 +78,9 @@ struct SpanView: View {
         switch span.state {
         case .filled: "done"
         case .open: "due today"
+        case .missed: "missed"
         // A span is never `.rest` — see the note on `SlotSpan.mark`.
-        case .missed, .inactive, .rest: "still to come"
+        case .inactive, .rest: "still to come"
         }
     }
 

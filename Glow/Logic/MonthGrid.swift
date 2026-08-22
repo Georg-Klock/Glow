@@ -36,10 +36,20 @@ struct MonthCell: Identifiable, Equatable, Sendable {
 ///   about which weekday a completion sits on — but the month is a calendar,
 ///   so a completion shows on the day it really happened. Whether *today* is
 ///   open is still the week row's own verdict: `WeekGrid.slots` decides, and
-///   this asks. Every other day is an empty socket — never missed, because an
-///   empty Monday is not a failure on Tuesday, and a week already lost is a
-///   judgement this grid does not invent (see the note in the widget's spec
-///   entry: a per-week verdict was left as an open question).
+///   this asks.
+///
+///   **A lost week Xs its past unlogged days** (#82). It used to decline this
+///   verdict — "a week already lost is a judgement this grid does not invent" —
+///   and the judgement is no longer invented here: `WeekSpans` makes it, this
+///   grid asks how many reps that week lost, and Xs accordingly. The week row
+///   compresses a loss to one column; the month says which days it cost.
+///
+///   Four conditions, and the last is the one that keeps the mark honest: the
+///   week has lost a rep, the day holds no completion, the day is not the rest
+///   day, and the day is **strictly in the past**. A 3×/week row on Saturday
+///   with nothing logged has lost one rep, but Sunday can still carry another —
+///   an X on a day you can still act on would be a prediction, which is the one
+///   thing this mark must never be.
 enum MonthGrid {
     static func cells(
         for habit: HabitSnapshot,
@@ -62,6 +72,10 @@ enum MonthGrid {
         let todayIsOpen = weekVerdict.contains { $0.state == .open }
         let todayHasUndo = weekVerdict.contains { $0.isTappable && $0.state == .filled }
 
+        // A per-week habit's target, for the lost-rep verdict below. Daily rows
+        // take their marks straight off `WeekGrid` and never need it.
+        let weeklyTarget: Int? = if case .timesPerWeek(let n) = habit.frequency { n } else { nil }
+
         var cells: [MonthCell] = []
         var weekStart = WeekCalendar.startOfWeek(containing: month.start, calendar: calendar)
         var row = 0
@@ -70,6 +84,16 @@ enum MonthGrid {
             let slots: [Slot]? = habit.frequency == .daily
                 ? WeekGrid.slots(for: habit, in: week, today: todayStart, calendar: calendar)
                 : nil
+
+            // How many reps this week has run out of days for. Asked of
+            // `WeekSpans` rather than re-derived, so the month and the week row
+            // cannot disagree about whether a week is lost.
+            let lostThisWeek = weeklyTarget.map { target in
+                WeekSpans.spans(
+                    for: habit, in: week, today: todayStart,
+                    target: target, calendar: calendar
+                ).count { $0.state == .missed }
+            } ?? 0
 
             for (column, day) in week.days.enumerated() where month.contains(day) && day < month.end {
                 let mark: SlotMark
@@ -85,6 +109,13 @@ enum MonthGrid {
                 } else if day == todayStart, todayIsOpen {
                     mark = .openToday
                     actionDay = todayStart
+                } else if lostThisWeek > 0, day < todayStart,
+                          !WeekPreferences.isRestDay(day, calendar: calendar) {
+                    // A day of a lost week that went unlogged. Strictly past:
+                    // today and the days after it can still be acted on, and an
+                    // X there would be a prediction.
+                    mark = .missed
+                    actionDay = nil
                 } else {
                     mark = .upcoming
                     actionDay = nil

@@ -117,9 +117,13 @@ completions are logged, independent of which weekday each fell on.
 Every slot is in exactly one of five states.
 
 1. **Inactive.** A day still to come.
-2. **Missed.** A past day that went unlogged. Daily habits only — for a habit
-   due a number of times a week, an empty Monday is not a failure on Tuesday,
-   because the week is still winnable.
+2. **Missed.** A day, or a rep, that can no longer happen. For a daily habit
+   that is a past day that went unlogged. For a habit due a number of times a
+   week it is a rep with no day left to land on: an empty Monday is still not a
+   failure on Tuesday, and it becomes one once no day remains that could have
+   carried it. **Never a warning** — the test is strict, `repsLeft >
+   actionableLeft`, so on Saturday with two reps owed and Sunday still live the
+   row stays clean and the ✕ arrives on Sunday.
 3. **Open.** Today's slot, not yet completed. The only glowing state.
 4. **Filled.** Completed.
 5. **Rest.** The rest day: a day nothing can happen on, which is not the same
@@ -133,6 +137,22 @@ A habit due a number of times a week is not day-pinned, so it is not drawn as
 seven columns at all: `WeekSpans` divides the week into N shapes that stretch
 across it, with the open one always containing today. **That rule is inferred
 from the design rather than specified** — see the note on the type.
+
+**A weekly row draws exactly N shapes, however late in the week it is.** Each is
+at least one column wide and together they cover all seven with no gaps. A rep
+with no day left to land on still gets a column — it stops being the open one
+and draws a ✕ instead, inert and permanent for the week: not tappable, not
+undoable, and it does not take the row down with it. The reps still reachable
+keep glowing beside it, because a partially lost week is not a finished one.
+This used to produce *fewer* than N shapes, and it did so exactly when the goal
+was running out of room. The rest day enters only through which days count as
+actionable, which brings the squeeze forward by one.
+
+**A lost week shows in the month too.** `MonthGrid` asks `WeekSpans` how many
+reps a week lost and crosses that week's unlogged past days — the week row
+compresses a loss to one column, the month says which days it cost. Strictly
+past: today and the days after it can still be acted on, and a ✕ there would be
+a prediction.
 
 **What any of this looks like is deliberately not written down.** The visual
 design is being worked on directly and prose here would only go stale between
