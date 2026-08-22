@@ -39,6 +39,41 @@ struct WidgetMetricsTests {
         ))
     }
 
+    @Test("The medium widget holds five habits, by one point")
+    func mediumHoldsFive() {
+        // The medium family on the same 6.1" phone the file is authored for:
+        // the same width, and so the same track and the same slot, in 158pt of
+        // height with no header.
+        //
+        // Five is the whole of #57. It was four, missing by 0.05 of a row, and
+        // `padVertical` gave up the point that closes it. This test is the
+        // guard on that point: put 16 back and the count silently returns to
+        // four, which is exactly how it went unnoticed the first time.
+        let mediumHeight: CGFloat = 158
+        #expect(WidgetMetrics.rowCapacity(
+            height: mediumHeight - WidgetMetrics.padVertical * 2,
+            slot: largeSlot,
+            hasHeader: false
+        ) == 5)
+
+        // And it really is one point of margin, not a rounding artifact: the
+        // file's own 16 gives four.
+        #expect(WidgetMetrics.rowCapacity(
+            height: mediumHeight - 16 * 2, slot: largeSlot, hasHeader: false
+        ) == 4)
+    }
+
+    @Test("The large widget's eleven survives the point")
+    func largeIsUnaffectedByThePoint() {
+        // `padVertical` moved for the medium family's sake, and the large one
+        // must not have moved with it. Its spare change was never within a
+        // point of the next row, and this says so rather than trusting it.
+        #expect(WidgetMetrics.rowCapacity(
+            height: largeHeight - 16 * 2, slot: largeSlot, hasHeader: true
+        ) == 11)
+        #expect(WidgetMetrics.largeRowCapacity == 11)
+    }
+
     @Test("Eleven rows actually fit, and twelve do not")
     func capacityIsTheRealLimit() {
         let available = contentHeight - WidgetMetrics.headerHeight - WidgetMetrics.headerGap
