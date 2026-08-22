@@ -23,8 +23,19 @@ KEY="widgetTrace"
 
 device="${1:-}"
 if [ -z "$device" ]; then
+  # Excludes "unavailable" rather than requiring a positive word. The state
+  # column is prose, not an enum: a plugged-in, unlocked phone reads
+  # "available (paired)" here, not "connected", so matching /connected/ found
+  # nothing and the script fell through to its own "no connected device"
+  # branch — the same message an unplugged phone produces. That is the trap the
+  # header already warns about for "unavailable", made a second time by this
+  # script rather than by the device.
+  #
+  # The identifier's shape is the reliable part. If a future devicectl invents
+  # another word for usable, this keeps working; if it reports unavailable,
+  # the message below is the right one.
   device=$(xcrun devicectl list devices 2>/dev/null \
-    | awk '$0 ~ /connected/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9A-F]{8}-/) { print $i; exit } }')
+    | awk '$0 !~ /unavailable/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9A-F]{8}-/) { print $i; exit } }')
 fi
 
 if [ -z "$device" ]; then
