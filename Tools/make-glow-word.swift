@@ -87,9 +87,33 @@ let typographicWidth = CGFloat(CTLineGetTypographicBounds(line, &ascent, &descen
 // Horizontal air only: any vertical padding would move the baseline, and the
 // manifest would have to carry it. The CSS pulls this back with a negative
 // margin so the word still sits where the text flow expects it.
-let padX = (fontSize * 0.06).rounded()
-let width = Int((typographicWidth + padX * 2).rounded(.up))
-let height = Int((ascent + descent).rounded(.up))
+// Room for the halo to fall off inside the plate. The glow is baked into the
+// image rather than added in CSS, so the plate has to be big enough to contain
+// it — a blur that runs into the edge reads as a cut-off rectangle.
+//
+// It is baked in for two reasons. A CSS filter forces a rasterisation that
+// tone-maps to SDR, so a CSS halo around an HDR word is a dim halo around a
+// bright word. And blurring an *opaque* plate cannot be undone by a blend mode:
+// `mix-blend-mode: screen` needs the page's black to cancel against, and an
+// element that already has `filter` and `opacity` is an isolated group, so the
+// blurred black plate composites as grey. Measured on the staging page: a
+// visible rectangle around the word, with the blur layer alone and no grain.
+let padX = (fontSize * 0.22).rounded()
+let padY = (fontSize * 0.16).rounded()
+
+// Both dimensions are rounded up to even, and that is not cosmetic.
+//
+// ImageIO writes an AVIF this size as a *grid* of 512x512 tiles, and MIAF
+// (ISO/IEC 23000-22:2019, 7.3.11.4.2) requires a 4:2:0 grid's width and height
+// to be even. At 1119x479 — both odd — libavif refuses the file outright with
+// "Invalid image grid", so Chrome draws nothing at all. Apple's decoder is
+// lenient and shows it happily, which is why every check run on this Mac passed
+// while the file was unusable in the browser it was made for.
+//
+// Verify with `avifdec --info` after touching anything here, not with Preview.
+func evened(_ v: CGFloat) -> Int { let n = Int(v.rounded(.up)); return n + (n % 2) }
+let width = evened(typographicWidth + padX * 2)
+let height = evened(ascent + descent + padY * 2)
 
 guard let maskContext = CGContext(
     data: nil,
@@ -105,7 +129,7 @@ maskContext.setFillColor(gray: 0, alpha: 1)
 maskContext.fill(CGRect(x: 0, y: 0, width: width, height: height))
 maskContext.setAllowsAntialiasing(true)
 maskContext.setShouldSmoothFonts(true)
-maskContext.textPosition = CGPoint(x: padX, y: descent)
+maskContext.textPosition = CGPoint(x: padX, y: descent + padY)
 CTLineDraw(line, maskContext)
 
 guard let maskImage = maskContext.makeImage() else { fatalError("could not draw the word") }
@@ -118,7 +142,75 @@ print("word \"\(text)\" in \(fontName) at \(Int(fontSize))pt -> \(width)x\(heigh
 
 let ciContext = CIContext(options: [.workingColorSpace: workingSpace])
 
-/// White multiplied by `gain`, composited over black through the letterforms.
+/// How far the halo reaches, and how bright it is at its brightest.
+let haloRadius = fontSize * 0.085
+/// Deliberately low. The halo is a suggestion of light around the letters, not
+/// a second light source: at 0.55 it read as a neon sign rather than as a
+/// bright word, and it competed with the core for attention on a page whose
+/// whole argument is about attention.
+let haloStrength: CGFloat = 0.15
+/// How deep the grain cuts into the halo. 0 is a clean falloff.
+let grainDepth: CGFloat = 0.22
+/// Grain is softened before it is applied. Per-pixel noise reads as dust rather
+/// than grain, and — being incompressible — took a 10 KB step to 250 KB.
+let grainSoftness: CGFloat = 1.6
+
+/// The halo, grained, as a mask in 0...1.
+///
+/// Grain multiplies rather than adds, which is the only version that stays
+/// honest here: the plate is opaque, so anything additive lifts the black
+/// surround into a visible rectangle. Multiplying leaves black at black and
+/// only textures the light.
+let halo: CIImage = {
+    let blurred = mask
+        .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: haloRadius])
+        .cropped(to: bounds)
+
+    let noise = CIFilter(name: "CIRandomGenerator")!.outputImage!
+        .cropped(to: bounds)
+        .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: grainSoftness])
+        .cropped(to: bounds)
+    let grey = noise.applyingFilter("CIColorMatrix", parameters: [
+        "inputRVector": CIVector(x: 0.33, y: 0.33, z: 0.33, w: 0),
+        "inputGVector": CIVector(x: 0.33, y: 0.33, z: 0.33, w: 0),
+        "inputBVector": CIVector(x: 0.33, y: 0.33, z: 0.33, w: 0),
+        "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+        "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+    ]).cropped(to: bounds)
+    // Remap the noise into 1-grainDepth ... 1 so it only ever darkens.
+    let modulator = grey.applyingFilter("CIColorMatrix", parameters: [
+        "inputRVector": CIVector(x: grainDepth, y: 0, z: 0, w: 0),
+        "inputGVector": CIVector(x: 0, y: grainDepth, z: 0, w: 0),
+        "inputBVector": CIVector(x: 0, y: 0, z: grainDepth, w: 0),
+        "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+        "inputBiasVector": CIVector(x: 1 - grainDepth, y: 1 - grainDepth,
+                                    z: 1 - grainDepth, w: 1),
+    ]).cropped(to: bounds)
+
+    let textured = blurred.applyingFilter("CIMultiplyCompositing", parameters: [
+        kCIInputBackgroundImageKey: modulator,
+    ]).cropped(to: bounds)
+
+    return textured.applyingFilter("CIColorMatrix", parameters: [
+        "inputRVector": CIVector(x: haloStrength, y: 0, z: 0, w: 0),
+        "inputGVector": CIVector(x: 0, y: haloStrength, z: 0, w: 0),
+        "inputBVector": CIVector(x: 0, y: 0, z: haloStrength, w: 0),
+        "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+        "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+    ]).cropped(to: bounds)
+}()
+
+/// Core and halo combined by `maximum`, not by addition.
+///
+/// Addition would push the stroke centres above `gain`, and the whole point of
+/// dividing by the brightest component is that the peak lands exactly on the
+/// requested headroom. Maximum keeps the core at `gain` and lets the halo only
+/// fill in where the core is dark.
+let shape = mask.applyingFilter("CIMaximumCompositing", parameters: [
+    kCIInputBackgroundImageKey: halo,
+]).cropped(to: bounds)
+
+/// White multiplied by `gain`, composited over black through core-plus-halo.
 func litImage(gain: CGFloat) -> CIImage {
     let lit = CIImage(color: CIColor(red: gain, green: gain, blue: gain,
                                      colorSpace: workingSpace)!).cropped(to: bounds)
@@ -127,7 +219,7 @@ func litImage(gain: CGFloat) -> CIImage {
     let blend = CIFilter(name: "CIBlendWithMask", parameters: [
         kCIInputImageKey: lit,
         kCIInputBackgroundImageKey: black,
-        kCIInputMaskImageKey: mask,
+        kCIInputMaskImageKey: shape,
     ])
     guard let out = blend?.outputImage else { fatalError("blend failed") }
     // A filter whose output extends past the source would be infinite, and an
@@ -202,9 +294,10 @@ let manifest: [String: Any] = [
     "pixelWidth": width,
     "pixelHeight": height,
     "steps": steps,
+    "haloRadiusPx": Int(haloRadius),
     "css": [
-        "height": String(format: "%.4fem", (ascent + descent) / fontSize),
-        "verticalAlign": String(format: "%.4fem", -descent / fontSize),
+        "height": String(format: "%.4fem", CGFloat(height) / fontSize),
+        "verticalAlign": String(format: "%.4fem", -(descent + padY) / fontSize),
         "marginInline": String(format: "%.4fem", -padX / fontSize),
     ],
 ]

@@ -412,3 +412,68 @@ The box is the font's ascent and descent rather than the ink bounds, because ink
 bounds move with the word — "brighter" has a descender and "attention" does not,
 so two words rendered the same way would sit on different baselines. The script
 writes the metrics to `manifest.json` next to the images.
+
+### What the browser refused, and why it took so long to see
+
+The first set of these files was 1119x479 and **no strict decoder would touch
+it**. ImageIO writes an AVIF that size as a *grid* of 512x512 tiles, and MIAF
+(ISO/IEC 23000-22:2019, 7.3.11.4.2) requires a 4:2:0 grid's width and height to
+be even. Both were odd, so libavif — which is what Chrome decodes with —
+returned `Invalid image grid` and drew nothing at all. Not a dim word, not a
+fallback: a hole in the middle of the sentence.
+
+It survived a long time because **Apple's decoder is lenient**. The files opened
+correctly in Preview, decoded through Core Image, reported the right colour
+space and bit depth, and measured 1.00 to 13.08 in extended linear. Every check
+run on the Mac that made them passed, because each one asked the encoder's own
+vendor whether the encoder's output was valid.
+
+`avifdec --info` said no in one line. Rounding both dimensions up to even fixed
+it, and that is now what the renderer does.
+
+**Check a written file with the decoder the target actually uses.** This is the
+same lesson as the gain map, in a new costume: the property that decides the
+behaviour was never the one being asserted on.
+
+Two smaller findings from the same session:
+
+- **Alpha is a dead end through ImageIO.** Encoding with a transparent surround
+  does carry alpha into the AVIF, but writes it invalidly — `Alpha plane
+  dimensions do not match color plane dimensions`. A transparent plate would
+  have removed the black-background dependency and let CSS `drop-shadow` follow
+  the letterforms; it is not available by this route.
+- **`(dynamic-range: high)` is not a capability test.** It answers a question
+  about the display, not about whether the browser will decode or paint the
+  file, and a gate built on it hid the control on screens that could have shown
+  it.
+
+### The halo is in the image, not in CSS
+
+The glow and its grain are rendered into the plate rather than added by the
+page, for two reasons that are worth keeping.
+
+A CSS filter forces a rasterisation that tone-maps to SDR, so a CSS halo around
+an HDR word is a *dim* halo around a bright word — the opposite of the point.
+
+And blurring an opaque plate cannot be undone by a blend mode. `mix-blend-mode:
+screen` needs the page's black to cancel against, but an element that already
+carries `filter` and `opacity` is an isolated group, so the blurred black plate
+composited as grey and the word wore a visible rectangle. Measured on the
+staging page by hiding one layer at a time: the box appeared with the blur layer
+alone, before any grain was involved.
+
+Baked in, the halo is HDR too, and the page's CSS is three numbers from the
+renderer's `manifest.json`.
+
+| Property | Value | Why |
+| --- | --- | --- |
+| `haloRadius` | `fontSize * 0.085` | Reaches past the strokes without touching the plate edge |
+| `haloStrength` | `0.15` | A suggestion of light, not a second source. At 0.55 it read as a neon sign |
+| `grainDepth` | `0.22`, multiplied | Multiplying keeps black at black; anything additive lifts the surround |
+| `grainSoftness` | `1.6` | Per-pixel noise reads as dust — and is incompressible: it took a step from 10 KB to 250 KB |
+
+Core and halo are combined with **maximum, not addition**: addition would push
+the stroke centres above the requested gain, and dividing by the brightest
+component exists precisely so the peak lands on `peakHeadroom` exactly.
+
+About twenty kilobytes a step, 256 KB for a twelve-step slider.
