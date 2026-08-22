@@ -751,3 +751,45 @@ Twice the OFF track's brightness. The direction holds, and the value is
 roughly 23 — below the untouched OFF track at 90, which inverts the switch. This
 call site is one #111 has to look at, and the number above is what it has to
 beat.
+
+## The Settings preview scrolls, and a shadow's reach is not its radius
+
+**2026-08-22.** #91 fixed a clipped halo by lifting the glow preview out of the
+`Form` and pinning it above one, which cost the preview its scrolling: two views
+in a `VStack`, only one of which moves. #109 asked for the untested half of
+#91's reasoning to be settled before designing around it.
+
+**Both halves were wrong, and in the same direction.**
+
+*A `Form` row does not clip content that fits.* Put back as the first section
+with `.listRowInsets(EdgeInsets())` and a clear row background, the halo renders
+exactly as it does outside — profiled down the capsule's centre column, the
+falloff reaches black at the same distance in both layouts.
+
+*What clipped it was the reservation being short.* #91 derived the padding from
+the same expression the halo is drawn from — `height × haloRadius ×
+maxHaloScale`, 34.97pt — and treated that as the halo's size. It is the
+`.shadow` **radius**: the blur is still painting well past it. Measured at 12×,
+from the capsule's edge to the last pixel above black: **237px at 3.0 px/pt =
+79pt**, against a 34.97pt radius — 2.26×. The old reservation cut the light at
+exactly the radius, which the profile shows as the falloff dropping from 34 to 0
+in one step instead of fading.
+
+The reservation is now `radius × haloReach`, with `haloReach = 3` — the usual
+figure quoted for a Gaussian's visible extent, the next round number above what
+was measured, and its margin costs black on black. Verified uncut at 1×, 6× and
+12×.
+
+**The navigation bar took two attempts.** The preview scrolls under it now, so
+the bar has to be opaque or the capsule shows through.
+`.toolbarBackground(Color.black, for: .navigationBar)` renders black and
+**silently removes the title**, large and inline both — a real trap, since it
+compiles and looks deliberate. `.toolbarBackground(.visible, for: .navigationBar)`
+alone, over this view's own black background, gives the same black and keeps the
+title: a column down the left edge reads 0,0,0 straight through the bar and past
+its boundary.
+
+Leaving the bar alone was the alternative and it is worse than it sounds: the
+system material dims the capsule to grey and prints "Settings" over it, so the
+product's one lit object slides under the title as a smear. Both were
+screenshotted before choosing, which is the only reason the choice is defensible.

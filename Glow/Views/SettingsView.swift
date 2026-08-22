@@ -47,15 +47,29 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                preview
-                form
-            }
+            form
             // True black under the whole screen rather than the grouped
             // background, so the halo falls off into the same black the grid
             // uses and there is no seam where the row would have been.
             .background(Color.black)
             .navigationTitle("Settings")
+            // The bar is opaque from the start, because the preview scrolls
+            // under it now. Measured on screen: a column down the left edge
+            // reads 0,0,0 straight through the bar and past its boundary — no
+            // grey band across the one screen that exists to show the product,
+            // which is #87's argument, and no seam.
+            //
+            // **Without a `Color`.** `.toolbarBackground(Color.black, for:)`
+            // compiles, renders black, and silently removes the title — large
+            // and inline both. `.visible` alone over this view's own black
+            // background gives the same black and keeps the title.
+            //
+            // The alternative was to leave the bar as it was, and it is worse
+            // than it sounds: the system material dims the capsule to grey and
+            // prints "Settings" on top of it, so the product's one lit object
+            // slides under the title as a smear. Screenshotted before choosing.
+            .toolbarBackground(.visible, for: .navigationBar)
+
             .onAppear { isDemoSeeded = DemoHistory(context: context).isSeeded }
             // Covers the toggle and the day picker both: the widget draws the
             // same week and withholds the same taps, and it is not told when
@@ -66,6 +80,25 @@ struct SettingsView: View {
 
     private var form: some View {
             Form {
+                // The preview is a row of the Form, so it scrolls with
+                // everything else (#109). It was pinned above the Form for one
+                // release because #91 measured its halo being cut and blamed
+                // the row; the row was innocent. See `previewHalo`.
+                //
+                // `Color.clear`, not black: the Form already runs
+                // `.scrollContentBackground(.hidden)` over a black background,
+                // so a row background would only put the panel back.
+                Section {
+                    preview
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                // No section gap under it. The halo's own reservation is
+                // already a band of black, and the Form's gap on top of that
+                // reads as the first section having drifted down the screen.
+                .listSectionSpacing(0)
+
                 // Glow leads: it is the one control here that is the product
                 // rather than a preference about it.
                 Section {
@@ -225,8 +258,23 @@ struct SettingsView: View {
     /// moves. This is the same expression the halo is drawn from.
     private static let previewSize = CGSize(width: 120, height: 40)
     private static var previewHalo: CGFloat {
-        previewSize.height * GlowPalette.haloRadius * CGFloat(GlowSettings.maxHaloScale)
+        previewSize.height * GlowPalette.haloRadius
+            * CGFloat(GlowSettings.maxHaloScale) * haloReach
     }
+
+    /// How far past its radius a shadow is still visible.
+    ///
+    /// **This is the number #91 was missing**, and the reason its "correct"
+    /// reservation still clipped. `radius` is what `.shadow` blurs by, not how
+    /// far the light gets: a Gaussian is still painting well beyond its own
+    /// radius, and the row bounded the content at exactly the radius.
+    ///
+    /// Measured on screen at 12x, from the capsule's edge to the last pixel
+    /// above black: 237px at 3.0 px/pt is 79pt, against a 34.97pt radius —
+    /// 2.26x. Three is the usual reach quoted for a Gaussian, it is the next
+    /// round number above what was measured, and the cost of the margin is
+    /// black on black.
+    private static let haloReach: CGFloat = 3
 
     /// The Dynamic Island's pop, on or off.
     ///
