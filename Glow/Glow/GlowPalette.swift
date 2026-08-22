@@ -1,25 +1,34 @@
 import SwiftUI
+import WidgetKit
 
 /// Every colour and every effect in the grid.
 ///
-/// **Two colours.** White is anything lit; grey is anything that is not. There
-/// is no third. A slot is never identified by hue — only by whether it is
-/// glowing and, if not, how far down the grey scale it sits. That is what makes
-/// the glow readable: when several accents were in play the eye read colour
-/// first and the glow second, which is backwards for an app whose whole signal
-/// is the glow.
+/// **Two colours, both opaque.** White is anything lit; `#171717` is everything
+/// else. There is no third, and there is no scale between them — a slot is
+/// identified by whether there is light in it and by its silhouette, never by
+/// how far down a grey ramp it sits (#111).
+///
+/// It used to sit on a ramp: one grey at 55.3% white, which composites to 141
+/// on black, and two more stacked on top of it at 71 and 23. Four names, three
+/// steps, for a distinction the app does not make. The grid, and the widgets
+/// most of all, read as a grey scale when the whole premise is that brightness
+/// means one thing. `#171717` is not a new colour: it is exactly what the socket
+/// already composited to, so the sockets stayed where they were and every other
+/// grey darkened to meet them.
+///
+/// **Two values below still carry alpha, and neither is a colour the app
+/// draws.** `greyAccented` is what the system is handed once it has already
+/// discarded the colours, and `controlTint` is a system switch's track. Both
+/// are documented where they are declared.
 ///
 /// **This file is the source of truth for colour.** There is no design-system
 /// document to reconcile it against any more: the numbers below, and the
 /// derivations in `GlowShape`, `WidgetMetrics` and `SlotLayout`, are what the
 /// app draws. Where a value departs from the design file it says so in place.
 ///
-/// Two cleanups worth doing when something else touches this file:
-///
-///  - `headerRest` and `labelResting` are the same value and could be one name.
-///  - `haloRadius` and `ringHaloRadius` differ only because the file draws the
-///    ring's halo softer. If the ring keeps its offset pair anyway, one radius
-///    would do.
+/// One cleanup worth doing when something else touches this file: `haloRadius`
+/// and `ringHaloRadius` differ only because the file draws the ring's halo
+/// softer. If the ring keeps its offset pair anyway, one radius would do.
 ///
 /// Reading a radius here does not tell you what lands on screen: every drop
 /// shadow is multiplied by `GlowSettings.haloScale(peak)`, which is 1.7 at the
@@ -44,53 +53,76 @@ enum GlowPalette {
         opacity: 1
     )
 
-    /// Everything that is not lit.
+    /// Everything that is not lit: the resting habit name, the weekday letter
+    /// that is not today, the ✕ on a day that went unlogged, the rest day's cut,
+    /// and the socket on a day still to come. One name, because they are one
+    /// colour — five names for one value would only be a record of what they
+    /// used to differ by.
     ///
-    /// **White at 55%, not the design's solid #8D8D93** — and the difference is
-    /// invisible here but load-bearing in the widget. On black the two are the
-    /// same colour to within six levels of blue out of 255.
-    ///
-    /// What they are not the same at is *accented* rendering, which is what a
-    /// Home Screen set to Clear or Tinted puts a widget into. There the system
-    /// tints content a single white and keeps only the alpha. A solid grey comes
-    /// out identical to a lit mark and the entire hierarchy collapses into one
-    /// tone; white at 55% stays 55% and the grid still reads.
-    ///
-    /// So the alpha is the thing being stored, and the colour is incidental.
-    static let grey = Color.white.opacity(0.553)
+    /// **A style rather than a `Color`, and that is the whole of the accented
+    /// problem.** `resolve(in:)` reads the environment the mark is drawn in, so
+    /// the one name answers three questions in one place. What the app draws is
+    /// `greyOpaque`; see `GlowGrey`.
+    static let grey = GlowGrey()
 
-    // MARK: - The grey, by weight
-    //
-    // Four steps, and each one is a different kind of "not now".
+    /// The second colour, as declared. `#171717`, opaque.
+    ///
+    /// Exactly what the old socket composited to on black: the old ramp was
+    /// 55.3% white with 16% on top of it, and 0.553 × 0.16 × 255 = 22.6 → 23 =
+    /// 0x17. Confirmed on screen rather than trusted — SwiftUI blends alpha in
+    /// gamma-encoded sRGB, and a linear blend would have put the same alpha near
+    /// `#545454`. Sampled off a simulator screenshot the socket reads 23, 23, 23.
+    static let greyOpaque = Color(
+        .sRGB, red: 23 / 255, green: 23 / 255, blue: 23 / 255, opacity: 1
+    )
 
-    /// A habit already handled today.
+    /// The grey when the reader has asked for **Increase Contrast**.
     ///
-    /// Asked for as "between the ✕ and the label as it was". The ✕ composites to
-    /// rgb(70, 70, 74) on black and the label was rgb(199, 199, 204), putting the
-    /// midpoint at #87878B — and the grey above is #8D8D93, 4.7% off it. So this
-    /// is the grey at full strength, which lands where the eye asked and costs
-    /// the palette nothing: no bespoke value, just the one grey again.
+    /// `#171717` against black is about 1.1:1, and a resting habit name is body
+    /// text. The design says so on purpose — what stays dark is what never
+    /// happened, carried through to type — so the answer is not to compromise it
+    /// for everyone but to honour the setting for the people who asked.
     ///
-    /// It was briefly lifted well above this on the grounds that SDR reads dark
-    /// beside HDR. That is still true, and it stopped mattering once the glows
-    /// went to pure white with a single halo pass instead of three.
-    static let labelResting = grey
+    /// `#8D8D8D` is not a number invented for this: it is what `grey` composited
+    /// to before #111, so Increase Contrast gets the app's own previous grey.
+    /// It measures 6.3:1 on black, comfortably past the 4.5:1 asked of body text.
+    static let greyIncreasedContrast = Color(
+        .sRGB, red: 141 / 255, green: 141 / 255, blue: 141 / 255, opacity: 1
+    )
 
-    /// A weekday letter that is not today.
+    /// The grey under *accented* rendering, which is what a Home Screen set to
+    /// Clear or Tinted puts a widget into.
     ///
-    /// The same grey at the same strength as a resting habit name. It was 60%
-    /// here, taken from generated CSS that had folded a node opacity into the
-    /// colour; the file's own paint is 100%, and a census of all 89 paints in
-    /// the frame turned up no 60% anywhere.
-    static let headerRest = grey
-    /// A day that went unlogged.
-    static let missed = grey.opacity(0.5)
-    /// The rest day's cut: the line down its column. It marks absence, and
-    /// absence does not glow — the missed cross's grey, turned vertical.
-    static let restCut = missed
-    /// A day still to come. Dark enough to be a socket rather than a mark, which
-    /// is what keeps a nearly-empty row legible as a week.
-    static let upcoming = grey.opacity(0.16)
+    /// There the system tints every pixel a single white and keeps only the
+    /// alpha. An opaque grey has no alpha to be read: it comes out identical to
+    /// a lit mark, and the entire hierarchy collapses into one tone. So in that
+    /// mode, and only in that mode, the grey is stored as alpha instead — the
+    /// value the whole palette used to be built from.
+    ///
+    /// **This is not a third colour.** It is the same one grey, expressed in the
+    /// only quantity the system has not thrown away. #53 would remove the mode
+    /// entirely with `containerBackgroundRemovable(false)`; until it does, or if
+    /// it never does, this is what keeps a Tinted Home Screen readable.
+    static let greyAccented = Color.white.opacity(greyAlpha)
+
+    /// The alpha the grey used to be stored at, and the one number that outlived
+    /// the ramp. Two places still need a grey expressed as alpha rather than as
+    /// a colour, and both are places the app is not the one painting.
+    static let greyAlpha: Double = 0.553
+
+    /// A system switch's ON track.
+    ///
+    /// Not `greyOpaque`, and the reason is measured. #124 gave the Settings
+    /// toggles an explicit tint because white is what this app reserves for lit
+    /// and a switch track is not lit; the ON track landed at 181,181,183 against
+    /// an untouched system OFF track at 90,90,94. `#171717` would take that ON
+    /// track to roughly 23 — *below* the OFF track — and invert the control.
+    ///
+    /// A `Toggle` in a `Form` is one of iOS's own components on a support
+    /// screen, which is the boundary #111 draws its own scope at. So it keeps
+    /// the value that measured, declared here under its own name rather than
+    /// borrowed from a grid colour it is no longer allowed to share.
+    static let controlTint = Color.white.opacity(greyAlpha)
 
     // MARK: - Glow reach
     //
@@ -197,4 +229,32 @@ enum GlowPalette {
     /// exactly one thing: saying that the glow is unavailable. A warning in the
     /// app's own white would be indistinguishable from the thing it warns about.
     static let warning = Color(.sRGB, red: 1.0, green: 0.72, blue: 0.22, opacity: 1)
+}
+
+/// `GlowPalette.grey`, resolved against the environment it is drawn in.
+///
+/// A `ShapeStyle` rather than a `Color` because two of the three answers are not
+/// the app's to choose: whether the reader asked for **Increase Contrast**, and
+/// whether the system is about to discard every colour on the way to a Tinted
+/// Home Screen. A `Color` is a value and cannot ask; a style is resolved at draw
+/// time and is handed the whole environment.
+///
+/// Put another way: **the palette holds one grey, and this is where its three
+/// expressions live** — the colour the app draws, the colour it draws instead
+/// when asked for more contrast, and the alpha it hands the system when the
+/// system has stopped taking colours.
+///
+/// Precedence is deliberate. Accented rendering wins over Increase Contrast:
+/// under accented there is no such thing as a light or a dark grey, only a more
+/// or less transparent one, so lifting the value there would say nothing.
+struct GlowGrey: ShapeStyle {
+    func resolve(in environment: EnvironmentValues) -> Color {
+        if environment.widgetRenderingMode == .accented {
+            return GlowPalette.greyAccented
+        }
+        if environment.colorSchemeContrast == .increased {
+            return GlowPalette.greyIncreasedContrast
+        }
+        return GlowPalette.greyOpaque
+    }
 }

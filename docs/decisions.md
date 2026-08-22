@@ -1531,3 +1531,137 @@ property of every animating file at once: if it contains `withAnimation` or
 `.animation`, it reads the setting. Nothing here has been heard on a device,
 and Dynamic Type at accessibility sizes and a right-to-left layout were not
 checked at all.
+
+## Two colours, both opaque
+
+**2026-08-22.** #111 replaced the palette's grey ramp with a single opaque
+`#171717`. The app draws two colours now: glow white for anything lit, `#171717`
+for everything else, and nothing between them.
+
+**What it was.** One grey at `white.opacity(0.553)` and three more derived from
+it — the resting label and the weekday letter at full strength, the ✕ at half,
+the socket at 16%. Composited on black and sampled off a simulator screenshot:
+141, 141, 71 and 23. Four steps for a distinction the app does not make, and in
+the widget especially the grid read as a grey scale when the premise is that
+brightness means one thing.
+
+**`#171717` is not a new colour.** `0.553 × 0.16 × 255 = 22.6 → 23 = 0x17` — it
+is exactly what the socket already composited to. The arithmetic assumes SwiftUI
+blends alpha in gamma-encoded sRGB; a linear blend would have put the same alpha
+near `#545454`, so it was read off the screen rather than trusted. The socket
+samples 23, 23, 23. So the sockets stayed where they were and every other grey
+darkened to meet them: label 141 → 23, header 141 → 23, ✕ 71 → 23, span line
+23 → 23.
+
+**The five names collapsed to one.** `labelResting`, `headerRest`, `missed`,
+`restCut` and `upcoming` were the same value under five names; keeping them
+would only have recorded what they used to differ by. The file's own header had
+already flagged two of them as one name waiting to happen.
+
+### #53 does not block this, because the grey is a style
+
+The issue said this was blocked on `containerBackgroundRemovable(false)`, and
+the reasoning was sound: under accented rendering the system tints every pixel a
+single white and keeps only the alpha, so an opaque grey comes out identical to
+a lit mark and the hierarchy collapses into one tone. #53 is still open.
+
+What unblocks it is that `GlowPalette.grey` is a `ShapeStyle` rather than a
+`Color`. `resolve(in:)` is handed the environment the mark is drawn in, so one
+name answers three questions in the one place they can all be answered:
+
+| environment | resolves to | why |
+| --- | --- | --- |
+| the app, and a `fullColor` widget | `#171717` opaque | the colour the app draws |
+| Increase Contrast | `#8D8D8D` opaque | see below |
+| accented rendering | white at 55.3% | the only quantity the system has not discarded |
+
+This is not a third colour. It is the same grey expressed as alpha in the one
+mode where colour has already been thrown away, and it means the reason the old
+rule existed is handled rather than forgotten. #53 remains a live question about
+StandBy, the iPad Lock Screen gallery and foreground tinting; it is no longer a
+prerequisite for this.
+
+**Measured on a Home Screen, not argued.** The medium week widget was placed and
+the appearance switched through all three. Lit dot against socket: **Default
+255 / 23**, **Tinted 255 / 149**, **Clear 255 / 162**. The hierarchy survives in
+all three, which also confirms that `widgetRenderingMode` really does reach a
+custom style's `resolve(in:)` inside a live widget.
+
+### What it costs, and the one mitigation
+
+A habit name that is not due today, and every weekday letter that is not today,
+went from 141 to 23 — about **1.1:1** against black, against the 4.5:1 WCAG asks
+of body text. That is the intended reading of *what stays dark is what never
+happened* carried through to type, and it is a real regression rather than a
+side effect.
+
+The answer is to honour the setting rather than to compromise the design:
+`colorSchemeContrast == .increased` lifts the grey to `#8D8D8D`, which is
+**6.3:1** and is not a number invented for the setting — it is the value
+`GlowPalette.grey` composited to before this change. Verified with
+`simctl ui … increase_contrast enabled`: every unlit mark reads 141 again, and
+141 → 23 when it is turned off.
+
+### The Settings toggles keep the alpha, and the switch does not invert
+
+#124 measured the toggles' ON track at 181,181,183 against an untouched system
+OFF track at 90,90,94, and warned that `#171717` would take that ON track to
+roughly 23 — below the OFF track, inverting the control. That is correct, and it
+is why the toggles do not take the body grey.
+
+A `Toggle` in a `Form` is one of iOS's own components on a support screen, which
+is where #111 draws its own scope. The value moved to `GlowPalette.controlTint`,
+declared under its own name rather than borrowed from a grid colour it is no
+longer allowed to share. Re-measured after the change: **ON 181,181,183, OFF
+90,90,94** — unchanged, twice the OFF track, direction holds.
+
+Settings has two `Toggle`s, not the three #124 recorded; #119 turned the third
+into a segmented `Picker`.
+
+### The Year is the part that needed a decision
+
+`YearView` drew four levels as four brightnesses — full, partial, empty, future
+at 255-with-a-glow, 115, 23 and 9. Two colours carry two of them, and #111 asked
+for the carrier to be named rather than picked silently. What it is now:
+
+- **full** — the glow, unchanged.
+- **partial** — a white ring. Something happened, so there is light in it; the
+  day did not close, so it is an outline and not a dot. That is the app's own
+  silhouette rule — a slot open today is a ring, a completion is a dot — applied
+  to a day instead of a slot.
+- **empty** — a filled `#171717` dot.
+- **future** — nothing at all, at the cell's own size. `SlotMarkView` already
+  draws a rest day this way and for the same reason: there is no slot here yet.
+
+**A filled white dot was tried for `partial` first, and the render is why it is
+a ring.** A year of demo history came out a solid white block: at 10pt cells with
+a 3pt gap the only thing separating a full day from a partial one was the halo,
+and neighbouring halos close the gap. Collapsing `empty` and `future` to the same
+value was also tried on paper and rejected — the year would no longer be able to
+say how far through itself it is.
+
+This section is the half of #111 that is a proposal rather than a measurement.
+The alternative for `future`, if a blank right-hand side reads as a bug rather
+than as a boundary, is a grey dot at less than the cell's width — carrying it on
+size instead of on presence.
+
+### What the render tests had to change
+
+Two thresholds in `RenderTests/WidgetRenderDiffTests.swift` were calibrated
+against the ramp and would have passed on halo bleed alone afterwards.
+`renderIsReal` counted "grey" as anything above 40, which caught a ramp from 23
+to 141; it is now a 20–26 band, one level of slack either side of the one grey.
+`restCutStartsAndStopsOnAHabit` used a floor of 40 for a cut that composited to
+72; it now uses the same `lineFloor` of 15 every other unlit-line scan in the
+file already used.
+
+`Tests/WidgetBackgroundTests.swift` gained a suite for the claim itself: that the
+grey is `#171717` and opaque, that it is the old socket's value rather than a new
+one, that Increase Contrast clears 4.5:1 where the shipping grey does not, and
+that the only two values still carrying alpha are the two the app does not paint.
+
+**"Two greys, on purpose" (#7) still holds**, and one clause in it no longer
+does: the grid's grey is not "the file's grey, which also has to survive the
+widget's accented rendering as stored alpha" — surviving accented rendering is
+`GlowGrey`'s job now, not the value's. The decision it records, that the grid and
+the system screens keep different greys, is unaffected.

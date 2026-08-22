@@ -57,6 +57,11 @@ struct YearView: View {
     private let cell: CGFloat = 10
     private let gap: CGFloat = 3
 
+    /// A partial day's ring, as a fraction of the cell. A quarter leaves a hole
+    /// of half the cell at 10pt — thin enough to read as an outline rather than
+    /// a thick dot, thick enough to survive a year's worth of them at 3x.
+    private static let partialStroke: CGFloat = 0.25
+
     var body: some View {
         Group {
             if realHabits.isEmpty {
@@ -155,7 +160,7 @@ struct YearView: View {
                 // stop lining up, which is the only job the row has.
                 Text(monthInitial(startingAt: index, week: week))
                     .font(.system(size: 9))
-                    .foregroundStyle(GlowPalette.headerRest)
+                    .foregroundStyle(GlowPalette.grey)
                     .frame(width: cell, height: monthLabelHeight, alignment: .leading)
             }
         }
@@ -181,13 +186,42 @@ struct YearView: View {
             ForEach(Array(WeekCalendar.weekdayInitials(calendar: calendar).enumerated()), id: \.offset) { _, initial in
                 Text(initial)
                     .font(.system(size: 8))
-                    .foregroundStyle(GlowPalette.headerRest)
+                    .foregroundStyle(GlowPalette.grey)
                     .frame(width: 10, height: cell, alignment: .trailing)
             }
         }
         .accessibilityHidden(true)
     }
 
+    /// The four levels in two colours (#111).
+    ///
+    /// This screen was the one place the palette's ramp was doing real work: it
+    /// drew four levels as four brightnesses, and two colours carry two of them.
+    /// The issue said as much and asked for the carrier to be named rather than
+    /// picked silently, so here it is, with what each level now leans on.
+    ///
+    ///  - **full** — the glow, unchanged. Everything expected happened.
+    ///  - **partial** — a white ring. Something happened, so there is light in
+    ///    it; the day did not close, so it is an outline and not a dot. That is
+    ///    the app's own silhouette rule — a slot open today is a ring, a
+    ///    completion is a dot — applied to a day instead of a slot.
+    ///  - **empty** — a filled grey dot. A day that came and went with nothing.
+    ///  - **future** — nothing at all, at the cell's own size, so the lattice
+    ///    keeps its shape. `SlotMarkView` already draws a rest day this way, for
+    ///    the same reason: there is no slot here yet. The alternative, and the
+    ///    thing to try if this reads as a bug rather than as a boundary, is a
+    ///    grey dot at less than the cell's width — carrying it on size instead.
+    ///
+    /// What is deliberately *not* here is `empty` and `future` at the same
+    /// value. They were 23 and 9 on black, four levels apart, and collapsing
+    /// them would have left the year unable to say how far through it is.
+    ///
+    /// **A filled white dot was tried for `partial` first and is what the ring
+    /// is a correction of.** Read off the render, a year of demo history came
+    /// out a solid white block: at 10pt cells with a 3pt gap, the only thing
+    /// separating a full day from a partial one was the halo, and neighbouring
+    /// halos close the gap. The ring separates them at the silhouette, which is
+    /// what this app reaches for whenever light cannot carry a distinction.
     @ViewBuilder
     private func cellView(_ fill: YearHistory.DayFill) -> some View {
         let size = CGSize(width: cell, height: cell)
@@ -196,11 +230,13 @@ struct YearView: View {
             // The same glow as a completion in the week grid, at a year's scale.
             GlowImageView(size: size, shape: .capsule)
         case .partial:
-            Circle().fill(GlowPalette.color.opacity(0.45)).frame(width: cell, height: cell)
+            Circle()
+                .strokeBorder(GlowPalette.color, lineWidth: cell * Self.partialStroke)
+                .frame(width: cell, height: cell)
         case .empty:
-            Circle().fill(GlowPalette.upcoming).frame(width: cell, height: cell)
+            Circle().fill(GlowPalette.grey).frame(width: cell, height: cell)
         case .future:
-            Circle().fill(GlowPalette.upcoming.opacity(0.4)).frame(width: cell, height: cell)
+            Color.clear.frame(width: cell, height: cell)
         }
     }
 }

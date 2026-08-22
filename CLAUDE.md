@@ -152,9 +152,15 @@ actual bug. Every line here is something that already happened.
 - **The glow modifier uses `.overlay`, not `ZStack`.** The HDR tile is
   `resizable()`, and inside a `ZStack` it expands and centres — which renders as
   glowing text in the wrong place. There is a comment saying so; believe it.
-- **Greys are white with alpha, not a hue.** Accented widget rendering
-  (Clear/Tinted) strips the background and keeps only alpha, so a grey with a
-  colour in it loses its hierarchy. `GlowPalette` is the single source.
+- **Two colours, both opaque: glow white and `#171717`** (#111). Not a grey
+  ramp — the palette used to stack opacities into four steps and the grid read
+  as a grey scale. `GlowPalette` is the single source, and `GlowPalette.grey` is
+  a `ShapeStyle`, not a `Color`, because two of its three answers are the
+  system's: Increase Contrast lifts it to `#8D8D8D`, and **accented widget
+  rendering (Clear/Tinted) strips the background and keeps only alpha**, where
+  an opaque grey comes back as a lit mark and the hierarchy collapses into one
+  tone. That is why the alpha-stored grey still exists and why it is reached
+  through `resolve(in:)` rather than at the call site.
 - **A widget's background can be removed by the user.** The measurement that
   said otherwise held for `fullColor` rendering only. Handle
   `widgetRenderingMode`.

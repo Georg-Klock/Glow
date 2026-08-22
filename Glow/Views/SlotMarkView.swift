@@ -54,7 +54,7 @@ struct SlotMarkView: View {
         if spansDays {
             sized(
                 Capsule(style: .continuous)
-                    .fill(GlowPalette.upcoming)
+                    .fill(GlowPalette.grey)
                     .frame(height: GlowShape.upcomingThickness)
                     .padding(.horizontal, (size.height - GlowShape.upcomingDiameter) / 2)
             )
@@ -66,7 +66,7 @@ struct SlotMarkView: View {
         } else {
             sized(
                 Circle()
-                    .fill(GlowPalette.upcoming)
+                    .fill(GlowPalette.grey)
                     .frame(
                         width: GlowShape.upcomingDiameter,
                         height: GlowShape.upcomingDiameter
@@ -92,7 +92,7 @@ struct SlotMarkView: View {
                 Rectangle().frame(width: thickness, height: arm)
                     .rotationEffect(.degrees(-45))
             }
-            .foregroundStyle(GlowPalette.missed)
+            .foregroundStyle(GlowPalette.grey)
         )
     }
 

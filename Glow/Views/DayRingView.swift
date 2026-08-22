@@ -3,8 +3,8 @@ import SwiftUI
 /// One habit's day as a ring: an outlined pill per repetition still open, and
 /// one line for the run already logged.
 ///
-/// **Both are lit.** This view used to paint a logged repetition
-/// `GlowPalette.labelResting` grey, which made it the one surface in the app
+/// **Both are lit.** This view used to paint a logged repetition in
+/// `GlowPalette.grey`, which made it the one surface in the app
 /// where a completion went quiet — everywhere else `SlotMarkView` sends a
 /// completion straight to `GlowImageView`. What separates open from done here
 /// is *shape*, not light: a band against a line (#75).
