@@ -1392,3 +1392,63 @@ rather than at the root. That is a design decision, not a bug fix.
 
 **A third empty state has no button and so no bug**: Settings → History shows
 an icon and a sentence. Worth knowing before someone "fixes" it for symmetry.
+
+## The demo's provenance is on the row, and seeding is one save
+
+**2026-08-22.** Two writes that had to agree, in two stores that cannot be
+written together (#140). The demo saved its completions and *then* recorded
+their ids in the App Group defaults; the default seeder recorded that it had run
+and *then* inserted eleven habits one save at a time. Each has a gap, and each
+gap is durable: a crash in the first left ten weeks of invented history that
+nothing could name — the toggle read as off and the fiction stayed on the grid
+for good — and a crash in the second left a partial list under a flag that said
+"seeded", so nothing would ever repair it.
+
+**The demo's fix is that there is no second write.** `Completion.demoSessionID`
+is `nil` for a row a person logged and carries the seeding's id for a row the
+demo invented, and it is saved in the same transaction as the row it describes.
+Either both landed or neither did. Removal fetches on that predicate, so it also
+takes back a seeding that was interrupted half-way — those rows carry the same
+mark as the ones that never got written.
+
+**Exactness is unchanged, and it was the constraint.** Removal still deletes
+what the demo added and nothing else, still by record rather than by
+recomputing which days "look seeded". The record simply moved to where it cannot
+disagree with the data. The one thing it gains: it survives the defaults being
+lost, which is exactly the case the old scheme could not survive.
+
+**A session id rather than a flag**, because the id says *which* seeding, and
+that is free — one column either way. Removal deliberately ignores it and takes
+out everything with any id, so two ids can never strand each other.
+
+**An install that already has a demo is adopted, once.** Its ids are still in
+the defaults and nothing is on its rows, so `DemoHistory` reads that list, stamps
+those rows in one save, and deletes the key. Dropping the key unread would have
+handed exactly these people the bug being fixed. Verified on a simulator: a
+store built by the previous build, with three completions recorded the old way,
+opens under the new one with the column migrated in, the rows stamped, the key
+gone and the toggle reading on; switching it off takes back those three and
+leaves the completion logged by hand.
+
+**Seeding is one transaction, and the flag goes last.** `HabitStore.addAll`
+inserts the whole list and saves once, and `didSeedDefaultHabits` is written
+after that save returns. A failure anywhere leaves an install that is exactly as
+it was and a next launch that tries again. The save and the flag are still two
+stores and still cannot be atomic, so that one step converges instead: a launch
+that finds habits it has no record of seeding records that, rather than adding
+eleven more rows to a list somebody is already using.
+
+**The flag stays a Bool.** A seed *version* was the obvious next step and is
+refused, because a version that bumps means re-seeding, and re-seeding is the
+behaviour that "deleting every habit does not bring them back" exists to
+prevent. A changed seed set is for installs that have not been seeded yet.
+
+**And a failed save now rolls back** — in `HabitStore` and in `DemoHistory`
+both. A `ModelContext` keeps its pending changes when a save throws, and the next
+save from anywhere else in the app commits them, so a write reported as failed
+would arrive later, in pieces, attached to an unrelated gesture.
+
+**This is about atomicity, not latency.** The seeding measurements stand and
+nothing moves off the main actor. The only timing-shaped change is that the
+default seed commits once rather than eleven times, which is not claimed as a
+speed-up here because it was not measured as one.

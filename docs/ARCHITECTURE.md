@@ -89,6 +89,19 @@ what the tap means and translates the answer into rows — one more `Completion`
 or a cleared day when a full ring resets. The rule lives in `Logic/` and the
 rows live here, so the app's ring and the widget's tap the same behaviour.
 
+Every write ends in a private `commit()`: save, and then invalidate the widget
+timelines. A save that throws rolls back, so a failed write leaves the store as
+it was rather than leaving its changes pending for the next unrelated save to
+commit (#140). `addAll(_:now:)` is the batch door — a whole list inserted and
+saved once, which is how the default seed arrives.
+
+`HabitSeeder` inserts through it and writes `didSeedDefaultHabits` *after* the
+save returns, so an interrupted first launch is retried rather than half-recorded
+forever. `DemoHistory` writes its own transaction, and the demo's provenance is
+a column on `Completion` rather than a list of ids beside the store: one write,
+so "what did the demo add" cannot disagree with what is there. Both are in
+decisions.md.
+
 ### Models
 
 SwiftData, shaped for a CloudKit future even though v1 is local-only: every
@@ -103,6 +116,12 @@ meaning "counted across a week" — a sentinel no real per-day habit can store,
 because the initializer clamps into 1...12. `Habit.countedPerWeek` and
 `Habit.countedPerDay` are the two fetch predicates, one definition each, so the
 week surfaces and Today cannot drift in how they split the kinds.
+
+`Completion.demoSessionID` is provenance: `nil` for a completion a person
+logged, and the seeding's id for one the demo invented. It is what the demo
+toggle reads and what its removal fetches on, so a demo is identifiable from the
+store alone. Optional with a `nil` default, which makes it a lightweight
+migration for a store written before it existed — verified against one.
 
 ### Views
 
