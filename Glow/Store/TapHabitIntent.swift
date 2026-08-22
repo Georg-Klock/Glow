@@ -53,14 +53,23 @@ struct TapHabitIntent: LiveActivityIntent {
         guard let habit = try context.fetch(descriptor).first else { return .result() }
         let count = try HabitStore(context: context).recordTap(for: habit, on: Date())
 
-        // The day's goal, if this repetition met it — the twelfth glass, not
-        // each of the twelve. This is the path the pop is seen on; see
+        // Every repetition now, and the goal on top of the one that meets it —
+        // which of those actually speaks is `PopPreferences`' business, not
+        // this call site's (#119). This is the path the pop is seen on; see
         // `ToggleHabitIntent`.
-        GoalPopCentre.popIfMet(
-            habit: habit.snapshot(),
-            in: WeekCalendar.week(containing: Date()),
-            today: Date()
-        )
+        //
+        // **Except a reset**, which lands here as a count of zero. A full ring
+        // tapped again is a correction, and a correction that says "logged" is
+        // the app congratulating somebody for undoing something. The toggle
+        // path has the same rule for free, because `.uncompleted` never calls
+        // this at all.
+        if count > 0 {
+            GoalPopCentre.popIfMet(
+                habit: habit.snapshot(),
+                in: WeekCalendar.week(containing: Date()),
+                today: Date()
+            )
+        }
 
         let outcome = "ring tap \(id.uuidString): now \(count) of \(habit.timesPerDay)"
         GlowLog.widget.notice("\(outcome, privacy: .public)")

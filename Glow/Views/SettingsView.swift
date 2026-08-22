@@ -39,8 +39,8 @@ struct SettingsView: View {
     @State private var pendingExport: URL?
     @State private var isChoosingFormat = false
 
-    /// Mirrors `PopPreferences.isEnabled`, so the toggle animates its own flip.
-    @State private var popIsOn = PopPreferences.isEnabled
+    /// Mirrors `PopPreferences.level`, so the picker moves on the tap.
+    @State private var popLevel = PopPreferences.level
 
     @AppStorage(GlowSettings.key, store: GlowSettings.store)
     private var peak: Double = GlowSettings.defaultValue
@@ -151,15 +151,23 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    // Explicit, like the slider above and for the same reason:
-                    // a root `.tint()` cascades, and an inherited white here is
-                    // not a decision — it is the absence of one. Worse than
-                    // arbitrary, because white is what this app reserves for
-                    // *lit*, and a switch track is not lit. See #124, and the
-                    // `role: .destructive` note in CLAUDE.md for the same trap
-                    // on a different control.
-                    Toggle("Say well done", isOn: popBinding)
-                        .tint(GlowPalette.grey)
+                    // Three states, so it is a picker rather than a toggle
+                    // (#119). Segmented rather than a menu because the three
+                    // are a scale — quiet, the rare thing, everything — and a
+                    // scale reads better laid out than hidden behind its own
+                    // current value.
+                    Picker("Say well done", selection: popBinding) {
+                        ForEach(Self.popChoices, id: \.0) { level, title in
+                            Text(title).tag(level)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    // The label goes in the header, because a segmented picker
+                    // in a `Form` drops it — leaving three unlabelled words
+                    // where a row used to say what it was for.
+                    .labelsHidden()
+                } header: {
+                    Text("Say well done")
                 } footer: {
                     Text(popFooter)
                 }
@@ -299,19 +307,35 @@ struct SettingsView: View {
     /// black on black.
     private static let haloReach: CGFloat = 3
 
-    /// The Dynamic Island's pop, on or off.
+    /// How much the Dynamic Island says.
     ///
-    /// A binding rather than `@AppStorage`, because the default is **on** and
-    /// `@AppStorage` hands back `false` for a key nobody has written — a plain
-    /// `@AppStorage("pop") var on = true` reads as off for everybody until they
-    /// toggle it twice. `PopPreferences` keeps the sentinel; this reflects it.
-    private var popBinding: Binding<Bool> {
-        Binding(get: { popIsOn }, set: { popIsOn = $0; PopPreferences.isEnabled = $0 })
+    /// A binding rather than `@AppStorage`, because the default is **goals**
+    /// and `@AppStorage` hands back `0` for a key nobody has written — a plain
+    /// stored default reads as whatever `0` maps to until it is changed twice.
+    /// `PopPreferences` keeps the sentinel; this reflects it.
+    private var popBinding: Binding<PopPreferences.Level> {
+        Binding(get: { popLevel }, set: { popLevel = $0; PopPreferences.level = $0 })
     }
 
+    /// The three choices, in the order they escalate.
+    private static let popChoices: [(PopPreferences.Level, String)] = [
+        (.off, "Never"),
+        (.goals, "Goals"),
+        (.everything, "Everything"),
+    ]
+
     private var popFooter: String {
-        "When you finish a habit for the day or the week, the Dynamic Island "
-            + "says so for a moment. It is the goal, not every repetition."
+        switch popLevel {
+        case .off:
+            "The Dynamic Island stays quiet."
+        case .everything:
+            "The Dynamic Island says so for a moment every time you log "
+                + "something, and says something different when that finishes "
+                + "the day or the week."
+        case .goals, .unset:
+            "When you finish a habit for the day or the week, the Dynamic "
+                + "Island says so for a moment. Not every repetition."
+        }
     }
 
     // MARK: - Export

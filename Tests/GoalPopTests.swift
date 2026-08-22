@@ -86,34 +86,38 @@ struct GoalPopTests {
 
     // MARK: - The line
 
-    @Test("The same completion always says the same thing")
-    func lineIsStable() {
+    @Test("The same completion always says the same thing", arguments: [GoalPop.Register.logged, .goal])
+    func lineIsStable(register: GoalPop.Register) {
         // A Live Activity's content can be re-read, and a phrase that changed
         // under the reader would look like a glitch.
         let id = UUID()
-        let first = GoalPop.line(habitID: id, on: day(4), calendar: calendar)
+        let first = GoalPop.line(habitID: id, on: day(4), register: register, calendar: calendar)
         for _ in 0..<50 {
-            #expect(GoalPop.line(habitID: id, on: day(4), calendar: calendar) == first)
+            #expect(
+                GoalPop.line(habitID: id, on: day(4), register: register, calendar: calendar)
+                    == first
+            )
         }
-        #expect(GoalPop.lines.contains(first))
+        #expect(GoalPop.lines(for: register).contains(first))
     }
 
-    @Test("The vocabulary is short, clean and non-empty")
-    func vocabulary() {
-        #expect(!GoalPop.lines.isEmpty)
+    @Test("Each vocabulary is short, clean and fully reachable", arguments: [GoalPop.Register.logged, .goal])
+    func vocabulary(register: GoalPop.Register) {
+        let vocabulary = GoalPop.lines(for: register)
+        #expect(!vocabulary.isEmpty)
         // Short is a hard constraint: a compact Island state truncates rather
         // than wraps.
-        #expect(GoalPop.lines.allSatisfy { $0.count <= 16 })
-        #expect(GoalPop.lines.allSatisfy { !$0.isEmpty })
+        #expect(vocabulary.allSatisfy { $0.count <= 16 })
+        #expect(vocabulary.allSatisfy { !$0.isEmpty })
         // Every line is reachable — a hash that collapsed onto one would make
         // the set a lie.
         var seen = Set<String>()
         for i in 0..<400 {
             seen.insert(GoalPop.line(
-                habitID: UUID(), on: day(i % 7), calendar: calendar
+                habitID: UUID(), on: day(i % 7), register: register, calendar: calendar
             ))
         }
-        #expect(seen.count == GoalPop.lines.count)
+        #expect(seen.count == vocabulary.count)
     }
 
     // MARK: - The switch
@@ -124,16 +128,87 @@ struct GoalPopTests {
         defer { GlowSettings.store.set(previous, forKey: PopPreferences.key) }
 
         // The trap the sentinel exists for: a key nobody has written must read
-        // as *on*, and `@AppStorage`'s own default would hand back false.
+        // as *on*, and `@AppStorage`'s own default would hand back 0.
         GlowSettings.store.removeObject(forKey: PopPreferences.key)
         #expect(PopPreferences.isEnabled)
+        #expect(PopPreferences.level == .goals)
 
-        PopPreferences.isEnabled = false
+        PopPreferences.level = .off
         #expect(!PopPreferences.isEnabled)
-        #expect(GlowSettings.store.object(forKey: PopPreferences.key) as? Int == PopPreferences.off)
+        #expect(
+            GlowSettings.store.object(forKey: PopPreferences.key) as? Int
+                == PopPreferences.Level.off.rawValue
+        )
 
-        PopPreferences.isEnabled = true
+        PopPreferences.level = .goals
         #expect(PopPreferences.isEnabled)
+    }
+
+    @Test("Nobody's stored setting changes meaning")
+    func storedOnStillMeansGoals() {
+        // "On" was 1 before there were three levels, and 1 is `goals` now — so
+        // an install that already turned this on keeps exactly what it had,
+        // rather than being upgraded into being spoken to on every tap (#119).
+        let previous = GlowSettings.store.object(forKey: PopPreferences.key)
+        defer { GlowSettings.store.set(previous, forKey: PopPreferences.key) }
+
+        GlowSettings.store.set(1, forKey: PopPreferences.key)
+        #expect(PopPreferences.level == .goals)
+        GlowSettings.store.set(2, forKey: PopPreferences.key)
+        #expect(PopPreferences.level == .off)
+    }
+
+    @Test("Each level allows exactly what it says")
+    func levelsAllowTheRightRegisters() {
+        #expect(!PopPreferences.allows(.logged, at: .off))
+        #expect(!PopPreferences.allows(.goal, at: .off))
+
+        #expect(!PopPreferences.allows(.logged, at: .goals))
+        #expect(PopPreferences.allows(.goal, at: .goals))
+
+        #expect(PopPreferences.allows(.logged, at: .everything))
+        #expect(PopPreferences.allows(.goal, at: .everything))
+
+        // Unset is goals, everywhere it is asked.
+        #expect(!PopPreferences.allows(.logged, at: .unset))
+        #expect(PopPreferences.allows(.goal, at: .unset))
+    }
+
+    // MARK: - Two vocabularies
+
+    @Test("The routine line and the goal's are different words")
+    func vocabulariesDoNotOverlap() {
+        // The whole reason there are two: sharing a list would make the goal
+        // indistinguishable from the twelfth glass of water, which is what the
+        // old restriction was really guarding against.
+        #expect(Set(GoalPop.lines).isDisjoint(with: Set(GoalPop.goalLines)))
+        #expect(!GoalPop.lines.isEmpty)
+        #expect(!GoalPop.goalLines.isEmpty)
+    }
+
+    @Test("Both vocabularies fit a compact Island state")
+    func linesStayShort() {
+        // Not a style preference: anything that does not fit is truncated by
+        // the system rather than wrapped.
+        for line in GoalPop.lines + GoalPop.goalLines {
+            #expect(line.count <= 16, "\(line) is \(line.count) characters")
+            #expect(line == line.lowercased(), "\(line) is not in the app's voice")
+        }
+    }
+
+    @Test("The pair for one tap reads as one moment")
+    func registersShareASeed() {
+        // Same index, different list — so the routine line and the goal line a
+        // single tap produces are the same *position* in two vocabularies
+        // rather than two unrelated phrases.
+        let id = UUID()
+        for i in 0..<7 {
+            let routine = GoalPop.line(habitID: id, on: day(i), register: .logged, calendar: calendar)
+            let goal = GoalPop.line(habitID: id, on: day(i), register: .goal, calendar: calendar)
+            let a = try? #require(GoalPop.lines.firstIndex(of: routine))
+            let b = try? #require(GoalPop.goalLines.firstIndex(of: goal))
+            #expect(a == b)
+        }
     }
 }
 

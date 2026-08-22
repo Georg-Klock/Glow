@@ -64,11 +64,18 @@ struct ToggleHabitIntent: LiveActivityIntent {
             WidgetBurst.record(
                 habitID: id, reduceMotion: UIAccessibility.isReduceMotionEnabled
             )
-            // The week's goal, if this was the tap that met it. This is the
-            // path the pop is actually seen on: the Island does not render an
-            // activity while its own app is in front, so a completion logged in
-            // the app fires one nobody looks at, and one logged from the home
-            // screen fires one they are already looking at.
+            // The completion, and the week's goal on top of it if this was
+            // the tap that met it — which of those actually speaks is
+            // `PopPreferences`' business, not this call site's (#119).
+            //
+            // Only on `.completed`, which is what makes un-logging silent: an
+            // undo is a correction, and a correction that says "logged" is the
+            // app congratulating somebody for taking something back.
+            //
+            // This is the path the pop is actually seen on: the Island does not
+            // render an activity while its own app is in front, so a completion
+            // logged in the app fires one nobody looks at, and one logged from
+            // the home screen fires one they are already looking at.
             GoalPopCentre.popIfMet(
                 habit: habit.snapshot(),
                 in: WeekCalendar.week(containing: Date()),
