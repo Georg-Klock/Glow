@@ -402,6 +402,37 @@ No model change and no migration: `Completion.day` has been stored and
 normalized since the first version, and `WeekGrid.frequencySlots` was simply
 counting the completions and throwing the weekday away.
 
+## The span rule stands, and the mock has a sixth slip
+
+**Question** (#4). `WeekSpans` divides the week for a habit due N times a week,
+and the rule was read off the design rather than specified. The file does not
+agree with itself: five of six spanning rows across two large-widget frames
+follow the rule, and one — Early night, two a week, nothing done, today Tuesday
+— spans Mon–Wed where the rule gives Mon–Tue.
+
+**Decision** (2026-08-22). The rule stands. The mock is wrong in that row.
+
+Three things point the same way, and none of them is "the code is easier".
+
+The **same row in the other frame**, on a Friday, follows the rule exactly:
+Mon–Fri, which is "through today", where the Tuesday frame shows an even split
+of seven into two. One row doing both in two frames is a slip, not a rule.
+
+**Matching it would break a different row in the same frame.** Touch Grass, in
+the Tuesday frame, follows the rule; a division that produced Mon–Wed for Early
+night gives the wrong answer there. There is no rule that satisfies both, which
+is the definition of a file contradicting itself.
+
+And the file has **four other self-contradictions already on record**, so a
+sixth is a likelier reading than a rule nobody has been able to state.
+
+**#47 lowered the stakes rather than settling it.** With the lit dots carrying
+the record of *when*, the open span's boundary is no longer what the row is read
+by — it is structure. Where it falls decides less than it did when this was
+filed, which is why closing it as decided is now cheap. If the design ever wants
+the even-split reading, the place to change is `WeekSpans.divide` and the thing
+to check first is Touch Grass.
+
 ## The open ring has no fill
 
 **Question** (#65). `GlowPalette.ringWash` — a 1% white — was declared and never
