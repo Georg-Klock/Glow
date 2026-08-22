@@ -558,3 +558,29 @@ that clipping would flatten the HDR layer was never measured; it does not.
 Dark is still where the glow reads best, and it is still what the app looks
 best in. That is now the user's choice rather than the app's. See
 [glow.md](glow.md).
+
+## vision.md is kept in sync, dated, or deleted
+
+**2026-08-22.** #75 reversed the Today ring's rule — open and done are now both
+lit, separated by shape — and corrected `CLAUDE.md`, `README.md`, `SPEC.md` and
+`DayRing`'s own comment. `docs/vision.md` was missed, and kept saying "at the
+goal the ring is quiet… the glow is what is still open, never what is
+finished".
+
+An ordinary stale doc line is a small debt. This one was not, because of what
+`CLAUDE.md` says vision.md *is*: "the target… where the code disagrees with it,
+the code is the backlog." A reader who found that paragraph was being told to
+restore the grey. That is the same failure #65 closed for `ringWash` — a
+declared intent nobody can date, faithfully re-implemented as a regression.
+
+So the rule is now written into the document's own opening: a document that
+outranks the code is kept in sync, dated, or deleted. It carries a revision
+date, and the paragraph explains why the date is load-bearing rather than
+decorative.
+
+Two other sections were checked rather than assumed, which is what turned up
+the rest of the drift: "Habits gain a second kind — which the data model does
+not have today" had landed, and the "Deliberately later" section still deferred
+export, which shipped in #23. Both are corrected in place rather than deleted —
+the value of the list is what the vision *asked for*, and a target with nothing
+left to hit is worth being able to see.

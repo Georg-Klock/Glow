@@ -1,8 +1,14 @@
 # Vision
 
-Dated 2026-08-20. This is the product intent, cleaned up from a brain dump and
-kept short on purpose. Where it disagrees with what is built, this document is
-the target and the code is the backlog.
+Dated 2026-08-20, revised 2026-08-22. This is the product intent, cleaned up
+from a brain dump and kept short on purpose. Where it disagrees with what is
+built, this document is the target and the code is the backlog.
+
+That last sentence is why the revision exists rather than a footnote. A stale
+line here does not read as stale — it reads as an instruction — so when the
+Today ring's rule was reversed and this document was not, it was one grep away
+from being faithfully re-implemented as a regression. Kept in sync, dated, or
+deleted; there is no fourth option for a document that outranks the code.
 
 ## The idea
 
@@ -40,10 +46,17 @@ medium widget at app size:
   say, and offering a size in order to fill it is how a minimal app stops being
   one.
 
-**The ring starts full and glowing, and doing the habit closes it.** At none
-done the whole ring glows; each completion takes a share of it away; at the
-goal the ring is quiet. This is the same rule as everywhere else in the app —
-the glow is what is still open, never what is finished.
+**The ring is the day, and doing the habit closes it.** A repetition still to
+do is an outlined band; one that is done is a line drawn through the middle of
+where that band was. **Both glow.** Consecutive completions merge into one run
+rather than staying a row of ticks, so the ring reads as a single closing
+gesture, and at the goal it is one unbroken glowing circle.
+
+This is the same rule as everywhere else in the app, and it is worth stating in
+the direction that keeps being got wrong: **light marks the habit; what stays
+dark is what never happened.** Brightness is not a score and not a reward — a
+completion is not something to hide. What separates *still open* from *done* is
+shape, because it cannot also be light.
 
 **The ring is arcs, one per repetition**, so the count is legible without
 reading a number. A day's target is **1 to 12**. At 1 the ring is a single
@@ -52,6 +65,11 @@ unbroken circle, because a gap would imply a division that is not there.
 **Tapping adds one.** A tap is `+1` on the counter, straight from the widget.
 **Once the ring is full, the next tap resets it to zero.** That is the only way
 back, and it is also the undo.
+
+The `+1` is the only thing on this screen that moves: the line sweeps clockwise
+to its new end, crossing the gap it is closing. Everything else — the reset, a
+day turning over, an edit — snaps, because animating a correction dresses a
+mistake up as an achievement.
 
 ### This Week
 
@@ -62,6 +80,12 @@ that happens to show the same data.
 
 **Rows: as many as fit, then a hard cut.** No "+3 more" row — a row spent
 saying how much is missing is a row not showing a habit.
+
+**A row says *when*, not just *how many*.** A habit due three times a week is
+drawn as three shapes stretched across the seven days, and a lit dot sits on
+each day it actually happened. The shapes answer "what is left"; the dots
+answer "when did I do this" — which is the question a week view is for, and the
+one a row of pills alone cannot answer.
 
 ### Settings
 
@@ -95,11 +119,19 @@ It is the denser screen and Today is one tap away.
 
 - **The year view stops being a tab** and becomes History inside Settings.
 - **Four tabs become three.**
-- **Habits gain a second kind** — a per-day count — which the data model does
-  not have today.
+- **Habits gain a second kind** — a per-day count — which the data model did
+  not have when this was written.
+
+All three have landed. They are kept here rather than deleted because the point
+of the list is what the vision *asked for*, and a target with nothing left to
+hit is worth being able to see.
 
 ## Deliberately later
 
-- **Export.** Wanted, and now placed, but "might be boiling the ocean" for the
-  next stretch of work. The shape is settled — a file you send yourself — so it
-  can wait without the decision being reopened.
+**Nothing, currently.** Export was the only entry — wanted, placed, and put off
+as "might be boiling the ocean". It shipped instead: CSV or JSON, written when
+a person asks for it and sent where that person sends it, with no upload and no
+sync anywhere. The settled shape turned out to be small enough to just build.
+
+The heading stays. The next thing that gets deferred belongs under it, with the
+reason, so that deferring stays a decision rather than a silence.
