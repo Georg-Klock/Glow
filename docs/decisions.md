@@ -672,3 +672,49 @@ three came back true — `enabled=true met=true auth=true` — with the pop
 following on the next tap. The first attempt had gone to a process that was
 one second old, launched by the intent immediately after an install. Worth
 knowing before reading a single silent run as a broken feature.
+
+## One pop at a time, whose words change
+
+**2026-08-22.** #58 gave `GoalPopAttributes` a `habitID`, on the reasoning that
+a second goal met while the first pop was still up should queue as its own
+activity rather than replace it. That was a guess, and #102 asked for it to be
+measured. Two per-week habits were each put one tap from their goal and both
+were tapped from the week widget.
+
+**What was measured.** ActivityKit does not refuse the second request — both
+activities run — and it does not queue them either. The Island renders only the
+newest. So the first habit's line was drawn, immediately hidden behind the
+second, and ended two seconds later on a timer nobody saw start. Its Lock
+Screen presentation was rendered for the bin.
+
+**One activity, updated.** The attributes are now empty and a second goal
+`update`s the running activity's content. The same thing on screen, with one
+session and one timer — and the outcome becomes this app's decision rather than
+a side effect of how the Island stacks activities, which is undocumented and
+could change.
+
+`PopWindow` is the part that can be wrong, so it is pure and tested: every pop
+takes a number, and only the newest may end the activity. Without it the first
+tap's ending would land two seconds after *its* tap and close a pop the second
+goal had just refreshed.
+
+**Why the third option is not just more work — it is unsafe.** #102 offered
+"queue deliberately", extending the first pop so the second gets its own two
+seconds. Trying to observe an overlap needed a longer window, and at 30 seconds
+the pop stopped ending at all. The reason is in the log: `willExpireAssertionsSoon`
+followed by `Firing background task expiration handlers`, 26 seconds after the
+intent ran. **A pop's ending depends on the process that requested it still
+being alive**, and a widget tap's process is a background one that is not.
+
+At two seconds that is comfortably inside the assertion. Anything that stretches
+the window walks toward a cliff, and past it the activity is never dismissed and
+sits on the Lock Screen as exactly the notification-shaped thing
+`dismissalPolicy: .immediate` exists to prevent. Two seconds is now a
+correctness bound, not only a taste one.
+
+That also caps what can be verified here. The guard's *live* behaviour — the
+first ending arriving while a second pop is up — cannot be observed in this
+setup: the taps cannot be driven closer than about 2.4s apart, and the window
+cannot be widened without crossing the cliff above. The logic is unit-tested;
+what was seen on screen is the second goal logging `(replacing)` and the Island
+carrying its new line in the same activity.

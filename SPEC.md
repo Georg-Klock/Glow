@@ -74,6 +74,12 @@ sentence with an exception is two sentences.
   identical whether it fired or not. A switch in Settings turns it off, default
   on.
 
+  **One pop at a time, whose words change** (#102). Two goals met inside the
+  two seconds is not an edge case — the medium Today widget puts three rings
+  side by side so they can be tapped in a flurry. A second goal updates the
+  running activity rather than requesting another; the ending belongs to the
+  most recent one, so nothing is cut short.
+
   **It fires from the home screen only** (#103). The Island does not render a
   Live Activity while its own app is in the foreground, so a goal met inside
   the app would spend its two seconds on nobody. `GoalPopCentre` is called from
