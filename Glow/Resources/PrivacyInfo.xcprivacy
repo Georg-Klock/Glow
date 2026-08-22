@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Glow Up — the app.
+
+  Audited rather than copied (#132). Every required-reason family was searched
+  for across both targets' sources; UserDefaults is the only one this app
+  touches. File-timestamp, disk-space, system-boot-time, active-keyboard and
+  pasteboard APIs return no matches, so none of them is declared here — a
+  manifest that over-declares is as wrong as one that under-declares.
+
+  Two reasons, and both are real in this binary:
+
+    1C8F.1  The App Group's defaults. GlowSettings.store is
+            UserDefaults(suiteName: "group.com.georgklock.glow"), and it is how
+            the app and the widget extension share the glow level, the week
+            preferences, the pop switch, the tap burst and the widget trace.
+            Read and written only within this app group.
+
+    CA92.1  The app's own defaults. HabitSeeder records whether the first-run
+            habits have been seeded in UserDefaults.standard, and GlowSettings
+            falls back to .standard if the group container is ever unavailable.
+            Read and written only by this app.
+
+  NSPrivacyCollectedDataTypes is empty, and that is a statement about the
+  product rather than an omission: nothing here is uploaded, synced or sent
+  anywhere. History leaves the device only through the share sheet, on a tap,
+  to wherever the person sending it chooses. There is no network code in either
+  target — no URLSession, no Network framework.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>1C8F.1</string>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

@@ -951,3 +951,45 @@ does not say what of.
 The Home Screen widgets are deliberately **not** marked. They are only visible
 on an unlocked phone — this bundle declares no accessory families — so redacting
 them would cost the week grid its labels and buy nothing.
+
+## Both executables carry an audited privacy manifest
+
+**2026-08-22.** The repository had no `PrivacyInfo.xcprivacy` at all, and both
+targets use `UserDefaults`, which is a required-reason API (#132).
+
+**Audited, not copied.** Every required-reason family was searched for across
+both targets: file timestamps, disk space, system boot time, active keyboard,
+pasteboard. None of them appears. `UserDefaults` is the only one, and it is used
+two genuinely different ways, so both reasons are declared and both are true:
+
+- `1C8F.1` — the App Group's defaults, which is how the app and the widget share
+  the glow level, the week preferences, the pop switch, the tap burst and the
+  trace.
+- `CA92.1` — the app's own defaults. `HabitSeeder` records the first-run seeding
+  in `UserDefaults.standard`, and `GlowSettings` falls back to it if the group
+  container is ever unavailable.
+
+A manifest that over-declares is as wrong as one that under-declares, so the
+test asserts the family count as well as its contents.
+
+**`NSPrivacyCollectedDataTypes` is empty, and that is a product statement.**
+Nothing is uploaded, synced or sent anywhere; there is no `URLSession` and no
+Network framework in either target. History leaves the device only through the
+share sheet, on a tap, to wherever the person sending it chooses.
+
+**The appex needs its own.** An extension is independently shipped and the app's
+manifest does not cover it — and it is the one that is easy to forget, because
+the app's is what a reviewer looks at first.
+
+**Two guards, and the stronger one is not the test.** The manifests are listed
+*explicitly* in `project.yml` even though `xcodegen` would pick them up from the
+directory anyway. That redundancy is the point: deleting either file now fails
+`Tools/generate.sh` outright —
+
+    Spec validation error: Target "GlowWidget" has a missing source directory
+    ".../GlowWidget/PrivacyInfo.xcprivacy"
+
+— before anything builds. The tests cover the other direction, reading the
+**built** `.app` and every `.appex` inside it rather than the repository,
+because a manifest that exists in the source tree and does not reach the shipped
+bundle is exactly this issue wearing a different hat.
