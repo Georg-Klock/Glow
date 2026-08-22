@@ -63,7 +63,7 @@ struct StaleCompletionTests {
         try twoContexts { habit, _, widget in
             try deleteOneCompletion(of: habit, in: widget)
             // The line that crashed: `.day` on a row that is no longer there.
-            let counts = habit.completionCounts
+            let counts = habit.completionCounts(in: calendar)
             #expect(counts.values.reduce(0, +) == 1)
         }
     }
@@ -72,7 +72,7 @@ struct StaleCompletionTests {
     func daysSurviveAnOutsideDelete() throws {
         try twoContexts { habit, _, widget in
             try deleteOneCompletion(of: habit, in: widget)
-            #expect(habit.completedDays.count == 1)
+            #expect(habit.completedDays(in: calendar).count == 1)
         }
     }
 
@@ -82,7 +82,7 @@ struct StaleCompletionTests {
         // recompute, which is where all three crash reports landed.
         try twoContexts { habit, _, widget in
             try deleteOneCompletion(of: habit, in: widget)
-            let snapshot = habit.snapshot()
+            let snapshot = habit.snapshot(calendar: calendar)
             #expect(snapshot.name == "Read")
             #expect(snapshot.completionCounts.values.reduce(0, +) == 1)
         }
@@ -93,8 +93,8 @@ struct StaleCompletionTests {
         try twoContexts { habit, _, widget in
             try deleteOneCompletion(of: habit, in: widget)
             try deleteOneCompletion(of: habit, in: widget)
-            #expect(habit.completionCounts.isEmpty)
-            #expect(habit.completedDays.isEmpty)
+            #expect(habit.completionCounts(in: calendar).isEmpty)
+            #expect(habit.completedDays(in: calendar).isEmpty)
         }
     }
 
@@ -107,11 +107,11 @@ struct StaleCompletionTests {
             let match = FetchDescriptor<Habit>(predicate: #Predicate { $0.id == habitID })
             let theirs = try #require(try widget.fetch(match).first)
             let wednesday = TestCalendar.date(2026, 8, 19)
-            widget.insert(Completion(day: wednesday, habit: theirs))
+            widget.insert(Completion(day: wednesday, habit: theirs, calendar: calendar))
             try widget.save()
 
-            #expect(habit.completedDays.count == 3)
-            #expect(habit.completedDays.contains(wednesday))
+            #expect(habit.completedDays(in: calendar).count == 3)
+            #expect(habit.completedDays(in: calendar).contains(wednesday))
         }
     }
 
@@ -123,7 +123,7 @@ struct StaleCompletionTests {
             name: "Read", icon: "📖", frequency: .timesPerWeek(3),
             createdAt: monday, sortOrder: 0
         )
-        habit.completions = [Completion(day: monday, habit: habit)]
-        #expect(habit.completedDays == [monday])
+        habit.completions = [Completion(day: monday, habit: habit, calendar: calendar)]
+        #expect(habit.completedDays(in: calendar) == [monday])
     }
 }

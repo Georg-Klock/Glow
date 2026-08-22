@@ -36,7 +36,15 @@ enum GlowStore {
             throw StoreMigration.Failure(reason: reason)
         }
         let configuration = ModelConfiguration(schema: schema, url: StoreLocation.url)
-        return try ModelContainer(for: schema, configurations: configuration)
+        let container = try ModelContainer(for: schema, configurations: configuration)
+        // After the file is in place and before anything reads it, but *not*
+        // as a condition of opening: a store whose completions still infer
+        // their day shows the same history as one that has been through this.
+        // Failing here must therefore not stop a launch. See #130.
+        StoreMigration.stampDayIdentities(
+            in: ModelContext(container), storeAt: StoreLocation.url
+        )
+        return container
     }
 
     /// A read-only container for the widget process.

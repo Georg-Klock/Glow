@@ -47,7 +47,7 @@ struct PersistenceTests {
 
         #expect(try store.toggleCompletion(for: habit, on: today) == .uncompleted)
         #expect(try context.fetch(FetchDescriptor<Completion>()).isEmpty)
-        #expect(habit.completedDays.isEmpty)
+        #expect(habit.completedDays(in: calendar).isEmpty)
     }
 
     @Test("Two taps on the same day never store two completions")
@@ -194,7 +194,7 @@ struct PersistenceTests {
         let habit = try store.addHabit(name: "Read", icon: "📖", frequency: .timesPerWeek(3))
         try store.toggleCompletion(for: habit, on: today)
 
-        let snapshot = habit.snapshot()
+        let snapshot = habit.snapshot(calendar: calendar)
         #expect(snapshot.name == "Read")
         #expect(snapshot.frequency == .timesPerWeek(3))
         #expect(snapshot.completedDays == [today])
@@ -243,6 +243,6 @@ struct PersistenceTests {
         #expect(habit.id == habitID)
         #expect(habit.name == "Read")
         #expect(habit.frequency == .timesPerWeek(4))
-        #expect(habit.completedDays == [today, TestCalendar.date(2026, 8, 17)])
+        #expect(habit.completedDays(in: calendar) == [today, TestCalendar.date(2026, 8, 17)])
     }
 }
