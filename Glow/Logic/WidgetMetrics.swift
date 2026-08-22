@@ -82,8 +82,8 @@ enum WidgetMetrics {
     ///
     /// Derived rather than written down, so it cannot drift when the padding,
     /// the gap or the slot changes — all three have moved at least once. The
-    /// spec's §4 does this arithmetic by hand for the large family and gets 11;
-    /// there is a test asserting this agrees with it.
+    /// Eleven for the large family, and asserted by a test rather than
+    /// written down anywhere: every input to it has moved at least once.
     ///
     /// `height` is the content box, inside the vertical padding.
     static func rowCapacity(height: CGFloat, slot: CGFloat, hasHeader: Bool) -> Int {

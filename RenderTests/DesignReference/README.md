@@ -8,10 +8,6 @@ own 338 × 354 and diffs it against the flat export committed here.
   frame exists at 1x as `58:52`.
 - **Filename:** `widget-large-338x354@2x.png` (committed).
 
-**The node id in `docs/widget-large-spec.md` is stale.** That file measures
-`83:1676`, which resolves to nothing in the current document; the frame it
-describes is the one above. The measurements still hold — only the id moved.
-
 **Which weekday this frame is.** It is the **Friday** frame (issue #4's
 `83:1485` composite): today is F, and Early night's open span runs Mon–Fri.
 That is the frame whose span *follows* `WeekSpans`' rule, so the diff below is
@@ -46,6 +42,11 @@ not the percentage.
 
 A third, smaller departure is visible and also known: the file's `GLASS` effect
 on the container is not reproduced, because SwiftUI has no equivalent.
+
+All three reasons live next to the code that chose them — `GlowWidget.swift` for
+the container, `GlowShape` for the mark vocabulary — rather than in a design
+document. There is no longer a design document; see docs/decisions.md, "The code
+is the source of truth for design".
 
 ## Re-exporting
 

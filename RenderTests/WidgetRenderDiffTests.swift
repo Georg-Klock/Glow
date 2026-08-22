@@ -124,9 +124,9 @@ struct WidgetRenderDiffTests {
 
     // MARK: - The fixture
 
-    /// The exact week `docs/widget-large-spec.md` §14 says the design frame
-    /// depicts — today is Tuesday — so a committed export of `83:1676` is
-    /// compared against its own data, not against whatever this store held.
+    /// The week the committed design export depicts — today is Tuesday — so
+    /// the reference is compared against its own data rather than against
+    /// whatever this store happened to hold. See DesignReference/README.md.
     private func entry() -> WeekEntry {
         let anchor = WeekCalendar.day(Date())
         let week = WeekCalendar.week(containing: anchor)

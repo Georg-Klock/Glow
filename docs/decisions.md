@@ -176,8 +176,49 @@ system control tinted with a custom grey stops looking like the system. The
 border between the two greys is the border between "designed here" and
 "designed by Apple" — a real line in this app, worth keeping visible. The
 same reasoning already governs type: the grid's sizes are the file's 12pt
-scaled (#32), the system screens keep the system's text styles. Full
-rationale in [design-system.md](design-system.md), "Outside the grid".
+scaled (#32), the system screens keep the system's text styles.
+
+## The code is the source of truth for design
+
+**Question** (#66). Two documents published the numbers the app draws:
+`docs/design-system.md` (every colour, type size, radius and effect) and
+`docs/widget-large-spec.md` (1,282 lines measuring the large-widget frame
+through the Figma Plugin API). Both had drifted. Generate them from the code,
+or stop keeping them?
+
+**Decision** (2026-08-21). **Stop keeping them. Both are deleted.** The code
+that draws a thing is the only description of it.
+
+The drift was not carelessness, it was structural. Almost nothing the app
+draws is a stored constant: the slot is `194 / (7 + 6·24/35)` at runtime, the
+ring's stroke is `3/35` of that, and every drop shadow is then multiplied by
+`GlowSettings.haloScale(peak)` — 1.7 at the shipping default. So a documented
+value could be a faithful record of the design file and still not predict a
+single pixel. The tables published `17.5`, `1.5` and `9`; the app renders
+`17.4550`, `1.4961` and `15.26`. Anyone building from the docs got numbers
+close enough to look right and wrong enough to fail a diff, which is the worst
+of both.
+
+Generating the tables from code was the alternative, and it was rejected as
+the wrong shape of fix: it keeps a second artefact in step with the first at
+the cost of a script, a CI check and a committed file, to serve a reader who
+could have read `GlowPalette`. The rationale that was *only* in prose moved
+into the code beside the value it explains — the accented-rendering argument
+for storing hierarchy in alpha, the two effects of the design container that
+are deliberately not reproduced, the Today ring's borrowed ratios, and the
+open question of whether `.fullColor` survives a Tinted home screen.
+
+What replaces them where a document genuinely helps:
+
+- **The frame itself**, committed as a 2x PNG in `RenderTests/DesignReference/`,
+  with the render diff comparing the shipping view against it. An artefact
+  cannot drift from itself, and the harness reports rather than asserts.
+- **This file**, for decisions.
+- **`docs/glow.md`**, for the HDR engineering and its negative results — that
+  is measurement history, not a design spec, and it stays.
+
+Recoverable from git if this turns out to be wrong; the deleting commit is the
+one that carries this entry.
 
 ## Appearance: follow the system
 

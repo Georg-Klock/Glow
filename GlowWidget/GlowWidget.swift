@@ -40,6 +40,21 @@ struct GlowWidget: Widget {
                 // default is true, and passing false opts out of glass, out of
                 // the StandBy and iPad Lock Screen galleries, and out of
                 // foreground tinting with it.
+                //
+                // Two things the design file specifies for this container are
+                // deliberately not reproduced, and a render diff will show both
+                // as differences rather than regressions:
+                //
+                //  - **Figma's `GLASS` effect** — radius 4, refraction 0.8,
+                //    depth 20, light at −45°. SwiftUI has no equivalent;
+                //    `Material` and `.glassEffect` reproduce none of the
+                //    refraction, dispersion or directional light. In a flat
+                //    export it shows as the faint hairline along the top-left
+                //    corner arc.
+                //  - **A 30pt corner radius**, because iOS masks a widget to
+                //    its own continuous-corner squircle regardless. The file's
+                //    *interior* corners are plain circular arcs and those are
+                //    reproduced.
                 .containerBackground(GlowPalette.widgetBackground, for: .widget)
                 // The marks act in place through their intents; everything
                 // else opens the app on this widget's own screen.

@@ -114,6 +114,11 @@ private struct GlowTile: View {
                 // point of this file. Apple reserves `.fullColor` for media like
                 // album art; the argument for it here is that the light *is* the
                 // content, not a decoration applied to it.
+                //
+                // **Still unverified on a Tinted or Clear home screen.** The
+                // reasoning is sound and the call is cheap, but nobody has put
+                // this widget on a tinted Home Screen and looked. Worth doing
+                // before anything else is built on top of it.
                 .widgetAccentedRenderingMode(.fullColor)
         } else {
             GlowPalette.color
