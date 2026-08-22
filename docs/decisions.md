@@ -265,6 +265,36 @@ than a solved one. What reopening this needs is a mechanism, not a second
 opinion. The measurements are in `GlowWidget.swift` and `GlowImageCache.swift`
 so that the flag is not tried a third time.
 
+## The open ring has no fill
+
+**Question** (#65). `GlowPalette.ringWash` — a 1% white — was declared and never
+applied. The design file gives the open ring a `#FFFFFF` @ 1% fill; the code
+draws it with `Capsule().strokeBorder`, which paints a border and no fill, so
+the wash has never been on screen in any release. Wire it up, or delete it?
+
+**Decision** (2026-08-22). Deleted.
+
+Three things pointed the same way. The document that specified it no longer
+exists — see "The code is the source of truth for design" above, and a token
+kept alive only by a deleted document is a token with no argument left. The
+ring's interior is *deliberately* clear rather than incidentally so: the glow
+modifier masks its HDR tile with the view it wraps, and a mask reads alpha, so
+any fill inside the glowed layer lights the interior instead of leaving it dark
+— which is the opposite of what a ring is. And the one real problem that
+interior has, halo bleed from the neighbouring marks making it read grey rather
+than black, is fixed by black drawn *beneath* the glow, never by white inside
+it. A 1% white is the wrong sign for it.
+
+What this is not: a claim that the design file was wrong. A 1% wash on a
+`fill`-then-`overlay` construction is a coherent thing to ask for. It is a claim
+that the app does not draw the ring that way, has not for its whole life, and
+gains nothing by starting.
+
+The risk this closes is the one the issue names: a declared-but-unapplied colour
+is exactly what gets "restored" by the next person reading a design file, after
+which nobody can say whether the change was a fix or a regression. The comment
+left in `GlowPalette` where the token was says so.
+
 ## Appearance: follow the system
 
 **Question.** Not in the spec's list. It arrived from the implementation, twice.
