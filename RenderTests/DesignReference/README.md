@@ -3,6 +3,12 @@
 `WidgetRenderDiffTests` renders the real `WeekWidgetView` at the design frame's
 own 338 × 354 and diffs it against the flat export committed here.
 
+**This diff is a report, not a gate.** The number below is large on purpose and
+would be a bad threshold; the gate that fails CI on an unapproved visual change
+is `RenderTests/Baselines/render-signatures.json`, which compares the widget
+against a committed signature of itself rather than against a flat mockup of an
+HDR app. See #138 and `RenderBaselineTests`.
+
 - **Source:** Figma file `0m9qFcvvUrIgLmqIxE0jtj` ("Glow Up"), page **05 Widgets**.
 - **Node:** `83:1486` — "Widget — Large", authored at **2x**, 676 × 708. The same
   frame exists at 1x as `58:52`.

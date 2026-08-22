@@ -127,6 +127,12 @@ struct WidgetRenderDiffTests {
         // matching the flat export — HDR against clipped white, no glass —
         // so a hard gate would either fail forever or hide behind a number
         // nobody derived. The harness reports; deciding is a person's job.
+        //
+        // **This is a report, and the gate is elsewhere** (#138). An audit run
+        // of this test found 90.04% of pixels beyond tolerance and passed, and
+        // the fix was not to adopt that number: `RenderBaselineTests` asserts
+        // against a committed signature of what the widget itself renders,
+        // which is a claim this project can actually make.
     }
 
     @Test("The rest day's line runs between the first and last habit, and no further")

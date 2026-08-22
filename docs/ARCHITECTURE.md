@@ -263,10 +263,30 @@ changes. Two paths, and both are needed:
 ## Testing
 
 `Tools/test.sh` is the test command. Use it rather than a hand-typed
-`xcodebuild test`: it asserts a **non-zero** test count, so a scheme that builds
-no test target fails instead of exiting 0 and looking like a pass. It also
-picks whichever iPhone simulator the machine actually has, so it behaves the
-same locally and on a runner with a different Xcode.
+`xcodebuild test`. It picks whichever iPhone simulator the machine actually
+has, so it behaves the same locally and on a runner with a different Xcode; it
+runs the suite once into a result bundle under `Artifacts/<run>/`, unique per
+run and gitignored; and it then asks `Tools/validate-test-result.py` whether the
+run was really a pass.
+
+That last step is the point (#138). `xcodebuild` exiting 0 answers one question
+— did anything that ran report a failure — and a lost test bundle, a suite that
+shrank by three hundred tests, a skipped test and a compiler warning all exit 0.
+The validator reads the `.xcresult` through `xcresulttool` and fails when:
+
+* a test bundle named in `Tools/test-inventory.json` did not run, or ran fewer
+  tests than its reviewed floor;
+* a bundle ran that the inventory does not declare;
+* any test is anything other than `Passed`;
+* the build carries a warning that is not in the inventory's fingerprinted
+  allowlist;
+* the run left no render-baseline manifest, or failed a visual test without
+  attaching the images.
+
+The floors are minima. Adding a test never touches the inventory; lowering a
+floor is the reviewable event, because it means tests were deleted. The
+validator's own mutations run under `--self-test`, on every push, on a Linux
+runner — a checker nobody checks can weaken silently.
 
 Tests exercise the real app types via `@testable import Glow`. Never
 re-implement app logic in a test file: a mirror copy passes forever while the
@@ -286,11 +306,20 @@ at the design frame's own 338 × 354 and, once a design export is committed
 (#6). Its own target because `GlowTests` reaches the app module and the
 widget's view is not in it — so it compiles the widget's sources directly, the
 same sharing the widget target itself uses, hosted by the app so `Bundle.main`
-carries the symbol catalogue. `Tools/test.sh` sums the counts across both
-targets; taking the last summary line would silently shrink the number to
-whichever target finished last.
+carries the symbol catalogue. It also carries the **render baseline**: a
+committed 16 × 16 grid of mean brightness per widget family, in
+`RenderTests/Baselines/render-signatures.json`, rendered for a pinned date at a
+pinned glow setting. Each cell averages roughly 450 pixels, so antialiasing
+moves a cell by well under one level while a mark that moves a column moves
+several cells by tens — measured as bit-identical across two simulator models,
+with the tolerance at 3 for headroom. A change that is deliberate is approved by
+copying the manifest the run attached over the committed file; `Tools/test.sh`
+prints that command with the run's own path in it.
 
-CI runs the same script on pull requests and on merges to `main`.
+CI runs the same script on pull requests and on merges to `main`, plus an
+unsigned Release build against the device SDK — the configuration and the SDK
+that ship, which the simulator test lane never compiles. Every run uploads its
+`Artifacts/` directory, passing or failing.
 
 ## The App Group
 

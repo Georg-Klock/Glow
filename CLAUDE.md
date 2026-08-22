@@ -62,11 +62,26 @@ overshot it into contradicting §1. See #75 and docs/decisions.md.
 
 - **Tests:** `Tools/test.sh`
 
-  Not a hand-typed `xcodebuild test`. The script **asserts a non-zero test
-  count**, so a scheme that builds no test target fails instead of exiting 0 and
-  looking exactly like a pass. It also picks whichever iPhone simulator the
-  machine actually has, so it behaves the same locally and on CI. It prints
-  `L1 <n>/<n>`; that number goes in the PR body.
+  Not a hand-typed `xcodebuild test`. It picks whichever iPhone simulator the
+  machine actually has, so it behaves the same locally and on CI, and it runs
+  the suite once into `Artifacts/<run>/` — result bundle, log, attachments and
+  a structured verdict, unique per run and gitignored. It prints `L1 <n>/<n>`;
+  that number goes in the PR body.
+
+  **A green `xcodebuild` is not the verdict.** After the run,
+  `Tools/validate-test-result.py` reads the `.xcresult` and fails the command
+  when a declared test bundle did not run, when one ran fewer tests than its
+  floor in `Tools/test-inventory.json`, when anything was skipped, when the
+  build carries an undeclared warning, or when the render baseline left no
+  evidence. All of those exit 0 from `xcodebuild`; one of them was observed on
+  this repository the day the check landed. See #138.
+
+  Adding tests never touches the inventory — the floors are minima. **Lowering
+  one is the reviewable event**, and it belongs in the same change as the
+  deletion that caused it.
+
+  When the render baseline moves, the script prints the one command that
+  approves it. Approving is a decision: say in the pull request what moved.
 
 - **Regenerate the symbol picker catalog:** `Tools/make-symbol-catalog.py`
 - **Render the website's HDR word images:** `Tools/make-glow-word.swift`
@@ -78,6 +93,9 @@ overshot it into contradicting §1. See #75 and docs/decisions.md.
 - **Read the widget's trace off a tethered phone:** `Tools/pull-widget-log.sh`
 - **Check the App Group entitlement survived signing:** `Tools/check-app-group.sh`
 - **Validate the generated project on its own:** `Tools/check-project.py`
+- **Validate a kept result bundle on its own:**
+  `Tools/validate-test-result.py --xcresult Artifacts/latest/Glow.xcresult`
+- **Check the gate itself:** `Tools/validate-test-result.py --self-test`
 
 CI runs the tests on every pull request and on merges to `main`
 (`.github/workflows/ci.yml`), on a pinned macOS runner — pinned rather than

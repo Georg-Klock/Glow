@@ -205,8 +205,8 @@ struct GoalPopTests {
         for i in 0..<7 {
             let routine = GoalPop.line(habitID: id, on: day(i), register: .logged, calendar: calendar)
             let goal = GoalPop.line(habitID: id, on: day(i), register: .goal, calendar: calendar)
-            let a = try? #require(GoalPop.lines.firstIndex(of: routine))
-            let b = try? #require(GoalPop.goalLines.firstIndex(of: goal))
+            let a = GoalPop.lines.firstIndex(of: routine)
+            let b = GoalPop.goalLines.firstIndex(of: goal)
             #expect(a == b)
         }
     }

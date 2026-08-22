@@ -2088,3 +2088,71 @@ a slot toggled to a filled dot, a two-rep ring filled to a solid circle by two
 taps, the label going grey behind it — and History draws the year with today
 lit. The widgets' own render was not put on a home screen; their providers call
 the same bounded reads the app does.
+
+## A green tick has to mean something
+
+**2026-08-22.** `xcodebuild` exiting 0 says one thing: nothing that ran
+reported a failure. CI was reading it as three, and #138 is the list of what it
+could not see.
+
+The render-diff test computed a difference against a design export and
+**deliberately asserted nothing** — in an audit run it reported 90.04% of
+pixels beyond tolerance and passed. The background audit next door printed
+`bg-audit: week small exact-black 97.3%` and printed nothing else; a percentage
+in a log is not a gate. And `Tools/test.sh` accepted any non-zero test count
+grepped out of human-readable output, which cannot tell 380 tests from 40, and
+certainly cannot tell that `GlowRenderTests` stopped running while `GlowTests`
+kept the total high.
+
+**That last one is not hypothetical, and it was not found by argument.** The
+first run of the new validator on this branch failed a run `xcodebuild` had
+exited 0 on: the app host had crashed as `GlowRenderTests` started, one "test"
+was recorded for the whole bundle, and `GlowTests`' 370 passes were enough to
+make the old check print `L1 370/370`. The run that proved the gate was the run
+the gate was written for.
+
+**Three gates now, each fail-closed.**
+
+*Inventory.* `Tools/test-inventory.json` names every test bundle and the
+smallest number of tests it may report. A **floor, not an equality** — adding a
+test never touches the file, which is the whole reason a hard-coded expected
+count was rejected: a number people bump reflexively stops being read. Lowering
+a floor means tests were deleted, and it should be as visible in a diff as
+deleting them was. A bundle that runs and is not declared fails too.
+
+*Diagnostics.* Warnings come out of the result bundle and have to be zero,
+against a fingerprinted allowlist that carries a reason and an issue per entry.
+Six existed; all six were in test code and all six are fixed. The one entry left
+is `llvm-profdata`'s complaint about coverage data from a previous build, which
+is a property of a DerivedData directory rather than of the code and quotes an
+absolute path, so it is allowlisted by prefix.
+
+*Visual.* Not a PNG diff against the design export. The export is a flat mockup
+of an HDR app and disagrees with the render by design; adopting that 90% as a
+baseline would have been adopting a number nobody derived. The baseline is a
+committed **16 × 16 grid of mean brightness** per widget family, plus the share
+of the frame that is exactly black, rendered for a pinned date at a pinned glow
+setting. Each cell averages roughly 450 pixels, so antialiasing along an edge
+moves a cell by well under one level while a mark that moves a column moves
+cells by tens. Measured rather than assumed: two simulator models produced
+**bit-identical grids**, so the tolerance of 3 is headroom for a future
+renderer, not slack for today's. Moving `WidgetMetrics.labelWidth` from 98 to 94
+— four points, the size of the error that once cost this project three real code
+changes — turns it red and attaches expected, actual and diff images.
+
+**Every gate here was watched failing before it was believed.** The validator's
+own mutations run under `--self-test` on every push, on a Linux runner, because
+a checker nobody checks can weaken silently; the visual gate was proved by the
+four-point mutation above; the inventory and diagnostics gates were proved by
+running one bundle instead of two with a warning injected, which named the
+missing bundle and the warning separately.
+
+**What CI still cannot do.** An iOS 18 lane was in scope and is not possible on
+the pinned runner: `macos-26` carries iOS 26.2, 26.4 and 26.5 simulator runtimes
+and no 18.x at all, so a minimum-deployment-target *test* lane would have to
+download a runtime on every run. Compile-time coverage of the floor already
+exists — the deployment target is 18.0 and the SDK is 26, so newer API is an
+error at the call site — and runtime behaviour on 18 remains something only a
+device answers. The lane that did land is an unsigned Release build against the
+device SDK, which is the configuration and the SDK that ship and which the
+simulator test lane never compiles.

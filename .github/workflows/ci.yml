@@ -12,13 +12,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Tests
+  # The gate's own tests, on a runner that costs nothing. Tools/validate-test-result.py
+  # is what decides whether a green xcodebuild is really a pass, and a checker
+  # nobody checks can weaken silently — so its mutations run first, on every
+  # push, without waiting for a macOS runner. See #138.
+  gate:
+    name: Gate self-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: The validator rejects what it claims to reject
+        run: python3 Tools/validate-test-result.py --self-test
+
+  build-and-test:
+    name: Build and test
     # Pinned rather than macos-latest: the test suite reads gain-map metadata,
     # and where that metadata lives has already been seen to differ between
     # platform versions. Pin, and bump deliberately.
     runs-on: macos-26
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v7
@@ -59,7 +72,66 @@ jobs:
             -sdk iphonesimulator \
             CODE_SIGNING_ALLOWED=NO
 
-      # Picks an available simulator, runs the suite, and fails if the run
-      # reported no tests.
+      # The configuration and the SDK that actually ship. Release turns on
+      # whole-module optimization and the device SDK is not the simulator SDK,
+      # so this compiles code the test lane never compiles — and until now the
+      # first build of it was the one Tools/ship-testflight.sh made, on the way
+      # to an upload.
+      #
+      # Unsigned on purpose: signing needs a team and profiles that are
+      # machine-local by design, and compiling is the part CI can own.
+      #
+      # #133 hooks in here. The archive-time checks it wants — the widget's
+      # CFBundleShortVersionString and CFBundleVersion matching the host app's,
+      # before anything is uploaded — belong in a script this step calls, in
+      # the shape of Tools/check-project.py: a checked-in validator that reads
+      # the built product and exits non-zero with the two values in the
+      # message. Add the step after this one and call the same script from
+      # Tools/ship-testflight.sh, so the gate and the release path cannot
+      # disagree about what "matching" means.
+      - name: Build Release for the device SDK
+        run: |
+          xcodebuild build \
+            -project Glow.xcodeproj \
+            -scheme Glow \
+            -sdk iphoneos \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO
+
+      # Runs the suite into a unique result bundle under Artifacts/, then
+      # validates that bundle: every declared test bundle present, every
+      # inventory floor met, nothing skipped, no undeclared warning, and the
+      # visual baseline's manifest attached. GLOW_ERASE_SIMULATOR makes the
+      # lane's isolation explicit — the runner image is reused across jobs, and
+      # #168 was a value one run left in a simulator's defaults for the next.
       - name: Run tests
+        env:
+          GLOW_ERASE_SIMULATOR: "1"
         run: Tools/test.sh
+
+      # The verdict in the run summary, so a red build says what was wrong
+      # without anyone downloading a 4MB bundle first. The markdown is written
+      # by the validator itself, from the same report it exits on.
+      - name: Publish the verdict
+        if: always()
+        run: |
+          summary=$(ls Artifacts/*/summary.md 2>/dev/null | head -1 || true)
+          if [ -n "$summary" ]; then
+            cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No summary was written — the run did not reach the validator." \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Always, and an error when there is nothing to upload: the run that
+      # failed is the run whose result bundle, log and rendered images are worth
+      # the most, and a lane that quietly uploads nothing is a lane with no
+      # evidence.
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-run-${{ github.run_id }}-${{ github.run_attempt }}
+          path: Artifacts/
+          if-no-files-found: error
+          retention-days: 14

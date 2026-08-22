@@ -1,0 +1,39 @@
+{
+  "_": [
+    "What a test run has to contain to count as one. Read by",
+    "Tools/validate-test-result.py, which Tools/test.sh runs after every run.",
+    "",
+    "bundles: every test bundle the scheme is supposed to run, and the smallest",
+    "number of tests it may report. A floor, not an equality — adding tests never",
+    "touches this file. Lowering one means tests were deleted, and that should be",
+    "as visible in a diff as deleting them was. A bundle that runs and is not",
+    "listed here fails too: an undeclared target is a target that can vanish",
+    "again unnoticed.",
+    "",
+    "diagnosticAllowlist: compiler and analyzer warnings this repository has",
+    "decided to live with, each fingerprinted as 'issueType: message', with a",
+    "reason and the issue tracking it. Use fingerprintPrefix only where the",
+    "message carries an absolute path and so cannot be named exactly. Short is",
+    "the intended state.",
+    "",
+    "requiredAttachments / visualFailureAttachments: evidence the run has to",
+    "leave behind. The render baseline records what it rendered on every run,",
+    "and a visual failure has to leave images a person can look at. See #138."
+  ],
+  "bundles": {
+    "GlowTests": { "minimum": 370 },
+    "GlowRenderTests": { "minimum": 12 }
+  },
+  "requiredAttachments": ["render-signatures-actual.json"],
+  "visualFailureAttachments": {
+    "bundle": "GlowRenderTests",
+    "names": ["-expected.png", "-actual.png", "-diff.png"]
+  },
+  "diagnosticAllowlist": [
+    {
+      "fingerprintPrefix": "Uncategorized: Aggregation tool emitted warnings:",
+      "reason": "llvm-profdata complains that a coverage profile was produced by a different binary than the one being merged. It is a property of a DerivedData directory that a previous run wrote into, not of the code: a clean CI runner never produces it, and a developer who edits a test between two local runs always does. Its message quotes an absolute path, so it cannot be fingerprinted exactly.",
+      "issue": "#138"
+    }
+  ]
+}
