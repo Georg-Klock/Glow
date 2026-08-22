@@ -1359,3 +1359,36 @@ Both directions were exercised. An invalid `-destination` now reports
 followed by the invocation, where it used to report one graphics warning. A
 planted failing test still reports `✘ Expectation failed: 1 == 2` exactly as
 before.
+
+## Nothing prominent is styled by the tint
+
+**2026-08-22.** Both "Add Habit" empty-state buttons rendered a **white label
+on a white capsule** (#162). `.borderedProminent` fills with the environment's
+tint and draws the label in the contrasting colour; `RootTabView` sets
+`.tint(GlowPalette.color)`, which is pure white, so the contrasting colour is
+white too.
+
+Measured on screen before changing anything, on both tabs: the capsule's
+interior sampled **8077 pixels, one distinct colour, 255,255,255** — not one
+pixel of a label. After: 236 colours, darkest 0,0,0, **3149 near-black pixels**
+where the words are. Identical numbers on Today and This Week, which is what
+you would expect from two copies of the same four lines.
+
+Both are now drawn rather than styled — a `Text` in black on a `Capsule` filled
+with `GlowPalette.color`, `.buttonStyle(.plain)` — the same shape
+`StoreUnavailableView` already used after hitting this in #131.
+
+**This is the third instance of one trap**, and `CLAUDE.md` now says so
+generally rather than naming a third control. `role: .destructive` was the
+first, `Toggle` the second (#124), `.borderedProminent` the third. The pattern
+is not "some controls need an explicit tint"; it is that **a pure-white tint
+makes every control that derives a foreground from it invisible**, and the list
+of such controls is not knowable in advance.
+
+Not fixed here, and left on #162: whether the root tint should exist at all.
+It is there so the Glow slider and the lit marks read as the product's white;
+if most controls have to opt out of it, it belongs on the surfaces that want it
+rather than at the root. That is a design decision, not a bug fix.
+
+**A third empty state has no button and so no bug**: Settings → History shows
+an icon and a sentence. Worth knowing before someone "fixes" it for symmetry.
