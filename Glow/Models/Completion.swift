@@ -19,9 +19,31 @@ final class Completion {
     var day: Date = Date.distantPast
     var habit: Habit?
 
-    init(id: UUID = UUID(), day: Date, habit: Habit? = nil) {
+    /// Which demo invented this row, and `nil` for every row a person logged.
+    ///
+    /// **Provenance lives on the row so it cannot disagree with the row.** The
+    /// demo used to record what it had added as a list of ids in the App Group
+    /// defaults, written after the completions were saved — two stores, two
+    /// writes, and a gap between them in which a crash left durable invented
+    /// history that nothing could identify or remove. Here the fact that a
+    /// completion is invented is saved in the same transaction as the
+    /// completion, so either both landed or neither did. See #140.
+    ///
+    /// A session id rather than a flag because it says *which* demo: the id is
+    /// stable across one seeding, so a future question about a particular run
+    /// has an answer. Removal does not need it — `DemoHistory` takes out
+    /// everything with any session id — and that is deliberate, because it
+    /// makes a half-finished seeding removable too.
+    ///
+    /// Optional with a `nil` default, like every other property here: the
+    /// schema stays CloudKit-shaped, and an install that predates this column
+    /// reads back as rows nobody invented, which is what they are.
+    var demoSessionID: UUID?
+
+    init(id: UUID = UUID(), day: Date, habit: Habit? = nil, demoSessionID: UUID? = nil) {
         self.id = id
         self.day = day
         self.habit = habit
+        self.demoSessionID = demoSessionID
     }
 }
