@@ -220,11 +220,28 @@ either end is outside it. All three week widget families draw it, on the same
 `RestCut` numbers the app uses.
 
 **A per-day habit has no slots and no week row.** It is drawn on Today as a
-ring of arcs, one per repetition — see `DayRing` and docs/vision.md. The ring
-starts full and glowing and each completion quiets one arc, clockwise from the
-top, so the glow is always exactly what is left to do. At a target of 1 the
-ring is a single unbroken circle. At the goal the ring is quiet but present,
-in the same grey as a habit already handled.
+ring, one segment per repetition, consumed clockwise from the top — see
+`DayRing` and docs/vision.md.
+
+**Open is a band, done is a line, and both are lit.** A repetition still open is
+an outlined pill: the annulus between the ring's two radii, bounded by its two
+angles, corners rounded, its interior left clear and its perimeter a glowing
+hairline. A logged repetition is a thin glowing line on the band's centreline,
+and consecutive logged ones **merge into one unbroken run** — the line crosses
+the gaps between them, and the divisions only survive between repetitions still
+open. That is the week grid's rule at a different shape: a run of days there is
+one bar, not a row of dots.
+
+**At the goal the line closes into a full circle**, with no break at twelve
+o'clock where the first gap was: when nothing is left there is nothing to
+divide. A target of 1 is an outlined pill too — two concentric circles with a
+black band between them — closing to that same single circle, so "finished" is
+one silhouette at every count.
+
+Everything scales from the diameter (`DayRingGeometry`), so the app's 92pt ring
+and the two widget rings are one drawing at three sizes. This ring used to paint
+a logged repetition grey, which made it the one surface in the app where a
+completion went dark, against §1 (#75).
 
 **A tap on the ring is one more.** Once the ring is full, the next tap resets
 the day to zero — the reset is the whole undo, and the day's completion rows

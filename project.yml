@@ -98,6 +98,7 @@ targets:
       - path: Glow/Views/HabitIconView.swift
       - path: Glow/Views/SlotMarkView.swift
       - path: Glow/Views/DayRingView.swift
+      - path: Glow/Views/DayRingArcShape.swift
       - path: Glow/Resources/SymbolCatalog.json
         buildPhase: resources
     configFiles:

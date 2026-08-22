@@ -2,11 +2,16 @@ import Foundation
 
 /// The Today ring: one arc per repetition, closing as the day is logged.
 ///
-/// The ring is the inverse of the fitness rings it resembles. It starts full
-/// and glowing — the whole day still open — and each completion quiets one arc,
-/// so what glows is always what is left to do. At the goal the ring is quiet.
-/// That is the same rule as every other mark in the app: the glow means still
-/// open, never a reward for finishing.
+/// The ring is the inverse of the fitness rings it resembles. It starts as
+/// twelve o'clock's worth of outlined pills — the whole day still open — and
+/// each completion turns one into a line, so the ring's *shape* says what is
+/// left and its light says the habit was touched at all.
+///
+/// **Both states glow** (#75). Open is a band, done is a line, and both are
+/// lit — which is what the rest of the app has always done and what SPEC §1
+/// says in as many words. This ring was the last surface painting a completion
+/// grey, on a reading of the rule that made light a reward for being unfinished
+/// rather than a mark on the habit.
 ///
 /// Pure geometry over fractions of a circle, so it is testable without a
 /// renderer and the app and the widget cannot disagree about where an arc
@@ -37,7 +42,9 @@ enum DayRing {
     /// `gap` is the space between neighbouring arcs as a fraction of the whole
     /// circle. It is clamped to half a slice, so no gap can grow until the
     /// arcs it separates are smaller than it — twelve arcs on a small ring
-    /// stay twelve visible arcs rather than a ring of holes.
+    /// stay twelve visible arcs rather than a ring of holes. **The clamp is
+    /// dormant** since #75 halved the gap: the worst supported case is twelve
+    /// repetitions, 15° of slice against a 10.74° gap. It stays as a guard.
     static func arcs(target: Int, done: Int, gap: Double = 0) -> [Arc] {
         let count = max(1, min(target, Frequency.selectableDailyCounts.upperBound))
         let quiet = max(0, min(done, count))
@@ -75,16 +82,26 @@ enum DayRing {
         return current >= goal ? 0 : current + 1
     }
 
-    /// The gap that keeps two round-capped arcs reading as separate.
+    /// The clear space between two neighbouring repetitions: one band width of
+    /// it, measured along the band's centreline.
     ///
-    /// A round cap extends the stroke by half its width at each end, so two
-    /// arcs whose trims are a bare stroke-width apart are visually touching.
-    /// One stroke-width for the caps plus one of clear space, measured along
-    /// the stroke's centreline — which for a stroke kept inside `diameter`
-    /// is inset by half the stroke from the outer edge.
+    /// **Literal clear space, and that is the change** (#75). This used to be
+    /// *two* band widths, and the doubling was not spacing — it was one width
+    /// for the round caps plus one of air, because a round cap extends a stroke
+    /// half its width past each trim endpoint and two arcs a bare width apart
+    /// were visually touching. A pill is bounded exactly by its own start and
+    /// end angles and rounds its corners *inside* that span, so nothing extends
+    /// past the trim any more and the cap allowance has nothing to pay for.
+    ///
+    /// One band width, because the ring's only spacing unit is its own
+    /// thickness. Both scale with the diameter, so this is a constant angle at
+    /// every size: `3 / (32π)` of the circle, **10.74°**, down from 21.49°.
+    ///
+    /// Segment spans, for the record: 169.26° at a target of 2, 109.26° at 3,
+    /// 49.26° at 6, 19.26° at 12.
     static func gapFraction(strokeWidth: Double, diameter: Double) -> Double {
         let centreline = Double.pi * (diameter - strokeWidth)
         guard centreline > 0 else { return 0 }
-        return (2 * strokeWidth) / centreline
+        return strokeWidth / centreline
     }
 }
