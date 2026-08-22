@@ -122,6 +122,73 @@ struct WidgetRenderDiffTests {
         // nobody derived. The harness reports; deciding is a person's job.
     }
 
+    @Test("The rest day's line runs between the first and last habit, and no further")
+    func restCutStartsAndStopsOnAHabit() throws {
+        // Sunday, which is the mockup's rest day and also the last column — so
+        // a line drawn at the wrong x lands outside the track entirely rather
+        // than one column over, which is the easier failure to read.
+        let entry = self.entry()
+        let sunday = entry.week.days[6]
+        let weekday = WeekCalendar.calendar.component(.weekday, from: sunday)
+
+        let previous = WeekPreferences.restDay
+        defer { WeekPreferences.restDay = previous }
+        WeekPreferences.restDay = weekday
+
+        let pixels = try rgba(of: try render())
+        let width = Int(Self.size.width * Self.scale)
+
+        // Where the line should be, from `RestCut`'s own numbers rather than
+        // from a measured render — the pixel-scanning script that chased a
+        // four-point baseline error into three real code changes is the reason.
+        let track = Self.size.width
+            - WidgetMetrics.padLeading - WidgetMetrics.padTrailing
+            - WidgetMetrics.labelWidth - WidgetMetrics.labelGap
+        let x = WidgetMetrics.padLeading + RestCut.x(
+            restIndex: 6,
+            trackWidth: track,
+            labelWidth: WidgetMetrics.labelWidth,
+            labelGap: WidgetMetrics.labelGap
+        )
+        let column = Int((x * Self.scale).rounded())
+
+        // The cut's grey against black, sampled down the column. The marks in
+        // this row are far brighter, so a generous floor still separates the
+        // line from the background without catching a dot.
+        func isCut(_ y: Int) -> Bool {
+            let i = (y * width + column) * 4
+            guard i + 2 < pixels.count else { return false }
+            return max(pixels[i], pixels[i + 1], pixels[i + 2]) > 40
+        }
+
+        // Eight habits under a header, all in points, derived rather than
+        // measured off the render this is checking.
+        let side = SlotLayout.slotHeight(trackWidth: track)
+        let headerBottom = WidgetMetrics.padVertical + WidgetMetrics.headerHeight
+        let firstRowTop = headerBottom + WidgetMetrics.headerGap
+        let lastRowBottom = firstRowTop + 8 * side + 7 * WidgetMetrics.rowGap
+
+        func yRange(from top: CGFloat, to bottom: CGFloat) -> Range<Int> {
+            Int((top * Self.scale).rounded())..<Int((bottom * Self.scale).rounded())
+        }
+
+        // Sunday's own header letter sits in this column too, so the scan
+        // starts below it. One point of slack at each boundary for
+        // antialiasing.
+        let above = yRange(from: headerBottom + 1, to: firstRowTop - 1)
+        #expect(!above.contains(where: isCut),
+                "the cut runs up into the header's air")
+
+        let band = yRange(from: firstRowTop + 1, to: lastRowBottom - 1)
+        let litInBand = band.filter(isCut).count
+        #expect(litInBand > band.count * 9 / 10,
+                "the cut is broken: \(litInBand) of \(band.count) rows lit between the first and last habit")
+
+        let below = yRange(from: lastRowBottom + 1, to: Self.size.height)
+        #expect(!below.contains(where: isCut),
+                "the cut runs on past the last habit")
+    }
+
     // MARK: - The fixture
 
     /// The week the committed design export depicts — today is Tuesday — so

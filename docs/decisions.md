@@ -162,6 +162,12 @@ and still counts â€” a record of what happened stays a record of what happened â
 and per-day habits are untouched, because water and a walk are bodily and not
 the thing the rest is from. The grid marks the cut as one vertical line down
 the rest day's column, in the missed cross's grey.
+
+Where that line starts and stops was settled separately (#71): both ends land
+on a habit, never on a gap and never on the edge of the list, and it is drawn
+at the span bar's weight rather than the missed cross's. `RestCut` owns both
+answers so the app and the three week widget families cannot disagree. See
+SPEC.md, "How the cut is drawn".
 ## Two greys, on purpose
 
 **Question** (#7). The grid's unlit text is `GlowPalette.labelResting`; the
