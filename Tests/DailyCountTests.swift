@@ -57,10 +57,10 @@ struct DailyCountTests {
             completedDays: [friday]
         )
 
-        #expect(WeekGrid.slots(for: habit, in: week, today: friday, calendar: calendar).isEmpty)
+        #expect(WeekGrid.slots(for: habit, in: week, today: friday, editing: .todayOnly, calendar: calendar).isEmpty)
         #expect(
             WeekSpans.spans(
-                for: habit, in: week, today: friday, target: 3, calendar: calendar
+                for: habit, in: week, today: friday, target: 3, editing: .todayOnly, calendar: calendar
             ).isEmpty
         )
     }

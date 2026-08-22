@@ -134,7 +134,11 @@ A build that violates one of these is broken regardless of what else works.
 
 - **R1.** At most one slot per habit is open at a time, and only ever for the
   current day.
-- **R2.** Only today's slot responds to taps. Past days are never editable.
+- **R2.** A slot responds to taps only where its surface allows it. The week
+  view edits any day of the week it shows; the widget, its intents and the month
+  grid edit today and nothing else. A rest day is never editable on any surface.
+  The days *ahead* are editable only with demo history in — outside it you can
+  correct the past, not claim the future.
 - **R3.** For a weekly-cadence habit, a day holds zero or one completion.
   Never two. A per-day habit stores one completion row per repetition, so a
   day holds up to its target.
@@ -147,10 +151,14 @@ A build that violates one of these is broken regardless of what else works.
   Without EDR the app renders flat colour, never a broken or blank slot.
 
 R1, R2, R5 and R7 are asserted in `Tests/WeekGridTests.swift`, including an
-exhaustive pass over all 128 possible completion histories of a week. R3 and R4
-are asserted in `Tests/PersistenceTests.swift`, R6 in `Tests/SlotLayoutTests.swift`,
-and R8 in `Tests/GlowRendererTests.swift`, which asserts the encoded colour
-space rather than trusting it.
+exhaustive pass over all 128 possible completion histories of a week — run under
+each surface's rule, so R2 is asserted as the difference between them rather
+than as one answer. `Tests/SlotEditingTests.swift` covers the rule itself and
+the geometry that resolves a touch on a span into a weekday. R3 and R4 are
+asserted in `Tests/PersistenceTests.swift`, which also asserts the store's own
+refusal of a day still to come, R6 in `Tests/SlotLayoutTests.swift`, and R8 in
+`Tests/GlowRendererTests.swift`, which asserts the encoded colour space rather
+than trusting it.
 
 ## 6. Layout
 
@@ -196,6 +204,22 @@ Every slot is in exactly one of five states.
 The states map to *marks* via `Slot.mark`, which is where the rendering
 distinctions live and where they are tested.
 
+**A state is what is true, not what can be tapped** (#116). The week view edits
+any day it shows, so a missed day is now something you can correct: tapping it
+stores a completion, the day becomes filled, and it draws `donePast` — lit,
+because §1 says every completion is, and not `doneToday`, because it is not
+today. `Slot.isToday` is a real comparison against today for exactly this
+reason; it used to be an alias for "carries an action", which was true only
+while today was the one day that did. Nothing about *open* moved: at most one
+slot is open, on today, on every surface (R1).
+
+For a habit due a number of times a week the same tap changes the arithmetic
+rather than one column. A completion on a past day is one fewer rep still owed,
+so the week re-divides: the completed block grows, a ✕ that was there because
+the reps had run out of days may no longer be owed, and the lit dot appears on
+the weekday it was logged. `WeekSpans` decides all of that from the record, as
+it always did — the record is simply now something the app can correct.
+
 A habit due a number of times a week is not day-pinned, so it is not drawn as
 seven columns at all: `WeekSpans` divides the week into N shapes that stretch
 across it, with the open one always containing today. **That rule is inferred
@@ -221,8 +245,12 @@ both come from the calendar's locale.
 **A weekly row draws exactly N shapes, however late in the week it is.** Each is
 at least one column wide and together they cover all seven with no gaps. A rep
 with no day left to land on still gets a column — it stops being the open one
-and draws a ✕ instead, inert and permanent for the week: not tappable, not
-undoable, and it does not take the row down with it. **A lost rep never
+and draws a ✕ instead: never a warning, never a prediction, and it does not take
+the row down with it. On the widget and in the month it is permanent, because
+nothing there can change the past. **In the week view it is not** (#116): the
+column under it is a day, and logging that day means the rep happened, late, so
+the arithmetic re-runs and the ✕ goes. The mark never changes on its own — only
+the record can move it. **A lost rep never
 occupies the rest day's column alone**: `RestWindow` subtracts that column from
 whatever shape crosses it, so a span exactly its width would be removed
 entirely, and the ✕ would be drawn and invisible. Such a span takes the next
@@ -387,6 +415,20 @@ it is why "7x per week" is the wording for the everyday case rather than a
 separate mode. The label is what the person reads; the enum keeps its name
 because `Habit.countedPerDay` and `countedPerWeek` are built on it.
 
+**Every slot in the week view is a plain button** (#116). No edit mode, no long
+press, no confirmation: a tap on Monday marks or un-marks Monday, exactly as a
+tap on today does for today. Today still glows and still reads as the live one;
+the other six are tap targets that happen not to be lit, which is §1 doing its
+job — light says what happened, and shape says what is still open. The cost is
+accepted: a stray tap changes a day, and nothing distinguishes a correction from
+an original. That is what editing the past means.
+
+A span row resolves the tap to **the column under the finger** rather than to
+the span's nominal day, so a habit due N times a week records the weekday it
+really happened on — the same day the month grid and the row's own dots already
+draw it on. Touching the rest day's column inside a span does nothing: the
+column is drawn as a hole, and pressing a hole is pressing nothing.
+
 **Edit changes what a ring's tap means** rather than adding a second control
 beside it: out of edit mode a tap counts, in edit mode it opens that habit in
 the editor, where renaming, re-targeting and deleting already live. Today is a
@@ -401,7 +443,9 @@ grid of rings, not a `List`, so there is nothing for edit mode to reorder.
       runs the fill transition.
 - [x] Tapping today's filled slot un-marks it, reverting to open with the glow
       resumed.
-- [x] Past days are never tappable.
+- [x] Tapping any other day of the week in the app marks or un-marks *that*
+      day; the widget offers today and nothing else.
+- [x] Days still to come are tappable only with demo history in.
 - [x] At most one slot per habit is open at a time.
 - [x] Without EDR the glow renders as flat colour, no crash, no artifact.
 - [x] Restarting preserves all habits and completions.
@@ -419,7 +463,11 @@ Two widgets, reading the same store through an App Group.
 
 **The week widget**: three families. Today's slot is a button backed by an
 `AppIntent`, so a habit can be logged from the home screen without launching
-the app. Past days are not buttons, which is R2 holding in a second process.
+the app. Past days are not buttons here even though the app's own grid now
+edits them: a widget is a glance and a single confirmed action, and it has no
+touch location to resolve a span's column with. `SlotEditing.todayOnly` is how
+the surface says so, and `HabitStore` refuses a day ahead whatever the surface
+offers.
 Rows are as many as fit, then a hard cut — no "+N more" row, per
 docs/vision.md: a row spent saying how much is missing is a row not showing a
 habit. The app's own grid marks the boundary, where there is room to say it.
