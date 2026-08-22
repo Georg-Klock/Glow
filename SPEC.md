@@ -18,6 +18,14 @@ merely absent: a missed day and a day still to come are both flat. So a good
 week is a row of lights and a bad one is nearly dark, which is the whole product
 in one sentence.
 
+**A span is structure, not a mark, and structure is never lit.** A habit due N
+times a week is drawn as N shapes dividing the week; those shapes say how the
+week was *divided*, which is not something that happened. They are unlit
+whether their share has been achieved or not, and the lit dots sitting on them
+say which days it happened on. Without this the sentence above has an exception
+in it — an achieved span was lit while saying nothing about when — and one
+sentence with an exception is two sentences.
+
 ## 2. Goals
 
 - One weekly-grid screen is enough to see every habit's status for the current
@@ -88,7 +96,8 @@ A build that violates one of these is broken regardless of what else works.
   Never two. A per-day habit stores one completion row per repetition, so a
   day holds up to its target.
 - **R4.** `Completion.day` is always midnight in the user's calendar.
-- **R5.** A daily row draws exactly 7 slots; an N-times row draws exactly N.
+- **R5.** A daily row draws exactly 7 slots; an N-times row draws exactly N
+  spans — plus one lit dot per completion, on the weekday it happened.
 - **R6.** Every row spans the same track width, whatever its slot count.
 - **R7.** Weeks reset clean. A frequency habit's unmet goal does not carry over.
 - **R8.** The glow is encoded in a colour space with headroom above SDR white.
@@ -116,8 +125,12 @@ dailySlotWidth = (W - 6 * G) / 7
 slotWidth(N)   = (W - (N - 1) * G) / N
 ```
 
-Pills are not pinned to weekdays. They fill left to right in the order
-completions are logged, independent of which weekday each fell on.
+**Spans are not pinned to weekdays; the dots on them are.** A span fills left to
+right in the order the week is divided, independent of which weekday anything
+fell on — it is the *how much*. A lit dot sits on each weekday a completion
+actually landed on, at the same column centre a daily row uses — it is the
+*when*. The two jobs used to be one mark doing neither well: the row said how
+much was left and nothing about when (#47).
 
 ## 7. Slot states
 
@@ -144,6 +157,14 @@ A habit due a number of times a week is not day-pinned, so it is not drawn as
 seven columns at all: `WeekSpans` divides the week into N shapes that stretch
 across it, with the open one always containing today. **That rule is inferred
 from the design rather than specified** — see the note on the type.
+
+**An achieved span draws the same unlit line as one still to come**, because
+they are the same thing: a share of the week with no ask left in it. What tells
+them apart is the lit dot on the day it happened, which `WeekDots` places. Two
+spans keep their light and their shape: the open one, which is the one thing
+outstanding, and the ✕, which is a rep that can no longer happen. A completion
+past the goal still lights its day — it has no span, and the row is a record of
+what happened rather than of what was owed.
 
 **A weekly row draws exactly N shapes, however late in the week it is.** Each is
 at least one column wide and together they cover all seven with no gaps. A rep

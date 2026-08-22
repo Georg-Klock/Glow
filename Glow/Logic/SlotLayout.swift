@@ -53,6 +53,17 @@ enum SlotLayout {
         )
     }
 
+    /// The centre of one weekday's column, measured from the track's leading
+    /// edge.
+    ///
+    /// Every mark that has to sit *on a weekday* asks this: the rest day's cut,
+    /// and the dots a weekly row now puts on the days it was logged. One
+    /// formula, so a dot and the line behind it cannot land a point apart.
+    static func columnCentre(trackWidth: CGFloat, index: Int) -> CGFloat {
+        let slot = dailySlot(trackWidth: trackWidth)
+        return CGFloat(index) * (slot + gap(trackWidth: trackWidth)) + slot / 2
+    }
+
     /// Width of a shape covering `dayCount` whole columns and the gaps between
     /// them — the unit a habit due a number of times a week is drawn in.
     static func spanWidth(trackWidth: CGFloat, dayCount: Int) -> CGFloat {

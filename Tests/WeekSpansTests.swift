@@ -358,3 +358,95 @@ struct LateWeekSpansTests {
         }
     }
 }
+
+/// #47: the spans say how much, the dots say when.
+@Suite("Week dots", .serialized)
+struct WeekDotsTests {
+    private let calendar = TestCalendar.monday
+    private var week: Week {
+        WeekCalendar.week(containing: TestCalendar.date(2026, 8, 17), calendar: calendar)
+    }
+    private func day(_ column: Int) -> Date { week.days[column] }
+
+    private func withRest(_ column: Int?, _ body: () throws -> Void) rethrows {
+        let previous = WeekPreferences.restDay
+        defer { WeekPreferences.restDay = previous }
+        WeekPreferences.restDay = column.map {
+            calendar.component(.weekday, from: week.days[$0])
+        }
+        try body()
+    }
+
+    private func columns(_ frequency: Frequency, done: [Int]) -> [Int] {
+        WeekDots.columns(
+            for: .fixture(frequency: frequency, completedDays: Set(done.map { day($0) })),
+            in: week,
+            calendar: calendar
+        )
+    }
+
+    @Test("A dot on every weekday a completion actually landed on")
+    func dotsAreDayPinned() {
+        #expect(columns(.timesPerWeek(3), done: [1, 5]) == [1, 5])
+        #expect(columns(.timesPerWeek(3), done: []) == [])
+        // Order is the week's, not the order they were logged in.
+        #expect(columns(.timesPerWeek(3), done: [5, 0, 2]) == [0, 2, 5])
+    }
+
+    @Test("A completion past the goal still lights its day")
+    func completionsPastTheGoalCount() {
+        // Four on a three-a-week habit: the fourth has a day even though it has
+        // no span. `WeekDots` never reads the target, which is what makes this
+        // fall out rather than need a case.
+        #expect(columns(.timesPerWeek(3), done: [0, 1, 2, 3]) == [0, 1, 2, 3])
+    }
+
+    @Test("The rest day is never lit, even holding a completion")
+    func restDayIsNotLit() {
+        // Not this type's opinion: #72 settled that the rest column draws
+        // nothing at all, a stored completion included. It still counts
+        // everywhere it counted; a dot would be drawing it.
+        withRest(2) {
+            #expect(columns(.timesPerWeek(3), done: [1, 2, 5]) == [1, 5])
+        }
+    }
+
+    @Test("Daily habits and blank rows have no dots of their own")
+    func onlySpanRows() {
+        // A daily row is already seven day-pinned columns and already puts the
+        // light on the day; a per-day habit has no week row at all.
+        #expect(WeekDots.columns(
+            for: .fixture(frequency: .timesPerDay(3), completedDays: [day(1)]),
+            in: week, calendar: calendar
+        ).isEmpty)
+        #expect(WeekDots.columns(
+            for: .fixture(isSpacer: true), in: week, calendar: calendar
+        ).isEmpty)
+    }
+
+    @Test("Completions outside the week are not this week's dots")
+    func onlyThisWeek() {
+        let habit = HabitSnapshot.fixture(
+            frequency: .timesPerWeek(3),
+            completedDays: [TestCalendar.date(2026, 8, 10), day(1)]
+        )
+        #expect(WeekDots.columns(for: habit, in: week, calendar: calendar) == [1])
+    }
+
+    @Test("An achieved span draws the same line as one still to come")
+    func achievedSpansAreStructure() {
+        // The other half of #47. A met goal and an untouched week are the same
+        // marks, and the dots are what tell them apart.
+        let met = WeekSpans.spans(
+            for: .fixture(frequency: .timesPerWeek(2), completedDays: [day(0), day(1)]),
+            in: week, today: day(4), target: 2, calendar: calendar
+        )
+        #expect(met.allSatisfy { $0.mark == .upcoming })
+        // And the two that are still marks keep their own.
+        let partial = WeekSpans.spans(
+            for: .fixture(frequency: .timesPerWeek(2)),
+            in: week, today: day(6), target: 2, calendar: calendar
+        )
+        #expect(partial.map(\.mark) == [.missed, .openToday])
+    }
+}

@@ -18,10 +18,24 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
     var dayCount: Int { lastDay - firstDay + 1 }
     var isTappable: Bool { actionDay != nil }
 
+    /// **A span is structure, not a mark** (#47).
+    ///
+    /// An achieved span and one still to come draw the same unlit line, and
+    /// that is the change rather than an oversight: a span says how the week
+    /// was *divided*, and the division does not change when a share of it is
+    /// achieved. What says a share was achieved is the lit dot on the weekday
+    /// it happened, which `WeekDots` places — so the row stops being a progress
+    /// bar and becomes a record of when.
+    ///
+    /// The two spans that are still marks keep their light and their shape. The
+    /// open one is the one thing outstanding, and the ✕ is a rep that can no
+    /// longer happen.
     var mark: SlotMark {
         switch state {
         case .open: .openToday
-        case .filled: .donePast
+        // Structure. The same line an upcoming span draws, because it is the
+        // same thing: a share of the week with no ask left in it.
+        case .filled: .upcoming
         // A rep that can no longer happen. Reachable only through #81's `lost`,
         // and only once the miss is unavoidable — never as a warning.
         case .missed: .missed

@@ -187,6 +187,15 @@ struct HabitRowView: View {
         }
     }
 
+    /// Which weekdays this row was logged on, for the dots over the spans.
+    private var dotColumns: [Int] {
+        // Read here rather than in `WeekDots` for the same reason `restIndex`
+        // is: moving the rest day has to redraw a row whose spans did not
+        // change, and only a value read in `body` does that.
+        _ = restDayStorage
+        return WeekDots.columns(for: snapshot, in: week)
+    }
+
     @ViewBuilder
     private var track: some View {
         HStack(spacing: SlotLayout.gap(trackWidth: geometry.trackWidth)) {
@@ -223,6 +232,32 @@ struct HabitRowView: View {
                         onToggle: onToggle
                     )
                 }
+            }
+        }
+        .overlay(alignment: .leading) { dots }
+    }
+
+    /// A lit dot on each weekday a span row was actually logged on.
+    ///
+    /// Drawn over the spans rather than inside them: a span is one shape covering
+    /// several columns and knows nothing about which of them carried a completion,
+    /// which is the whole reason `WeekDots` exists. See #47.
+    ///
+    /// The same `.dot` mark the daily rows use, at the same column centres, so a
+    /// weekly row and a daily row put their light in exactly the same places.
+    @ViewBuilder
+    private var dots: some View {
+        if !spans.isEmpty {
+            ForEach(dotColumns, id: \.self) { column in
+                GlowImageView(
+                    size: CGSize(width: slotHeight, height: slotHeight),
+                    shape: .dot
+                )
+                .offset(
+                    x: SlotLayout.columnCentre(
+                        trackWidth: geometry.trackWidth, index: column
+                    ) - slotHeight / 2
+                )
             }
         }
     }
