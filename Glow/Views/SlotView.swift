@@ -19,7 +19,17 @@ struct SlotView: View {
     let slot: Slot
     let size: CGSize
     let habitName: String
+    /// The calendar day this column stands for, or nil for a slot that is not
+    /// day-pinned. Handed down by the row, which is what knows the week: a
+    /// slot carries only the day a tap would *act* on, and six of the seven
+    /// have none. See `SlotVoice`.
+    var day: Date?
     let onToggle: (Date) -> Void
+
+    /// A completion arriving is the only thing that moves here, and this is
+    /// what switches it off. `MotionPolicy` holds the rule; the view holds the
+    /// setting. See #137.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// How far past its resting size a press pushes the ring. Shared with the
     /// spanning rows, which do the same thing at a different shape.
@@ -41,7 +51,9 @@ struct SlotView: View {
         Group {
             if slot.isTappable {
                 Button { tap() } label: { mark }
-                    .buttonStyle(PressStyle(scale: Self.pressScale))
+                    .buttonStyle(PressStyle(
+                        scale: MotionPolicy.pressScale(Self.pressScale, reduceMotion: reduceMotion)
+                    ))
             } else {
                 mark
             }
@@ -71,25 +83,20 @@ struct SlotView: View {
         }
     }
 
+    /// The habit, the date this column is, and what the mark says — including
+    /// the rest day's word, which is the only thing explaining a column that
+    /// draws nothing (#72), and the date, which is the only thing saying which
+    /// Tuesday a "missed" belongs to (#137). The weekday header carries it on
+    /// screen and is hidden from VoiceOver, because seven letters over seven
+    /// numbers is a table read aloud.
     private var accessibilityLabel: String {
-        let state = switch slot.mark {
-        case .doneToday, .donePast: "done"
-        case .openToday: "due today"
-        case .missed: "missed"
-        case .upcoming: "upcoming"
-        // The line down the column is `accessibilityHidden`, so with the marks
-        // gone this is the only thing that explains the hole in the row.
-        case .rest: "rest day"
-        }
-        return "\(habitName), \(state)"
+        guard let day else { return "\(habitName), \(SlotVoice.state(slot.mark))" }
+        return SlotVoice.label(habitName: habitName, mark: slot.mark, day: day)
     }
 
-    /// The glow is the only thing marking a slot as actionable, and it is
-    /// invisible to VoiceOver, so the hint has to carry what a sighted user
-    /// reads off the screen.
     private var accessibilityHint: String {
         guard slot.isTappable else { return "" }
-        return slot.state == .filled ? "Mark as not done" : "Mark as done"
+        return SlotVoice.hint(isDone: slot.state == .filled)
     }
 
     private func tap() {
@@ -97,8 +104,13 @@ struct SlotView: View {
         onToggle(day)
     }
 
+    /// Reduce Motion takes the same branch every other state change takes: the
+    /// resting mark, immediately, with nothing scheduled behind it. A shorter
+    /// spring would still be a spring.
     private func transition(from previous: SlotState, to next: SlotState) {
-        guard previous == .open, next == .filled else {
+        guard MotionPolicy.closesCompletion(
+            from: previous, to: next, reduceMotion: reduceMotion
+        ) else {
             closing = nil
             return
         }

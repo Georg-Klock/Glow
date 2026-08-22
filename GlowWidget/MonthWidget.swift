@@ -117,9 +117,17 @@ struct MonthWidgetView: View {
         let rows = MonthGrid.rowCount(of: cells)
         let isDue = cells.contains { $0.mark == .openToday }
 
+        // The month's history, counted off the same cells the grid draws and
+        // hung on the name — which is the one thing here that is already text,
+        // and the one thing a VoiceOver user lands on first (#137). Thirty-one
+        // dated stops would be a wall; the week widget's seven are a row. See
+        // `HistoryVoice`.
+        let summary = HistoryVoice.month(cells)
         let name = Text(habit.name)
             .font(.system(size: WidgetMetrics.textSize))
             .lineLimit(1)
+            .accessibilityLabel(habit.name)
+            .accessibilityValue(summary ?? "")
 
         return GeometryReader { proxy in
             let side = SlotLayout.slotHeight(trackWidth: proxy.size.width)
@@ -227,10 +235,14 @@ private struct MonthCellView: View {
                 // including a refusal — cannot differ by surface.
                 Button(intent: ToggleHabitIntent(habitID: habit.id)) { mark }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        "\(habit.name), \(cell.mark == .doneToday ? "done today" : "due today")"
-                    )
+                    .accessibilityLabel(SlotVoice.label(
+                        habitName: habit.name, mark: cell.mark, day: cell.date
+                    ))
+                    .accessibilityHint(SlotVoice.hint(isDone: cell.mark == .doneToday))
             } else {
+                // Still hidden, and now with something saying what they were:
+                // the habit's name carries a count of the whole month, so the
+                // thirty other cells are spoken once rather than thirty times.
                 mark.accessibilityHidden(true)
             }
         } else {

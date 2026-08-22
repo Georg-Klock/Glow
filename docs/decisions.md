@@ -1452,3 +1452,82 @@ would arrive later, in pieces, attached to an unrelated gesture.
 nothing moves off the main actor. The only timing-shaped change is that the
 default seed commits once rather than eleven times, which is not claimed as a
 speed-up here because it was not measured as one.
+
+## The date rides on the mark, and a year is counted
+
+**2026-08-22.** #137. A row swiped end to end said "Read, missed" seven times
+over. The states were right and the dates were nowhere: the only thing on the
+screen that carries them is `WeekdayHeader`, seven letters over seven numbers,
+and that is `accessibilityHidden` — correctly, because read aloud it is a table
+somebody has to hold in their head while they swipe a row underneath it.
+
+**So the header stays hidden and the date moves onto the mark.** "Read, Tuesday
+18 August, missed" is one stop that needs no other stop to make sense of it.
+The date goes on all seven columns rather than on the tappable one alone: a
+person who stops in the middle of a row should know where they are, and the six
+that cannot be tapped are precisely the history this issue is about. `SlotVoice`
+builds the sentence for the app and the widget both, the way `WeekDots` does.
+
+**A span is not given a date it does not have.** A habit due N times a week is
+not day-pinned — #47 divided the week into shares that say *how much* and put
+the *when* on the dots — so a span speaks the day it would act on, which is
+today's, and nothing else. Naming the columns it happens to cover would
+announce a date the control does not touch.
+
+**A week of columns speaks; a month and a year of them count.** This is #104's
+rule about the dots, applied to a longer stretch. Seven dated marks is a row,
+and the row is what the app is. Thirty-one is a picture of a month and 365 is a
+picture of a year: swiping those one cell at a time is not navigation. The
+month widget hangs one sentence on the habit's name, and the year makes each
+week column one stop — fifty-two of them, which is also what the grid is drawn
+to be read as, since a vertical band there is a good week. Both sentences are
+counted off the marks the grid draws rather than off the completions, so the
+picture and the words cannot drift apart; `YearHistory` is the year's own
+verdict moved out of the view so that the counting has one definition. It is
+also cheaper than what it replaced: the fill rule used to rebuild a dictionary
+of completion sets, and a `Set` per habit, on every one of 365 cells.
+
+**The widget's row was the tappable column and nothing else.** Today's slot
+spoke, the rest day spoke because #72 gave it a voice, and the five columns of
+history in between said nothing at all — on the surface most people look at
+most often, while the app's identical row said all of it. It says all seven
+now. The month widget is the other half of the same decision and goes the other
+way, because thirty-one is not seven.
+
+**Reduce Motion reached one animated surface out of four.** SPEC §3 says
+"Reduce Motion snaps" and it was written about the Today ring, where it was
+true, and about the widget's burst, where it was true — the setting is recorded
+at the tap and the timeline carries one still entry (#107). The week grid read
+it nowhere: a completion closed on a spring, the row's label dimmed on the same
+spring, and a press grew 32% and sprang back. "It is honoured here, so it is
+honoured" is how a rule ends up half-applied, and the fix is not four more
+`if`s: `MotionPolicy` holds the predicates and all four surfaces ask it.
+
+**The reduced path is the app's own instant path**, not a second one written
+for accessibility. Every one of these surfaces already had a branch that draws
+the settled truth with nothing scheduled behind it — it is what un-completing,
+a day rolling over and an edit all take — and Reduce Motion takes that branch.
+A shortened animation would still be an animation.
+
+**What was measured.** The completion, on an iPhone 17 Pro simulator, as
+frames: with the setting on, the mark goes 63px to 9px between two consecutive
+recorded frames and takes no intermediate size; with it off, the same tap on
+the same row draws 63, 57, 49, 41, 33, 9. The screens are unchanged — a
+full-screen diff of the two builds on This Week is 4160 pixels apart at one
+level out of 255, which is render dither, and on History the two builds are
+identical outside the clock in the status bar.
+
+**What could not be verified here.** The spoken result. VoiceOver does not
+engage in this simulator: #104 recorded the attempt — the Accessibility toggles
+ignore automated taps, and setting `VoiceOverTouchEnabled` with the cache
+notifications and a respring leaves it off — and the toggles held out again
+here, since Settings' own Demo history switch will not flip under an automated
+tap either. What is asserted instead is
+the strings, against the real types, including the cases that must stay silent:
+a rest day says "rest day" and never "done", a lost rep says "missed" and names
+no day, and a month with no cells produces no sentence at all. The declaration
+that cannot be observed — that a view honours Reduce Motion — is asserted as a
+property of every animating file at once: if it contains `withAnimation` or
+`.animation`, it reads the setting. Nothing here has been heard on a device,
+and Dynamic Type at accessibility sizes and a right-to-left layout were not
+checked at all.
