@@ -223,8 +223,21 @@ struct WeeklyGridView: View {
         } description: {
             Text("Add a habit and today's slot will be waiting for you.")
         } actions: {
-            Button("Add Habit") { isAddingHabit = true }
-                .buttonStyle(.borderedProminent)
+            // Drawn rather than styled: the app's root tint is pure
+            // white, and `.borderedProminent` fills with the tint and
+            // draws the label in the contrasting colour — white on white.
+            // Measured: the capsule's interior was 8077 pixels of a single
+            // colour, 255,255,255, with no label in it at all. Same
+            // treatment as `StoreUnavailableView`. See #162.
+            Button { isAddingHabit = true } label: {
+                Text("Add Habit")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Capsule().fill(GlowPalette.color))
+            }
+            .buttonStyle(.plain)
         }
     }
 

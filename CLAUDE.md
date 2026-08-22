@@ -167,8 +167,13 @@ actual bug. Every line here is something that already happened.
   state (`@State var editMode: EditMode`) and inject it with
   `.environment(\.editMode, $editMode)`.
 - **`Color.clear.frame(height:)` is greedy horizontally** and will eat a layout.
-- **A root `.tint()` beats `role: .destructive`.** Colour destructive controls
-  explicitly.
+- **A root `.tint()` beats anything that derives a colour from it.** This tint
+  is pure white, so any control that fills with it and draws its label in "the
+  contrasting colour" renders white on white. Three instances so far:
+  `role: .destructive`, `Toggle` (#124), and `.borderedProminent` (#162), where
+  both empty-state buttons measured 8077 interior pixels of a single colour
+  with no label in them. Draw prominent controls explicitly — a `Text` over a
+  filled `Capsule` — rather than styling them and hoping.
 - **Figma's radius ≈ SwiftUI's radius.** The CSS that design tools emit doubles
   blur radii; do not halve an already-doubled number.
 
