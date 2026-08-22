@@ -177,13 +177,44 @@ CI runs the same script on pull requests and on merges to `main`.
 
 The widget runs in its own process and cannot see the app's private container,
 so the store lives in `group.com.georgklock.glow` and both open it there.
-`StoreLocation` owns that decision and the one-time move of a pre-widget store,
-copying the write-ahead log alongside the store because a copy without it loses
-every write still sitting in the log.
+`StoreLocation` owns that decision and names the two paths the store has ever
+had; `StoreMigration` owns the one-time move between them.
 
 If the group container is unavailable the app falls back to its own container
 and keeps working; only the widget goes blank. That is deliberate: a missing
-entitlement should not stop the app launching.
+entitlement should not stop the app launching. The migration runs to wherever
+the store now lives, shared or not, because the file name changes either way.
+
+### Moving a store without adopting half of one
+
+A SQLite store is three files — the database, the write-ahead log and the
+shared-memory file — and the recent writes are the ones still in the log. So
+nothing is copied into place:
+
+1. a complete set is copied into `Migration-Staging/`, a directory beside the
+   destination so that promoting it is a rename rather than a second copy;
+2. the staged copy is opened as a real `ModelContainer` and its habit and
+   completion identifiers are read back — opening it *is* the validation;
+3. it is promoted sidecars first and database last, because the database file is
+   what every later launch tests for. Interrupted before the last move there is
+   no destination and the next launch starts over; interrupted after it every
+   file is already there;
+4. `Glow.store.migration.json` is written last: a durable record carrying a
+   format version, a generation id, the source and the counts. Its presence is
+   what makes later launches cheap.
+
+A destination that exists *without* that record is not trusted. It is opened and
+compared against the source by identifier: a superset is adopted and recorded,
+an unopenable one or a strict subset — which is what a partial copy looks like —
+is moved to `Quarantine/` and replaced, and two stores that each hold what the
+other does not are both kept, with the record naming the one that was not merged
+in.
+
+The source is never deleted and nothing is ever overwritten in place. When the
+migration cannot be completed, `GlowStore.makeContainer()` throws rather than
+opening: an empty store created beside a person's real one is the failure that
+cannot be undone. The app shows `StoreUnavailableView` instead of terminating.
+See #131 and docs/decisions.md.
 
 Getting this working took four separate fixes, each of which failed silently.
 Recorded here because every one of them presents as "the widget shows no

@@ -460,10 +460,12 @@ the one signal, and movement said it twice. A lit mark is lit and holds still.
 See docs/glow.md.
 
 The store therefore lives in the App Group container rather than the app's
-private one, and `StoreLocation` migrates a pre-widget store into it on first
-launch. Without the App Group entitlement the app falls back to its own
-container and keeps working; only the widget goes blank, which is a better
-failure than refusing to launch.
+private one, and a pre-widget store is migrated into it on first launch — staged
+in full, opened to prove it is a whole store, and only then promoted, with the
+old one left where it is. A migration that cannot be completed stops the launch
+on a screen that says so rather than starting with an empty list. Without the
+App Group entitlement the app falls back to its own container and keeps working;
+only the widget goes blank, which is a better failure than refusing to launch.
 
 ## 10. Resolved questions
 

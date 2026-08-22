@@ -1258,3 +1258,70 @@ compiler only objects if it reaches for API the extension cannot have; app-only
 code that happens to be extension-safe — seeding, export, demo history — still
 compiles in and still adds to the appex. The `GlowShared` target that would make
 that a target-graph error is #139's remaining half and is not done here.
+
+## The migration proves a copy before it adopts one
+
+**2026-08-22.** The move into the App Group container copied the database, the
+write-ahead log and the shared-memory file one at a time and logged whatever
+went wrong. A sidecar that failed left the database in place at the new path —
+and because the next launch tested for exactly that file, the half-copy became
+the store forever. It opens cleanly. It is simply missing whatever had not been
+checkpointed out of the log yet, which is to say the most recent days (#131).
+
+**A copy is now staged, proven and then promoted.** The complete set goes into
+`Migration-Staging/` beside the destination, the staged copy is opened as a real
+`ModelContainer` and its habit and completion identifiers are read back, and
+only then is it moved into place. Opening it is the validation: a truncated
+database, a schema this build cannot read and a file that is not a database at
+all all fail there, before anything has moved.
+
+**The order of the moves is the atomicity.** Sidecars first, database last,
+because the database file is what every later launch tests for. Cut short before
+the last move there is no destination and the next launch simply starts over;
+cut short after it, every file is already there. That is as close to atomic as
+three files on one volume get without moving the store into a directory of its
+own, which would change the store's path for a second time to fix a bug about
+changing the store's path.
+
+**A destination without a record is inspected, not trusted.** The record —
+`Glow.store.migration.json`, written last, carrying a format version, a
+generation id and the counts — is what makes an ordinary launch cheap. Its
+absence is the interesting state, because it means either an install migrated
+before the record existed or a promotion that was interrupted. So the
+destination is opened and compared against the source *by identifier*, not by
+count and not by modification date:
+
+- a superset of the source is adopted and recorded — that is a store somebody
+  has been using;
+- an unopenable one, or a strict subset, is a partial copy: it goes to
+  `Quarantine/` and is replaced;
+- two stores that each hold what the other does not are **both kept**. Neither
+  can be called the later state of the other by looking at it, so the one the
+  app has been writing to stays in use and the record names the other for a
+  merge that does not exist yet.
+
+**Nothing is deleted, including on success.** The source stays where it is after
+a successful migration, and a displaced destination is moved aside rather than
+overwritten. Reclaiming that space is a separate decision that can be taken once
+a copy has survived more than one launch; taking it here would mean the recovery
+path had to be right the first time.
+
+**And a migration that cannot be completed stops the launch.** `makeContainer()`
+now throws instead of opening, because the alternative is an empty store created
+beside a person's real one — and the moment they add a habit to the empty one,
+the two have diverged for good. `fatalError` was the previous answer and it
+crash-looped, which from the outside looks exactly like the data being gone.
+`StoreUnavailableView` says what happened, says nothing has been deleted, and
+offers a retry that re-opens in place. Verified in the simulator: a planted
+unopenable store shows the screen, and restoring the store behind it and tapping
+*Try again* brings the grid back without a relaunch.
+
+**What the tests are.** `Tests/StoreMigrationTests.swift` works on real files
+with live write-ahead logs, because in-memory stores cannot express a bug about
+there being three files. The faults are real ones rather than injected hooks: a
+sidecar chmodded unreadable so the copy genuinely fails partway, a database file
+copied without its log, a stray sidecar left where an interrupted promotion
+would leave it. One test asserts its own premise first — that the database file
+alone is behind the store it was copied from — so that it fails loudly if
+SwiftData ever stops leaving writes in the log, rather than passing on a fixture
+that no longer proves anything.
