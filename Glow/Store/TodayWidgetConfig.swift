@@ -29,7 +29,7 @@ struct PerDayHabitQuery: EntityQuery {
         let matched = try await suggestedEntities().filter { identifiers.contains($0.id) }
         // Resolution is the step that silently failed under extension-only
         // metadata, so it stays traced for the device check.
-        WidgetTrace.record("query resolve \(identifiers.count) id(s) -> \(matched.map(\.name).joined(separator: ","))")
+        WidgetTrace.record(WidgetTrace.resolution("query", asked: identifiers, got: matched.map(\.id)))
         return matched
     }
 

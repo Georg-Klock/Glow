@@ -25,10 +25,40 @@ import Foundation
 /// **What it records is deliberately narrow**: habit IDs, entry counts and
 /// timings. Never a habit's name, never anything a person typed. It is capped,
 /// and it never leaves the phone by itself.
+///
+/// That paragraph was a claim rather than a property until #141. Four call
+/// sites — both widget providers and both entity queries — interpolated
+/// `habit.name` straight into a line, and `Tools/pull-widget-log.sh` exists
+/// precisely to carry the result to a Mac. A diagnostic that quietly collects
+/// what a person typed is worse than no diagnostic, and a comment saying it
+/// does not is worse still.
+///
+/// `tag` and `resolution` are how a call site names a habit now, and
+/// `WidgetTraceRedactionTests` reads this repository's own sources to check
+/// that nothing has gone back to interpolating a name.
 enum WidgetTrace {
     static let key = "widgetTrace"
     /// Enough for a session's worth of taps, small enough to never matter.
     static let keepLines = 60
+
+    /// How a habit is named in the trace: by id, or `unset`.
+    ///
+    /// The id is already the convention on the tap lines, and it is the thing
+    /// worth having — every question this trace was built to answer is about
+    /// *whether the right habit reached the provider*, which an id answers and
+    /// a name only answers by accident.
+    static func tag(_ id: UUID?) -> String {
+        id?.uuidString ?? "unset"
+    }
+
+    /// One entity query's answer: how many were asked for, and which came back.
+    ///
+    /// Resolution is the step that silently failed under extension-only
+    /// metadata, so what it needs to record is a count and a set of ids.
+    static func resolution(_ label: String, asked: [UUID], got: [UUID]) -> String {
+        let ids = got.isEmpty ? "none" : got.map(\.uuidString).joined(separator: ",")
+        return "\(label) resolve \(asked.count) id(s) -> \(ids)"
+    }
 
     private static var store: UserDefaults { GlowSettings.store }
 

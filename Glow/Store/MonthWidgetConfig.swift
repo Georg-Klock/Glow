@@ -31,7 +31,7 @@ struct WeeklyHabitEntity: AppEntity, Identifiable {
 struct WeeklyHabitQuery: EntityQuery {
     func entities(for identifiers: [UUID]) async throws -> [WeeklyHabitEntity] {
         let matched = try await suggestedEntities().filter { identifiers.contains($0.id) }
-        WidgetTrace.record("month query resolve \(identifiers.count) id(s) -> \(matched.map(\.name).joined(separator: ","))")
+        WidgetTrace.record(WidgetTrace.resolution("month query", asked: identifiers, got: matched.map(\.id)))
         return matched
     }
 

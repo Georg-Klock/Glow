@@ -59,7 +59,9 @@ struct MonthProvider: AppIntentTimelineProvider {
 
     func timeline(for configuration: SelectWeeklyHabitIntent, in context: Context) async -> Timeline<MonthEntry> {
         let now = Date()
-        WidgetTrace.record("month timeline: habit=\(configuration.habit?.name ?? "unset")")
+        WidgetTrace.record(
+            "month timeline: habit=\(WidgetTrace.tag(configuration.habit?.id))"
+        )
         // One entry, and a refresh at midnight: the open dot is defined as
         // "today", and a month only ever changes at a midnight too. Writes
         // reload the timelines explicitly, same as the other widgets.
