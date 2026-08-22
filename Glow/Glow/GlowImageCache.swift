@@ -114,6 +114,14 @@ private struct GlowTile: View {
                 // point of this file. Apple reserves `.fullColor` for media like
                 // album art; the argument for it here is that the light *is* the
                 // content, not a decoration applied to it.
+                //
+                // Whether it is honoured there is still unmeasured, and the
+                // simulator cannot settle it: with no EDR headroom the tile is
+                // tone-mapped anyway, and against glass a flattened white and a
+                // lit white are the same pixels. What the simulator does show is
+                // that the *halo* does not survive — see GlowModifier — so a
+                // mark on a Tinted or Clear home screen reads as a flat shape
+                // whatever this line does for the core. #53.
                 .widgetAccentedRenderingMode(.fullColor)
         } else {
             GlowPalette.color
@@ -136,6 +144,12 @@ private struct GlowTile: View {
 /// shadow composites against whatever is behind it, which an opaque tile cannot.
 /// The core is what has to be HDR; a halo is dimmer than its source by
 /// definition, so nothing is lost by drawing it in SDR.
+///
+/// It is lost on a Tinted or Clear home screen, though: the same widget renders
+/// today's ring with a halo under Default and as a bare white circle under both
+/// of the others. Measured in the simulator, 2026-08-21. Nothing here can put
+/// it back — see #53 — so a widget on those appearances shows the marks without
+/// the light around them.
 ///
 /// The caster is the same view as the mask, which matters for a hollow shape: a
 /// solid caster under a ring shows through the hole as a grey lozenge, and the

@@ -122,6 +122,73 @@ struct WidgetRenderDiffTests {
         // nobody derived. The harness reports; deciding is a person's job.
     }
 
+    @Test("The rest day's line runs between the first and last habit, and no further")
+    func restCutStartsAndStopsOnAHabit() throws {
+        // Sunday, which is the mockup's rest day and also the last column — so
+        // a line drawn at the wrong x lands outside the track entirely rather
+        // than one column over, which is the easier failure to read.
+        let entry = self.entry()
+        let sunday = entry.week.days[6]
+        let weekday = WeekCalendar.calendar.component(.weekday, from: sunday)
+
+        let previous = WeekPreferences.restDay
+        defer { WeekPreferences.restDay = previous }
+        WeekPreferences.restDay = weekday
+
+        let pixels = try rgba(of: try render())
+        let width = Int(Self.size.width * Self.scale)
+
+        // Where the line should be, from `RestCut`'s own numbers rather than
+        // from a measured render — the pixel-scanning script that chased a
+        // four-point baseline error into three real code changes is the reason.
+        let track = Self.size.width
+            - WidgetMetrics.padLeading - WidgetMetrics.padTrailing
+            - WidgetMetrics.labelWidth - WidgetMetrics.labelGap
+        let x = WidgetMetrics.padLeading + RestCut.x(
+            restIndex: 6,
+            trackWidth: track,
+            labelWidth: WidgetMetrics.labelWidth,
+            labelGap: WidgetMetrics.labelGap
+        )
+        let column = Int((x * Self.scale).rounded())
+
+        // The cut's grey against black, sampled down the column. The marks in
+        // this row are far brighter, so a generous floor still separates the
+        // line from the background without catching a dot.
+        func isCut(_ y: Int) -> Bool {
+            let i = (y * width + column) * 4
+            guard i + 2 < pixels.count else { return false }
+            return max(pixels[i], pixels[i + 1], pixels[i + 2]) > 40
+        }
+
+        // Eight habits under a header, all in points, derived rather than
+        // measured off the render this is checking.
+        let side = SlotLayout.slotHeight(trackWidth: track)
+        let headerBottom = WidgetMetrics.padVertical + WidgetMetrics.headerHeight
+        let firstRowTop = headerBottom + WidgetMetrics.headerGap
+        let lastRowBottom = firstRowTop + 8 * side + 7 * WidgetMetrics.rowGap
+
+        func yRange(from top: CGFloat, to bottom: CGFloat) -> Range<Int> {
+            Int((top * Self.scale).rounded())..<Int((bottom * Self.scale).rounded())
+        }
+
+        // Sunday's own header letter sits in this column too, so the scan
+        // starts below it. One point of slack at each boundary for
+        // antialiasing.
+        let above = yRange(from: headerBottom + 1, to: firstRowTop - 1)
+        #expect(!above.contains(where: isCut),
+                "the cut runs up into the header's air")
+
+        let band = yRange(from: firstRowTop + 1, to: lastRowBottom - 1)
+        let litInBand = band.filter(isCut).count
+        #expect(litInBand > band.count * 9 / 10,
+                "the cut is broken: \(litInBand) of \(band.count) rows lit between the first and last habit")
+
+        let below = yRange(from: lastRowBottom + 1, to: Self.size.height)
+        #expect(!below.contains(where: isCut),
+                "the cut runs on past the last habit")
+    }
+
     // MARK: - The rest day's window (#73)
 
     /// The track and column pitch the large frame divides itself by, so the
@@ -164,6 +231,22 @@ struct WidgetRenderDiffTests {
         return best
     }
 
+    /// The brightest mark in the rest day's own column, sampled a quarter-slot
+    /// either side of its centre.
+    ///
+    /// Not at the centre, because since #71 the widget draws the rest cut
+    /// there: a flat 2pt rule in `GlowPalette.restCut`, which composites to 72
+    /// on black and would be read as a mark. The cut casts no halo, so a
+    /// quarter-slot clears it, and that is still well inside the window the
+    /// span is supposed to have lost.
+    private func brightestInRestColumn(_ index: Int, in pixels: [UInt8]) -> Int {
+        let quarter = SlotLayout.dailySlot(trackWidth: track) / 4
+        return max(
+            brightest(atColumn: columnCentre(index) - quarter, in: pixels),
+            brightest(atColumn: columnCentre(index) + quarter, in: pixels)
+        )
+    }
+
     /// One habit, so the first row's band is unambiguous.
     private func oneHabit(_ frequency: Frequency, done: [Int], todayColumn: Int) -> WeekEntry {
         let week = WeekCalendar.week(containing: WeekCalendar.day(Date()))
@@ -192,7 +275,7 @@ struct WidgetRenderDiffTests {
         try withRestColumn(6, of: entry.week) {
             let pixels = try rgba(of: try render(entry))
             let saturday = brightest(atColumn: columnCentre(5), in: pixels)
-            let sunday = brightest(atColumn: columnCentre(6), in: pixels)
+            let sunday = brightestInRestColumn(6, in: pixels)
             #expect(saturday > 150, "the met-goal bar is missing at Saturday (\(saturday))")
             #expect(sunday < 60, "the bar runs into Sunday's column (\(sunday))")
         }
@@ -204,7 +287,7 @@ struct WidgetRenderDiffTests {
         try withRestColumn(2, of: entry.week) {
             let pixels = try rgba(of: try render(entry))
             let tuesday = brightest(atColumn: columnCentre(1), in: pixels)
-            let wednesday = brightest(atColumn: columnCentre(2), in: pixels)
+            let wednesday = brightestInRestColumn(2, in: pixels)
             let thursday = brightest(atColumn: columnCentre(3), in: pixels)
             #expect(wednesday < 60, "the bar crosses the rest day (\(wednesday))")
             #expect(tuesday > 150, "the left piece is missing (\(tuesday))")
@@ -226,7 +309,7 @@ struct WidgetRenderDiffTests {
             #expect(open.firstDay < 2 && open.lastDay > 2, "the fixture does not straddle Wednesday")
 
             let pixels = try rgba(of: try render(entry))
-            let wednesday = brightest(atColumn: columnCentre(2), in: pixels)
+            let wednesday = brightestInRestColumn(2, in: pixels)
             let before = brightest(atColumn: columnCentre(open.firstDay), in: pixels)
             let after = brightest(atColumn: columnCentre(3), in: pixels)
             #expect(wednesday < 60, "the open span crosses the rest day (\(wednesday))")
@@ -237,9 +320,9 @@ struct WidgetRenderDiffTests {
 
     // MARK: - The fixture
 
-    /// The exact week `docs/widget-large-spec.md` §14 says the design frame
-    /// depicts — today is Tuesday — so a committed export of `83:1676` is
-    /// compared against its own data, not against whatever this store held.
+    /// The week the committed design export depicts — today is Tuesday — so
+    /// the reference is compared against its own data rather than against
+    /// whatever this store happened to hold. See DesignReference/README.md.
     private func entry() -> WeekEntry {
         let anchor = WeekCalendar.day(Date())
         let week = WeekCalendar.week(containing: anchor)

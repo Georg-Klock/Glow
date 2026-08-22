@@ -58,15 +58,27 @@ struct MonthGridTests {
         #expect(byDay(25)?.mark == .upcoming)
     }
 
-    @Test("A rest day is never missed in the month either")
+    @Test("A rest day draws nothing in the month either")
     func restDayInheritsFromTheWeekGrid() {
-        // Tuesday the 18th went unlogged; as the rest day it is a socket, not
-        // a cross. Not re-decided here — MonthGrid asks WeekGrid, so whatever
-        // the rest day means there is what it means here.
+        // Tuesday the 18th went unlogged; as the rest day it draws nothing —
+        // not a cross, and since #72 not a socket either. Not re-decided here:
+        // MonthGrid asks WeekGrid, so whatever the rest day means there is
+        // what it means here, and the whole Tuesday column empties with it.
         withRestDay(calendar.component(.weekday, from: TestCalendar.date(2026, 8, 18))) {
             let cells = MonthGrid.cells(for: .fixture(), today: today, calendar: calendar)
             let tuesday = cells.first { calendar.component(.day, from: $0.date) == 18 }
-            #expect(tuesday?.mark == .upcoming)
+            #expect(tuesday?.mark == .rest)
+
+            // Every Tuesday, not only the one asked about — the column is the
+            // shape a reader sees, and one blank cell among six sockets would
+            // read as a bug rather than as a rest day.
+            let tuesdays = cells.filter {
+                calendar.component(.weekday, from: $0.date)
+                    == calendar.component(.weekday, from: TestCalendar.date(2026, 8, 18))
+            }
+            #expect(tuesdays.count >= 4)
+            #expect(tuesdays.allSatisfy { $0.mark == .rest })
+            #expect(tuesdays.allSatisfy { !$0.isTappable })
         }
     }
 

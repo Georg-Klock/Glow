@@ -1,6 +1,6 @@
 import Foundation
 
-/// The four states a slot can be in. Exactly one applies to any slot.
+/// The five states a slot can be in. Exactly one applies to any slot.
 enum SlotState: String, Equatable, Sendable {
     /// Nothing has happened here and nothing can yet: a day still to come.
     case inactive
@@ -14,6 +14,15 @@ enum SlotState: String, Equatable, Sendable {
     case open
     /// Completed.
     case filled
+    /// The rest day: a day nothing can happen on, which is not the same as a
+    /// day that has not happened yet.
+    ///
+    /// It was `.inactive` until #72, which drew a socket on it — a socket says
+    /// *one is coming*, and on a rest day none is. This state wins over every
+    /// other, a stored completion included: the completion still counts
+    /// everywhere it counted before, it simply is not drawn in the week grid.
+    /// See docs/decisions.md.
+    case rest
 }
 
 /// What a slot actually draws.
@@ -35,6 +44,9 @@ enum SlotMark: Equatable, Sendable {
     case missed
     /// A day still to come.
     case upcoming
+    /// The rest day. Drawn as nothing at all — the column keeps its width and
+    /// holds no mark, so the line down it is the only thing in it.
+    case rest
 }
 
 /// One rendered circle or pill.
@@ -59,6 +71,7 @@ struct Slot: Identifiable, Equatable, Sendable {
         case .filled: isToday ? .doneToday : .donePast
         case .missed: .missed
         case .inactive: .upcoming
+        case .rest: .rest
         }
     }
 }
@@ -164,17 +177,22 @@ enum WeekGrid {
             let isToday = day == today
             // A rest day is never open, never missed, and never writable. It
             // is true rest — the week stops there rather than being made up
-            // around it — so it draws as an empty socket whether it is behind
-            // or ahead, and it never carries an action. A completion already
-            // on record still counts and still shows: a record of what
-            // happened stays a record of what happened. Only new writes are
+            // around it — so it draws nothing at all, whether it is behind or
+            // ahead, and it never carries an action. Only new writes are
             // refused, and the refusal itself is `HabitStore.toggleCompletion`'s;
             // withholding the tap here is the same rule at the surface.
+            //
+            // Rest is tested *before* `isDone`, which is the one clause of #39
+            // that #72 reverses: a completion already on record still counts —
+            // `completedDays` is untouched, weekly totals are untouched,
+            // History still shows it — but the week grid stops drawing it. The
+            // grid's job is to say what is open, and on a rest day that is
+            // nothing.
             let isRest = WeekPreferences.isRestDay(day, calendar: calendar)
 
             let state: SlotState =
-                if isDone { .filled }
-                else if isRest { .inactive }
+                if isRest { .rest }
+                else if isDone { .filled }
                 else if isToday { .open }
                 else if day < today { .missed }
                 else { .inactive }

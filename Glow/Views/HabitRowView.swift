@@ -71,6 +71,11 @@ struct HabitRowView: View {
     let week: Week
     let today: Date
     let geometry: RowGeometry
+    /// This row's position in the grid, and the range of positions the rest
+    /// day's line runs through. Both are needed to draw one segment of it: the
+    /// range says whether this row is inside the cut, and which end of it.
+    let index: Int
+    let cut: ClosedRange<Int>?
     let onToggle: (Date) -> Void
     let onEdit: () -> Void
 
@@ -131,10 +136,13 @@ struct HabitRowView: View {
     }
 
     /// The rest day cuts the week: one vertical line at that weekday's
-    /// x-position, drawn by every row — blank rows included — at the same x
-    /// and running edge to edge of the row's height, so the segments meet
-    /// across rows and the grid reads as stopped there rather than as seven
-    /// rows each carrying its own mark.
+    /// x-position, drawn as a segment per row so that the segments meet across
+    /// rows and the grid reads as stopped there rather than as seven rows each
+    /// carrying their own mark.
+    ///
+    /// Both ends land on a habit — `RestCut.rows` decides which — and a blank
+    /// row between two habits still draws its segment. The line is a cut
+    /// through the grid, and a gap the user placed is part of the grid.
     ///
     /// Behind the marks, not over them: a span crossing the rest day is a
     /// record, and the line marks the day, not the record.
@@ -145,21 +153,36 @@ struct HabitRowView: View {
         // row — including one whose slots are unchanged — redraw the line on
         // the new day the moment Settings moves it.
         if restDayStorage != 0,
+           let cut, cut.contains(index),
            let restIndex = week.days.firstIndex(where: { WeekPreferences.isRestDay($0) }) {
-            let slotWidth = SlotLayout.slotWidth(trackWidth: geometry.trackWidth, slotCount: 7)
-            let gap = SlotLayout.gap(trackWidth: geometry.trackWidth)
-            let x = geometry.labelWidth + geometry.labelGap
-                + CGFloat(restIndex) * (slotWidth + gap) + slotWidth / 2
+            let width = GlowShape.barThickness
+            let x = RestCut.x(
+                restIndex: restIndex,
+                trackWidth: geometry.trackWidth,
+                labelWidth: geometry.labelWidth,
+                labelGap: geometry.labelGap
+            )
+            // The row inset above and below, so adjacent segments touch —
+            // except at the ends of the cut, where there is no neighbour to
+            // meet and the overshoot would run into the header's air or past
+            // the last habit.
+            let above: CGFloat = index == cut.lowerBound ? 0 : geometry.rowInset
+            let below: CGFloat = index == cut.upperBound ? 0 : geometry.rowInset
+            let rowHeight = max(slotHeight, GridMetrics.minimumRowHeight)
             Rectangle()
                 .fill(GlowPalette.restCut)
-                .frame(
-                    // The missed cross's stroke, turned vertical.
-                    width: max(1, slotHeight * GlowShape.missedThickness),
-                    // Past the row's own height by the list inset above and
-                    // below, so adjacent rows' segments touch.
-                    height: max(slotHeight, GridMetrics.minimumRowHeight) + 2 * geometry.rowInset
-                )
-                .offset(x: x)
+                // The span bar's weight, in points. The line is a line, and the
+                // completed bar is the line this grid already draws; matching it
+                // is what makes the cut read as part of the grid rather than as
+                // a heavier ✕. It used to take the missed cross's stroke, which
+                // is a *proportion* of the slot and so drew at ~1.2pt on the
+                // phone against 2pt bars beside it.
+                .frame(width: width, height: rowHeight + above + below)
+                // Centred on the column. `.offset(x:)` moves the leading edge,
+                // so offsetting by the centre put the whole line half its width
+                // to the right of it — invisible at a hairline, a full point off
+                // at two.
+                .offset(x: x - width / 2, y: (below - above) / 2)
                 .accessibilityHidden(true)
         }
     }
