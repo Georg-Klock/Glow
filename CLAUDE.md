@@ -49,6 +49,12 @@ and closes as you go rather than filling like a fitness ring.
   `L1 <n>/<n>`; that number goes in the PR body.
 
 - **Regenerate the symbol picker catalog:** `Tools/make-symbol-catalog.py`
+- **Render the website's HDR word images:** `Tools/make-glow-word.swift`
+
+  The glow technique applied to type, for the brightness slider on the project
+  page. See the end of `docs/glow.md` for what was measured, including the one
+  trap: a screen without headroom tone-maps the result to grey, so the page has
+  to test for headroom before showing it at all.
 - **Read the widget's trace off a tethered phone:** `Tools/pull-widget-log.sh`
 - **Check the App Group entitlement survived signing:** `Tools/check-app-group.sh`
 

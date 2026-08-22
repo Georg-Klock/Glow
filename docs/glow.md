@@ -361,3 +361,54 @@ lasts, and explains it once per activation — quoting the live
 
 Low Power Mode cannot be toggled in the Simulator. Launch with
 `-glow-force-low-power` to see the banner and the notice.
+
+## The same technique, off the phone
+
+`Tools/make-glow-word.swift` renders a word as twelve HDR images, one per
+headroom step, for the brightness slider on the project page at
+georgklock.com/glow-up. It is this file's argument applied to type: a browser
+will not give extended range to text any more than SwiftUI will give it to a
+`Color`, so the word has to be an image, encoded in PQ, for the same measured
+reason the slot is.
+
+Two things differ from `GlowRenderer`, both because a web page has no clip:
+
+- **The letterforms are in the image.** The app renders a uniform tile and the
+  view clips it to the slot. Nothing on a page does that, so the type is
+  composited in.
+- **The surround is opaque black**, since the PQ encoder drops alpha. That is
+  only acceptable because the page background is `#000000`. If it ever stops
+  being black, these have to be re-cut.
+
+The output is AVIF rather than HEIF. Both carry PQ, but Chrome cannot decode
+HEIC at all, and AVIF is the one HDR still format Safari and Chromium both read.
+
+Measured, 2026-08-21:
+
+| Check | Result |
+| --- | --- |
+| Colour space at 1x | Display P3 — off is a different encoding, as in Settings |
+| Colour space at 2x and above | Rec. 2100 PQ |
+| Decoded peak, extended linear | 1.00, 2.23, 3.44 … 13.08 |
+| Size | ~10.5 KB per step, 126 KB for the slider |
+
+The peaks run about 8% above the requested gain — 6x encodes to 6.67 — which is
+the PQ round trip and is consistent across steps.
+
+**Webflow does not re-encode an uploaded AVIF.** Uploaded, fetched back off the
+CDN and compared: byte-identical, `image/avif` preserved, and no derivative
+variants generated. That is only true of the raw asset URL. Webflow's own Image
+element emits a `srcset` of resized variants, which is exactly where an HDR
+original would be quietly replaced by an SDR one, so the page uses a plain
+`<img>`.
+
+**A screen without headroom must not be shown these at all.** The browser
+tone-maps 6x content down to grey, so an SDR visitor sent the images would see a
+word *dimmer* than the sentence around it. The page tests
+`matchMedia('(dynamic-range: high)')` and falls back to ordinary white text,
+hiding the slider rather than offering a control that does nothing.
+
+The box is the font's ascent and descent rather than the ink bounds, because ink
+bounds move with the word — "brighter" has a descender and "attention" does not,
+so two words rendered the same way would sit on different baselines. The script
+writes the metrics to `manifest.json` next to the images.
