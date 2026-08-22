@@ -69,7 +69,9 @@ struct TodaySmallProvider: AppIntentTimelineProvider {
         let now = Date()
         // Whether the stored choice reaches the provider is exactly what the
         // device check needs to see, and the simulator could not answer it.
-        WidgetTrace.record("today-small timeline: habit=\(configuration.habit?.name ?? "unset")")
+        WidgetTrace.record(
+            "today-small timeline: habit=\(WidgetTrace.tag(configuration.habit?.id))"
+        )
         return Timeline(
             entries: [entry(for: configuration)],
             policy: .after(TodayStore.midnight(after: now))

@@ -913,3 +913,41 @@ because the fix was wrong, but because a SwiftData object is live rather than a
 snapshot: `first`, the blank row and `second` are the same instance, so
 `first.id` afterwards asks the *new* habit for its own id. The value has to be
 read before the delete.
+
+## The trace's privacy claim is now a property, not a comment
+
+**2026-08-22.** `WidgetTrace`'s own doc comment said it records "habit IDs,
+entry counts and timings. Never a habit's name, never anything a person typed."
+Four call sites interpolated `habit.name` straight into a line — both widget
+providers and both entity queries — and `Tools/pull-widget-log.sh` exists
+precisely to carry the result to a Mac (#141).
+
+A diagnostic that quietly collects what a person typed is worse than no
+diagnostic. A comment claiming it does not is worse still, because it is the
+thing a reader checks instead of the code.
+
+**The id was always the better record anyway.** Every question this trace was
+built to answer is *whether the right habit reached the provider*, and an id
+answers that; a name only answers it by accident, and only while no two habits
+share one. `WidgetTrace.tag` and `WidgetTrace.resolution` are the spellings now.
+
+**The enforcing test reads this repository's own sources.** No unit test of
+`record` can make this claim true — the type cannot see which substring of a
+line was somebody's habit — so the test walks `Glow/` and `GlowWidget/` from
+`#filePath` and fails on any `WidgetTrace.record` call with `.name` in it,
+naming the file and line. Reintroducing the old call site reproduces exactly
+that failure. It also asserts the scan found files at all, because a source scan
+that finds nothing passes vacuously, which is the failure mode of every test
+like it.
+
+**The Lock Screen decision, made rather than inherited.** The Live Activity is
+the one surface here a locked phone shows, and it prints a habit's name — which
+is whatever a person typed, and can be a great deal more revealing than
+"Workout". The name is now `.privacySensitive()` in both the Lock Screen
+presentation and the Island's expanded one. The line beside it is ours and says
+nothing personal, so a locked pop still reads as an acknowledgement; it just
+does not say what of.
+
+The Home Screen widgets are deliberately **not** marked. They are only visible
+on an unlocked phone — this bundle declares no accessory families — so redacting
+them would cost the week grid its labels and buy nothing.

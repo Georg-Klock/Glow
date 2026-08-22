@@ -31,10 +31,18 @@ struct GoalPopActivity: Widget {
                     .font(.system(size: WidgetMetrics.textSize, weight: .medium))
                     .glowing(halo: GlowPalette.labelHalo)
                 Spacer(minLength: 0)
+                // Redacted on a locked phone. This presentation is the Lock
+                // Screen one, so the habit's name — which is whatever a person
+                // typed, and can be a great deal more revealing than "Workout"
+                // — would otherwise be readable by anyone holding the device.
+                // The line beside it is ours and says nothing personal, so the
+                // pop still reads as an acknowledgement while locked; it just
+                // does not say what of. See #141.
                 Text(context.state.habitName)
                     .font(.system(size: WidgetMetrics.textSize))
                     .foregroundStyle(GlowPalette.labelResting)
                     .lineLimit(1)
+                    .privacySensitive()
             }
             .padding(.horizontal, WidgetMetrics.padLeading)
             .padding(.vertical, 12)
@@ -46,10 +54,13 @@ struct GoalPopActivity: Widget {
                         Text(context.state.line)
                             .font(.system(size: WidgetMetrics.textSize + 4, weight: .medium))
                             .glowing(halo: GlowPalette.labelHalo)
+                        // The Island is visible on a locked phone too, so the
+                        // name is redacted here for the same reason. See #141.
                         Text(context.state.habitName)
                             .font(.system(size: WidgetMetrics.textSize))
                             .foregroundStyle(GlowPalette.labelResting)
                             .lineLimit(1)
+                            .privacySensitive()
                     }
                 }
             } compactLeading: {
