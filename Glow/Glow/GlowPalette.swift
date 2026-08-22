@@ -139,7 +139,36 @@ enum GlowPalette {
 
     /// Halo reach for glowing text, in points. Tighter than a mark's and not
     /// proportional to it: a glyph is thin, and a mark's halo turns a word into
-    /// a smear. 3px and 4px blur at 2x.
+    /// a smear.
+    ///
+    /// **These two divide twice and the marks above divide not at all, and that
+    /// is correct** (#63). The difference is what kind of number the file was
+    /// read for, not an inconsistency:
+    ///
+    ///  - `haloRadius` and the ring's radii are *Figma shadow radii*, taken
+    ///    straight. A Figma radius is about a SwiftUI radius, so nothing is
+    ///    divided.
+    ///  - These two are *CSS blurs at 2x* — 3px and 4px. Halve for 1x, halve
+    ///    again because a CSS blur is about twice a Figma radius, and 0.75 and
+    ///    1.0 are the radii that fall out.
+    ///
+    /// Worth spelling out because the project has already paid for the opposite
+    /// slip once, halving numbers that were already halved and landing every
+    /// glow at a quarter of its reach. The check that separates the two cases is
+    /// whether the source number was a blur or a radius, and there is no way to
+    /// tell them apart from the value alone.
+    ///
+    /// A design document used to publish 1.5 and 2 for these rows, which is the
+    /// 1x CSS blur rather than the radius — the same column quoting two
+    /// different quantities. That document is gone (see docs/decisions.md, "The
+    /// code is the source of truth for design"), and these two lines are now the
+    /// only statement of the number.
+    ///
+    /// What would reopen it: 0.75pt against 1.5pt of blur on 12pt text is not a
+    /// difference the simulator can show, because it has no EDR headroom and the
+    /// halo is the part that needs it. If a due label ever reads under-lit on a
+    /// device, the thing to suspect is that the file's number was a radius after
+    /// all and one of these divisions is spurious.
     static let labelHalo: CGFloat = 3.0 / 2 / 2
     static let headerHalo: CGFloat = 4.0 / 2 / 2
 
