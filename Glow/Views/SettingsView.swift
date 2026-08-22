@@ -193,7 +193,7 @@ struct SettingsView: View {
                     }
 
                     Toggle("Rest day", isOn: restDayBinding)
-                        .tint(GlowPalette.grey)
+                        .tint(GlowPalette.controlTint)
                     if restDay != 0 {
                         Picker("Day", selection: $restDay) {
                             ForEach(WeekPreferences.pickerOrder, id: \.self) { weekday in
@@ -226,7 +226,7 @@ struct SettingsView: View {
                     .disabled(habits.isEmpty)
 
                     Toggle("Demo history", isOn: demoBinding)
-                        .tint(GlowPalette.grey)
+                        .tint(GlowPalette.controlTint)
                 } header: {
                     Text("Data")
                 } footer: {

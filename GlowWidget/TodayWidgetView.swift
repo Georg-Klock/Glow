@@ -70,7 +70,7 @@ private struct RingCell: View {
             if isOpen {
                 name.glowing(halo: GlowPalette.labelHalo)
             } else {
-                name.foregroundStyle(GlowPalette.labelResting)
+                name.foregroundStyle(GlowPalette.grey)
             }
         }
         .accessibilityElement(children: .ignore)
@@ -88,7 +88,7 @@ private struct TodayEmptyState: View {
             Text("No daily habits yet")
                 .font(.system(size: WidgetMetrics.textSize))
         }
-        .foregroundStyle(GlowPalette.headerRest)
+        .foregroundStyle(GlowPalette.grey)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

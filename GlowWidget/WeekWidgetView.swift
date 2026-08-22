@@ -38,7 +38,7 @@ struct WeekWidgetView: View {
                 Text("No habits yet")
                     .font(.system(size: WidgetMetrics.textSize))
             }
-            .foregroundStyle(GlowPalette.headerRest)
+            .foregroundStyle(GlowPalette.grey)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             // One measurement for the whole widget, so every row divides the
@@ -123,7 +123,7 @@ private struct WidgetHeader: View {
                         if isToday {
                             letter.glowing(halo: GlowPalette.headerHalo)
                         } else {
-                            letter.foregroundStyle(GlowPalette.headerRest)
+                            letter.foregroundStyle(GlowPalette.grey)
                         }
                     }
                     .frame(width: SlotLayout.slotWidth(trackWidth: track, slotCount: 7))
@@ -204,7 +204,7 @@ private struct WidgetRow: View {
             let above: CGFloat = index == cut.lowerBound ? 0 : WidgetMetrics.rowGap / 2
             let below: CGFloat = index == cut.upperBound ? 0 : WidgetMetrics.rowGap / 2
             Rectangle()
-                .fill(GlowPalette.restCut)
+                .fill(GlowPalette.grey)
                 .frame(width: width, height: side + above + below)
                 // `.offset(x:)` moves the leading edge, so the centre has to
                 // have half the width taken off it.
@@ -295,7 +295,7 @@ private struct WidgetRow: View {
             if isDue {
                 text.glowing(halo: GlowPalette.labelHalo)
             } else {
-                text.foregroundStyle(GlowPalette.labelResting)
+                text.foregroundStyle(GlowPalette.grey)
             }
         }
         .frame(width: labelWidth, alignment: .leading)

@@ -197,7 +197,7 @@ struct HabitRowView: View {
             let below: CGFloat = index == cut.upperBound ? 0 : geometry.rowInset
             let rowHeight = max(slotHeight, GridMetrics.minimumRowHeight)
             Rectangle()
-                .fill(GlowPalette.restCut)
+                .fill(GlowPalette.grey)
                 // The span bar's weight, in points. The line is a line, and the
                 // completed bar is the line this grid already draws; matching it
                 // is what makes the cut read as part of the grid rather than as
@@ -352,7 +352,7 @@ struct HabitRowView: View {
         // thing the marks are. Rendered as bright text it was the one part of
         // the screen pretending to be lit.
         return ZStack {
-            text.foregroundStyle(GlowPalette.labelResting)
+            text.foregroundStyle(GlowPalette.grey)
             text.glowing(halo: GlowPalette.labelHalo).opacity(lit)
         }
         .frame(width: geometry.labelWidth, alignment: .leading)

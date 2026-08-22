@@ -371,7 +371,7 @@ struct WeekdayHeader: View {
                         if isToday {
                             column.glowing(halo: GlowPalette.headerHalo)
                         } else {
-                            column.foregroundStyle(GlowPalette.headerRest)
+                            column.foregroundStyle(GlowPalette.grey)
                         }
                     }
                     .frame(

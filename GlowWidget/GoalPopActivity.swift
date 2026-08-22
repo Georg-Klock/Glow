@@ -40,7 +40,7 @@ struct GoalPopActivity: Widget {
                 // does not say what of. See #141.
                 Text(context.state.habitName)
                     .font(.system(size: WidgetMetrics.textSize))
-                    .foregroundStyle(GlowPalette.labelResting)
+                    .foregroundStyle(GlowPalette.grey)
                     .lineLimit(1)
                     .privacySensitive()
             }
@@ -58,7 +58,7 @@ struct GoalPopActivity: Widget {
                         // name is redacted here for the same reason. See #141.
                         Text(context.state.habitName)
                             .font(.system(size: WidgetMetrics.textSize))
-                            .foregroundStyle(GlowPalette.labelResting)
+                            .foregroundStyle(GlowPalette.grey)
                             .lineLimit(1)
                             .privacySensitive()
                     }
