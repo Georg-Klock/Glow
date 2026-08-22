@@ -1032,3 +1032,60 @@ preference, so the value was correct — but a value read only inside
 `WeekCalendar` is a dependency SwiftUI cannot see, and the grid kept its old
 columns until something else redrew it. Read in `week`, the same way
 `HabitRowView` reads the rest day.
+
+## Demo seeding stays on the main actor, and the number is why
+
+**2026-08-22.** #125 proposed moving `DemoHistory.seed()` and `.remove()` off
+the main actor into their own `ModelContext`, on the reasoning that 400–500
+inserts inside one SwiftUI transaction is a freeze. The shape of that is right.
+The cost is not what it assumed.
+
+Measured on disk, both operations, median of five, in one process:
+
+| habits | completions | seed | remove |
+| --- | --- | --- | --- |
+| 8 (today's default) | ~240 | **33ms** | **33ms** |
+| 20 | ~610 | 82ms | 82ms |
+| 40 | ~1210 | 165ms | 165ms |
+
+Linear, and at the shipping habit count it is a third of a frame budget's worth
+of hitch rather than a freeze. #123 would take the default to 13 habits, which
+lands around 55ms.
+
+**So it stays on the main actor for now**, and the reason is not that the
+refactor is hard. It is that the refactor's own key risk is unverified: #125
+notes that *when* a background context's committed save becomes visible to a
+live `@Query` is a timing question this codebase has never exercised, and every
+existing cross-context case in this app is cross-*process* and routes through an
+explicit reload rather than a query noticing by itself. Trading a 33ms hitch for
+an unverified refresh path is a bad trade. It stops being one somewhere north of
+~500ms, which on this curve is about 120 habits.
+
+**A busy state was considered and dropped.** While the write is synchronous
+there is no turn of the run loop in which a spinner could be seen, so it would
+be a control that renders one state forever.
+
+## Two timings from two `xcodebuild` runs are not a comparison
+
+**2026-08-22.** The measurement above nearly produced a change that made things
+worse, and the way it did is worth recording.
+
+Scoping `remove`'s fetch with a predicate instead of fetching every completion
+and filtering in Swift is obviously better — cost proportional to what the demo
+added rather than to the whole record. Measured across two separate
+`Tools/test.sh` invocations it first looked like a large win (572ms → 275ms at
+20 habits) and then, on the next pair of runs, like a large regression
+(83ms → 293ms).
+
+Both were artefacts. `seed`, whose code did not change at all, reported 34ms in
+one run and 103ms in another — a 3× spread on identical work. Machine state
+between `xcodebuild` invocations dominates everything being measured here.
+
+Run in **one process, alternating**, the two strategies are indistinguishable:
+82 vs 86ms, 165 vs 165ms, 33 vs 35ms. So the change was reverted, having bought
+nothing.
+
+This is the same lesson as the pixel-scanning script that produced three code
+changes chasing a four-point baseline error. A timing comparison in this
+codebase is only a comparison when both arms run in the same process, alternated,
+and reported as a median.
