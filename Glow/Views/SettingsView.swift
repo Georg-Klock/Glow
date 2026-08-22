@@ -98,7 +98,15 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    // Explicit, like the slider above and for the same reason:
+                    // a root `.tint()` cascades, and an inherited white here is
+                    // not a decision — it is the absence of one. Worse than
+                    // arbitrary, because white is what this app reserves for
+                    // *lit*, and a switch track is not lit. See #124, and the
+                    // `role: .destructive` note in CLAUDE.md for the same trap
+                    // on a different control.
                     Toggle("Say well done", isOn: popBinding)
+                        .tint(GlowPalette.grey)
                 } footer: {
                     Text(popFooter)
                 }
@@ -124,6 +132,7 @@ struct SettingsView: View {
                     }
 
                     Toggle("Rest day", isOn: restDayBinding)
+                        .tint(GlowPalette.grey)
                     if restDay != 0 {
                         Picker("Day", selection: $restDay) {
                             ForEach(WeekPreferences.pickerOrder, id: \.self) { weekday in
@@ -156,6 +165,7 @@ struct SettingsView: View {
                     .disabled(habits.isEmpty)
 
                     Toggle("Demo history", isOn: demoBinding)
+                        .tint(GlowPalette.grey)
                 } header: {
                     Text("Data")
                 } footer: {
