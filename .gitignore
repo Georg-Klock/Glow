@@ -30,3 +30,8 @@ private/
 # Claude Code, per-machine. Permission grants are a property of this
 # checkout and this operator, not of the project.
 .claude/settings.local.json
+
+# Agent worktrees. `git worktree add` puts a whole second checkout here, and
+# an untracked nested checkout is one `git add -A` away from being committed
+# into the repository it is a copy of.
+.claude/worktrees/
