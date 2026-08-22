@@ -23,15 +23,43 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install xcodegen
-        run: brew install xcodegen
+      # Not `brew install xcodegen`, which resolves whatever is current on the
+      # day. The version and the digest of its release archive are pinned in
+      # Tools/xcodegen.pin, so this runner and a developer machine generate the
+      # project with the same bytes. Cached by that version.
+      - name: Cache the pinned XcodeGen
+        uses: actions/cache@v4
+        with:
+          path: Tools/.xcodegen
+          key: xcodegen-${{ hashFiles('Tools/xcodegen.pin') }}
+
+      - name: Install the pinned XcodeGen
+        run: Tools/install-xcodegen.sh
 
       - name: Show toolchain
         run: |
           xcodebuild -version
           xcrun simctl list runtimes | grep iOS || true
 
-      # Generates the project, picks an available simulator, runs the suite,
-      # and fails if the run reported no tests.
+      # Generates, then reads the project back as a property list and fails if
+      # App Groups, the entitlement or extension-only API enforcement is not
+      # really there. Its own step so a capability failure is legible as one
+      # rather than as a test failure.
+      - name: Generate and validate the project
+        run: Tools/generate.sh
+
+      # Compiles the widget alone with -application-extension. The scheme build
+      # covers it too; this fails on its own line, naming the call site, when
+      # app-only API reaches the extension's shared sources.
+      - name: Build the widget as an app extension
+        run: |
+          xcodebuild build \
+            -project Glow.xcodeproj \
+            -target GlowWidget \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO
+
+      # Picks an available simulator, runs the suite, and fails if the run
+      # reported no tests.
       - name: Run tests
         run: Tools/test.sh

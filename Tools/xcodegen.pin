@@ -1,0 +1,13 @@
+# The XcodeGen this project generates with, pinned by version and by the
+# SHA-256 of the release archive rather than by version alone. A version
+# number names a tag; the digest names bytes.
+#
+# `Tools/install-xcodegen.sh` reads this file, and `Tools/generate.sh` refuses
+# to generate with anything else. Bumping it is a deliberate act: change both
+# lines, regenerate, and check the project diff — xcodegen's output format has
+# already been seen to need repair (see generate.sh), so a new version is a
+# change to the build, not a routine update.
+#
+# Digest of https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip
+XCODEGEN_VERSION=2.46.0
+XCODEGEN_SHA256=4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806

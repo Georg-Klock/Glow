@@ -1184,3 +1184,77 @@ an explicit guard — it lands in `TapHabitIntent` as a count of zero, and a
 | Everything | completion that meets the goal | `pop: got it`, then `pop: well played (replacing)` 0.73s later |
 | Goals | completion that meets the goal | `pop: well played` only |
 | either | un-log | nothing |
+
+## The generator is pinned, and the project it writes is verified
+
+**2026-08-22.** `Glow.xcodeproj` is generated, gitignored and unreviewed, so
+whatever produced it is part of the build. CI ran `brew install xcodegen`, which
+resolves whatever is current on the day; a developer machine resolved whatever
+it happened to have. The generated project is a function of `project.yml` *and*
+of the generator, and only one of the two was written down.
+
+**XcodeGen is now pinned by digest, not by version.** `Tools/xcodegen.pin`
+carries `2.46.0` and the SHA-256 of its release archive;
+`Tools/install-xcodegen.sh` downloads it into a gitignored cache, checks the
+digest before unpacking, and then reads the version back out of the unpacked
+binary — a binary with the right filename and the right `--version` string is
+exactly the substitution a pin exists to catch.
+
+**Whatever is on `PATH` is not used, even when it reports the pinned version.**
+An earlier draft took it as a fast path, which reintroduces precisely the
+substitution the digest is there to catch; only the checked bytes generate. It
+costs one 4MB download per version, once. Verified by pointing the pin at a
+wrong digest: the download is refused and nothing is unpacked.
+
+**The repair stayed; the check that it worked is new.** `generate.sh` rewrites
+the `SystemCapabilities` string xcodegen emits into the dictionary Xcode reads.
+That repair is a string substitution, so it fixes what it recognises and is
+silent when it recognises nothing — which is precisely what a changed output
+format looks like. `Tools/check-project.py` now reads the generated project back
+through `plutil`, as a property list rather than as text, and **fails the
+generation** unless both targets carry the capability as a real dictionary with
+App Groups enabled and unless the entitlements file each one names actually
+contains the group. A string and a dictionary are indistinguishable to a search
+for the key, which is why the old check could not have caught this.
+
+Verified against three mutations: raw xcodegen output with the repair skipped,
+the extension-only setting stripped from the project, and the widget's generated
+entitlements emptied to `<dict/>`. Each fails, naming the target and the
+configuration.
+
+**`Tools/generate.sh` is now the only documented path.** The README told device
+users to run `xcodegen generate` directly, which produces a project that opens,
+builds, installs, and leaves the widget unable to see the store.
+
+## The widget compiles with `-application-extension`
+
+**2026-08-22.** The widget target compiles four of the app's source folders
+wholesale — `Logic`, `Models`, `Store`, `Glow` — which is the right trade for
+four folders of value types (see the note in `project.yml`), but it makes the
+*folder* the boundary, and folders grow. #107 was this shape already:
+`UIApplication.shared` cannot be used from an extension, and
+`UIAccessibility.isReduceMotionEnabled` had to be read on the app's main actor
+and carried across.
+
+`APPLICATION_EXTENSION_API_ONLY = YES` makes the compiler the boundary instead.
+
+**It surfaced nothing.** The widget compiles clean with `-application-extension`
+today; the audit that suspected otherwise was wrong, and the setting is here to
+keep that true rather than to fix something. Confirmed both ways: a clean build
+of the target shows `-application-extension` on the swiftc invocations, and a
+temporary `UIApplication.shared` added to `Glow/Logic` fails the widget build
+with `'shared' is unavailable in application extensions for iOS` while leaving
+the app build alone. Without the flag the same file compiles into the extension
+and fails at runtime as a widget that will not load.
+
+The setting is asserted in `Tools/check-project.py`, so it cannot be dropped
+from `project.yml` and rediscovered later, and CI builds the widget target on
+its own so an extension-safety failure reads as one rather than as a test
+failure.
+
+**What this does not do.** It does not narrow the widget's compile surface. A
+new file in `Glow/Store` still joins the extension automatically, and the
+compiler only objects if it reaches for API the extension cannot have; app-only
+code that happens to be extension-safe — seeding, export, demo history — still
+compiles in and still adds to the appex. The `GlowShared` target that would make
+that a target-graph error is #139's remaining half and is not done here.

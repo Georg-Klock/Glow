@@ -152,6 +152,13 @@ targets:
         PROVISIONING_PROFILE_SPECIFIER: Glow Up Widget Development
         CODE_SIGN_IDENTITY: Apple Development
         SKIP_INSTALL: YES
+        # The widget compiles four of the app's source folders wholesale, so
+        # the folders are the boundary and the folders can grow. This makes the
+        # compiler the boundary instead: app-only API reaching the extension is
+        # an error at the call site rather than a placeholder on the home
+        # screen. Verified by Tools/check-project.py, which fails generation if
+        # it is ever not YES here. See #107, #139.
+        APPLICATION_EXTENSION_API_ONLY: YES
     dependencies:
       - sdk: WidgetKit.framework
       - sdk: SwiftUI.framework
