@@ -109,6 +109,12 @@ struct HabitRowView: View {
     @AppStorage(WeekPreferences.restDayKey, store: GlowSettings.store)
     private var restDayStorage: Int = 0
 
+    /// The label dims on exactly the spring the mark closes on, so the row
+    /// reads as one movement — which means it has to snap when the mark snaps.
+    /// Two timings for one event is two events, and so is one timing and one
+    /// jump. See `MotionPolicy` and #137.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private var slots: [Slot] {
         WeekGrid.slots(for: snapshot, in: week, today: today)
     }
@@ -152,7 +158,7 @@ struct HabitRowView: View {
         .background(alignment: .leading) { restDayCut }
         .onAppear { lit = isDue ? 1 : 0 }
         .onChange(of: isDue) { _, due in
-            withAnimation(SlotView.close) { lit = due ? 1 : 0 }
+            withAnimation(reduceMotion ? nil : SlotView.close) { lit = due ? 1 : 0 }
         }
     }
 
@@ -229,6 +235,13 @@ struct HabitRowView: View {
                         slot: slot,
                         size: CGSize(width: slotHeight, height: slotHeight),
                         habitName: snapshot.name,
+                        // Which day this column is. These rows are day-pinned —
+                        // column N is weekday N — and the row is what knows the
+                        // week, so it hands the date down rather than the slot
+                        // deriving one. It is what lets a mark say which
+                        // Tuesday it is talking about (#137).
+                        day: week.days.indices.contains(slot.index)
+                            ? week.days[slot.index] : nil,
                         onToggle: onToggle
                     )
                 }

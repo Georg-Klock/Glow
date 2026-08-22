@@ -225,6 +225,12 @@ private struct WidgetRow: View {
                             size: CGSize(width: side, height: side),
                             habitID: habit.id,
                             habitName: habit.name,
+                            // Which day this column is, handed down by the row
+                            // exactly as the app's row hands it down. A widget
+                            // row and an app row are the same row, so they say
+                            // the same seven things (#137).
+                            day: week.days.indices.contains(slot.index)
+                                ? week.days[slot.index] : nil,
                             burst: slot.isTappable ? burst : nil
                         )
                     }
@@ -333,12 +339,22 @@ private struct WidgetSpan: View {
             spansDays: span.dayCount > 1,
             restWindow: restWindow
         )
+        let label = SlotVoice.span(
+            habitName: habit.name, state: span.state, actionDay: span.actionDay
+        )
         if span.isTappable {
             Button(intent: ToggleHabitIntent(habitID: habit.id)) { mark }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(habit.name), \(span.state == .filled ? "done" : "due today")")
+                .accessibilityLabel(label)
+                .accessibilityHint(SlotVoice.hint(isDone: span.state == .filled))
         } else {
+            // A span that cannot be tapped is still a share of the week that
+            // was drawn, so it is still a share of the week that is said. It
+            // was silent here while the app said it — the widget's rows were
+            // the tappable column and nothing else (#137).
             mark
+                .accessibilityElement()
+                .accessibilityLabel(label)
         }
     }
 }
@@ -348,6 +364,8 @@ private struct WidgetSlot: View {
     let size: CGSize
     let habitID: UUID
     let habitName: String
+    /// The calendar day this column stands for. See `SlotVoice`.
+    let day: Date?
     /// Set only on the slot that was just tapped.
     let burst: Double?
 
@@ -356,24 +374,32 @@ private struct WidgetSlot: View {
         // enforces: past days are not editable, so they are not tappable here
         // either. A Button wrapping an untappable slot would still highlight on
         // touch and promise something it does not do.
+        //
+        // **Every column speaks, tappable or not** (#137). Only two of them did:
+        // today's, and the rest day, which #72 gave a voice because it draws
+        // nothing. The other five draw a completion, a miss or a day still to
+        // come — a week of history, on the surface most people look at most
+        // often — and said none of it, while the app's identical row said all
+        // of it. Seven dated facts is a row; it is a month and a year of them
+        // that get counted into a sentence instead (`HistoryVoice`).
         if slot.isTappable {
             Button(intent: ToggleHabitIntent(habitID: habitID)) {
                 shape
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(habitName), \(slot.state == .filled ? "done" : "due today")")
-            .accessibilityHint(slot.state == .filled ? "Mark as not done" : "Mark as done")
-        } else if slot.state == .rest {
-            // The one untappable slot that still needs a voice. It draws
-            // nothing and the line down its column is hidden, so without this
-            // a VoiceOver user meets a hole in the row and no explanation.
+            .accessibilityLabel(label)
+            .accessibilityHint(SlotVoice.hint(isDone: slot.state == .filled))
+        } else {
             // No button trait and no hint: there is nothing to do here.
             shape
                 .accessibilityElement()
-                .accessibilityLabel("\(habitName), rest day")
-        } else {
-            shape
+                .accessibilityLabel(label)
         }
+    }
+
+    private var label: String {
+        guard let day else { return "\(habitName), \(SlotVoice.state(slot.mark))" }
+        return SlotVoice.label(habitName: habitName, mark: slot.mark, day: day)
     }
 
     @ViewBuilder

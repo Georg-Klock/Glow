@@ -23,18 +23,6 @@ struct YearView: View {
 
     @State private var today = WeekCalendar.day(Date())
 
-    /// How a day went.
-    enum DayFill: Equatable {
-        /// Everything expected was done.
-        case full
-        /// Some of it.
-        case partial
-        /// None of it, or nothing was expected.
-        case empty
-        /// Not yet.
-        case future
-    }
-
     private var calendar: Calendar { WeekCalendar.calendar }
 
     /// Every week of the current year, as columns of seven days.
@@ -54,10 +42,14 @@ struct YearView: View {
         return result
     }
 
-    /// Completions, flattened once, so a year of cells is not a year of queries.
-    private var completions: [UUID: Set<Date>] {
-        Dictionary(uniqueKeysWithValues: habits.map { ($0.id, $0.snapshot().completedDays) })
-    }
+    /// Every habit as a value, taken once and handed down.
+    ///
+    /// This used to be a dictionary of completion sets, rebuilt by the computed
+    /// property on every one of the year's 365 cells. The verdict moved to
+    /// `YearHistory` (#137) and the snapshots come with it: taken once per
+    /// redraw, and read by a dictionary lookup per habit per day rather than by
+    /// building a `Set` per habit per day.
+    private var snapshots: [HabitSnapshot] { habits.map { $0.snapshot() } }
 
     /// Spacers hold a position in the grid and nothing else.
     private var realHabits: [Habit] { habits.filter { !$0.isSpacer } }
@@ -84,10 +76,14 @@ struct YearView: View {
     }
 
     private var grid: some View {
+        // Taken once here rather than per cell: `body` is the one place that
+        // can read the query, and 365 cells asking it 365 times is what this
+        // view used to do.
+        let snapshots = self.snapshots
         // The gutter sits outside the scroll view, or it scrolls away and the
         // rows become seven unlabelled bands. Only the weeks scroll, and only
         // horizontally: seven rows always fit.
-        HStack(alignment: .top, spacing: 6) {
+        return HStack(alignment: .top, spacing: 6) {
             VStack(alignment: .leading, spacing: 4) {
                 // A width as well as a height: Color.clear given only a height
                 // is greedy horizontally and will take half the screen, leaving
@@ -101,12 +97,31 @@ struct YearView: View {
                         monthLabels
                         HStack(alignment: .top, spacing: gap) {
                             ForEach(Array(weeks.enumerated()), id: \.offset) { index, week in
+                                let fills = YearHistory.fills(
+                                    in: week, habits: snapshots,
+                                    today: today, calendar: calendar
+                                )
                                 VStack(spacing: gap) {
-                                    ForEach(Array(week.days.enumerated()), id: \.offset) { _, day in
-                                        cellView(for: day)
+                                    ForEach(Array(fills.enumerated()), id: \.offset) { _, fill in
+                                        cellView(fill)
                                     }
                                 }
                                 .id(index)
+                                // **The column is the stop** (#137). A year of
+                                // days spoke nothing at all: the cells are
+                                // `GlowImageView`s and plain `Circle`s, hidden
+                                // from accessibility from the inside or
+                                // carrying no label at all, and the two
+                                // gutters that explain them are hidden on
+                                // purpose. Fifty-two sentences is a year
+                                // somebody can swipe through; 365 stops
+                                // reading "complete" is a wall. A column is
+                                // also what the grid is drawn to be read as —
+                                // "a vertical band is a good week".
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(HistoryVoice.week(
+                                    startingOn: week.start, fills: fills, calendar: calendar
+                                ))
                             }
                         }
                     }
@@ -174,9 +189,9 @@ struct YearView: View {
     }
 
     @ViewBuilder
-    private func cellView(for day: Date) -> some View {
+    private func cellView(_ fill: YearHistory.DayFill) -> some View {
         let size = CGSize(width: cell, height: cell)
-        switch fill(for: day) {
+        switch fill {
         case .full:
             // The same glow as a completion in the week grid, at a year's scale.
             GlowImageView(size: size, shape: .capsule)
@@ -187,33 +202,5 @@ struct YearView: View {
         case .future:
             Circle().fill(GlowPalette.upcoming.opacity(0.4)).frame(width: cell, height: cell)
         }
-    }
-
-    /// How a given day went, by the same rule the week grid uses.
-    private func fill(for day: Date) -> DayFill {
-        guard day <= today else { return .future }
-
-        let all = completions
-        var expected = 0
-        var met = 0
-        for habit in habits where !habit.isSpacer {
-            let done = all[habit.id]?.contains(day) ?? false
-            // Only daily habits pin to a day, so only they can be expected on
-            // one. A habit due three times a week has no opinion about Tuesday.
-            guard habit.frequency == .daily else {
-                if done { met += 1; expected += 1 }
-                continue
-            }
-            if WeekPreferences.isRestDay(day, calendar: calendar) {
-                if done { met += 1; expected += 1 }
-                continue
-            }
-            expected += 1
-            if done { met += 1 }
-        }
-
-        guard expected > 0 else { return .empty }
-        if met == expected { return .full }
-        return met > 0 ? .partial : .empty
     }
 }

@@ -98,7 +98,11 @@ struct DayRingView: View {
     /// made on this ring. **Reduce Motion snaps**, because a line travelling
     /// around a circle is exactly what that setting is for.
     private func start(from previous: Int, to next: Int) {
-        guard next == previous + 1, !reduceMotion else { return settle() }
+        // The rule itself lives in `MotionPolicy`, with the grid's — one
+        // setting, one place, four drawings of the same completion (#137).
+        guard MotionPolicy.sweepsRing(
+            from: previous, to: next, reduceMotion: reduceMotion
+        ) else { return settle() }
         let arcs = self.arcs
         guard let range = DayRing.sweep(arcs: arcs, index: previous) else { return settle() }
 

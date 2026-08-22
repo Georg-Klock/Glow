@@ -23,6 +23,10 @@ struct SpanView: View {
     var restWindow: ClosedRange<CGFloat>?
     let onToggle: (Date) -> Void
 
+    /// See `SlotView`: one setting, one rule, four drawings of the same
+    /// completion.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     /// Non-nil only while a completion is closing.
     @State private var closing: CGSize?
 
@@ -33,7 +37,9 @@ struct SpanView: View {
         Group {
             if span.isTappable {
                 Button { tap() } label: { mark }
-                    .buttonStyle(PressStyle(scale: SlotView.pressScale))
+                    .buttonStyle(PressStyle(scale: MotionPolicy.pressScale(
+                        SlotView.pressScale, reduceMotion: reduceMotion
+                    )))
             } else {
                 mark
             }
@@ -43,7 +49,8 @@ struct SpanView: View {
             transition(from: previous, to: next)
         }
         .accessibilityElement()
-        .accessibilityLabel("\(habitName), \(label)")
+        .accessibilityLabel(label)
+        .accessibilityHint(hint)
         .accessibilityAddTraits(span.isTappable ? .isButton : [])
     }
 
@@ -74,14 +81,19 @@ struct SpanView: View {
         }
     }
 
+    /// A day only when the span has one, which is today's and only today's.
+    ///
+    /// A span covers a run of columns and is not day-pinned — the dots say
+    /// which days this row was logged on, once, for the whole row (#47, #104) —
+    /// so naming its columns here would announce a date the control does not
+    /// act on. What it does name is the day a tap would touch. See `SlotVoice`.
     private var label: String {
-        switch span.state {
-        case .filled: "done"
-        case .open: "due today"
-        case .missed: "missed"
-        // A span is never `.rest` — see the note on `SlotSpan.mark`.
-        case .inactive, .rest: "still to come"
-        }
+        SlotVoice.span(habitName: habitName, state: span.state, actionDay: span.actionDay)
+    }
+
+    private var hint: String {
+        guard span.isTappable else { return "" }
+        return SlotVoice.hint(isDone: span.state == .filled)
     }
 
     private func tap() {
@@ -90,7 +102,9 @@ struct SpanView: View {
     }
 
     private func transition(from previous: SlotState, to next: SlotState) {
-        guard previous == .open, next == .filled else {
+        guard MotionPolicy.closesCompletion(
+            from: previous, to: next, reduceMotion: reduceMotion
+        ) else {
             closing = nil
             return
         }
