@@ -116,6 +116,73 @@ struct DayRingTests {
         #expect(DayRing.arcs(target: 6, done: 5, gap: gap).contains { $0.isOpen })
     }
 
+    // MARK: - The sweep (#76)
+
+    @Test("The sweep starts at the end of the run already logged")
+    func sweepGrowsOutOfTheExistingLine() {
+        let gap = 3 / (32 * Double.pi)
+        let arcs = DayRing.arcs(target: 4, done: 0, gap: gap)
+
+        // The first repetition has no run behind it, so it starts at its own
+        // start rather than at nothing.
+        #expect(DayRing.sweep(arcs: arcs, index: 0)?.from == arcs[0].start)
+        #expect(DayRing.sweep(arcs: arcs, index: 0)?.to == arcs[0].end)
+
+        // Every later one starts at the *previous* segment's end, which is
+        // before its own start — so the head crosses the gap between them, and
+        // that crossing is the merge.
+        let second = DayRing.sweep(arcs: arcs, index: 1)
+        #expect(second?.from == arcs[0].end)
+        #expect(second?.to == arcs[1].end)
+        #expect((second?.from ?? 0) < arcs[1].start)
+    }
+
+    @Test("The last repetition sweeps a full turn and closes the circle")
+    func lastSweepCloses() {
+        let gap = 3 / (32 * Double.pi)
+        for target in 1...12 {
+            let arcs = DayRing.arcs(target: target, done: 0, gap: gap)
+            let last = DayRing.sweep(arcs: arcs, index: arcs.count - 1)
+            // Past its own end and on to the first repetition's start plus a
+            // full turn, so the line meets its own tail.
+            #expect(last?.to == arcs[0].start + 1, "at a target of \(target)")
+            #expect((last?.to ?? 0) - (last?.from ?? 0) > 0, "at a target of \(target)")
+            if target > 1 {
+                #expect((last?.to ?? 0) > arcs[arcs.count - 1].end, "at a target of \(target)")
+            }
+        }
+    }
+
+    @Test("A target of one sweeps a whole circle on its single tap")
+    func singleRepetitionSweepsTheWholeCircle() {
+        let arcs = DayRing.arcs(target: 1, done: 0)
+        let only = DayRing.sweep(arcs: arcs, index: 0)
+        #expect(only?.from == 0)
+        #expect(only?.to == 1)
+    }
+
+    @Test("The sweep always runs forward, at every count")
+    func sweepIsAlwaysForward() {
+        let gap = 3 / (32 * Double.pi)
+        for target in 1...12 {
+            let arcs = DayRing.arcs(target: target, done: 0, gap: gap)
+            for index in arcs.indices {
+                let range = DayRing.sweep(arcs: arcs, index: index)
+                #expect(range != nil, "target \(target), index \(index)")
+                #expect((range?.to ?? 0) > (range?.from ?? 1),
+                        "target \(target), index \(index) sweeps backwards")
+            }
+        }
+    }
+
+    @Test("An index the ring does not have sweeps nothing")
+    func sweepOutOfRange() {
+        let arcs = DayRing.arcs(target: 3, done: 0)
+        #expect(DayRing.sweep(arcs: arcs, index: 3) == nil)
+        #expect(DayRing.sweep(arcs: arcs, index: -1) == nil)
+        #expect(DayRing.sweep(arcs: [], index: 0) == nil)
+    }
+
     @Test("The gap is one band width, measured along the centreline")
     func gapFraction() {
         // A 4pt band inside a 40pt circle runs along a 36pt centreline: one
