@@ -1665,3 +1665,43 @@ does: the grid's grey is not "the file's grey, which also has to survive the
 widget's accented rendering as stored alpha" — surviving accented rendering is
 `GlowGrey`'s job now, not the value's. The decision it records, that the grid and
 the system screens keep different greys, is unaffected.
+
+## A test may not poison the machine it ran on
+
+**2026-08-22.** `Tools/test.sh` reported 42 failures on `main` while CI reported
+success on the same commit (#168). The cause was not the code and not a race:
+`weekRestDay = 7` — Saturday — was sitting in the **simulator's App Group
+defaults**, and every run on that device inherited it. A whole weekday vanished
+from generated history, so `SeedingTests`, `MonthGridTests`, `WeekSpansTests`
+and `WeekDotsTests` went red together.
+
+`UserDefaults` outlives the process. `TestPreferences.withWeek` restores on the
+way out, and a process that dies does not get a way out — a crash, a cancelled
+run, or a hard trap like the SwiftData precondition #145 is about. Several of
+those happened during one long session, and one of them left the value behind.
+
+**Under a test bundle, `GlowSettings.store` is now a private suite**, keyed by
+process id and cleared on first use. Nothing a test writes can reach the app's
+real defaults, so nothing it writes can outlive it. Production is untouched: no
+test bundle, no override.
+
+Proved both ways on the same deliberately poisoned device: **45 failures without
+the change, 0 with it.**
+
+**#105 was wrong, and so was the first diagnosis here.** #105 concluded the
+hazard was impossible because `parallelizable: false` serialises the suites; the
+hazard was never about ordering within a run. Worse, the first attempt at this
+entry blamed xcodebuild running the two test targets in parallel, on the
+strength of a comparison that looked decisive — five red runs against three
+green ones — and the two arms had been run against **different simulators**, one
+poisoned and one clean. The flag "fixed" nothing; the clean device did.
+
+That is the third time this project has been misled by its own measurement, and
+the rule from the pixel-scanning episode applies unchanged: when a measurement
+disagrees, suspect the measurement. Specifically — an experiment that changes a
+setting must hold the *machine* fixed, and on this project the machine includes
+which simulator `Tools/test.sh` happened to pick.
+
+The first version of the regression test carried the same flaw in miniature: it
+asserted the App Group did not hold `7`, which fails on precisely the machine
+where the bug was found. It compares before against after now.
