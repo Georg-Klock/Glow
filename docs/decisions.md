@@ -793,3 +793,30 @@ Leaving the bar alone was the alternative and it is worse than it sounds: the
 system material dims the capsule to grey and prints "Settings" over it, so the
 product's one lit object slides under the title as a smear. Both were
 screenshotted before choosing, which is the only reason the choice is defensible.
+
+## Every width a row hands out is a width
+
+**2026-08-22.** The suite passed while logging
+`Invalid frame dimension (negative or non-finite)` at test-host startup, and
+`RowGeometry` had an arithmetic path straight to it (#136).
+
+`nameMaxWidth` is a *difference*, not a product: `labelWidth + labelGap -
+iconWidth - iconGap`. Every other value on the type is a positive constant times
+a scale that cannot go below 1, so they were safe by construction and this one
+was not. A narrow proposal squeezes the label column to nothing and the result
+goes negative — **−13.5pt at `totalWidth == 0`**, which is the first pass of
+every `GeometryReader` — and straight into `.frame(maxWidth:)`.
+
+Two floors, and neither is defensive padding. `nameMaxWidth` is clamped because
+it is the one subtraction. The initializer's width is clamped because
+`.infinity` and `.nan` both arrive through layout, and a `.nan` propagated from
+here surfaces three properties later in a frame modifier that names no source.
+Non-finite collapses to zero rather than to a screen-sized number, so the
+failure mode is a row with no room rather than a row scaled to infinity.
+
+The tests sweep sixteen proposals — zero, narrow, ordinary, oversized, negative,
+both infinities and `.nan` — and assert every exposed value is finite and
+non-negative, named so a failure says which. Run against the unfixed code they
+report exactly the values the issue predicted: `-13.5`, `-13.08`, `-9.3`, `inf`.
+One more test pins the ordinary case, because a floor that also flattens a real
+layout would pass the sweep and fail the app.
