@@ -1,15 +1,24 @@
 # Glow Up
 
-A one-screen iPhone habit tracker. The one twist is in the name: today's slot,
-while it is still incomplete, **physically glows** on an HDR-capable screen. The
-glow means "unfinished, still actionable today" — it is not a reward for
-finishing. It disappears the moment the habit is done, and again when the day
-ends.
+A one-screen iPhone habit tracker. The one twist is in the name: a mark
+**physically glows** on an HDR-capable screen.
 
-That single rule decides more than it looks like it does. **Every mark in this
-app means *still open* when it glows.** A control that brightened on success
-would be the one place contradicting it, which is why the Today ring starts full
-and closes as you go rather than filling like a fitness ring.
+**Light marks the habit; what stays dark is what never happened.** Today's open
+slot glows because it is still actionable, and every completion glows too,
+whatever day it fell on — SPEC §1 has said so from the start. What does not glow
+is absence: a missed day, a day still to come, a rep that ran out of days.
+
+That single rule decides more than it looks like it does, and the corollary is
+that **light cannot also be what separates open from done** — so shape carries
+that instead. A slot open today is a ring and a completion is a dot; a
+repetition still open on the Today ring is an outlined band and a logged one is
+a line. Both lit, different silhouettes.
+
+This paragraph used to say the glow was "not a reward for finishing", and the
+Today ring was built to match: it painted a logged repetition grey and was the
+one surface in the app where a completion went dark. The rule it was reaching
+for is real — brightness must not mean *well done* — but grey for a completion
+overshot it into contradicting §1. See #75 and docs/decisions.md.
 
 ## Read first
 

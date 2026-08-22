@@ -326,6 +326,37 @@ it still does not invent it; it asks. The strictly-past condition is the same
 rule again at day resolution: a lost 3×/week week on Saturday has still not lost
 Sunday.
 
+## The Today ring's grey was the outlier
+
+**Question** (#75). SPEC §1 says every completion glows. `SlotMarkView` sends
+`.doneToday` and `.donePast` straight to `GlowImageView` and always has —
+`DayRingView` instead painted logged arcs `GlowPalette.labelResting` grey. One
+of the two was wrong.
+
+**Decision** (2026-08-22). The ring was. **Light marks the habit, open or
+closed; what stays dark is what never happened.** A completion is a thing that
+happened, so it glows, and the Today ring was the last surface saying otherwise.
+
+The rule the grey was reaching for is real and survives: brightness must not
+mean *well done*, or the app becomes a machine for congratulating you. But the
+corollary is not "a completion goes dark" — it is that **light cannot also be
+what separates open from done**, because it is already carrying something else.
+So *shape* carries that distinction instead, which is what the week grid has
+always done: a ring for a slot open today, a dot for one already logged. The
+Today ring now does the same thing at its own shape — an outlined band for a
+repetition still open, a line for a logged one.
+
+`CLAUDE.md`'s opening paragraph said the glow "is not a reward for finishing"
+and the ring was built to match it. Both are corrected. What is *not* corrected
+is the sentence after it — every mark still means one thing, and the app still
+has exactly one signal; that signal is just "this happened" rather than "this is
+outstanding".
+
+The gap halved with it, from two band widths to one, and that is not taste: the
+old number was one width of clear space *plus* one for round line caps, which
+extend a stroke half its width past each trim endpoint. A pill is bounded
+exactly by its own start and end angles, so there are no caps left to pay for.
+
 ## The open ring has no fill
 
 **Question** (#65). `GlowPalette.ringWash` — a 1% white — was declared and never

@@ -7,11 +7,14 @@ is not a name.
 A habit tracker whose weekly overview is the whole app: a grid of habits by
 day, filled when done.
 
-The one twist is in the name. The slot for today, while it is still
-incomplete, physically glows on an HDR-capable screen, using the same gain-map
-technique that makes HDR photos look brighter than white in Photos. The glow
-means "unfinished, still actionable today". It is not a reward for finishing:
-it disappears the moment you complete the habit, and again when the day ends.
+The one twist is in the name. A mark physically glows on an HDR-capable screen,
+brighter than white, the way an HDR photo does in Photos.
+
+Light marks the habit: today's slot glows because it is still actionable, and
+every completion glows too, whatever day it fell on. What stays dark is what
+never happened — a missed day, a day still to come. Open and done are told apart
+by *shape* rather than by brightness: a ring against a dot in the week grid, an
+outlined band against a line on the Today ring.
 
 Working name. Rename freely.
 

@@ -92,14 +92,80 @@ struct DayRingTests {
         #expect(DayRing.countAfterTap(count: 1, target: -1) == 0)
     }
 
-    @Test("The gap for a stroke is measured along its centreline")
-    func gapFraction() {
-        // A 4pt stroke kept inside a 40pt circle runs along a 36pt centreline:
-        // two stroke-widths of trim over a circumference of 36π.
-        let fraction = DayRing.gapFraction(strokeWidth: 4, diameter: 40)
-        #expect(abs(fraction - 8 / (36 * Double.pi)) < 1e-9)
+    @Test("A run of logged repetitions is one line, and it closes at the goal")
+    func loggedRunMergesAndCloses() {
+        // The endpoints the view draws the merged run between. One line for the
+        // whole run rather than one per repetition: it crosses the gaps, so the
+        // divisions only survive between repetitions still open.
+        let gap = 3 / (32 * Double.pi)
+        let arcs = DayRing.arcs(target: 6, done: 4, gap: gap)
+        let logged = arcs.filter { !$0.isOpen }
+        let open = arcs.filter(\.isOpen)
 
-        // A stroke as wide as its circle has nowhere to run.
+        #expect(logged.count == 4)
+        #expect(open.count == 2)
+        // The run spans from the first logged repetition's start to the fourth's
+        // end, which is past the three gaps inside it.
+        #expect(logged.first?.start == arcs[0].start)
+        #expect(logged.last?.end == arcs[3].end)
+        // And the division against the first still-open repetition survives.
+        #expect((open[0].start - (logged.last?.end ?? 0)) > 0)
+
+        // 6/6 closes and 5/6 does not.
+        #expect(DayRing.arcs(target: 6, done: 6, gap: gap).allSatisfy { !$0.isOpen })
+        #expect(DayRing.arcs(target: 6, done: 5, gap: gap).contains { $0.isOpen })
+    }
+
+    @Test("The gap is one band width, measured along the centreline")
+    func gapFraction() {
+        // A 4pt band inside a 40pt circle runs along a 36pt centreline: one
+        // band width of trim over a circumference of 36π. It was two until
+        // #75 — one width for round caps that no longer exist, plus one of
+        // air — and a pill is bounded exactly by its own angles, so only the
+        // air is left to pay for.
+        let fraction = DayRing.gapFraction(strokeWidth: 4, diameter: 40)
+        #expect(abs(fraction - 4 / (36 * Double.pi)) < 1e-9)
+
+        // A band as wide as its circle has nowhere to run.
         #expect(DayRing.gapFraction(strokeWidth: 40, diameter: 40) == 0)
+    }
+
+    @Test("The gap is the same angle at every ring size")
+    func gapIsAConstantAngle() {
+        // Both the band and the gap scale with the diameter, so the gap is a
+        // constant 3/(32π) of the circle — 10.74° — on the app's 92pt ring and
+        // on both widget rings alike.
+        for diameter in [92.0, 96.0, 76.0, 40.0] {
+            let band = diameter * Double(GlowShape.ringWeight)
+            let fraction = DayRing.gapFraction(strokeWidth: band, diameter: diameter)
+            #expect(abs(fraction - 3 / (32 * Double.pi)) < 1e-9, "at \(diameter)pt")
+            #expect(abs(fraction * 360 - 10.7429) < 0.001, "at \(diameter)pt")
+        }
+    }
+
+    @Test("The half-slice clamp is dormant at every supported count")
+    func clampNoLongerBinds() {
+        // Twelve repetitions is the worst supported case: 30° of slice against
+        // a 10.74° gap. The clamp stays as a guard against an unsupported
+        // input, and this is the assertion that it is not silently doing the
+        // work — if the gap ever grows past a half-slice again, the arcs stop
+        // being what `gapFraction` says they are.
+        let gap = 3 / (32 * Double.pi)
+        for target in 1...12 {
+            let slice = 1.0 / Double(target)
+            #expect(gap <= slice / 2, "the clamp binds at a target of \(target)")
+        }
+    }
+
+    @Test("Segment spans, at the counts the app offers")
+    func segmentSpans() {
+        // The issue's own table, in degrees, as the record of what the halved
+        // gap draws.
+        let gap = 3 / (32 * Double.pi)
+        for (target, expected) in [(2, 169.26), (3, 109.26), (6, 49.26), (12, 19.26)] {
+            let arcs = DayRing.arcs(target: target, done: 0, gap: gap)
+            let span = (arcs[0].end - arcs[0].start) * 360
+            #expect(abs(span - expected) < 0.01, "target \(target) spans \(span)°")
+        }
     }
 }
