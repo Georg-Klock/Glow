@@ -467,13 +467,67 @@ renderer's `manifest.json`.
 
 | Property | Value | Why |
 | --- | --- | --- |
-| `haloRadius` | `fontSize * 0.085` | Reaches past the strokes without touching the plate edge |
-| `haloStrength` | `0.15` | A suggestion of light, not a second source. At 0.55 it read as a neon sign |
+| `haloRadius` | `fontSize * 0.155` | Wide. A tight halo reads as an outline drawn round the word rather than as light coming off it |
+| `haloStrength` | `0.085` | Faint. It is there to help the illusion, not to be the act. 0.55 was a neon sign; even 0.15 pooled brightly enough beside the stems to make the spacing look uneven |
 | `grainDepth` | `0.22`, multiplied | Multiplying keeps black at black; anything additive lifts the surround |
 | `grainSoftness` | `1.6` | Per-pixel noise reads as dust — and is incompressible: it took a step from 10 KB to 250 KB |
+
+Wide and faint beats tight and strong. The first attempt reached for strength
+and got a neon sign; the second kept the strength and shrank the radius, which
+pooled light beside the vertical stems and made the word's own spacing look
+wrong. Spreading it out and dimming it is what reads as glow.
 
 Core and halo are combined with **maximum, not addition**: addition would push
 the stroke centres above the requested gain, and dividing by the brightest
 component exists precisely so the peak lands on `peakHeadroom` exactly.
 
 About twenty kilobytes a step, 256 KB for a twelve-step slider.
+
+### Render it at the size it will be seen at, and turn font smoothing off
+
+Two settings that decide whether the word looks like the type it sits in.
+
+**`setShouldSmoothFonts(false)`.** On macOS, font smoothing applies stem
+darkening, which thickens the strokes. With it on, the word rendered visibly
+heavier than the same font set as live text beside it — heavy enough to read as
+a different, wrong cut. Browsers do not stem-darken, so neither should the
+plate.
+
+**Render at roughly display size times the densest screen that will show it.**
+The first cut was 300pt, which meant 1216 natural pixels squeezed into 346
+device pixels — a 3.5x reduction that softened the letterforms and, with them,
+the apparent spacing. The default is now 144pt: 1:1 on a 3x display, 1.7x on a
+2x one. It is also four times smaller on disk.
+
+### The squash, and a measurement that could not have caught it
+
+Webflow ships a global `img { max-width: 100% }`. The page gave the word image a
+height and let width follow the intrinsic ratio, so that rule clamped it to the
+parent's width — already narrowed by the negative margins that pull the plate's
+padding back — while the height held. The letterforms rendered at **89% of their
+width**. Squashed by 11%, which is exactly enough to look like the wrong
+typeface without looking obviously broken.
+
+The fix is to state both dimensions from `manifest.json` and set
+`max-width: none`.
+
+The reason it survived several rounds of checking is the part worth keeping.
+The check being run was advance width: the image measured 173px, the same word
+as live text measured 173px, so it was called a match. **173px was the squashed
+width.** It agreed with the text only because the same negative margins that
+caused the squash also pulled the box to that number — the one measurement that
+reads correct precisely when the rendering is wrong. Advance width also says
+nothing about x-height, cap height or letterform shape, so it could not have
+caught this even in principle.
+
+Compare the **ink box** instead, and the **aspect ratio against the natural
+size**:
+
+| Check | Before | After |
+| --- | --- | --- |
+| Natural → rendered aspect | 1.919 → 1.884 | 1.919 → **1.919** |
+| Image ink width | — | 168.3px |
+| Live text ink width | — | 168.4px |
+
+Ink-to-ink, at 0.1px, is a claim about the rendering. Advance width was a claim
+about a box that happened to be the right size.

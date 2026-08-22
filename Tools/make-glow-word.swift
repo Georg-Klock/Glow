@@ -40,7 +40,12 @@ func arg(_ name: String, _ fallback: String) -> String {
 
 let text = arg("text", "brighter")
 let fontName = arg("font", "Sohne-Buch")
-let fontSize = CGFloat(Double(arg("size", "300")) ?? 300)
+// Rendered at roughly the size it is displayed at, times the densest screen
+// that will show it. The page sets the word at 48px, so 144 covers a 3x display
+// at 1:1 and a 2x one at 1.7x. The first cut was 300, which meant downscaling
+// 1216 natural pixels into 346 device pixels — a 3.5x reduction that softened
+// the letterforms until they no longer matched the type they sit in.
+let fontSize = CGFloat(Double(arg("size", "144")) ?? 144)
 let steps = Int(arg("steps", "12")) ?? 12
 let outDir = URL(fileURLWithPath: arg("out", "./out"), isDirectory: true)
 
@@ -98,8 +103,8 @@ let typographicWidth = CGFloat(CTLineGetTypographicBounds(line, &ascent, &descen
 // element that already has `filter` and `opacity` is an isolated group, so the
 // blurred black plate composites as grey. Measured on the staging page: a
 // visible rectangle around the word, with the blur layer alone and no grain.
-let padX = (fontSize * 0.22).rounded()
-let padY = (fontSize * 0.16).rounded()
+let padX = (fontSize * 0.34).rounded()
+let padY = (fontSize * 0.32).rounded()
 
 // Both dimensions are rounded up to even, and that is not cosmetic.
 //
@@ -128,7 +133,11 @@ guard let maskContext = CGContext(
 maskContext.setFillColor(gray: 0, alpha: 1)
 maskContext.fill(CGRect(x: 0, y: 0, width: width, height: height))
 maskContext.setAllowsAntialiasing(true)
-maskContext.setShouldSmoothFonts(true)
+// Font smoothing OFF. On macOS it applies stem darkening, which thickens the
+// strokes — so the word came out visibly heavier than the same font set as text
+// beside it, and read as the wrong cut rather than as the same one lit up.
+// The browser does not stem-darken, so neither should the plate.
+maskContext.setShouldSmoothFonts(false)
 maskContext.textPosition = CGPoint(x: padX, y: descent + padY)
 CTLineDraw(line, maskContext)
 
@@ -143,12 +152,13 @@ print("word \"\(text)\" in \(fontName) at \(Int(fontSize))pt -> \(width)x\(heigh
 let ciContext = CIContext(options: [.workingColorSpace: workingSpace])
 
 /// How far the halo reaches, and how bright it is at its brightest.
-let haloRadius = fontSize * 0.085
-/// Deliberately low. The halo is a suggestion of light around the letters, not
-/// a second light source: at 0.55 it read as a neon sign rather than as a
-/// bright word, and it competed with the core for attention on a page whose
-/// whole argument is about attention.
-let haloStrength: CGFloat = 0.15
+let haloRadius = fontSize * 0.155
+/// Wide and faint. The halo is there to help the illusion, not to be the main
+/// act: it should read as light spilling off the letters rather than as a
+/// second object drawn around them. Broad and dim beats tight and strong —
+/// 0.55 was a neon sign, and even 0.15 at a small radius still pooled brightly
+/// enough beside the stems to make the word's spacing look uneven.
+let haloStrength: CGFloat = 0.085
 /// How deep the grain cuts into the halo. 0 is a clean falloff.
 let grainDepth: CGFloat = 0.22
 /// Grain is softened before it is applied. Per-pixel noise reads as dust rather
