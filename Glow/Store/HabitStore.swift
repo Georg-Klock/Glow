@@ -30,6 +30,13 @@ struct HabitStore {
     /// The mirror of `delete`, which leaves a blank row behind rather than
     /// collapsing one. Between them a row's existence is stable and only its
     /// contents change, which is what makes the grid something you can arrange.
+    ///
+    /// **Blank rows belong to This Week, and only weekly habits take them**
+    /// (#143). A blank row is a *layout* row: it holds a position in the week
+    /// grid so habits can be clustered around it. Today has no blank-row layout
+    /// at all, so a per-day habit filling one would delete a gap somebody
+    /// deliberately placed on a screen it never appears on. Per-day habits
+    /// append.
     @discardableResult
     func addHabit(
         name: String,
@@ -39,12 +46,19 @@ struct HabitStore {
     ) throws -> Habit {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if let blank = try firstBlankRow() {
+        if !frequency.isCountedPerDay, let blank = try firstBlankRow() {
+            // A new habit is a new habit, not the old one wearing new text
+            // (#129). Widget configurations and widget intents both resolve by
+            // `id`, so a row that keeps its identity through delete-and-refill
+            // hands the next habit the last one's widget selection — and any
+            // completion a stale widget tap managed to write in between.
+            blank.id = UUID()
             blank.name = trimmed
             blank.icon = icon
             blank.frequency = frequency
             blank.createdAt = now
             blank.isSpacer = false
+            try clearHistory(of: blank)
             try context.save()
             return blank
         }
@@ -107,26 +121,51 @@ struct HabitStore {
     /// the grouping of every habit under it. Leaving a gap keeps what they
     /// arranged, and the gap is a real thing they can then delete or drag.
     ///
-    /// The habit itself is genuinely gone either way: name, icon, cadence and
-    /// every completion. What survives is the position.
+    /// The habit itself is genuinely gone either way: name, icon, cadence,
+    /// every completion — **and its identity** (#129). What survives is the
+    /// position, and a position is not an identity.
+    ///
+    /// **Only a weekly habit leaves a gap** (#143). Blank rows are This Week's
+    /// layout, and Today has none; a deleted per-day habit that left one would
+    /// insert a blank row into a screen it was never on. Per-day rows are
+    /// removed outright.
     func delete(_ habit: Habit) throws {
-        guard !habit.isSpacer else {
+        guard !habit.isSpacer, !habit.frequency.isCountedPerDay else {
+            // A spacer, or a Today habit: nothing here holds a position in the
+            // week grid, so there is nothing to keep.
+            try clearHistory(of: habit)
             context.delete(habit)
             try context.save()
             return
         }
 
-        // Completions are removed explicitly rather than left to cascade: the
-        // row is not being deleted, so nothing would cascade off it.
-        for completion in habit.completions ?? [] {
-            context.delete(completion)
-        }
-        habit.completions = []
+        try clearHistory(of: habit)
+        // A new UUID, and this is the whole of #129. Widget configurations and
+        // widget intents resolve habits by `id`: a row that kept its id through
+        // delete-and-refill would let a configured widget silently start
+        // showing an unrelated habit, and would let a widget tap made against
+        // the *deleted* habit — from a snapshot WidgetKit has not replaced yet
+        // — land as history on whatever fills the row next. Retiring the id
+        // makes both of those resolve to nothing, which is what a deleted
+        // habit should be.
+        habit.id = UUID()
         habit.name = ""
         habit.icon = ""
         habit.frequency = .daily
         habit.isSpacer = true
         try context.save()
+    }
+
+    /// Removes every completion a habit holds.
+    ///
+    /// Explicitly rather than by cascade: a row being blanked is not a row
+    /// being deleted, so nothing would cascade off it, and a reused row that
+    /// kept its old days would show them under the new habit's name.
+    private func clearHistory(of habit: Habit) throws {
+        for completion in habit.completions ?? [] {
+            context.delete(completion)
+        }
+        habit.completions = []
     }
 
     /// Rewrites `sortOrder` across the whole list so the stored order matches
@@ -155,8 +194,22 @@ struct HabitStore {
     enum ToggleOutcome: Equatable {
         case completed
         case uncompleted
-        /// The day is the rest day. Nothing was logged and nothing removed.
+        /// Nothing was logged and nothing removed. The rest day, a blank row,
+        /// or a habit this surface does not own.
         case refused
+    }
+
+    /// Whether this row can take a day-shaped write at all.
+    ///
+    /// Two rejections, and both are about a caller that is out of date rather
+    /// than a caller that is wrong (#129). A widget renders in its own process
+    /// and its snapshot can outlive the thing it draws, so a tap can arrive for
+    /// a habit that has since been deleted — now a blank row — or for one whose
+    /// cadence has since changed. The store is the one path both processes
+    /// share, so the rule lives here rather than in trust that no button was
+    /// offered.
+    private func acceptsDayWrite(_ habit: Habit) -> Bool {
+        !habit.isSpacer && !habit.frequency.isCountedPerDay
     }
 
     /// Marks the habit done on `date`, or un-marks it if it already is.
@@ -176,6 +229,12 @@ struct HabitStore {
         // A completion already stored on a rest day stays: records of what
         // happened remain records of what happened.
         guard !WeekPreferences.isRestDay(day, calendar: calendar) else { return .refused }
+
+        // A blank row has no habit to log, and a per-day habit is not
+        // day-toggled — its surface is a ring, and one tap there means "one
+        // more", not "done". Either write would be a stale caller's, and both
+        // used to be accepted. See `acceptsDayWrite` and #129.
+        guard acceptsDayWrite(habit) else { return .refused }
 
         if let existing = (habit.completions ?? []).first(where: { $0.day == day }) {
             habit.completions?.removeAll { $0.id == existing.id }
@@ -212,6 +271,10 @@ struct HabitStore {
     /// overwriting each other's counter.
     @discardableResult
     func addCompletion(for habit: Habit, on date: Date) throws -> Int {
+        // Nothing is ever logged against a blank row. It has no name to log it
+        // under and no surface to show it on, and a completion written here
+        // would belong to whatever habit fills the row next (#129).
+        guard !habit.isSpacer else { return 0 }
         let day = WeekCalendar.day(date, calendar: calendar)
         let completion = Completion(day: day, habit: habit)
         context.insert(completion)
@@ -228,6 +291,7 @@ struct HabitStore {
     /// cannot disagree about what a tap means.
     @discardableResult
     func recordTap(for habit: Habit, on date: Date) throws -> Int {
+        guard !habit.isSpacer else { return 0 }
         // A weekly habit has no ring to tap; its surface toggles days instead.
         // Answering with the current count rather than inventing a repetition.
         guard let target = habit.frequency.dailyTarget else {
@@ -245,6 +309,7 @@ struct HabitStore {
     /// Removes every completion on `date`, and returns how many there were.
     @discardableResult
     func clearDay(for habit: Habit, on date: Date) throws -> Int {
+        guard !habit.isSpacer else { return 0 }
         let day = WeekCalendar.day(date, calendar: calendar)
         let doomed = (habit.completions ?? []).filter { $0.day == day }
         guard !doomed.isEmpty else { return 0 }

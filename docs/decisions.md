@@ -869,3 +869,47 @@ nothing.
 Verified in the simulator, both ways round: export → cancel leaves zero files,
 export → complete (Copy) leaves zero files, and the folder the file lands in is
 the store's own.
+
+## A blank row is a position, not an identity and not a general-purpose slot
+
+**2026-08-22.** #129 and #143 are one change, because they land on the same two
+functions and fixing either alone leaves the other's reproduction working:
+`addHabit`'s reuse of a blank row, and `delete`'s conversion into one.
+
+**The identity had to be retired.** `delete` cleared a habit's name, icon,
+cadence and completions and left the row behind — keeping its `id`. Widget
+configurations and widget intents both resolve by `id`, so the row was a live
+handle to a habit that no longer existed: a configured widget could silently
+start showing an unrelated new habit, and a tap from a snapshot WidgetKit had
+not yet replaced could write a completion that later belonged to whoever filled
+the row. `delete` now assigns a new `UUID`, and so does the reuse in `addHabit`.
+Retiring the id is what makes both stale references resolve to nothing, which is
+what a deleted habit should be.
+
+**And the store now refuses the write rather than trusting the caller.** A blank
+row takes no completion of any kind, and a per-day habit takes no day toggle —
+a ring is not a row of days, and one tap there means *one more*, not *done*.
+This is the rest day's argument again, and it generalises: the widget is a
+second process drawing a surface that can outlive what it draws, so a rule
+enforced by not offering a button is not enforced.
+
+**Blank rows belong to This Week.** They are layout — a position in the week
+grid so habits can be clustered — and Today has no blank-row layout at all, a
+fact SPEC already stated for the add button. Yet `addHabit` filled the first
+blank row whatever the cadence, and `delete` blanked every row whatever the
+cadence. So adding a Today habit deleted a gap somebody had placed on a screen
+it never appears on, and deleting one inserted a gap there. Now only weekly
+rows take or leave a blank row; per-day rows append and are removed outright.
+
+**No migration, and that is a decision rather than an omission.** A blank row
+created by deleting a per-day habit is indistinguishable from one placed
+deliberately — `delete` zeroed the cadence, so there is nothing left to read.
+Treating every existing blank row as deliberate is the only safe reading, and
+it is also the one that preserves whatever layout someone has arranged.
+
+**One test bug worth keeping in mind.** The first version of "a new habit has a
+new id" compared `second.id` to `first.id` and failed with the two equal — not
+because the fix was wrong, but because a SwiftData object is live rather than a
+snapshot: `first`, the blank row and `second` are the same instance, so
+`first.id` afterwards asks the *new* habit for its own id. The value has to be
+read before the delete.

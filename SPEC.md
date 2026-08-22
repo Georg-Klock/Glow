@@ -345,6 +345,23 @@ where you made it: Today opens on **Daily**, This Week on **Weekly**. Today's
 add is a plain button rather than This Week's menu, because a blank row holds
 a position in the week grid and there is no grid here to hold one in.
 
+**A blank row belongs to This Week, and only weekly habits touch it** (#143).
+Adding a Today habit never fills one, and deleting a Today habit never leaves
+one — otherwise a screen with no blank-row layout would be silently rearranging
+a screen that has. A weekly habit still leaves its position behind when it goes
+and the next weekly habit still takes it, which is the rule that makes the grid
+something you can arrange.
+
+**A deleted habit does not keep its identity** (#129). The row survives; the
+`id` does not. Widget configurations and widget intents both resolve habits by
+`id`, so a row that kept it would hand the next habit the last one's widget
+selection, and would let a tap made from a widget snapshot rendered *before* the
+delete land as history on whatever fills the row next. The store also refuses
+every day-shaped write to a blank row or to a habit of the wrong cadence, on the
+same reasoning as the rest day's refusal: the widget runs in a second process
+and its surface can outlive what it draws, so the rule lives on the write path
+both processes share.
+
 **"Daily" means two different things, and only one of them is on screen.** The
 editor's `Daily` segment means *counted within a day* — a ring on Today, N
 repetitions that reset at midnight. The model's `Frequency.daily` means a
