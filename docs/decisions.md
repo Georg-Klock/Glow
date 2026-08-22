@@ -297,6 +297,35 @@ the thing to suspect is that the file's number was a radius after all and one of
 the two divisions is spurious. That is a device observation, not an argument,
 and it is the only thing that should move these numbers.
 
+## An empty Monday is not a failure on Tuesday — until it is
+
+**Question** (#82). `SlotState.missed` was documented as daily-habits-only: for
+a habit due a number of times a week, an empty Monday is not a failure on
+Tuesday, because the week is still winnable. Does a weekly row ever miss?
+
+**Decision** (2026-08-22). Yes, and the old rule is **bounded rather than
+reversed**. The week is still winnable right up to the point where it is not.
+Once a rep has no day left to land on, the row says so.
+
+The test is **strict**: a rep is lost when `repsLeft > actionableLeft`, not
+`>=`. On Saturday with two reps owed and Sunday still live, both are still
+reachable and the row stays clean; the ✕ arrives on Sunday. This is the whole
+character of the mark — it reports a miss that has *become unavoidable*, and it
+is never a warning and never a prediction. A mark that appeared while you could
+still act would be the app telling you it expects you to fail.
+
+**The design file is a day ahead of this**, and the rule wins. Its last row
+shows the ✕ on Saturday of a week with no rest day, where `2 > 2` is false.
+Recorded here so the next reading of the file does not re-derive the loose
+inequality from the mock.
+
+The same number governs the month: `MonthGrid` asks `WeekSpans` how many reps a
+week lost and crosses that week's unlogged **past** days. It used to decline the
+verdict — "a week already lost is a judgement this grid does not invent" — and
+it still does not invent it; it asks. The strictly-past condition is the same
+rule again at day resolution: a lost 3×/week week on Saturday has still not lost
+Sunday.
+
 ## The open ring has no fill
 
 **Question** (#65). `GlowPalette.ringWash` — a 1% white — was declared and never

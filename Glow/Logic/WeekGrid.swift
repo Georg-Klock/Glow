@@ -4,11 +4,17 @@ import Foundation
 enum SlotState: String, Equatable, Sendable {
     /// Nothing has happened here and nothing can yet: a day still to come.
     case inactive
-    /// A past day that went unlogged.
+    /// A day, or a rep, that can no longer happen.
     ///
-    /// Only daily habits can miss. For a habit due a number of times a week, an
-    /// empty Monday is not a failure on Tuesday — the week is still winnable —
-    /// so those rows never produce this state.
+    /// For a daily habit that is a past day that went unlogged. For a habit due
+    /// a number of times a week it is a rep with no day left to land on — an
+    /// empty Monday is still not a failure on Tuesday, and it becomes one once
+    /// no day remains that could have carried it. The week is winnable right up
+    /// until it is not, and this is the state for after that (#82).
+    ///
+    /// Never a warning. `WeekSpans` decides it with a strict inequality —
+    /// `repsLeft > actionableLeft` — so a rep is only lost when the days have
+    /// actually run out, not when they are about to.
     case missed
     /// Today's slot, not yet completed. The only steadily glowing state.
     case open

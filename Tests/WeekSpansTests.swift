@@ -178,9 +178,9 @@ struct LateWeekSpansTests {
     @Test("Nothing logged, no rest day: the squeeze arrives on the last days")
     func blankWeekTable() {
         #expect(shape(row(target: 2, todayColumn: 5)) == "open:0-5 inactive:6-6")
-        #expect(shape(row(target: 2, todayColumn: 6)) == "inactive:0-0 open:1-6")
-        #expect(shape(row(target: 3, todayColumn: 5)) == "inactive:0-0 open:1-5 inactive:6-6")
-        #expect(shape(row(target: 3, todayColumn: 6)) == "inactive:0-0 inactive:1-1 open:2-6")
+        #expect(shape(row(target: 2, todayColumn: 6)) == "missed:0-0 open:1-6")
+        #expect(shape(row(target: 3, todayColumn: 5)) == "missed:0-0 open:1-5 inactive:6-6")
+        #expect(shape(row(target: 3, todayColumn: 6)) == "missed:0-0 missed:1-1 open:2-6")
     }
 
     @Test("The completed block yields once something is lost")
@@ -189,14 +189,14 @@ struct LateWeekSpansTests {
         // owed against one day: the done block gives up the columns the lost
         // rep and the open one need, which it never did before #81.
         #expect(shape(row(target: 3, done: [0], todayColumn: 6))
-            == "filled:0-4 inactive:5-5 open:6-6")
+            == "filled:0-4 missed:5-5 open:6-6")
     }
 
     @Test("A rest day brings the squeeze forward a day")
     func restDayTable() {
         withRest(6) {
             #expect(shape(row(target: 2, todayColumn: 4)) == "open:0-4 inactive:5-6")
-            #expect(shape(row(target: 2, todayColumn: 5)) == "inactive:0-0 open:1-6")
+            #expect(shape(row(target: 2, todayColumn: 5)) == "missed:0-0 open:1-6")
         }
     }
 
@@ -210,7 +210,7 @@ struct LateWeekSpansTests {
             for: .fixture(frequency: .timesPerWeek(2), completedDays: [day(0)]),
             in: week, today: later, target: 2, calendar: calendar
         )
-        #expect(shape(spans) == "filled:0-5 inactive:6-6")
+        #expect(shape(spans) == "filled:0-5 missed:6-6")
     }
 
     @Test("A week that has not started divides evenly")
@@ -262,6 +262,83 @@ struct LateWeekSpansTests {
                 }
             }
         }
+    }
+
+    // MARK: - The X arrives only once the miss is unavoidable (#82)
+
+    @Test("Two a week, blank: clean through Saturday, one cross on Sunday")
+    func theCrossArrivesOnTheLastDay() {
+        // The strict inequality, stated as a row. On Saturday two reps are
+        // owed against two live days and the week is still winnable; on Sunday
+        // it is not. The mock draws the X a day earlier than this; the rule
+        // stands and the row moves.
+        for todayColumn in 0...5 {
+            let spans = row(target: 2, todayColumn: todayColumn)
+            #expect(!spans.contains { $0.state == .missed },
+                    "crossed on column \(todayColumn), which is still winnable")
+        }
+        #expect(row(target: 2, todayColumn: 6).count { $0.state == .missed } == 1)
+    }
+
+    @Test("A rest day brings the cross forward a day too")
+    func theCrossFollowsTheRestDay() {
+        withRest(6) {
+            for todayColumn in 0...4 {
+                #expect(!row(target: 2, todayColumn: todayColumn).contains { $0.state == .missed },
+                        "crossed on column \(todayColumn)")
+            }
+            #expect(row(target: 2, todayColumn: 5).count { $0.state == .missed } == 1)
+        }
+    }
+
+    @Test("Three a week on the last day: two crosses and one open, in that order")
+    func twoCrossesAndAnOpen() {
+        let spans = row(target: 3, todayColumn: 6)
+        #expect(spans.map(\.state) == [.missed, .missed, .open])
+    }
+
+    @Test("A cross is inert, and the row stays live around it")
+    func crossesAreInertButTheRowIsNot() {
+        let spans = row(target: 3, todayColumn: 6)
+        #expect(spans.filter { $0.state == .missed }.allSatisfy { !$0.isTappable })
+        // A partially lost week is not a finished one: what is still reachable
+        // still glows and is still worth logging.
+        #expect(spans.count { $0.isTappable } == 1)
+        #expect(spans.first { $0.isTappable }?.state == .open)
+    }
+
+    @Test("A finished week crosses every rep it never got to")
+    func finishedWeekCrossesTheRest() {
+        let later = TestCalendar.date(2026, 8, 26)
+        for (target, done) in [(2, 0), (2, 1), (3, 1), (6, 4)] {
+            let spans = WeekSpans.spans(
+                for: .fixture(
+                    frequency: .timesPerWeek(target),
+                    completedDays: Set((0..<done).map { day($0) })
+                ),
+                in: week, today: later, target: target, calendar: calendar
+            )
+            #expect(spans.count { $0.state == .missed } == target - done,
+                    "target \(target), done \(done): \(shape(spans))")
+        }
+    }
+
+    @Test("A met goal is never crossed, on any day of the week")
+    func metGoalIsNeverCrossed() {
+        for todayColumn in 0...6 {
+            let spans = row(target: 2, done: [0, 1], todayColumn: todayColumn)
+            #expect(!spans.contains { $0.state == .missed },
+                    "met goal crossed on column \(todayColumn)")
+        }
+    }
+
+    @Test("A cross reads as missed")
+    func crossHasAVoice() {
+        // `SlotSpan.mark` stopped folding a miss into a socket, which is what
+        // makes it draw the ✕ — and `SpanView` reads it out to match.
+        let spans = row(target: 3, todayColumn: 6)
+        #expect(spans.first { $0.state == .missed }?.mark == .missed)
+        #expect(spans.first { $0.state == .inactive }?.mark == nil)
     }
 
     @Test("Nothing is tappable on the rest day, and the open span is otherwise")
