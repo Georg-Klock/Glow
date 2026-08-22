@@ -165,6 +165,21 @@ weekday's column empties there too. VoiceOver still finds the slot, and it
 announces "rest day" with no button trait, because otherwise the hole in the
 row would have nothing explaining it.
 
+**A span never shows in it either.** A habit due a number of times a week is
+drawn as shapes stretching across the week, and a met goal is one shape across
+all seven — so without this a met week drew a single lit bar straight through
+the day nothing can happen in. The *arithmetic* is unchanged: `WeekSpans` keeps
+its seven-column division, its span count and its packing rule, and the shape
+is drawn with the rest column subtracted from it (`RestWindow`). The window is
+that column's slot plus the gap on each side, so its edges land on the
+neighbouring columns' slot edges and a bar ends flush with them rather than
+leaving a stub in the air. A bar the window falls inside becomes two pieces; at
+either end it simply stops short. An open span keeps its raw, unclosed ends
+rather than closing into two rings — a straddling span is one span. A span
+falling entirely inside the window draws nothing. The subtraction is applied to
+the *shape*, before the glow is generated from it, so the halo wraps the new
+ends instead of being sliced flat at them.
+
 The grid draws the cut as one vertical line down the rest day's column, in the
 missed cross's grey — absence, which does not glow.
 Per-day habits are untouched: Today's rings stay tappable, because water and a

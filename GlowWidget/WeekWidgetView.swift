@@ -147,7 +147,9 @@ private struct WidgetRow: View {
     /// This row's position among the rows the widget shows, the range of
     /// positions the rest day's line runs through, and which column it falls
     /// in. All three are decided once for the widget and handed down, so no row
-    /// re-derives them and no two rows can disagree.
+    /// re-derives them and no two rows can disagree. The column carries two
+    /// jobs: it places the line, and it is subtracted from any span that
+    /// crosses it (`RestWindow`).
     let index: Int
     let cut: ClosedRange<Int>?
     let restIndex: Int?
@@ -228,7 +230,10 @@ private struct WidgetRow: View {
                     }
                 } else {
                     ForEach(spans) { span in
-                        WidgetSpan(span: span, track: track, side: side, habit: habit)
+                        WidgetSpan(
+                            span: span, track: track, side: side, habit: habit,
+                            restIndex: restIndex
+                        )
                     }
                 }
             }
@@ -277,6 +282,8 @@ private struct WidgetSpan: View {
     let track: CGFloat
     let side: CGFloat
     let habit: HabitSnapshot
+    /// Which column the rest day falls in, decided once by the row.
+    let restIndex: Int?
 
     private var size: CGSize {
         CGSize(
@@ -285,8 +292,24 @@ private struct WidgetSpan: View {
         )
     }
 
+    /// The rest day's column inside this span, or nil when it does not cross
+    /// one. See `RestWindow`.
+    private var restWindow: ClosedRange<CGFloat>? {
+        RestWindow.inSpan(
+            firstDay: span.firstDay,
+            lastDay: span.lastDay,
+            restIndex: restIndex,
+            trackWidth: track
+        )
+    }
+
     var body: some View {
-        let mark = SlotMarkView(mark: span.mark, size: size, spansDays: span.dayCount > 1)
+        let mark = SlotMarkView(
+            mark: span.mark,
+            size: size,
+            spansDays: span.dayCount > 1,
+            restWindow: restWindow
+        )
         if span.isTappable {
             Button(intent: ToggleHabitIntent(habitID: habit.id)) { mark }
                 .buttonStyle(.plain)
