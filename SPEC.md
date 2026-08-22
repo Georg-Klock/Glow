@@ -65,14 +65,31 @@ sentence with an exception is two sentences.
   transition itself. These were explored as candidate glow moments and cut, to
   keep the interaction model at one rule rather than three.
 
-  **One exception, and it is bounded** (#58). When a goal is met — the day's
-  target for a per-day habit, the week's for a weekly one — the Dynamic Island
-  says so for two seconds. The non-goal above is about the surfaces that
-  *record state*: the grid, the rings, the widgets, all of which say one thing
-  in one register. The pop is outside all of them, it is transient, and nothing
-  it says persists. No streak is counted, no badge is kept, and the grid is
-  identical whether it fired or not. A switch in Settings turns it off, default
-  on.
+  **One exception, and it is bounded** (#58). Something logged from the home
+  screen makes the Dynamic Island say so for two seconds. The non-goal above is
+  about the surfaces that *record state*: the grid, the rings, the widgets, all
+  of which say one thing in one register. The pop is outside all of them, it is
+  transient, and nothing it says persists. No streak is counted, no badge is
+  kept, and the grid is identical whether it fired or not.
+
+  **How often it speaks is the person's choice** (#119), and Settings has three
+  positions rather than a switch: **Never**, **Goals**, **Everything**. Goals is
+  the default and is what "on" always meant, so a stored setting keeps exactly
+  what it had. This clause used to read "when a goal is met", and the reasoning
+  for that restriction — that firing on every completion would put twenty of
+  these a day on a screen whose whole argument is that it says one thing — is
+  kept in `GoalMet`'s own comment, marked superseded. What it got wrong is the
+  screen: a pop is not on that one.
+
+  **Two vocabularies, so the rare thing still reads as rarer.** A repetition
+  gets a flat acknowledgement — "logged", "counted" — and a goal met gets the
+  celebratory one. The tap that meets the goal says both, sequentially inside
+  the same two seconds, because a compact Island state has room for one short
+  phrase and not two.
+
+  **A correction says nothing.** Un-logging a day, and the tap that resets a
+  full ring to zero, both fire no pop. An acknowledgement for taking something
+  back is the app congratulating somebody for an undo.
 
   **One pop at a time, whose words change** (#102). Two goals met inside the
   two seconds is not an edge case — the medium Today widget puts three rings

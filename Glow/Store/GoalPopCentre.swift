@@ -42,17 +42,32 @@ enum GoalPopCentre {
         today: Date,
         calendar: Calendar = WeekCalendar.calendar
     ) {
-        guard PopPreferences.isEnabled,
-              GoalMet.justMet(habit: habit, in: week, today: today, calendar: calendar)
-        else { return }
-        pop(habitID: habit.id, name: habit.name, on: today, calendar: calendar)
+        let met = GoalMet.justMet(habit: habit, in: week, today: today, calendar: calendar)
+        // The routine line, and then the goal's — the tap that meets the goal
+        // has two things to say (#119). They share the two seconds rather than
+        // getting one each: a compact Island state has room for one short
+        // phrase, so "logged" hands over to "you did it" partway through.
+        let registers: [GoalPop.Register] = met ? [.logged, .goal] : [.logged]
+        let due = registers.filter { PopPreferences.allows($0) }
+        guard let first = due.first else { return }
+
+        pop(habitID: habit.id, name: habit.name, on: today, register: first, calendar: calendar)
+        guard due.count > 1 else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: GoalPop.handover)
+            pop(
+                habitID: habit.id, name: habit.name, on: today,
+                register: .goal, calendar: calendar
+            )
+        }
     }
 
     /// The number of the most recent pop. See `PopWindow`.
     private static var latest = 0
 
     private static func pop(
-        habitID: UUID, name: String, on day: Date, calendar: Calendar
+        habitID: UUID, name: String, on day: Date,
+        register: GoalPop.Register, calendar: Calendar
     ) {
         // Live Activities can be switched off system-wide, per app, and are
         // unavailable on some devices. All three arrive here as the same
@@ -62,7 +77,9 @@ enum GoalPopCentre {
         let content = ActivityContent(
             state: GoalPopAttributes.ContentState(
                 habitName: name,
-                line: GoalPop.line(habitID: habitID, on: day, calendar: calendar)
+                line: GoalPop.line(
+                    habitID: habitID, on: day, register: register, calendar: calendar
+                )
             ),
             staleDate: nil
         )

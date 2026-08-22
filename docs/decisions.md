@@ -1133,3 +1133,54 @@ expect an aborted run rather than a red test.
 One test covers the other direction, which never crashed and so was never
 noticed: a completion *added* by the other context was equally invisible to the
 cached array, and the fetch fixes both.
+
+## How often the Island speaks is a preference, not an invariant
+
+**2026-08-22.** #119 reverses a decision this project stated twice, and it is
+the repository owner's call, made deliberately. Both statements are kept and
+marked superseded rather than deleted, because they are the argument anyone
+will re-derive from first principles.
+
+`GoalMet` said:
+
+> firing on every completion would put twenty of these a day on a screen whose
+> whole argument is that it says one thing.
+
+**What that got wrong is the screen.** A pop is not on the screen whose argument
+is that it says one thing. It is two seconds over the Dynamic Island, on the
+home screen, and it leaves nothing behind — no streak, no badge, no change to
+the grid. The one-rule invariant is about the surfaces that *record state*, and
+this records none. So its frequency is a question about how often a person wants
+to be spoken to, which is a preference.
+
+Settings has three positions: **Never**, **Goals**, **Everything**. Goals is the
+default and is exactly what "on" always meant — the stored `1` still maps to it,
+so nobody's setting changes underneath them.
+
+**Two vocabularies, and that is what preserves what the old rule was protecting.**
+The real risk in speaking more often was never volume; it was that the rare
+thing would stop reading as rare. So a repetition gets a flat acknowledgement —
+"logged", "counted", "got it" — and a goal keeps the celebratory one. They are
+drawn at the *same index* from two lists, so the pair a single tap produces
+reads as one moment rather than two unrelated phrases.
+
+**The goal-completing tap says both, sequentially inside one two-second window.**
+Not one activity carrying two lines: a compact Island state has room for one
+short phrase. The routine line holds for 0.7s and the goal line replaces it,
+through the same update path #102 established. Splitting the window rather than
+extending it is also the safe choice — two seconds is a correctness bound, not
+only a taste one, because the process that requested the pop is what ends it.
+
+**A correction says nothing.** Un-logging never reaches the pop at all, because
+the toggle path only calls it on `.completed`. The reset of a full ring needed
+an explicit guard — it lands in `TapHabitIntent` as a count of zero, and a
+"logged" there is the app congratulating somebody for an undo.
+
+**Verified on screen**, all four paths, from the home screen widget:
+
+| setting | tap | log |
+| --- | --- | --- |
+| Everything | completion, goal not met | `pop: there it is` |
+| Everything | completion that meets the goal | `pop: got it`, then `pop: well played (replacing)` 0.73s later |
+| Goals | completion that meets the goal | `pop: well played` only |
+| either | un-log | nothing |
