@@ -61,8 +61,16 @@ enum GlowSettings {
     /// quarter of itself.
     static let haloReference: Double = 6
 
+    /// The most a halo is ever multiplied by, which is what it reaches at the
+    /// shipping default of 12x.
+    ///
+    /// Named rather than a literal inside `haloScale` because anything
+    /// reserving *room* for a halo has to reserve the largest one — Settings'
+    /// preview does, and a hand-typed 22 there is what clipped it (#91).
+    static let maxHaloScale: Double = 1.7
+
     static func haloScale(for peak: Double) -> Double {
         let normalised = (clamp(peak) - range.lowerBound) / (haloReference - range.lowerBound)
-        return min(max(normalised, 0), 1.7)
+        return min(max(normalised, 0), maxHaloScale)
     }
 }
