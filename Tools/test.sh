@@ -58,10 +58,35 @@ xcodebuild test \
 STATUS=${PIPESTATUS[0]}
 set -e
 
+# How many tests reported, whatever the exit code. A run that never reached the
+# tests and a run whose tests failed are different problems, and until now they
+# printed the same thing.
+REPORTED=$(grep -cE "^.?.?.?Test run with [0-9]+ test" "$LOG" || true)
+
 if [ "$STATUS" -ne 0 ]; then
   echo
-  echo "FAILED. Failing assertions:"
-  grep -E "✘|error:|failed" "$LOG" | head -40 || true
+  # `✘` and `error:` are the real signals. A bare `failed` is not: the
+  # simulator logs `IOSurfaceClientSetSurfaceNotify failed` on runs that pass,
+  # and matching it meant a launch failure was reported as one failing
+  # assertion — a graphics warning — with the actual cause discarded. See #148.
+  ASSERTIONS=$(grep -E "✘|error:|Testing failed:" "$LOG" | head -40 || true)
+
+  if [ -n "$ASSERTIONS" ]; then
+    echo "FAILED. Failing assertions:"
+    echo "$ASSERTIONS"
+  elif [ "$REPORTED" -eq 0 ]; then
+    # The mirror image of the no-tests check below, and the same argument: a
+    # run that never got to the tests must not look like a test failure.
+    echo "FAILED before any test reported — this is not an assertion failure."
+    echo "xcodebuild exited $STATUS with no test run. Its last 30 lines:"
+    echo
+    tail -30 "$LOG" | sed 's/^/  /'
+  else
+    echo "FAILED after the tests reported, with no assertion in the log."
+    echo "Something after the run failed — the last 30 lines:"
+    echo
+    tail -30 "$LOG" | sed 's/^/  /'
+  fi
   exit "$STATUS"
 fi
 

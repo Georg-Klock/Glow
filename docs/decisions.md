@@ -1325,3 +1325,37 @@ would leave it. One test asserts its own premise first — that the database fil
 alone is behind the store it was copied from — so that it fails loudly if
 SwiftData ever stops leaving writes in the log, rather than passing on a fixture
 that no longer proves anything.
+
+## A run that never reached the tests is not a test failure
+
+**2026-08-22.** `Tools/test.sh` exists because a scheme that runs no tests must
+not look like a pass — it asserts a non-zero count for exactly that reason.
+This is the mirror image, and it was undefended: a run that failed *before* any
+test reported printed "FAILED. Failing assertions:" followed by a graphics
+warning, and threw the actual cause away (#148).
+
+The warning is `IOSurfaceClientSetSurfaceNotify failed`, which the simulator
+also logs on runs that pass. It was matched only because the grep included a
+bare `failed`. So the report named a red herring, with high confidence, in the
+one place someone looks when they need the truth.
+
+Three outcomes now, not one:
+
+- **assertions found** — reported exactly as before, `✘` and `error:` and
+  `Testing failed:`, no bare `failed`;
+- **no test reported at all** — says so, gives `xcodebuild`'s exit code and its
+  last thirty lines, which is where the reason lives;
+- **tests reported but the run still failed** — says that too, rather than
+  claiming an assertion that is not in the log.
+
+**No automatic retry.** It was considered: two agents hit this in one evening,
+one of them twice in a row. But a retry that hides a genuinely flaky
+environment is the same class of mistake as the message this fixes — it makes
+the report say something more confident than the run earns. A named cause is
+what lets someone decide whether to re-run.
+
+Both directions were exercised. An invalid `-destination` now reports
+`FAILED before any test reported … xcodebuild exited 70 with no test run`
+followed by the invocation, where it used to report one graphics warning. A
+planted failing test still reports `✘ Expectation failed: 1 == 2` exactly as
+before.
