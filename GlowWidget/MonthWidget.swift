@@ -106,7 +106,7 @@ struct MonthWidgetView: View {
                 Text("No weekly habits yet")
                     .font(.system(size: WidgetMetrics.textSize))
             }
-            .foregroundStyle(GlowPalette.headerRest)
+            .foregroundStyle(GlowPalette.grey)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -149,7 +149,7 @@ struct MonthWidgetView: View {
                     if isDue {
                         name.glowing(halo: GlowPalette.labelHalo)
                     } else {
-                        name.foregroundStyle(GlowPalette.labelResting)
+                        name.foregroundStyle(GlowPalette.grey)
                     }
                 }
                 .frame(height: WidgetMetrics.headerHeight)
@@ -190,8 +190,8 @@ private extension MonthWidgetView {
     /// month's columns are weekdays in exactly the same sense, so the same line
     /// says the same thing here (#79).
     ///
-    /// Same weight and same grey: `GlowShape.barThickness` in
-    /// `GlowPalette.restCut`. What does *not* carry over is `RestCut` itself —
+    /// Same weight and the same grey: `GlowShape.barThickness` in
+    /// `GlowPalette.grey`. What does *not* carry over is `RestCut` itself —
     /// its job is deciding which rows a week grid's line runs through, and here
     /// every row is a week, so the line runs through all of them. The x is the
     /// month's own column pitch rather than `RestCut.x`, which divides a track
@@ -204,7 +204,7 @@ private extension MonthWidgetView {
             let width = GlowShape.barThickness
             let centre = CGFloat(column) * (side + gap) + side / 2
             Rectangle()
-                .fill(GlowPalette.restCut)
+                .fill(GlowPalette.grey)
                 .frame(
                     width: width,
                     // The whole grid, first row's top to last row's bottom —

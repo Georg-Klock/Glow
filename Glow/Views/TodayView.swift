@@ -168,7 +168,7 @@ struct TodayView: View {
                 if isOpen {
                     name.glowing(halo: GlowPalette.labelHalo)
                 } else {
-                    name.foregroundStyle(GlowPalette.labelResting)
+                    name.foregroundStyle(GlowPalette.grey)
                 }
             }
             .frame(width: Self.ringDiameter + 8)

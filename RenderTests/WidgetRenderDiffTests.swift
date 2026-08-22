@@ -39,17 +39,24 @@ struct WidgetRenderDiffTests {
         #expect(image.height == Int(Self.size.height * Self.scale))
 
         // A blank or all-black render would diff "successfully" against
-        // anything. Demand evidence of content: lit pixels (the marks) and
-        // mid-grey pixels (the labels and sockets).
+        // anything. Demand evidence of content: lit pixels (the marks) and grey
+        // pixels (the labels, the sockets and the span lines).
+        //
+        // **The grey band moved with #111 and is now narrow on purpose.** It
+        // used to be everything above 40, which caught a four-step ramp from 23
+        // to 141. There is one grey now and it sits at 23, so the band is 20 to
+        // 26 — one level of slack either side for antialiasing against the
+        // ground. A band that still reached to 141 would pass on halo bleed
+        // alone and stop being evidence that anything unlit was drawn.
         let pixels = try rgba(of: image)
         var lit = 0, grey = 0
         for i in stride(from: 0, to: pixels.count, by: 4) {
             let value = max(pixels[i], pixels[i + 1], pixels[i + 2])
             if value > 200 { lit += 1 }
-            else if value > 40 { grey += 1 }
+            else if (20...26).contains(value) { grey += 1 }
         }
         #expect(lit > 500, "no lit marks in the render")
-        #expect(grey > 500, "no grey hierarchy in the render")
+        #expect(grey > 500, "nothing unlit in the render: \(grey) pixels at the grey")
 
         let out = save(image, as: "widget-render@2x.png")
         print("render-diff: render written to \(out.path)")
@@ -157,12 +164,17 @@ struct WidgetRenderDiffTests {
         let column = Int((x * Self.scale).rounded())
 
         // The cut's grey against black, sampled down the column. The marks in
-        // this row are far brighter, so a generous floor still separates the
-        // line from the background without catching a dot.
+        // this row are far brighter, so a floor above the ground still separates
+        // the line from the background without catching a dot.
+        //
+        // The floor was 40, chosen when the cut composited to 72. With #111 the
+        // cut is the one grey at 23, so the floor is `lineFloor` — the same 15
+        // every other unlit-line scan in this file uses, and the number that
+        // now has to hold for all of them.
         func isCut(_ y: Int) -> Bool {
             let i = (y * width + column) * 4
             guard i + 2 < pixels.count else { return false }
-            return max(pixels[i], pixels[i + 1], pixels[i + 2]) > 40
+            return Int(max(pixels[i], pixels[i + 1], pixels[i + 2])) > Self.lineFloor
         }
 
         // Eight habits under a header, all in points, derived rather than
@@ -239,7 +251,7 @@ struct WidgetRenderDiffTests {
     /// either side of its centre.
     ///
     /// Not at the centre, because since #71 the widget draws the rest cut
-    /// there: a flat 2pt rule in `GlowPalette.restCut`, which composites to 72
+    /// there: a flat 2pt rule in `GlowPalette.grey`, which composites to 23
     /// on black and would be read as a mark. The cut casts no halo, so a
     /// quarter-slot clears it, and that is still well inside the window the
     /// span is supposed to have lost.
@@ -278,7 +290,7 @@ struct WidgetRenderDiffTests {
 
     /// A span's own line, unlit. Since #47 an achieved span is structure rather
     /// than a mark, so "is the span there" is a question about the grey line,
-    /// not about light — `GlowPalette.upcoming` composites to 23 on black.
+    /// not about light — `GlowPalette.grey` composites to 23 on black.
     private static let lineFloor = 15
     private static let clear = 10
 
