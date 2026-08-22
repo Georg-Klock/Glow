@@ -48,6 +48,9 @@ enum GoalPopCentre {
         pop(habitID: habit.id, name: habit.name, on: today, calendar: calendar)
     }
 
+    /// The number of the most recent pop. See `PopWindow`.
+    private static var latest = 0
+
     private static func pop(
         habitID: UUID, name: String, on day: Date, calendar: Calendar
     ) {
@@ -56,33 +59,60 @@ enum GoalPopCentre {
         // answer, and the answer is to do nothing.
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
 
-        let state = GoalPopAttributes.ContentState(
-            habitName: name,
-            line: GoalPop.line(habitID: habitID, on: day, calendar: calendar)
+        let content = ActivityContent(
+            state: GoalPopAttributes.ContentState(
+                habitName: name,
+                line: GoalPop.line(habitID: habitID, on: day, calendar: calendar)
+            ),
+            staleDate: nil
         )
-        do {
-            let activity = try Activity.request(
-                attributes: GoalPopAttributes(habitID: habitID.uuidString),
-                content: ActivityContent(state: state, staleDate: nil)
-            )
-            GlowLog.widget.notice("pop: \(state.line, privacy: .public)")
-            // A session that ends almost immediately, which is what a pop is.
-            // Dismissed rather than left to the system's own timeout, or it
-            // would sit on the Lock Screen as a notification-shaped thing.
-            //
-            // Ended by id rather than by holding the activity across the await:
-            // `Activity` is not `Sendable`, and sending one into a detached
-            // task is a data race the compiler is right about.
-            let id = activity.id
+        latest += 1
+        let mine = latest
+
+        // **One activity, whose words change.** Two goals met inside the pop's
+        // two seconds is not an edge case — the medium Today widget puts three
+        // rings side by side precisely so they can be tapped in a flurry.
+        //
+        // Requesting a second activity was measured (#102): ActivityKit allows
+        // it, both run, and the Island renders only the newest. So the first
+        // habit's line was drawn, immediately hidden, and ended on a timer
+        // nobody saw start. Updating says the same thing on screen with one
+        // session and one timer, and it makes the outcome this app's decision
+        // rather than a side effect of how the Island stacks.
+        if let running = Activity<GoalPopAttributes>.activities.first {
+            let id = running.id
             Task { @MainActor in
-                try? await Task.sleep(for: GoalPop.duration)
                 for live in Activity<GoalPopAttributes>.activities where live.id == id {
-                    await live.end(nil, dismissalPolicy: .immediate)
+                    await live.update(content)
                 }
             }
-        } catch {
-            // Nothing to report and nothing to retry.
-            GlowLog.widget.notice("pop: refused by ActivityKit")
+            GlowLog.widget.notice("pop: \(content.state.line, privacy: .public) (replacing)")
+        } else {
+            do {
+                _ = try Activity.request(
+                    attributes: GoalPopAttributes(), content: content
+                )
+                GlowLog.widget.notice("pop: \(content.state.line, privacy: .public)")
+            } catch {
+                // Nothing to report and nothing to retry.
+                GlowLog.widget.notice("pop: refused by ActivityKit")
+                return
+            }
+        }
+
+        // A session that ends almost immediately, which is what a pop is.
+        // Dismissed rather than left to the system's own timeout, or it would
+        // sit on the Lock Screen as a notification-shaped thing.
+        //
+        // Guarded by `PopWindow`: with one shared activity, the first tap's end
+        // would otherwise land two seconds after *its* tap and cut short a pop
+        // the second goal had just refreshed.
+        Task { @MainActor in
+            try? await Task.sleep(for: GoalPop.duration)
+            guard PopWindow.shouldEnd(scheduled: mine, latest: latest) else { return }
+            for live in Activity<GoalPopAttributes>.activities {
+                await live.end(nil, dismissalPolicy: .immediate)
+            }
         }
     }
 }

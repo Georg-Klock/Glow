@@ -136,3 +136,33 @@ struct GoalPopTests {
         #expect(PopPreferences.isEnabled)
     }
 }
+
+/// #102: two goals met inside one pop's two seconds.
+@Suite("Pop window")
+struct PopWindowTests {
+    @Test("Only the newest pop may end the activity")
+    func newestWins() {
+        // One shared activity means one shared ending, and the first tap's
+        // timer must not close a pop the second goal has just refreshed.
+        #expect(PopWindow.shouldEnd(scheduled: 2, latest: 2))
+        #expect(!PopWindow.shouldEnd(scheduled: 1, latest: 2))
+    }
+
+    @Test("A pop nobody replaced still ends")
+    func aloneStillEnds() {
+        // The ordinary case, and the one that would go wrong if the guard were
+        // written the other way round: a single pop has to close itself, or it
+        // sits on the Lock Screen until the system times it out.
+        #expect(PopWindow.shouldEnd(scheduled: 1, latest: 1))
+        #expect(PopWindow.shouldEnd(scheduled: 9, latest: 9))
+    }
+
+    @Test("A stale number never closes a later pop")
+    func staleNeverCloses() {
+        // Three goals in a flurry: only the third's ending counts, whatever
+        // order the sleeping tasks wake in.
+        #expect(!PopWindow.shouldEnd(scheduled: 1, latest: 3))
+        #expect(!PopWindow.shouldEnd(scheduled: 2, latest: 3))
+        #expect(PopWindow.shouldEnd(scheduled: 3, latest: 3))
+    }
+}

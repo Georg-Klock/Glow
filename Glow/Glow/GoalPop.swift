@@ -87,7 +87,29 @@ struct GoalPopAttributes: ActivityAttributes {
         var line: String
     }
 
-    /// Stable per habit, so a second goal met while the first is still up
-    /// replaces nothing and queues as its own activity.
-    var habitID: String
+    /// **Deliberately empty.** This used to be `habitID`, on the reasoning that
+    /// a second goal met while the first was still up should queue as its own
+    /// activity rather than replace it. Measured, and it does not queue: two
+    /// activities live at once and the Island renders only the newest, so the
+    /// first habit's line is drawn, hidden, and ended on a timer nobody saw
+    /// start. See #102.
+    ///
+    /// One activity, whose words change, is the same thing on screen with one
+    /// timer and no invisible second session — and it makes the behaviour this
+    /// app's rather than a side effect of how the Island stacks.
+}
+
+/// Which scheduled ending is allowed to fire.
+///
+/// With one shared activity, every pop schedules an end — and the first tap's
+/// end would land two seconds after *its* tap, cutting short a pop a later goal
+/// had just refreshed. So each pop takes a number, and only the newest may end
+/// the activity.
+///
+/// Pure, and separate from `GoalPopCentre`, because this is the part that can
+/// actually be wrong: the rest is ActivityKit calls with nothing to decide.
+enum PopWindow {
+    static func shouldEnd(scheduled: Int, latest: Int) -> Bool {
+        scheduled == latest
+    }
 }
