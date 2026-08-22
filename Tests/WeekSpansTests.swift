@@ -507,6 +507,72 @@ struct WeekDotsTests {
         ).isEmpty)
     }
 
+    @Test("The dots say which days, once")
+    func dotsHaveAVoice() {
+        // One element for the run, not one per dot: the days are a single
+        // fact, and a row already has up to six span elements. See #104.
+        let habit = HabitSnapshot.fixture(
+            name: "Workout",
+            frequency: .timesPerWeek(3),
+            completedDays: [day(1), day(4)]
+        )
+        #expect(
+            WeekDots.spokenDays(for: habit, in: week, calendar: calendar)
+                == "logged Tuesday and Friday"
+        )
+    }
+
+    @Test("A row with nothing lit says nothing at all")
+    func silentWhenUnlit() {
+        // nil rather than an empty string, so the view can drop the element
+        // instead of adding a stop that speaks nothing.
+        #expect(WeekDots.spokenDays(
+            for: .fixture(frequency: .timesPerWeek(3)), in: week, calendar: calendar
+        ) == nil)
+        // And the two rows that have no dots at all keep their silence.
+        #expect(WeekDots.spokenDays(
+            for: .fixture(frequency: .timesPerDay(3), completedDays: [day(1)]),
+            in: week, calendar: calendar
+        ) == nil)
+    }
+
+    @Test("What is not drawn is not spoken")
+    func restDayIsNotSpoken() {
+        // The rest column draws nothing (#72), so it says nothing — otherwise
+        // VoiceOver would report a day the screen does not show.
+        withRest(2) {
+            let habit = HabitSnapshot.fixture(
+                frequency: .timesPerWeek(3), completedDays: [day(1), day(2), day(4)]
+            )
+            #expect(
+                WeekDots.spokenDays(for: habit, in: week, calendar: calendar)
+                    == "logged Tuesday and Friday"
+            )
+        }
+    }
+
+    @Test("One day is a day, not a list of one")
+    func singleDay() {
+        let habit = HabitSnapshot.fixture(
+            frequency: .timesPerWeek(3), completedDays: [day(0)]
+        )
+        #expect(
+            WeekDots.spokenDays(for: habit, in: week, calendar: calendar)
+                == "logged Monday"
+        )
+    }
+
+    @Test("Three days keep their separators")
+    func threeDays() {
+        let habit = HabitSnapshot.fixture(
+            frequency: .timesPerWeek(3), completedDays: [day(0), day(2), day(6)]
+        )
+        #expect(
+            WeekDots.spokenDays(for: habit, in: week, calendar: calendar)
+                == "logged Monday, Wednesday and Sunday"
+        )
+    }
+
     @Test("Completions outside the week are not this week's dots")
     func onlyThisWeek() {
         let habit = HabitSnapshot.fixture(

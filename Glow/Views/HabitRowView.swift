@@ -245,20 +245,38 @@ struct HabitRowView: View {
     ///
     /// The same `.dot` mark the daily rows use, at the same column centres, so a
     /// weekly row and a daily row put their light in exactly the same places.
+    /// The dots' voice: one element saying which days, or none at all.
+    ///
+    /// The spans announce how much is left and the dots say when — so a row
+    /// with nothing lit adds no stop to a swipe-through, and a row with three
+    /// lit adds one rather than three. See `WeekDots.spokenDays` and #104.
+    private var dotVoice: String? {
+        WeekDots.spokenDays(for: snapshot, in: week)
+    }
+
     @ViewBuilder
     private var dots: some View {
         if !spans.isEmpty {
-            ForEach(dotColumns, id: \.self) { column in
-                GlowImageView(
-                    size: CGSize(width: slotHeight, height: slotHeight),
-                    shape: .dot
-                )
-                .offset(
-                    x: SlotLayout.columnCentre(
-                        trackWidth: geometry.trackWidth, index: column
-                    ) - slotHeight / 2
-                )
+            ZStack(alignment: .leading) {
+                ForEach(dotColumns, id: \.self) { column in
+                    GlowImageView(
+                        size: CGSize(width: slotHeight, height: slotHeight),
+                        shape: .dot
+                    )
+                    .offset(
+                        x: SlotLayout.columnCentre(
+                            trackWidth: geometry.trackWidth, index: column
+                        ) - slotHeight / 2
+                    )
+                }
             }
+            // `children: .ignore` on the stack rather than a label per dot: the
+            // days are one fact. The stack takes one slot's size — `offset`
+            // does not grow a layout — so the element sits at the start of the
+            // track instead of covering it and swallowing the spans' own.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(dotVoice.map { "\(snapshot.name), \($0)" } ?? "")
+            .accessibilityHidden(dotVoice == nil)
         }
     }
 

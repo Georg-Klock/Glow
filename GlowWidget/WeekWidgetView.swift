@@ -243,13 +243,22 @@ private struct WidgetRow: View {
             // mark and same column centres as a daily row, so the two put their
             // light in exactly the same places. See #47.
             .overlay(alignment: .leading) {
-                ForEach(WeekDots.columns(for: habit, in: week), id: \.self) { column in
-                    SlotMarkView(mark: .donePast, size: CGSize(width: side, height: side))
-                        .offset(
-                            x: SlotLayout.columnCentre(trackWidth: track, index: column)
-                                - side / 2
-                        )
+                let voice = WeekDots.spokenDays(for: habit, in: week)
+                ZStack(alignment: .leading) {
+                    ForEach(WeekDots.columns(for: habit, in: week), id: \.self) { column in
+                        SlotMarkView(mark: .donePast, size: CGSize(width: side, height: side))
+                            .offset(
+                                x: SlotLayout.columnCentre(trackWidth: track, index: column)
+                                    - side / 2
+                            )
+                    }
                 }
+                // One element for the run, no button trait: the dots are a
+                // record, and a past day is not tappable here. The app row does
+                // the same from the same string. See #104.
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(voice.map { "\(habit.name), \($0)" } ?? "")
+                .accessibilityHidden(voice == nil)
             }
         }
         .frame(height: side)

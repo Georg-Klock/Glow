@@ -179,6 +179,15 @@ outstanding, and the ✕, which is a rep that can no longer happen. A completion
 past the goal still lights its day — it has no span, and the row is a record of
 what happened rather than of what was owed.
 
+**The dots are spoken as one fact.** `WeekDots.spokenDays` names the weekdays
+that are lit — "Workout, logged Tuesday and Friday" — as a single element with
+no button trait, in the app and the widget both. One stop rather than up to
+six, because a list of days is one answer to one question, and the spans beside
+it already say how much is left. What is not drawn is not spoken: a completion
+on the rest day counts everywhere it counted and is absent from this sentence,
+exactly as it is absent from the row. Weekday names and the way they are joined
+both come from the calendar's locale.
+
 **A weekly row draws exactly N shapes, however late in the week it is.** Each is
 at least one column wide and together they cover all seven with no gaps. A rep
 with no day left to land on still gets a column — it stops being the open one
