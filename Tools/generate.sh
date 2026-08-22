@@ -35,19 +35,15 @@ cd "$(dirname "$0")/.."
 
 source Tools/xcodegen.pin
 
-# Prefer an xcodegen already on PATH when it is exactly the pinned version, so
-# the common case costs nothing; otherwise fetch the pinned bytes.
-XCODEGEN=""
-if command -v xcodegen >/dev/null 2>&1 &&
-   xcodegen --version 2>/dev/null | grep -qF "$XCODEGEN_VERSION"; then
-  XCODEGEN=$(command -v xcodegen)
-else
-  if ! XCODEGEN=$(Tools/install-xcodegen.sh); then
-    echo "error: could not resolve XcodeGen ${XCODEGEN_VERSION}." >&2
-    echo "It is pinned in Tools/xcodegen.pin and downloaded on first use;" >&2
-    echo "this needs network access once." >&2
-    exit 1
-  fi
+# Deliberately not "use whatever xcodegen is on PATH if it reports the pinned
+# version". A binary with the right name and the right --version string is the
+# one thing a pin is for; only the digest-checked copy is used, whatever else
+# is installed. It costs one 4MB download per version, once.
+if ! XCODEGEN=$(Tools/install-xcodegen.sh); then
+  echo "error: could not resolve XcodeGen ${XCODEGEN_VERSION}." >&2
+  echo "It is pinned in Tools/xcodegen.pin and downloaded on first use;" >&2
+  echo "this needs network access once." >&2
+  exit 1
 fi
 
 "$XCODEGEN" generate --quiet

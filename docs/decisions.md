@@ -1198,10 +1198,13 @@ carries `2.46.0` and the SHA-256 of its release archive;
 `Tools/install-xcodegen.sh` downloads it into a gitignored cache, checks the
 digest before unpacking, and then reads the version back out of the unpacked
 binary — a binary with the right filename and the right `--version` string is
-exactly the substitution a pin exists to catch. `Tools/generate.sh` will use an
-`xcodegen` already on `PATH` only when it reports the pinned version, and
-otherwise fetches the pinned bytes. Verified by pointing the pin at a wrong
-digest: the download is refused and nothing is unpacked.
+exactly the substitution a pin exists to catch.
+
+**Whatever is on `PATH` is not used, even when it reports the pinned version.**
+An earlier draft took it as a fast path, which reintroduces precisely the
+substitution the digest is there to catch; only the checked bytes generate. It
+costs one 4MB download per version, once. Verified by pointing the pin at a
+wrong digest: the download is refused and nothing is unpacked.
 
 **The repair stayed; the check that it worked is new.** `generate.sh` rewrites
 the `SystemCapabilities` string xcodegen emits into the dictionary Xcode reads.
