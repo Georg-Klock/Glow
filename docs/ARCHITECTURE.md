@@ -24,6 +24,11 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
 - `WeekGrid.slots(for:in:today:)` turns a habit plus a week into the row of
   slots to draw. This is the entire interaction model of the app, and it is one
   function.
+- `WeekReach` is how far back the week view may be paged: two week starts,
+  derived from where the record begins and capped at twelve weeks. Separate
+  from `SlotEditing` on purpose — one says which weeks there are to visit, the
+  other says what a tap may do on the week you are on, and neither needs to
+  know the other's answer.
 - `SlotLayout` is the row geometry, as a single formula that a 7-circle row and
   an N-pill row both go through.
 - `Frequency` normalizes cadence at construction, so no caller can build a
@@ -100,6 +105,15 @@ grid, by the span pass, and again by the view for the column under a finger.
 `WeekSpans` runs the surface's answer as a pass over the finished row, so the
 division of the week — which spans exist, how wide, which one is open — is
 identical on both surfaces and only the actions differ.
+
+**Widening from one week to several changed neither** (#117). `SlotEditing` is
+about the surface, not about which week is on screen, so a week entirely in the
+past asks the same question of each of its columns and gets seven yeses; the
+week view holds the visible week's start as state and `WeekReach` bounds it.
+Nothing was added to `HabitStore`: a day three weeks ago is behind *now* exactly
+as Monday is, so the pager reaches no write the store did not already accept.
+The store's refusals exist for a surface that outlives the setting it was drawn
+under, which is a second process's problem, and the pager runs in one.
 
 A span covers several columns, so the week view resolves a touch to a weekday
 with `SlotLayout.column(atX:trackWidth:)`, the inverse of `columnCentre`. The
@@ -240,7 +254,8 @@ app regresses.
 `WeekGridTests` includes an exhaustive pass: for each cadence, all 128 possible
 completion histories of a week, asserting R1 and R2 hold for every one — R2 under
 each `SlotEditing` case, since it is now a difference between surfaces rather
-than one answer. That is
+than one answer, and the same sweep again over a week already over, which is the
+branch with no today in it. That is
 cheap here because the logic is pure, and it is the reason those invariants can
 be stated as facts rather than as intentions.
 

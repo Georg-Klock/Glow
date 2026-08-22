@@ -1933,3 +1933,75 @@ storing days through `TestCalendar.monday` and reading them back through
 `Calendar.current`, and passed only because the raw stored instant was the
 identity on both sides. Making the projection explicit is the point of the
 parameter.
+
+## How far back the week view reaches (#117)
+
+**Question.** #116 made any day of the visible week editable and left the
+visible week as one week. The pager that follows needs a floor: the issue named
+three candidates — the first completion on record, `Habit.createdAt`, or an
+arbitrary window — and an unbounded pager over `.distantPast` is a scroll with
+no end.
+
+**Decision.** As far back as the record reaches, capped at twelve weeks.
+`WeekReach` holds it as two week starts and nothing else. Both halves earn their
+place. The record's, because a week before anything existed holds nothing to
+correct: a fresh install pages nowhere, which is the truth about it, and the
+reach grows with the app's own history. Capped, because the record is not a
+bound anybody can feel — and the cap is also what makes the one unusable
+candidate harmless, since `Habit.createdAt` defaults to `.distantPast` for every
+row written before that column existed. Twelve weeks is a quarter and more than
+the ten `SeededHistory` invents, so the demo's whole past is reachable. Further
+back the surface is History, which is a year of days and does not respond to
+touch on purpose.
+
+**The record is both tables.** `HabitStore.earliestRecordedDay` takes the
+earlier of the first completion and the first habit, because the demo writes
+completions ten weeks before the habits that carry them and `createdAt` alone
+would hide its own past. It is a read on the type that says reads do not go
+through it; the exception is narrow and stated there — a `min` over two tables
+is not something `@Query` can express without fetching both into a view.
+
+**A past week is editable end to end, stated rather than inferred.** Every day
+of a week already over is a day that happened, so all seven columns carry an
+action and `allowingFuture` decides nothing — it is a no-op on every week but
+the current one. `SlotEditing` did not gain a case: it is about the surface, not
+about which week is on screen, and widening the reach was a change to which
+weeks exist rather than to what a tap may do.
+
+**Nothing was added to `HabitStore`.** A day three weeks ago is behind *now*
+exactly as Monday is, so reaching back is not a new kind of write and the
+store's existing guard already covers it. The floor is a bound on navigation,
+not on what a record may hold — it is derived from the very record it would be
+guarding, and the store's other refusals exist because a widget renders in a
+second process from a surface that can outlive its settings. The pager runs in
+one process and recomputes its bounds with the record.
+
+**Buttons, not a swipe.** The issue says "swipe back through earlier weeks", and
+the rows say otherwise: every one of them already carries `swipeActions` for
+edit and delete, so a horizontal drag starting on a row is spoken for. A pager
+sharing that gesture would work on the header and on the empty space below the
+last habit and nowhere in between. Two chevrons in the leading toolbar instead,
+opposite Edit and Add, so nothing new sits over the marks.
+
+**The pager is always drawn and disabled at its ends.** It first hid itself when
+there was no earlier week to reach, and then never appeared at all: the reach is
+read from the store in a `.task`, so the first render of every launch has none,
+the `ToolbarItem` resolved to an empty view, and it was not re-added when the
+value arrived. Measured on the simulator — the control showed on one launch and
+was missing on the next with identical data. A toolbar item that is sometimes
+empty is a toolbar item that is sometimes gone.
+
+**Which week you are on is the title's job.** It names the month of today when
+today is in the visible week and of the week's first day otherwise, which leaves
+the current week saying exactly what it said before — a week straddling the end
+of August still reads "September" on the 2nd. The year appears only when it is
+not this one, which paging back a quarter from January reaches. The dates under
+the weekday letters carry the rest, and a week with no today in it lights no
+column, so no new chrome competes with the marks.
+
+**The ✕ again.** #116 made a lost rep correctable in the week view; a finished
+week is where that is sharpest, because every rep it still owed has run out of
+days and the row is a completed block plus a ✕ for each of the rest. All of
+those columns are now reachable. Nothing about the mark changed: it still never
+moves on its own, and logging the day means the rep happened, late. SPEC §7 says
+so in those terms.

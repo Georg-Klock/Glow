@@ -147,7 +147,10 @@ A build that violates one of these is broken regardless of what else works.
   view edits any day of the week it shows; the widget, its intents and the month
   grid edit today and nothing else. A rest day is never editable on any surface.
   The days *ahead* are editable only with demo history in — outside it you can
-  correct the past, not claim the future.
+  correct the past, not claim the future. **The week it shows need not be this
+  one** (#117): the view pages back as far as the record reaches, capped at
+  twelve weeks, and a week entirely in the past is editable end to end. Forward
+  stops at the current week.
 - **R3.** For a weekly-cadence habit, a day holds zero or one completion.
   Never two. A per-day habit stores one completion row per repetition, so a
   day holds up to its target.
@@ -164,10 +167,12 @@ A build that violates one of these is broken regardless of what else works.
 R1, R2, R5 and R7 are asserted in `Tests/WeekGridTests.swift`, including an
 exhaustive pass over all 128 possible completion histories of a week — run under
 each surface's rule, so R2 is asserted as the difference between them rather
-than as one answer. `Tests/SlotEditingTests.swift` covers the rule itself and
-the geometry that resolves a touch on a span into a weekday. R3 is asserted in
-`Tests/PersistenceTests.swift`, which also asserts the store's own refusal of a
-day still to come, and R4 in `Tests/DayIdentityTests.swift` — Los Angeles to
+than as one answer, and run again over an earlier week, which is the branch with
+no today in it. `Tests/SlotEditingTests.swift` covers the rule itself and the
+geometry that resolves a touch on a span into a weekday.
+`Tests/WeekReachTests.swift` covers how far back the pager goes. R3 is asserted
+in `Tests/PersistenceTests.swift`, which also asserts the store's own refusal of
+a day still to come, and R4 in `Tests/DayIdentityTests.swift` — Los Angeles to
 Berlin and back, both DST directions, and a zone whose clocks move at midnight.
 R6 is in `Tests/SlotLayoutTests.swift`, and R8 in
 `Tests/GlowRendererTests.swift`, which asserts the encoded colour space rather
@@ -282,7 +287,10 @@ the row down with it. On the widget and in the month it is permanent, because
 nothing there can change the past. **In the week view it is not** (#116): the
 column under it is a day, and logging that day means the rep happened, late, so
 the arithmetic re-runs and the ✕ goes. The mark never changes on its own — only
-the record can move it. **A lost rep never
+the record can move it. **A finished week is where this is sharpest** (#117):
+every rep it still owed has run out of days, so the row is a completed block and
+a ✕ for each of the rest, and every one of those columns is a day the pager can
+now reach and correct. **A lost rep never
 occupies the rest day's column alone**: `RestWindow` subtracts that column from
 whatever shape crosses it, so a span exactly its width would be removed
 entirely, and the ✕ would be drawn and invisible. Such a span takes the next
@@ -463,6 +471,30 @@ the other six are tap targets that happen not to be lit, which is §1 doing its
 job — light says what happened, and shape says what is still open. The cost is
 accepted: a stray tap changes a day, and nothing distinguishes a correction from
 an original. That is what editing the past means.
+
+**The week view pages back through earlier weeks** (#117). Two chevrons in the
+toolbar, opposite Edit and Add — buttons rather than a swipe, because every row
+already carries swipe actions for edit and delete. An earlier week is edited
+exactly as this one is: the surface has not changed, and all seven of its
+columns are past, so all seven are tap targets. Nothing is open in it, because
+nothing is open anywhere but today (R1).
+
+**How far back: as far as the record reaches, capped at twelve weeks.** The
+record starts at the first completion on record or the first habit's creation,
+whichever is earlier — the demo invents completions ten weeks before the habits
+that carry them, so neither alone is the answer. A week before anything existed
+holds nothing to correct, so a fresh install pages nowhere and the reach grows
+with the app's own history. The cap keeps the pager finite and makes the one
+unusable value harmless: `Habit.createdAt` defaults to `.distantPast` for rows
+written before the column existed. Forward stops at the current week; further
+back than a quarter, the surface is History, which is a year of days and does
+not respond to touch on purpose.
+
+**The title names the week you are looking at.** The month of today when today
+is in the visible week, and of the week's first day otherwise — so a week
+straddling a month end still reads as the month you are in. The year appears
+only when it is not this one. The dates under the weekday letters say the rest,
+and on a week with no today in it no column is lit.
 
 A span row resolves the tap to **the column under the finger** rather than to
 the span's nominal day, so a habit due N times a week records the weekday it

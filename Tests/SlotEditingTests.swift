@@ -65,6 +65,55 @@ struct SlotEditingTests {
         }
     }
 
+    // MARK: - A week that is not this one (#117)
+
+    /// The week beginning Monday 2026-08-03, two weeks before this one.
+    private var pastWeek: Week {
+        WeekCalendar.week(containing: TestCalendar.date(2026, 8, 3), calendar: calendar)
+    }
+
+    private func pastDay(_ editing: SlotEditing, column: Int, restDay: Int? = nil) -> Date? {
+        TestPreferences.withWeek(restDay: restDay) {
+            editing.day(atColumn: column, in: pastWeek, today: today, calendar: calendar)
+        }
+    }
+
+    @Test("A week entirely in the past is editable end to end", arguments: 0..<7)
+    func pastWeekIsEditableEndToEnd(column: Int) {
+        // Stated rather than left to fall out of the comparison: every day of a
+        // week already over is a day that happened, so every column carries an
+        // action. This is the whole reason the pager exists.
+        #expect(pastDay(.week(allowingFuture: false), column: column) == pastWeek.days[column])
+    }
+
+    @Test("Demo history decides nothing about a past week")
+    func allowingFutureIsANoOpInThePast() {
+        for column in 0..<7 {
+            #expect(
+                pastDay(.week(allowingFuture: true), column: column)
+                    == pastDay(.week(allowingFuture: false), column: column),
+                "column \(column)"
+            )
+        }
+    }
+
+    @Test("The widget's surface reaches nothing at all in an earlier week")
+    func todayOnlyCannotReachBack() {
+        // Reaching back is the app's, and only the app's. A widget snapshot
+        // built before the app paged anywhere still holds today and only today,
+        // and `HabitStore` refuses the rest anyway.
+        for column in 0..<7 {
+            #expect(pastDay(.todayOnly, column: column) == nil, "column \(column)")
+        }
+    }
+
+    @Test("The rest day is still refused in an earlier week")
+    func restDayHoldsInThePast() {
+        let thursday = TestPreferences.weekday(ofColumn: 3, in: pastWeek, calendar: calendar)
+        #expect(pastDay(.week(allowingFuture: false), column: 3, restDay: thursday) == nil)
+        #expect(pastDay(.week(allowingFuture: false), column: 2, restDay: thursday) != nil)
+    }
+
     @Test("A column outside the week is not a day")
     func columnsOutsideTheWeek() {
         #expect(day(.week(allowingFuture: true), column: -1) == nil)

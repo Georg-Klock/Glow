@@ -73,6 +73,42 @@ enum WeekCalendar {
         }
     }
 
+    /// What to call the week on screen, now that it is not always this one
+    /// (#117).
+    ///
+    /// **The month you are looking at is the month of the day you are looking
+    /// at**, and on a week with no today in it that is where the week begins.
+    /// One rule, and it leaves the current week saying exactly what it said
+    /// before: a week straddling the end of August still reads "September" on
+    /// the 2nd.
+    ///
+    /// The year appears only when it is not this one, which paging back a
+    /// quarter from January reaches. A year on every title would be chrome
+    /// answering a question nobody has eleven months of the time.
+    ///
+    /// Formatted through the calendar's own locale *and time zone*, not the
+    /// process's: a midnight formatted in the wrong zone is the previous day,
+    /// and one day in twelve that is the previous month.
+    static func monthTitle(
+        for week: Week,
+        today: Date,
+        calendar: Calendar = WeekCalendar.calendar
+    ) -> String {
+        let today = day(today, calendar: calendar)
+        let anchor = week.contains(today) ? today : week.start
+        var style = Date.FormatStyle(
+            date: .omitted,
+            time: .omitted,
+            locale: calendar.locale ?? .current,
+            calendar: calendar,
+            timeZone: calendar.timeZone
+        ).month(.wide)
+        if calendar.component(.year, from: anchor) != calendar.component(.year, from: today) {
+            style = style.year()
+        }
+        return anchor.formatted(style)
+    }
+
     /// Single-letter column headers in the user's locale, in the calendar's own
     /// week order.
     static func weekdayInitials(calendar: Calendar = WeekCalendar.calendar) -> [String] {

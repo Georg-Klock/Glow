@@ -375,6 +375,36 @@ struct HabitStore {
         return .completed
     }
 
+    /// The earliest day the record reaches, normalized to midnight, or nil for
+    /// a store with nothing in it.
+    ///
+    /// The first completion on record or the first habit's creation, whichever
+    /// is earlier — the demo invents completions ten weeks before the habits
+    /// that carry them, so neither table alone is the answer. `WeekReach` turns
+    /// it into how far the week view may be paged (#117).
+    ///
+    /// **A read, on the type that says reads do not go through it.** The
+    /// exception is deliberate and narrow: this is a `min` over two tables, and
+    /// `@Query` can only express it by fetching both of them into a view. Two
+    /// sorted fetches of one row each instead. It is also not a value a view
+    /// should recompute per redraw, which is why the caller holds it in state
+    /// and refreshes it on the events that can move it.
+    ///
+    /// A fetch that fails reads as "nothing on record", which is the same
+    /// answer an empty store gives and costs only the pager: the reach
+    /// collapses to the current week rather than the screen failing.
+    func earliestRecordedDay() -> Date? {
+        var completions = FetchDescriptor<Completion>(sortBy: [SortDescriptor(\.day)])
+        completions.fetchLimit = 1
+        var habits = FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdAt)])
+        habits.fetchLimit = 1
+
+        let logged = (try? context.fetch(completions))?.first?.day
+        let created = (try? context.fetch(habits))?.first?.createdAt
+        guard let earliest = [logged, created].compactMap({ $0 }).min() else { return nil }
+        return WeekCalendar.day(earliest, calendar: calendar)
+    }
+
     // MARK: - Counts
     //
     // A per-day habit is logged several times on one day, so these are the

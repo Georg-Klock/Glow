@@ -489,6 +489,118 @@ struct LateWeekSpansTests {
         #expect(demo.map(\.actionDay) == [day(4), day(6)])
     }
 
+    // MARK: - An earlier week (#117)
+
+    /// A day two weeks after the week under test, so the week is over and the
+    /// `todayIndex == nil` branch is the one doing the work.
+    private var later: Date { TestCalendar.date(2026, 8, 31) }
+
+    private func pastRow(
+        target: Int, done: [Int] = [], editing: SlotEditing = .week(allowingFuture: false)
+    ) -> [SlotSpan] {
+        WeekSpans.spans(
+            for: .fixture(
+                frequency: .timesPerWeek(target),
+                completedDays: Set(done.map { day($0) })
+            ),
+            in: week, today: later, target: target, editing: editing, calendar: calendar
+        )
+    }
+
+    @Test("A finished week still draws exactly its target, and every span acts")
+    func pastWeekInvariantsHold() {
+        for rest in [nil, 0, 3, 6] as [Int?] {
+            withRest(rest) {
+                for target in 1...6 {
+                    for doneCount in 0...target {
+                        let done = Array(0..<doneCount)
+                        let spans = pastRow(target: target, done: done)
+                        let what = "target \(target), done \(doneCount), rest \(String(describing: rest)): \(shape(spans))"
+
+                        // A met goal is one span across the whole week; short of
+                        // it, exactly `target`. The current week's rule, and it
+                        // does not change because the week is over.
+                        #expect(
+                            spans.count == (doneCount >= target ? 1 : target),
+                            "span count — \(what)"
+                        )
+                        #expect(spans.first?.firstDay == 0, "starts at 0 — \(what)")
+                        #expect(spans.last?.lastDay == 6, "ends at 6 — \(what)")
+                        for (a, b) in zip(spans, spans.dropFirst()) {
+                            #expect(b.firstDay == a.lastDay + 1, "gap — \(what)")
+                        }
+                        // R1: a week that is over has nothing open in it.
+                        #expect(!spans.contains { $0.state == .open }, "open — \(what)")
+
+                        for span in spans {
+                            let writable = (span.firstDay...span.lastDay).filter {
+                                !WeekPreferences.isRestDay(week.days[$0], calendar: calendar)
+                            }
+                            guard let action = span.actionDay else {
+                                // The only span with nothing to write is one
+                                // covering the rest day and nothing else.
+                                #expect(writable.isEmpty, "no action — \(what)")
+                                continue
+                            }
+                            // The day a span hands out is a day it covers, and
+                            // never the day nothing can happen on.
+                            #expect(week.index(of: action).map(writable.contains) == true,
+                                    "action outside the span — \(what)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test("The rest day is refused in an earlier week too")
+    func theRestDayHoldsInThePast() {
+        withRest(3) {
+            #expect(pastRow(target: 2).allSatisfy { $0.actionDay != day(3) })
+            #expect(pastRow(target: 4, done: [0, 1]).allSatisfy { $0.actionDay != day(3) })
+        }
+    }
+
+    @Test("The widget cannot reach into an earlier week")
+    func todayOnlyActsNowhereInThePast() {
+        for target in 1...6 {
+            let spans = pastRow(target: target, done: [0], editing: .todayOnly)
+            #expect(spans.allSatisfy { !$0.isTappable }, "\(target)x")
+        }
+    }
+
+    @Test("Logging a day the week had given up on takes a cross away")
+    func aLateCompletionUnmakesACross() {
+        // Three a week, one logged: two reps ran out of days, so two crosses.
+        let before = pastRow(target: 3, done: [0])
+        #expect(shape(before) == "filled:0-4 missed:5-5 missed:6-6")
+        #expect(before.count { $0.state == .missed } == 2)
+
+        // Correct the record — the tap the pager exists for — and the
+        // arithmetic re-runs: the rep happened, late, so it is no longer lost.
+        let after = pastRow(target: 3, done: [0, 2])
+        #expect(after.count { $0.state == .missed } == 1)
+        #expect(after.count == 3)
+
+        // And filling it out entirely stops the week being divided at all.
+        let met = pastRow(target: 3, done: [0, 2, 4])
+        #expect(shape(met) == "filled:0-6")
+    }
+
+    @Test("The division of a finished week does not change with the surface")
+    func pastWeekGeometryIsTheSameOnBothSurfaces() {
+        for target in 1...6 {
+            for doneCount in 0...target {
+                let done = Array(0..<doneCount)
+                #expect(
+                    shape(pastRow(target: target, done: done, editing: .todayOnly))
+                        == shape(pastRow(target: target, done: done)),
+                    "\(target)x, \(doneCount) done"
+                )
+            }
+        }
+    }
+
     @Test("A span never carries the rest day, whatever the surface")
     func spansNeverCarryTheRestDay() {
         withRest(6) {

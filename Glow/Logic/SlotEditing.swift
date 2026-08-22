@@ -27,6 +27,15 @@ enum SlotEditing: Equatable, Sendable {
     /// The case is about the *surface*, not about which week is on screen: a
     /// week view showing an earlier week asks the same question of each of its
     /// days, which is what #117 widens without unpicking anything here.
+    ///
+    /// **A week entirely in the past is editable end to end**, and that is a
+    /// decision rather than something that fell out of the comparison below
+    /// (#117). Every day of such a week is a day that happened and went
+    /// unlogged or was logged wrongly, which is exactly what this case exists
+    /// to let you correct — so all seven columns carry an action, and
+    /// `allowingFuture` decides nothing there because no day of a past week is
+    /// ahead of today. It is a no-op on every week but the current one. Which
+    /// weeks can be reached at all is `WeekReach`'s question, not this one's.
     case week(allowingFuture: Bool)
 
     /// Whether a tap may land on `day` at all, before the rest day is asked.

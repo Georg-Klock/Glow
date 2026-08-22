@@ -91,4 +91,41 @@ struct WeekCalendarTests {
         #expect(WeekCalendar.dayNumbers(in: week, calendar: calendar)
             == ["31", "1", "2", "3", "4", "5", "6"])
     }
+
+    // MARK: - Which week is on screen (#117)
+
+    private func title(_ weekOf: Date, today: Date) -> String {
+        WeekCalendar.monthTitle(
+            for: WeekCalendar.week(containing: weekOf, calendar: calendar),
+            today: today,
+            calendar: calendar
+        )
+    }
+
+    @Test("The current week is named for today, straddle or no straddle")
+    func theCurrentWeekIsNamedForToday() {
+        let wednesday = TestCalendar.date(2026, 9, 2)
+        // The week of Monday 31 August, seen on Wednesday 2 September. The
+        // title reads September, which is what it read before there was a
+        // pager at all — the rule was chosen so this did not move.
+        #expect(title(wednesday, today: wednesday) == "September")
+    }
+
+    @Test("An earlier week is named for the day it starts on")
+    func anEarlierWeekIsNamedForItsStart() {
+        let today = TestCalendar.date(2026, 9, 2)
+        #expect(title(TestCalendar.date(2026, 8, 31), today: TestCalendar.date(2026, 8, 31)) == "August")
+        // Paged back one, the same week is the one being looked at and it
+        // begins in August.
+        #expect(title(TestCalendar.date(2026, 8, 24), today: today) == "August")
+    }
+
+    @Test("The year appears only when it is not this one")
+    func theYearArrivesWhenItHasTo() {
+        let january = TestCalendar.date(2026, 1, 14)
+        #expect(title(january, today: january) == "January")
+        // Twelve weeks back from mid-January is late October of the year
+        // before, and "October" alone would not say which.
+        #expect(title(TestCalendar.date(2025, 10, 22), today: january) == "October 2025")
+    }
 }
