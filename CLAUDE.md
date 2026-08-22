@@ -51,6 +51,15 @@ overshot it into contradicting §1. See #75 and docs/decisions.md.
   entitlement is compiled in and then silently stripped by codesign, so the
   widget stops seeing the store.
 
+  The generator itself is pinned in `Tools/xcodegen.pin` by version *and* by
+  the digest of its release archive, and fetched by `Tools/install-xcodegen.sh`
+  into a gitignored cache — the generated project is a function of `project.yml`
+  and of the generator, so a floating generator floats the project. After
+  generating, `Tools/check-project.py` reads the project back as a property list
+  and **fails the generation** if App Groups, the entitlement or the widget's
+  `APPLICATION_EXTENSION_API_ONLY` is not really there. The textual repair fixes
+  what it recognises; the validator is what notices when it recognises nothing.
+
 - **Tests:** `Tools/test.sh`
 
   Not a hand-typed `xcodebuild test`. The script **asserts a non-zero test
@@ -68,6 +77,7 @@ overshot it into contradicting §1. See #75 and docs/decisions.md.
   to test for headroom before showing it at all.
 - **Read the widget's trace off a tethered phone:** `Tools/pull-widget-log.sh`
 - **Check the App Group entitlement survived signing:** `Tools/check-app-group.sh`
+- **Validate the generated project on its own:** `Tools/check-project.py`
 
 CI runs the tests on every pull request and on merges to `main`
 (`.github/workflows/ci.yml`), on a pinned macOS runner — pinned rather than

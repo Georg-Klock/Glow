@@ -221,6 +221,14 @@ with the Apple ID would remove that dependency and let automatic signing work.
 Verify the whole chain with `Tools/check-app-group.sh`, which reports which
 profiles grant the group and whether the last device build actually carries it.
 
+Two of those four fixes live in generated files, which nothing reviews. So
+`Tools/check-project.py` runs at the end of every `Tools/generate.sh`, reads the
+project back through `plutil` — as a property list, the way Xcode does — and
+fails the generation unless both targets carry `SystemCapabilities` as a real
+dictionary with App Groups enabled, and unless the entitlements file each target
+names on disk actually contains `group.com.georgklock.glow`. The generator that
+produced it is pinned by digest in `Tools/xcodegen.pin`.
+
 ## TestFlight
 
 `Tools/ship-testflight.sh` archives, signs for the App Store and uploads. It

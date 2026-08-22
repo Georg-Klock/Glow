@@ -1,34 +1,59 @@
 #!/usr/bin/env bash
 #
-# Generates Glow.xcodeproj. Use this rather than calling xcodegen directly.
+# Generates Glow.xcodeproj. This is the only supported way to do it.
 #
-# xcodegen writes a target's `attributes` as a Swift-style string when the
-# value is a nested dictionary, so
+# Three things happen here, and the third is the one that makes the first two
+# trustworthy.
 #
-#     SystemCapabilities = "[\"com.apple.ApplicationGroups.iOS\": [\"enabled\": 1]]";
+# 1. The generator is pinned. Tools/xcodegen.pin names a version and the digest
+#    of its release archive; Tools/install-xcodegen.sh resolves it into a
+#    gitignored cache. The generated project is a function of project.yml *and*
+#    of the generator, so leaving the generator floating leaves the project
+#    floating.
 #
-# lands in the project where Xcode expects a real dictionary, and Xcode ignores
-# it. That matters: SystemCapabilities is how a project tells automatic signing
-# which capabilities the App ID needs. Without it, the App Groups entitlement is
-# compiled in and then silently stripped by codesign, because the profile it
-# picked never granted the group.
+# 2. One value is repaired. xcodegen writes a target's `attributes` as a
+#    Swift-style string when the value is a nested dictionary, so
 #
-# So: generate, then rewrite that one value into the form Xcode reads.
+#        SystemCapabilities = "[\"com.apple.ApplicationGroups.iOS\": [\"enabled\": 1]]";
+#
+#    lands where Xcode expects a real dictionary, and Xcode ignores it.
+#    SystemCapabilities is how a project tells signing which capabilities the
+#    App ID needs; without it the App Groups entitlement is compiled in and then
+#    silently stripped by codesign, because the profile it picked never granted
+#    the group.
+#
+# 3. The result is validated as a property list, not as text. The repair above
+#    is a string substitution: it fixes what it recognises and is silent when it
+#    recognises nothing, which is precisely what a changed output format looks
+#    like. Tools/check-project.py reads the project back the way Xcode does and
+#    fails if the capability, the entitlement or the extension-only setting is
+#    not really there.
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-if ! command -v xcodegen >/dev/null 2>&1; then
-  echo "error: xcodegen is not installed. brew install xcodegen" >&2
-  exit 1
+source Tools/xcodegen.pin
+
+# Prefer an xcodegen already on PATH when it is exactly the pinned version, so
+# the common case costs nothing; otherwise fetch the pinned bytes.
+XCODEGEN=""
+if command -v xcodegen >/dev/null 2>&1 &&
+   xcodegen --version 2>/dev/null | grep -qF "$XCODEGEN_VERSION"; then
+  XCODEGEN=$(command -v xcodegen)
+else
+  if ! XCODEGEN=$(Tools/install-xcodegen.sh); then
+    echo "error: could not resolve XcodeGen ${XCODEGEN_VERSION}." >&2
+    echo "It is pinned in Tools/xcodegen.pin and downloaded on first use;" >&2
+    echo "this needs network access once." >&2
+    exit 1
+  fi
 fi
 
-xcodegen generate --quiet
+"$XCODEGEN" generate --quiet
 
 /usr/bin/python3 - <<'PY'
 import pathlib
-import sys
 
 project = pathlib.Path("Glow.xcodeproj/project.pbxproj")
 text = project.read_text()
@@ -46,10 +71,10 @@ count = text.count(mangled)
 if count:
     project.write_text(text.replace(mangled, correct))
     print(f"generate: fixed SystemCapabilities on {count} target(s)")
-elif "SystemCapabilities" not in text:
-    # Not fatal, but worth saying out loud: it means the App Groups capability
-    # is no longer declared and the widget will quietly stop seeing the store.
-    print("generate: warning, no SystemCapabilities in the project", file=sys.stderr)
 PY
 
-echo "generate: wrote Glow.xcodeproj"
+# Fails the generation rather than warning about it. A project missing any of
+# this builds, installs, and is wrong on the phone.
+/usr/bin/python3 Tools/check-project.py
+
+echo "generate: wrote Glow.xcodeproj with XcodeGen ${XCODEGEN_VERSION}"

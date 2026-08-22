@@ -40,11 +40,21 @@ The Xcode project is generated and is not in the repository, so generate it
 first:
 
 ```bash
-brew install xcodegen && Tools/generate.sh
+Tools/generate.sh
 ```
 
-Use `Tools/generate.sh` rather than `xcodegen generate`: it fixes up one value
-xcodegen cannot write in the form Xcode reads. See the script for what and why.
+That is the only supported way to generate the project, and it needs no
+`brew install`: the XcodeGen it uses is pinned by version and by the digest of
+its release archive in `Tools/xcodegen.pin`, and downloaded into a gitignored
+cache on first use.
+
+Running `xcodegen generate` yourself produces a project that opens, builds and
+is wrong on the phone. The script repairs one value xcodegen cannot write in the
+form Xcode reads — the App Groups capability, without which codesign strips the
+entitlement and the widget stops seeing the store — and then reads the result
+back as a property list and fails if that capability, the entitlement or the
+widget's extension-only API enforcement is not really there. See the script for
+what and why.
 
 Then open `Glow.xcodeproj`, or just run the tests:
 
@@ -56,7 +66,7 @@ To run on a real phone, which is the only way to see the glow, create a
 `Local.xcconfig` with your team and regenerate:
 
 ```bash
-echo "DEVELOPMENT_TEAM = YOURTEAMID" > Local.xcconfig && xcodegen generate
+echo "DEVELOPMENT_TEAM = YOURTEAMID" > Local.xcconfig && Tools/generate.sh
 ```
 
 That file is gitignored, because a team ID is an account identifier rather than
