@@ -12,14 +12,19 @@ struct WeekSpansTests {
     private let friday = TestCalendar.date(2026, 8, 21)
     private var week: Week { WeekCalendar.week(containing: friday, calendar: calendar) }
 
+    /// No rest day, said out loud. These are the design file's own examples and
+    /// they are read against a plain week; a rest day arriving from elsewhere
+    /// would move the boundaries they exist to pin (#105).
     private func spans(_ habit: HabitSnapshot, target: Int, today: Date? = nil) -> [SlotSpan] {
-        WeekSpans.spans(
-            for: habit,
-            in: week,
-            today: today ?? friday,
-            target: target,
-            calendar: calendar
-        )
+        TestPreferences.withWeek(restDay: nil) {
+            WeekSpans.spans(
+                for: habit,
+                in: week,
+                today: today ?? friday,
+                target: target,
+                calendar: calendar
+            )
+        }
     }
 
     @Test("Two a week, nothing done: the open span runs to today and the rest waits")
@@ -144,13 +149,12 @@ struct LateWeekSpansTests {
     }
     private func day(_ column: Int) -> Date { week.days[column] }
 
+    /// One implementation, in `TestSupport`. See `TestPreferences`.
     private func withRest(_ column: Int?, _ body: () throws -> Void) rethrows {
-        let previous = WeekPreferences.restDay
-        defer { WeekPreferences.restDay = previous }
-        WeekPreferences.restDay = column.map {
-            calendar.component(.weekday, from: week.days[$0])
-        }
-        try body()
+        try TestPreferences.withWeek(
+            restDay: column.map { TestPreferences.weekday(ofColumn: $0, in: week) },
+            body
+        )
     }
 
     private func row(
@@ -368,13 +372,12 @@ struct WeekDotsTests {
     }
     private func day(_ column: Int) -> Date { week.days[column] }
 
+    /// One implementation, in `TestSupport`. See `TestPreferences`.
     private func withRest(_ column: Int?, _ body: () throws -> Void) rethrows {
-        let previous = WeekPreferences.restDay
-        defer { WeekPreferences.restDay = previous }
-        WeekPreferences.restDay = column.map {
-            calendar.component(.weekday, from: week.days[$0])
-        }
-        try body()
+        try TestPreferences.withWeek(
+            restDay: column.map { TestPreferences.weekday(ofColumn: $0, in: week) },
+            body
+        )
     }
 
     private func columns(_ frequency: Frequency, done: [Int]) -> [Int] {

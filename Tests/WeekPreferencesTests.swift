@@ -5,23 +5,14 @@ import Testing
 
 @Suite("Week preferences", .serialized)
 struct WeekPreferencesTests {
-    /// These write to the App Group's defaults, which every other suite reads
-    /// through `WeekCalendar.calendar`. Restored after each test rather than
-    /// left set, or a later suite inherits somebody else's week.
+    /// One implementation, in `TestSupport`, shared by every suite that sets
+    /// these — this used to be four near-copies. See `TestPreferences`.
     private func withPreferences(
         firstWeekday: Int? = nil,
         restDay: Int? = nil,
         _ body: () throws -> Void
     ) rethrows {
-        let previousFirst = WeekPreferences.firstWeekday
-        let previousRest = WeekPreferences.restDay
-        defer {
-            WeekPreferences.firstWeekday = previousFirst
-            WeekPreferences.restDay = previousRest
-        }
-        if let firstWeekday { WeekPreferences.firstWeekday = firstWeekday }
-        WeekPreferences.restDay = restDay
-        try body()
+        try TestPreferences.withWeek(firstWeekday: firstWeekday, restDay: restDay, body)
     }
 
     @Test("Monday by default, not whatever the locale says")
