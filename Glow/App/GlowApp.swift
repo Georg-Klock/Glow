@@ -42,7 +42,9 @@ struct GlowApp: App {
             WidgetTrace.record("forced burst: no habits to burst")
             return
         }
-        WidgetBurst.record(habitID: habit.id)
+        // A debug affordance for watching the burst, so it deliberately does
+        // not honour Reduce Motion — the point of forcing one is to see it.
+        WidgetBurst.record(habitID: habit.id, reduceMotion: false)
         WidgetTrace.record("forced burst for \(habit.id.uuidString), reloading")
         WidgetCenter.shared.reloadAllTimelines()
     }

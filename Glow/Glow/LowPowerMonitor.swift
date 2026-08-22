@@ -21,6 +21,15 @@ final class LowPowerMonitor {
 
     // Written once in init, read once in deinit. deinit is nonisolated, so
     // the property has to be too.
+    //
+    // `@ObservationIgnored` is what makes that expressible. Without it the
+    // `@Observable` macro wraps this in generated accessors, and then
+    // `nonisolated(unsafe)` lands on the wrapper rather than on the storage —
+    // which is why the compiler said it had no effect, and why its own
+    // suggestion of plain `nonisolated` did not compile either ("cannot be
+    // applied to mutable stored properties", from inside the macro expansion).
+    // Nothing observes a notification token anyway.
+    @ObservationIgnored
     private nonisolated(unsafe) var observer: NSObjectProtocol?
 
     init() {

@@ -13,6 +13,7 @@ import Foundation
 enum WidgetBurst {
     private static let habitKey = "burstHabitID"
     private static let timeKey = "burstAt"
+    private static let motionKey = "burstReduceMotion"
 
     /// How long the cross-fade runs.
     ///
@@ -45,10 +46,28 @@ enum WidgetBurst {
 
     private static var store: UserDefaults { GlowSettings.store }
 
-    static func record(habitID: UUID, at date: Date = Date()) {
+    /// Leaves the note, and with it whether the person has asked for less
+    /// movement.
+    ///
+    /// **Reduce Motion is captured here rather than read by the provider**, and
+    /// the reason is isolation rather than convenience.
+    /// `UIAccessibility.isReduceMotionEnabled` is main-actor isolated;
+    /// `TimelineProvider` is not, and reading it there is a strict-concurrency
+    /// warning the compiler is right about. The intent that calls this *is*
+    /// `@MainActor`, so the value is read where it is genuinely safe to read
+    /// and travels with the note.
+    ///
+    /// It also samples the setting at the moment of the tap rather than at
+    /// render time, which for a note that expires in 0.3s is a distinction
+    /// without a difference — and if anything the more honest of the two.
+    static func record(habitID: UUID, at date: Date = Date(), reduceMotion: Bool) {
         store.set(habitID.uuidString, forKey: habitKey)
         store.set(date.timeIntervalSince1970, forKey: timeKey)
+        store.set(reduceMotion, forKey: motionKey)
     }
+
+    /// Whether the tap that left the note asked for less movement.
+    static var reduceMotion: Bool { store.bool(forKey: motionKey) }
 
     /// The habit tapped within the last `duration`, if there is one.
     ///
