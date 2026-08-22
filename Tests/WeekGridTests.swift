@@ -9,8 +9,15 @@ struct WeekGridTests {
     private let today = TestCalendar.date(2026, 8, 19)
     private var week: Week { WeekCalendar.week(containing: today, calendar: calendar) }
 
+    /// Every test in this suite runs on a week with **no rest day**, said out
+    /// loud rather than inherited. This suite asserts R1, R2, R5 and R7 —
+    /// including the exhaustive pass over all 128 completion histories — and a
+    /// rest day arriving from elsewhere would change slot states underneath it
+    /// (#105).
     private func slots(_ habit: HabitSnapshot) -> [Slot] {
-        WeekGrid.slots(for: habit, in: week, today: today, calendar: calendar)
+        TestPreferences.withWeek(restDay: nil) {
+            WeekGrid.slots(for: habit, in: week, today: today, calendar: calendar)
+        }
     }
 
     // MARK: - Daily
@@ -211,7 +218,9 @@ struct WeekGridTests {
     func todayOutsideTheWeek() {
         let otherWeek = WeekCalendar.week(containing: TestCalendar.date(2026, 8, 10), calendar: calendar)
         let habit = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
-        let row = WeekGrid.slots(for: habit, in: otherWeek, today: today, calendar: calendar)
+        let row = TestPreferences.withWeek(restDay: nil) {
+            WeekGrid.slots(for: habit, in: otherWeek, today: today, calendar: calendar)
+        }
 
         #expect(row.allSatisfy { $0.state != .open })
         #expect(row.allSatisfy { !$0.isTappable })

@@ -10,13 +10,9 @@ struct MonthGridTests {
     /// case, which is why it is the fixture.
     private let today = TestCalendar.date(2026, 8, 19)
 
-    /// Same discipline as WeekPreferencesTests: these write to the App Group's
-    /// defaults, restored after each test so no later suite inherits them.
+    /// One implementation, in `TestSupport`. See `TestPreferences`.
     private func withRestDay(_ restDay: Int?, _ body: () throws -> Void) rethrows {
-        let previous = WeekPreferences.restDay
-        defer { WeekPreferences.restDay = previous }
-        WeekPreferences.restDay = restDay
-        try body()
+        try TestPreferences.withWeek(restDay: restDay, body)
     }
 
     @Test("The 1st sits under its real weekday, and the rows are ragged")

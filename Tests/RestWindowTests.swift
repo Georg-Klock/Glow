@@ -12,11 +12,9 @@ struct RestWindowTests {
     private var slot: CGFloat { SlotLayout.dailySlot(trackWidth: track) }
     private var gap: CGFloat { SlotLayout.gap(trackWidth: track) }
 
+    /// One implementation, in `TestSupport`. See `TestPreferences`.
     private func withPreferences(restDay: Int?, _ body: () throws -> Void) rethrows {
-        let previous = WeekPreferences.restDay
-        defer { WeekPreferences.restDay = previous }
-        WeekPreferences.restDay = restDay
-        try body()
+        try TestPreferences.withWeek(restDay: restDay, body)
     }
 
     // MARK: - The window

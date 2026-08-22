@@ -134,6 +134,10 @@ struct WidgetRenderDiffTests {
         let previous = WeekPreferences.restDay
         defer { WeekPreferences.restDay = previous }
         WeekPreferences.restDay = weekday
+        // This target has its own copy of the discipline `TestPreferences`
+        // carries in the app's suite: it is a separate bundle and cannot see
+        // it. The scheme runs both sequentially — see project.yml — which is
+        // what makes writing a process-wide preference here safe at all.
 
         let pixels = try rgba(of: try render())
         let width = Int(Self.size.width * Self.scale)
@@ -260,6 +264,9 @@ struct WidgetRenderDiffTests {
         )
     }
 
+    /// Same discipline as `TestPreferences` in the app's suite, which this
+    /// target cannot see — it is a separate bundle. Safe because the scheme
+    /// runs tests sequentially; see project.yml.
     private func withRestColumn(_ column: Int, of week: Week, _ body: () throws -> Void) rethrows {
         let previous = WeekPreferences.restDay
         defer { WeekPreferences.restDay = previous }
