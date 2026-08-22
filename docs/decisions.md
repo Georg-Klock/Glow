@@ -1771,3 +1771,71 @@ today was the one day carrying an action. It is a real comparison now; without
 it a Monday completion would have started drawing as today's.
 
 Followed by #117, which widens the same case from one week to several.
+
+## The seed set: eight weekly habits in three clusters, five for Today
+
+**2026-08-22.** `DefaultHabits.all` was the design file's list taken literally,
+and two things in it had been carried on purpose with a comment saying so: two
+rows both called **Touch Grass**, which in a mock shows both row shapes side by
+side and in a real install is two rows nobody can tell apart, and **Watch
+Sunset** drawn with the `sunrise` symbol because the mock's glyph pointed up.
+Both were faithful to a frame nobody is building from any more. The set is
+replaced (#123).
+
+**Eight weekly habits, clustered morning / midday / evening** — Gratitude,
+Stretch, Read Book · Workout, VO2 Max, Tutorial · Watch Sunset, Early night —
+and **five per-day habits** for Today: Sunlight ×2, Protein Meal ×3, Move ×4,
+Breathe ×3, Hydration ×8.
+
+**One array, two screens.** The split is not made here. `Frequency` has two
+kinds that never share a surface, and each screen asks the store its own
+question — This Week and the week widget query `Habit.countedPerWeek`, Today
+queries `Habit.countedPerDay` — so the seed is one list in one order and the
+sorting happens on the way out. `HabitSeeder` hands whatever it is given to
+`addAll`, which is still one save (#140).
+
+**Two blank rows, and they are dividers rather than padding.** Three clusters
+need two. The previous set's three were explicitly there to reach eleven, the
+large widget's capacity; this one reaches ten and the count is a consequence
+rather than a target. Spacers can only ever land on the weekly side —
+`countedPerWeek` is `timesPerDay == 0`, which a blank row satisfies and a
+per-day habit never does — so the Today five need none of their own, which is
+#143's rule seen from the seed's end.
+
+**Hydration changes shape.** It was `.daily`, one check for the whole day; it is
+`.timesPerDay(8)` now, which is the cadence something drunk across a day
+actually has. It is not the same habit appearing on both screens — it is not in
+the weekly eight at all.
+
+**The medium widget spends one of its five rows on a blank row.** Measured on
+the home screen rather than reasoned about: the medium family fits five rows and
+the cut is hard (SPEC §"as many as fit"), so it shows Gratitude, Stretch, Read
+Book, a gap, and Workout — four habits, and the cut falls inside the midday
+cluster. The previous set put all three of its blank rows last and so showed
+five. This is the documented behaviour meeting a set that groups from the top,
+and it is the cost of the clustering: the large family shows all ten rows, and
+the medium one shows the morning cluster and the first habit after it.
+
+**Every icon was checked against the generated catalogue** rather than assumed,
+and then read off the screen, because the check and the render are different
+claims — `figure.yoga`, `dumbbell`, `figure.run`, `play.rectangle`, `sunset`,
+`bed.double`, `pencil`, `book`, `sun.max`, `fork.knife`, `figure.walk`, `wind`
+and `drop` all resolve in `HabitSymbol`'s `known` set and all drew as symbols on
+a fresh install. A test asserts the set membership so a typo cannot reach a
+first launch; the screenshot is what says none of them fell back to literal
+text.
+
+**On the framing, honestly: there is no single published list of habits jointly
+authored by Huberman and Ferriss.** Several picks trace to specific, named
+protocols each has separately and publicly discussed — twice-daily sunlight,
+VO2 max, sleep timing, gratitude journaling, structured learning. Others —
+stretching, reading, resistance training, protein-forward meals, movement
+snacks, hydration — are general-wellness areas both cover without one protocol
+this set is drawn from. That distinction is the reason the attribution stays out
+of the app and out of its code comments: an app should not assert a citation it
+does not really have.
+
+**This set reaches installs that have not been seeded yet, and no others.**
+`didSeedDefaultHabits` is a Bool with no version in it, for the reason recorded
+under #140: a version that bumped would push a new list onto people who had
+already arranged the old one.

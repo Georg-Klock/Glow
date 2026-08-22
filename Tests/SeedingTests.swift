@@ -47,15 +47,41 @@ struct SeedingTests {
         #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
     }
 
-    @Test("Every seeded habit is open today")
+    @Test("Every seeded week row is open today")
     func seededHabitsAreOpenToday() throws {
+        // The weekly cadences only. A per-day habit has no week row at all —
+        // it is one ring on Today — so asking `WeekGrid` about it would assert
+        // against the backstop that draws nothing rather than against a habit.
         let context = try makeContext()
         try seeder(context, makeDefaults()).seedIfNeeded(now: today)
 
         let week = WeekCalendar.week(containing: today, calendar: calendar)
-        for habit in try context.fetch(FetchDescriptor<Habit>()) where !habit.isSpacer {
-            let slots = WeekGrid.slots(for: habit.snapshot(), in: week, today: today, editing: .todayOnly, calendar: calendar)
+        let rows = try context.fetch(FetchDescriptor<Habit>(predicate: Habit.countedPerWeek))
+        for habit in rows where !habit.isSpacer {
+            let slots = WeekGrid.slots(
+                for: habit.snapshot(), in: week, today: today,
+                editing: .todayOnly, calendar: calendar
+            )
             #expect(slots.filter { $0.state == .open }.count == 1, "\(habit.name)")
+        }
+    }
+
+    @Test("Every seeded ring has its whole day still to do")
+    func seededRingsAreOpenToday() throws {
+        // Today's half of the same claim: a fresh install's rings are empty,
+        // with every repetition open, because nothing has been logged yet.
+        let context = try makeContext()
+        try seeder(context, makeDefaults()).seedIfNeeded(now: today)
+
+        let rings = try context.fetch(FetchDescriptor<Habit>(predicate: Habit.countedPerDay))
+        #expect(rings.count == DefaultHabits.perDay.count)
+        for habit in rings {
+            #expect(!habit.isSpacer, "\(habit.name) is a blank row on Today")
+            let target = try #require(habit.frequency.dailyTarget)
+            let arcs = DayRing.arcs(target: target, done: 0)
+            let open = arcs.filter(\.isOpen).count
+            #expect(arcs.count == target, "\(habit.name)")
+            #expect(open == target, "\(habit.name)")
         }
     }
 
@@ -222,11 +248,30 @@ struct SeedingTests {
         }
     }
 
-    @Test("The defaults show both row shapes")
+    @Test("The defaults show every row shape the app draws")
     func defaultsCoverBothCadences() {
         let cadences = Set(DefaultHabits.all.map(\.frequency))
         #expect(cadences.contains(.daily))
         #expect(cadences.contains { if case .timesPerWeek = $0 { true } else { false } })
+        #expect(cadences.contains { if case .timesPerDay = $0 { true } else { false } })
+    }
+
+    @Test("A seven-a-week default is written as daily")
+    func sevenIsWrittenAsDaily() {
+        // `Frequency.init(timesPerWeek:)` folds seven into `.daily` at runtime.
+        // A literal `.timesPerWeek(7)` in the seed would therefore describe a
+        // row the store can never hold, and read as a different cadence from
+        // the one it seeds.
+        let folded = DefaultHabits.all.filter { $0.frequency == .timesPerWeek(Frequency.daysInWeek) }
+        #expect(folded.isEmpty)
+    }
+
+    @Test("No two defaults are named the same")
+    func defaultNamesAreDistinct() {
+        // Two rows nobody can tell apart is what the previous set shipped, with
+        // "Touch Grass" twice on the same grid.
+        let names = DefaultHabits.all.filter { !$0.isSpacer }.map(\.name)
+        #expect(Set(names).count == names.count)
     }
 }
 
@@ -254,15 +299,40 @@ struct SpacerTests {
         #expect(spans.isEmpty)
     }
 
-    @Test("The defaults fill a large widget exactly")
-    func defaultsFillTheWidget() {
-        // Eight habits and three blank rows is eleven, which is what a large
-        // widget holds — see WidgetMetricsTests. The blank rows are there to be
-        // moved between habits, and they only work as a grouping device if
-        // there is room for them.
-        #expect(DefaultHabits.all.count == 11)
-        #expect(DefaultHabits.all.count(where: \.isSpacer) == 3)
-        #expect(DefaultHabits.all.count(where: { !$0.isSpacer }) == 8)
+    @Test("The weekly rows fit a large widget")
+    func defaultsFitTheWidget() {
+        // Eight habits and two blank rows is ten, inside the eleven a large
+        // widget holds — see WidgetMetricsTests. Not a number the set was
+        // built to hit: three clusters need two dividers, and ten is what that
+        // comes to. What is asserted is that it fits.
+        #expect(DefaultHabits.weekly.count == 10)
+        #expect(DefaultHabits.weekly.count <= WidgetMetrics.largeRowCapacity)
+        #expect(DefaultHabits.weekly.count(where: \.isSpacer) == 2)
+        #expect(DefaultHabits.weekly.count(where: { !$0.isSpacer }) == 8)
+    }
+
+    @Test("Blank rows are the grid's, and only the grid's")
+    func spacersAreWeeklyOnly() {
+        // `countedPerWeek` is `timesPerDay == 0`, which a blank row satisfies
+        // and a per-day habit never does — so a spacer among the per-day five
+        // would be a row Today could not draw and the grid could not see.
+        let spacersOnToday = DefaultHabits.perDay.count(where: \.isSpacer)
+        #expect(DefaultHabits.perDay.count == 5)
+        #expect(spacersOnToday == 0)
+        #expect(DefaultHabits.weekly.count + DefaultHabits.perDay.count == DefaultHabits.all.count)
+    }
+
+    @Test("The blank rows fall between clusters, never at either end")
+    func spacersDivideRatherThanPad() {
+        // A blank row at the top or the bottom of the grid is padding; between
+        // two habits it is a divider. Three clusters, so the dividers are
+        // interior and never adjacent.
+        let isSpacer = DefaultHabits.weekly.map(\.isSpacer)
+        let adjacent = zip(isSpacer, isSpacer.dropFirst()).filter { $0 && $1 }.count
+        #expect(isSpacer.first == false)
+        #expect(isSpacer.last == false)
+        #expect(adjacent == 0)
+        #expect(isSpacer.filter { $0 }.count == 2)
     }
 
     @Test("Blank rows come with no habit fields and no history")
