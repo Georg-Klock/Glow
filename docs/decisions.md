@@ -357,6 +357,51 @@ old number was one width of clear space *plus* one for round line caps, which
 extend a stroke half its width past each trim endpoint. A pill is bounded
 exactly by its own start and end angles, so there are no caps left to pay for.
 
+## A weekly row says when, not just how much
+
+**Question** (#47). A habit due fewer than seven times a week drew as N spans
+that lit or went dark together. That says *how much* is left; it says nothing
+about *when* anything happened. The proposal: the line stops being the light,
+and the days carry it.
+
+**Decision** (2026-08-22). Taken, with the issue's five open questions answered
+here rather than left in the code.
+
+**Seven positions or N?** N spans, keeping the geometry they already have, with
+day-pinned dots over them. Seven positions joined by lines would make an
+N-times row indistinguishable from a daily one and throw away the span
+vocabulary; and it would undo #81 and #82, which had just made the row draw
+exactly N of them, honestly, however late in the week it is.
+
+**What colour is an achieved span?** The issue worried, correctly, that putting
+an achieved span in the missed grey puts a success and a failure in the same
+colour. The answer avoids the question: an achieved span draws **the same line
+an upcoming span already draws**, because they are the same thing — a share of
+the week with no ask left in it. No new grey, no third state. The row is the
+week divided into N, and light where days happened.
+
+**What happens before the goal is met?** The open span still glows. That is not
+a third state: it is the same rule #75 settled for the Today ring — light marks
+the habit, and *shape* separates open from done. A lit dot is a day that
+happened; a lit outline is the day still asking.
+
+**Completions past the goal?** They light their day. `WeekDots` reads
+completions and never reads `target`, so a fourth completion on a three-a-week
+habit lights its Thursday even though it has no span. The row is a record of
+what happened, not of what was owed.
+
+**Does #4 dissolve?** Not entirely, and it is left open. Its stakes drop a long
+way — the open span's boundary stops being the thing the row is read by — but
+the boundary is still drawn, so where it falls is still a question somebody
+could answer differently.
+
+What this costs: R5 and SPEC §6 both said an N-times row is not day-pinned, and
+half of that is now false. Amended rather than deleted — the *spans* are not
+day-pinned and the *dots* are, and saying which is which is the whole change.
+No model change and no migration: `Completion.day` has been stored and
+normalized since the first version, and `WeekGrid.frequencySlots` was simply
+counting the completions and throwing the weekday away.
+
 ## The open ring has no fill
 
 **Question** (#65). `GlowPalette.ringWash` — a 1% white — was declared and never

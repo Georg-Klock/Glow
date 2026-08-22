@@ -237,6 +237,20 @@ private struct WidgetRow: View {
                     }
                 }
             }
+            // A lit dot on each weekday this row was actually logged on, over
+            // the spans rather than inside them — a span covers several columns
+            // and knows nothing about which of them carried a completion. Same
+            // mark and same column centres as a daily row, so the two put their
+            // light in exactly the same places. See #47.
+            .overlay(alignment: .leading) {
+                ForEach(WeekDots.columns(for: habit, in: week), id: \.self) { column in
+                    SlotMarkView(mark: .donePast, size: CGSize(width: side, height: side))
+                        .offset(
+                            x: SlotLayout.columnCentre(trackWidth: track, index: column)
+                                - side / 2
+                        )
+                }
+            }
         }
         .frame(height: side)
     }

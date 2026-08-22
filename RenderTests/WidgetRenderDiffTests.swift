@@ -269,6 +269,12 @@ struct WidgetRenderDiffTests {
         try body()
     }
 
+    /// A span's own line, unlit. Since #47 an achieved span is structure rather
+    /// than a mark, so "is the span there" is a question about the grey line,
+    /// not about light — `GlowPalette.upcoming` composites to 23 on black.
+    private static let lineFloor = 15
+    private static let clear = 10
+
     @Test("A met goal with Sunday resting stops at Saturday")
     func metGoalStopsBeforeSunday() throws {
         let entry = oneHabit(.timesPerWeek(2), done: [0, 1], todayColumn: 4)
@@ -276,8 +282,10 @@ struct WidgetRenderDiffTests {
             let pixels = try rgba(of: try render(entry))
             let saturday = brightest(atColumn: columnCentre(5), in: pixels)
             let sunday = brightestInRestColumn(6, in: pixels)
-            #expect(saturday > 150, "the met-goal bar is missing at Saturday (\(saturday))")
-            #expect(sunday < 60, "the bar runs into Sunday's column (\(sunday))")
+            #expect(saturday > Self.lineFloor,
+                    "the met-goal line is missing at Saturday (\(saturday))")
+            #expect(sunday < Self.clear,
+                    "the line runs into Sunday's column (\(sunday))")
         }
     }
 
@@ -289,9 +297,30 @@ struct WidgetRenderDiffTests {
             let tuesday = brightest(atColumn: columnCentre(1), in: pixels)
             let wednesday = brightestInRestColumn(2, in: pixels)
             let thursday = brightest(atColumn: columnCentre(3), in: pixels)
-            #expect(wednesday < 60, "the bar crosses the rest day (\(wednesday))")
-            #expect(tuesday > 150, "the left piece is missing (\(tuesday))")
-            #expect(thursday > 150, "the right piece is missing (\(thursday))")
+            #expect(wednesday < Self.clear, "the line crosses the rest day (\(wednesday))")
+            #expect(tuesday > Self.lineFloor, "the left piece is missing (\(tuesday))")
+            #expect(thursday > Self.lineFloor, "the right piece is missing (\(thursday))")
+        }
+    }
+
+    @Test("The days carry the light, and the span does not")
+    func daysCarryTheLight() throws {
+        // #47 in one render. Two a week with Monday and Tuesday logged: the
+        // span across the week is an unlit line, and the two days it happened
+        // on are lit dots on it.
+        let entry = oneHabit(.timesPerWeek(2), done: [0, 1], todayColumn: 4)
+        try withRestColumn(6, of: entry.week) {
+            let pixels = try rgba(of: try render(entry))
+            for logged in [0, 1] {
+                #expect(brightest(atColumn: columnCentre(logged), in: pixels) > 150,
+                        "no lit dot on the day it was logged (column \(logged))")
+            }
+            // Wednesday and Thursday were not logged: line, no light.
+            for quiet in [2, 3] {
+                let value = brightest(atColumn: columnCentre(quiet), in: pixels)
+                #expect(value > Self.lineFloor, "the line is missing at column \(quiet)")
+                #expect(value < 150, "column \(quiet) is lit and nothing happened on it")
+            }
         }
     }
 

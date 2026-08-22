@@ -45,8 +45,7 @@ enum RestCut {
         labelWidth: CGFloat,
         labelGap: CGFloat
     ) -> CGFloat {
-        let slot = SlotLayout.dailySlot(trackWidth: trackWidth)
-        let gap = SlotLayout.gap(trackWidth: trackWidth)
-        return labelWidth + labelGap + CGFloat(restIndex) * (slot + gap) + slot / 2
+        labelWidth + labelGap
+            + SlotLayout.columnCentre(trackWidth: trackWidth, index: restIndex)
     }
 }
