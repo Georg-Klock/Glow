@@ -49,12 +49,21 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
 
 /// Turns a habit due N times a week into the spans to draw.
 ///
-/// **The rule is inferred, not specified.** It was read off the design file's
-/// two large-widget frames — six examples across two different weekdays — and
-/// reproduces five of them exactly. The sixth is a two-a-week row that spans one
-/// day more than the rule gives; the identical row in the other frame follows
-/// the rule, so it reads as a slip in the mock rather than a different rule.
-/// Worth re-checking if a row ever looks wrong:
+/// **The rule is inferred, not specified**, and it stands (#4). It was read off
+/// the design file's two large-widget frames — six examples across two
+/// different weekdays — and reproduces five of them exactly. The sixth is a
+/// two-a-week row on a Tuesday that spans one day more than the rule gives.
+///
+/// Three things settled it against the mock. The *same row* in the other frame,
+/// on a Friday, follows the rule. Contorting to match the Tuesday one would
+/// break Touch Grass in that same frame, which follows it. And the file has
+/// four other self-contradictions on record, so a sixth is the likelier reading
+/// than a rule nobody can state.
+///
+/// Since #47 the stakes are lower still: the open span's boundary is no longer
+/// what the row is read by — the lit dots are — so where it falls decides less
+/// than it did when the question was filed. Worth re-checking if a row ever
+/// looks wrong:
 ///
 ///  - **The goal met** is one bright span across the whole week. Nothing is
 ///    outstanding, so the week stops being divided at all.
