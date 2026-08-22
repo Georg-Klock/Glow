@@ -55,6 +55,13 @@ struct WeekWidgetView: View {
                     height: proxy.size.height, slot: side, hasHeader: showsHeader
                 )
                 let shown = Array(entry.habits.prefix(capacity))
+                // The rest day's line, decided once for the whole widget: which
+                // column it falls in, and which of the rows it actually shows
+                // run through it. Both ends land on a habit — see RestCut.
+                let restIndex = entry.week.days.firstIndex(where: {
+                    WeekPreferences.isRestDay($0)
+                })
+                let cut = RestCut.rows(entry.habits, capacity: capacity)
 
                 VStack(alignment: .leading, spacing: WidgetMetrics.rowGap) {
                     if showsHeader {
@@ -69,7 +76,7 @@ struct WeekWidgetView: View {
                         // rows stand from each other.
                         .padding(.bottom, WidgetMetrics.headerGap - WidgetMetrics.rowGap)
                     }
-                    ForEach(shown) { habit in
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { index, habit in
                         WidgetRow(
                             habit: habit,
                             week: entry.week,
@@ -79,6 +86,9 @@ struct WeekWidgetView: View {
                             labelWidth: labelWidth,
                             labelGap: labelGap,
                             showsLabel: showsLabels,
+                            index: index,
+                            cut: cut,
+                            restIndex: restIndex,
                             burst: entry.burstHabit == habit.id ? entry.progress : nil
                         )
                     }
@@ -134,6 +144,13 @@ private struct WidgetRow: View {
     let labelWidth: CGFloat
     let labelGap: CGFloat
     let showsLabel: Bool
+    /// This row's position among the rows the widget shows, the range of
+    /// positions the rest day's line runs through, and which column it falls
+    /// in. All three are decided once for the widget and handed down, so no row
+    /// re-derives them and no two rows can disagree.
+    let index: Int
+    let cut: ClosedRange<Int>?
+    let restIndex: Int?
     /// Non-nil while this habit's completion is animating.
     let burst: Double?
 
@@ -154,11 +171,43 @@ private struct WidgetRow: View {
     }
 
     var body: some View {
-        if habit.isSpacer {
-            // Holds its height and nothing else. It is a gap the user placed.
-            Color.clear.frame(height: side)
-        } else {
-            row
+        Group {
+            if habit.isSpacer {
+                // Holds its height and nothing else. It is a gap the user
+                // placed — and the rest day's line still crosses it, because
+                // the line cuts the grid rather than marking each habit.
+                Color.clear.frame(height: side)
+            } else {
+                row
+            }
+        }
+        .background(alignment: .leading) { restDayCut }
+    }
+
+    /// This row's segment of the rest day's line, at the same weight and the
+    /// same x the app draws — `RestCut` owns both formulas so the two surfaces
+    /// cannot drift apart. Behind the marks, not over them.
+    @ViewBuilder
+    private var restDayCut: some View {
+        if let restIndex, let cut, cut.contains(index) {
+            let width = GlowShape.barThickness
+            let x = RestCut.x(
+                restIndex: restIndex,
+                trackWidth: track,
+                labelWidth: labelWidth,
+                labelGap: labelGap
+            )
+            // Half the row gap above and below, so adjacent segments touch —
+            // except at the ends, where there is no neighbour to meet.
+            let above: CGFloat = index == cut.lowerBound ? 0 : WidgetMetrics.rowGap / 2
+            let below: CGFloat = index == cut.upperBound ? 0 : WidgetMetrics.rowGap / 2
+            Rectangle()
+                .fill(GlowPalette.restCut)
+                .frame(width: width, height: side + above + below)
+                // `.offset(x:)` moves the leading edge, so the centre has to
+                // have half the width taken off it.
+                .offset(x: x - width / 2, y: (below - above) / 2)
+                .accessibilityHidden(true)
         }
     }
 

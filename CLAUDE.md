@@ -20,9 +20,11 @@ and closes as you go rather than filling like a fitness ring.
   maps. **Read this before touching anything HDR.** Every gain-map encoding came
   back from `UIImage.isHighDynamicRange` as false; that road is closed and the
   writeup says why.
-- `docs/design-system.md` — every colour, type size, radius and effect in use.
-- `docs/widget-large-spec.md` — a measured spec of the large week widget.
-  Numbers here beat numbers derived from a screenshot.
+- **There is no design-system document, on purpose.** Colour, type, geometry and
+  effects live in the code that draws them and nowhere else: `GlowPalette`,
+  `GlowShape`, `WidgetMetrics`, `SlotLayout`, `DayRing`. Read those. Two
+  documents used to publish the same numbers and both drifted — see
+  `docs/decisions.md`.
 - `docs/decisions.md` — questions already settled, and why. Reopening one is a
   decision, not a rediscovery.
 - `docs/ARCHITECTURE.md` — current technical truth.
@@ -49,6 +51,12 @@ and closes as you go rather than filling like a fitness ring.
   `L1 <n>/<n>`; that number goes in the PR body.
 
 - **Regenerate the symbol picker catalog:** `Tools/make-symbol-catalog.py`
+- **Render the website's HDR word images:** `Tools/make-glow-word.swift`
+
+  The glow technique applied to type, for the brightness slider on the project
+  page. See the end of `docs/glow.md` for what was measured, including the one
+  trap: a screen without headroom tone-maps the result to grey, so the page has
+  to test for headroom before showing it at all.
 - **Read the widget's trace off a tethered phone:** `Tools/pull-widget-log.sh`
 - **Check the App Group entitlement survived signing:** `Tools/check-app-group.sh`
 

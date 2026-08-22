@@ -9,9 +9,22 @@ import SwiftUI
 /// first and the glow second, which is backwards for an app whose whole signal
 /// is the glow.
 ///
-/// The values are the design file's own, not approximations of a render. See
-/// docs/design-system.md for the full table and for the four places this
-/// deliberately differs.
+/// **This file is the source of truth for colour.** There is no design-system
+/// document to reconcile it against any more: the numbers below, and the
+/// derivations in `GlowShape`, `WidgetMetrics` and `SlotLayout`, are what the
+/// app draws. Where a value departs from the design file it says so in place.
+///
+/// Two cleanups worth doing when something else touches this file:
+///
+///  - `headerRest` and `labelResting` are the same value and could be one name.
+///  - `haloRadius` and `ringHaloRadius` differ only because the file draws the
+///    ring's halo softer. If the ring keeps its offset pair anyway, one radius
+///    would do.
+///
+/// Reading a radius here does not tell you what lands on screen: every drop
+/// shadow is multiplied by `GlowSettings.haloScale(peak)`, which is 1.7 at the
+/// shipping default of 12x. The ring's inner pair are the exception — they are
+/// baked into the stroke in `GlowImageView` and are not scaled.
 enum GlowPalette {
     // MARK: - The two colours
 
@@ -67,8 +80,8 @@ enum GlowPalette {
     ///
     /// The same grey at the same strength as a resting habit name. It was 60%
     /// here, taken from generated CSS that had folded a node opacity into the
-    /// colour; the file's own paint is 100% and there is no 60% anywhere in the
-    /// subtree. See docs/widget-large-spec.md §10.
+    /// colour; the file's own paint is 100%, and a census of all 89 paints in
+    /// the frame turned up no 60% anywhere.
     static let headerRest = grey
     /// A day that went unlogged.
     static let missed = grey.opacity(0.5)
@@ -81,16 +94,23 @@ enum GlowPalette {
 
     // MARK: - Glow reach
     //
-    // Blur radii in points, converted from the design's CSS-style shadows: a CSS
-    // blur is roughly twice a SwiftUI shadow radius, so these are half the
-    // published number at 1x.
-
-    // Radii are the file's own numbers, not halved.
+    // These are the design file's own shadow radii, not halved. The generated
+    // CSS doubles every one of them, and halving those already-doubled numbers
+    // — which this used to do — landed every glow at a quarter of its reach.
+    // The rule that avoids it: a Figma shadow radius is about half a CSS blur,
+    // and about the same number as a SwiftUI `.shadow(radius:)`.
     //
-    // A Figma shadow radius is roughly half a CSS blur and roughly equal to a
-    // SwiftUI `.shadow(radius:)`. The generated CSS doubles every one of them,
-    // and halving those doubled numbers — which is what this used to do — landed
-    // every glow at a quarter of its intended reach.
+    // "About the same number" is as far as it goes, and it was measured rather
+    // than assumed: rendering the same ring at the same radius in both, Figma's
+    // halo reaches 0.75x as far as SwiftUI's at half its edge brightness, and
+    // the kernels differ in shape — Figma is brighter near the source with a
+    // shorter tail. Matching a glow by eye in Figma will under-reach the app.
+    //
+    // What lands on screen is also not the number below. `GlowModifier`
+    // multiplies every drop shadow by `GlowSettings.haloScale(peak)`, which is
+    // 1.7 at the shipping default of 12x — so the dot's halo renders at 15.26
+    // on a 17.455 slot, not 9. `ringInnerRadius` is the exception: it is an
+    // inner shadow inside the stroke and the setting never touches it.
 
     /// The halo around a completion, as a multiple of slot height. 9 on 17.5.
     static let haloRadius: CGFloat = 9.0 / 17.5

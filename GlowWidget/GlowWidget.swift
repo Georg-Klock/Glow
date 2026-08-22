@@ -36,10 +36,39 @@ struct GlowWidget: Widget {
                 // that a home screen widget cannot be transparent. It is not a
                 // platform limit; it is one appearance out of three.
                 //
-                // `containerBackgroundRemovable` is deliberately untouched. Its
-                // default is true, and passing false opts out of glass, out of
-                // the StandBy and iPad Lock Screen galleries, and out of
-                // foreground tinting with it.
+                // `containerBackgroundRemovable` is deliberately untouched, and
+                // not for the reason this comment used to give. It claimed that
+                // passing false opts out of glass — buying black in every
+                // appearance at the price of StandBy, the iPad Lock Screen
+                // gallery and foreground tinting. Only the price is real. On
+                // iOS 26 the flag governs contexts that have no background at
+                // all; the Home Screen's Tinted and Clear appearances are a
+                // restyling, and they substitute glass whether it is true or
+                // false. Measured in the simulator, 2026-08-21, on a widget
+                // rendering fresh content — the same panel under both values.
+                //
+                // Nor can the background be smuggled in as content. A black
+                // image behind the view, carrying the `.fullColor` accented
+                // rendering mode that keeps the glow tile from being flattened,
+                // is dropped as completely as the declared background is: the
+                // probe was run in red and never appeared. Under Tinted and
+                // Clear the system keeps the silhouette of the marks and
+                // nothing else. See #53.
+                //
+                // Two things the design file specifies for this container are
+                // deliberately not reproduced, and a render diff will show both
+                // as differences rather than regressions:
+                //
+                //  - **Figma's `GLASS` effect** — radius 4, refraction 0.8,
+                //    depth 20, light at −45°. SwiftUI has no equivalent;
+                //    `Material` and `.glassEffect` reproduce none of the
+                //    refraction, dispersion or directional light. In a flat
+                //    export it shows as the faint hairline along the top-left
+                //    corner arc.
+                //  - **A 30pt corner radius**, because iOS masks a widget to
+                //    its own continuous-corner squircle regardless. The file's
+                //    *interior* corners are plain circular arcs and those are
+                //    reproduced.
                 .containerBackground(GlowPalette.widgetBackground, for: .widget)
                 // The marks act in place through their intents; everything
                 // else opens the app on this widget's own screen.

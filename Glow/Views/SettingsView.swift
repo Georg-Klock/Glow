@@ -2,9 +2,14 @@ import SwiftUI
 import UIKit
 import WidgetKit
 
-/// Settings: how hard the glow pushes, what shape a week is — and History,
-/// the long view, which is neither today nor this week and so lives here
-/// rather than spending a tab.
+/// Settings, in three clusters: **Glow**, **Week**, **Data**.
+///
+/// Glow leads because it is the product rather than a preference about it.
+/// Week holds both controls that decide what a week is — where it starts and
+/// which day the app stops asking about — which were two sections, one of them
+/// headerless. Data holds the long view of what is stored beside the one
+/// control that writes something invented into it, and is where export lands
+/// when it arrives.
 ///
 /// A tab now rather than a sheet, so there is no Done button and nothing to
 /// dismiss — the changes are live and the way out is the tab bar.
@@ -30,17 +35,8 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                // The long view. First because it is the one row here that is
-                // not configuration — it is the rest of the app's story, filed
-                // where the things that are neither today nor this week live.
-                Section {
-                    NavigationLink {
-                        YearView()
-                    } label: {
-                        Label("History", systemImage: "square.grid.3x3")
-                    }
-                }
-
+                // Glow leads: it is the one control here that is the product
+                // rather than a preference about it.
                 Section {
                     // A live slot, rendered by the same code path the grid
                     // uses, so the slider is judged against the real thing
@@ -70,12 +66,17 @@ struct SettingsView: View {
                     }
                     .tint(GlowPalette.color)
 
-                    LabeledContent("Asking for", value: label)
-                    LabeledContent("Screen currently allows", value: ceiling)
+                    // One sentence rather than two labelled rows of jargon.
+                    // What the glow aims for and what the panel is granting are
+                    // a single fact in two halves; read as a sentence, the gap
+                    // between them is obvious instead of arithmetic.
+                    Text(readout)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 } header: {
                     Text("Glow")
                 } footer: {
-                    Text(footer)
+                    Text("What the screen grants changes with ambient light, brightness and heat.")
                 }
 
                 if peak <= GlowSettings.range.lowerBound {
@@ -86,19 +87,18 @@ struct SettingsView: View {
                     }
                 }
 
+                // One subject, one section: which seven days a week is, and
+                // which of them the app stops asking about. They were two
+                // sections, and the rest day's had no header at all — so the
+                // single most consequential setting in the app read as an
+                // afterthought hanging below the week.
                 Section {
                     Picker("Week starts on", selection: $firstWeekday) {
                         ForEach(WeekPreferences.pickerOrder, id: \.self) { weekday in
                             Text(weekdayName(weekday)).tag(weekday)
                         }
                     }
-                } header: {
-                    Text("Week")
-                } footer: {
-                    Text("Also sets which seven days a weekly goal counts over.")
-                }
 
-                Section {
                     Toggle("Rest day", isOn: restDayBinding)
                     if restDay != 0 {
                         Picker("Day", selection: $restDay) {
@@ -107,28 +107,28 @@ struct SettingsView: View {
                             }
                         }
                     }
+                } header: {
+                    Text("Week")
                 } footer: {
-                    Text(
-                        "True rest: nothing can be logged on it, nothing counts as "
-                            + "missed, and the week is not made up around it. "
-                            + "Anything already on record still counts."
-                    )
+                    Text(weekFooter)
                 }
 
-                // Last, because it is the one control here that is not about
-                // the real data. The footer says the whole contract: what goes
-                // in is invented, and what comes out is exactly that.
+                // Data last, and History belongs in it: the long view of what
+                // is stored, beside the one control that writes something
+                // invented into the same store. When export arrives it lands
+                // here too, which is the quiet argument for the section.
                 Section {
+                    NavigationLink {
+                        YearView()
+                    } label: {
+                        Label("History", systemImage: "square.grid.3x3")
+                    }
+
                     Toggle("Demo history", isOn: demoBinding)
                 } header: {
-                    Text("Demo")
+                    Text("Data")
                 } footer: {
-                    Text(
-                        "Fills the past ten weeks with an invented history, so the "
-                            + "app can be seen with something in it. Today is never "
-                            + "touched. Switching it off removes exactly what it "
-                            + "added — nothing you logged yourself."
-                    )
+                    Text(demoFooter)
                 }
             }
             .navigationTitle("Settings")
@@ -181,8 +181,40 @@ struct SettingsView: View {
         return symbols[weekday - 1]
     }
 
-    private var label: String {
-        peak <= GlowSettings.range.lowerBound ? "Off" : String(format: "%.0f×", peak)
+    /// Both numbers in one sentence.
+    ///
+    /// They were two labelled rows — "Asking for 12×" and "Screen currently
+    /// allows 1.0×" — which is the same information filed as a specification
+    /// sheet. Neither number means anything alone: what matters is the gap
+    /// between what the app asks for and what the panel is willing to give at
+    /// this moment, and a sentence puts the two next to each other where that
+    /// gap is legible.
+    ///
+    /// At the bottom of the range the aim is dropped rather than printed as
+    /// "off": the amber notice directly below already says the glow is off, and
+    /// what is still worth reading is what the screen could have granted.
+    private var readout: String {
+        guard peak > GlowSettings.range.lowerBound else {
+            return "The screen allows \(ceiling) right now."
+        }
+        return String(format: "Aiming for %.0f×", peak) + " — the screen allows \(ceiling) right now."
+    }
+
+    /// Two controls, one subject, so one footer.
+    private var weekFooter: String {
+        "Week start also sets which seven days a weekly goal counts over.\n\n"
+            + "A rest day is true rest: nothing can be logged on it, nothing "
+            + "counts as missed, and the week is not made up around it. "
+            + "Anything already on record still counts."
+    }
+
+    /// Names the control it explains, because the section holds two rows and
+    /// only one of them invents anything.
+    private var demoFooter: String {
+        "Demo history fills the past ten weeks with an invented past, so the "
+            + "app can be seen with something in it. Today is never touched, "
+            + "and switching it off removes exactly what it added — nothing "
+            + "you logged yourself."
     }
 
     /// What the display will grant right now — and "now" is load-bearing.
@@ -200,8 +232,4 @@ struct SettingsView: View {
         String(format: "%.1f×", UIScreen.main.potentialEDRHeadroom)
     }
 
-    private var footer: String {
-        "How far above normal white the glow aims. What the screen grants "
-            + "changes with ambient light, brightness and heat."
-    }
 }

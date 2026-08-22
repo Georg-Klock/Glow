@@ -61,6 +61,20 @@ struct HabitEditorView: View {
     /// How far the name sits from the platter's edge.
     private static let namePadding: CGFloat = 20
 
+    /// The step buttons' own face. 44 × 32 was already the hit target; it is
+    /// now also what you can see.
+    private static let stepSize = CGSize(width: 44, height: 32)
+    /// A quarter of the control's height, which is where a segmented control's
+    /// selected segment sits at this size.
+    ///
+    /// The row's 26 is not a candidate: it is a ratio of a 56pt row, and on a
+    /// 32pt button the same ratio is 15 — a capsule, which would read as a
+    /// different family of control rather than the same one, smaller.
+    private static let stepRadius: CGFloat = 8
+    /// Spent, not merely quiet. Low enough to stop inviting a tap, high enough
+    /// that the button is still plainly there and the row keeps its shape.
+    private static let stepDisabledOpacity: Double = 0.45
+
     private var isEditing: Bool { habit != nil }
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
@@ -204,10 +218,18 @@ struct HabitEditorView: View {
     /// A segmented control rather than anything cleverer, because this is a
     /// genuine either/or — the model has no habit that is both — and two
     /// segments is the honest drawing of that.
+    /// **Two senses of "daily" meet here, and they are not the same thing.**
+    /// The segment labelled `Daily` means *counted within a day* — `Kind.day`,
+    /// `Frequency.timesPerDay`, the habit that draws a ring on Today. The
+    /// model's own `Frequency.daily` means something else: a seven-times-a-week
+    /// cadence, which is a *weekly* habit here and lives under `Weekly`. The
+    /// label is what the person reads and it wins on screen; renaming the model
+    /// to match would collide with `Habit.countedPerDay` / `countedPerWeek` and
+    /// every caller of both, so it is deliberately not renamed.
     private var kindRow: some View {
         Picker("Counted", selection: $kind) {
-            Text("Per Week").tag(Kind.week)
-            Text("Per Day").tag(Kind.day)
+            Text("Daily").tag(Kind.day)
+            Text("Weekly").tag(Kind.week)
         }
         .pickerStyle(.segmented)
         .padding(.horizontal, 10)
@@ -263,6 +285,22 @@ struct HabitEditorView: View {
         }
     }
 
+    /// Minus and plus, each on its own platter.
+    ///
+    /// They used to sit bare inside the row's platter, which made the two
+    /// controls tapped most often the only things on this screen that did not
+    /// look tappable — the icon, the name field and the toggle's segments all
+    /// have a face of their own.
+    ///
+    /// The face cannot be the row's own `secondarySystemGroupedBackground`,
+    /// which is what it is sitting on and would vanish into. It is a system
+    /// fill for the same reason this whole screen uses system semantic colours
+    /// (docs/decisions.md, "Two greys"): the editor is the system's surface,
+    /// and a raised control here should track whatever the OS does to raised
+    /// controls.
+    ///
+    /// The platter *is* the hit target rather than a smaller decoration inside
+    /// it, so what looks pressable and what is pressable are the same rectangle.
     private func stepButton(
         _ symbol: String,
         enabled: Bool,
@@ -271,13 +309,21 @@ struct HabitEditorView: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.body.weight(.medium))
-                .frame(width: 44, height: 32)
+                .frame(width: Self.stepSize.width, height: Self.stepSize.height)
+                .background(
+                    RoundedRectangle(cornerRadius: Self.stepRadius, style: .continuous)
+                        .fill(Color(.tertiarySystemFill))
+                )
                 .contentShape(Rectangle())
         }
         // Borderless, or a Form row treats its whole width as one button and
         // either control fires whichever was tapped.
         .buttonStyle(.borderless)
         .disabled(!enabled)
+        // The face dims with the glyph. `.disabled` alone fades the symbol and
+        // leaves the platter lit, which reads as a live control that ignores
+        // you — worse than one that plainly says it is spent.
+        .opacity(enabled ? 1 : Self.stepDisabledOpacity)
         .accessibilityHidden(true)
     }
 

@@ -171,6 +171,19 @@ Per-day habits are untouched: Today's rings stay tappable, because water and a
 walk are not the thing the rest is from. This reverses "resting is permission,
 not a prohibition" — see docs/decisions.md.
 
+**How the cut is drawn.** One line at the span bar's own weight — 2pt, absolute,
+`GlowShape.barThickness` — so it reads as part of the grid rather than as a
+heavier ✕. It is not a proportion of the slot: it took the missed cross's stroke
+until #71, which drew it at roughly 1.2pt on the phone against 2pt bars beside
+it. It runs from the **top of the first habit** to the **bottom of the last one
+the surface shows**, and no further: never into the header's air, never past the
+last row. `RestCut.rows` decides which rows carry it, taking the surface's
+capacity — the widget's `rowCapacity`, the app's `largeRowCapacity`, so the app's
+line ends on the same hairline that marks where the widget ends. A blank row
+*between* two habits is inside the cut and draws its segment; a blank row at
+either end is outside it. All three week widget families draw it, on the same
+`RestCut` numbers the app uses.
+
 **A per-day habit has no slots and no week row.** It is drawn on Today as a
 ring of arcs, one per repetition — see `DayRing` and docs/vision.md. The ring
 starts full and glowing and each completion quiets one arc, clockwise from the
@@ -190,9 +203,17 @@ arrives with #19.
 and This Week carry the same trailing pair — Edit, then add — so the two tabs
 wear one piece of chrome rather than two that resemble each other. Adding from
 a screen opens the editor on that screen's kind, so what you make appears
-where you made it: Today opens on Per Day, This Week on Per Week. Today's add
-is a plain button rather than This Week's menu, because a blank row holds a
-position in the week grid and there is no grid here to hold one in.
+where you made it: Today opens on **Daily**, This Week on **Weekly**. Today's
+add is a plain button rather than This Week's menu, because a blank row holds
+a position in the week grid and there is no grid here to hold one in.
+
+**"Daily" means two different things, and only one of them is on screen.** The
+editor's `Daily` segment means *counted within a day* — a ring on Today, N
+repetitions that reset at midnight. The model's `Frequency.daily` means a
+seven-times-a-week cadence, which is a *weekly* habit and sits under `Weekly`;
+it is why "7x per week" is the wording for the everyday case rather than a
+separate mode. The label is what the person reads; the enum keeps its name
+because `Habit.countedPerDay` and `countedPerWeek` are built on it.
 
 **Edit changes what a ring's tap means** rather than adding a second control
 beside it: out of edit mode a tap counts, in edit mode it opens that habit in
