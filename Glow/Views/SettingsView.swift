@@ -1,5 +1,7 @@
+import SwiftData
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 import WidgetKit
 
 /// Settings, in three clusters: **Glow**, **Week**, **Data**.
@@ -8,13 +10,21 @@ import WidgetKit
 /// Week holds both controls that decide what a week is — where it starts and
 /// which day the app stops asking about — which were two sections, one of them
 /// headerless. Data holds the long view of what is stored beside the one
-/// control that writes something invented into it, and is where export lands
-/// when it arrives.
+/// control that writes something invented into it, and where the export lives.
 ///
 /// A tab now rather than a sheet, so there is no Done button and nothing to
 /// dismiss — the changes are live and the way out is the tab bar.
 struct SettingsView: View {
     @Environment(\.modelContext) private var context
+
+    /// Every habit, per-day and per-week alike, because an export of "your
+    /// history" that quietly left one kind out would be worse than no export.
+    @Query(sort: [SortDescriptor(\Habit.sortOrder)]) private var habits: [Habit]
+
+    /// The file to hand to the share sheet, or nil while there is none.
+    /// Written only when the button is pressed — see `HistoryFile`.
+    @State private var exportFile: HistoryFile?
+    @State private var isChoosingFormat = false
 
     @AppStorage(GlowSettings.key, store: GlowSettings.store)
     private var peak: Double = GlowSettings.defaultValue
@@ -124,20 +134,81 @@ struct SettingsView: View {
                         Label("History", systemImage: "square.grid.3x3")
                     }
 
+                    Button {
+                        isChoosingFormat = true
+                    } label: {
+                        Label("Export History", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(habits.isEmpty)
+
                     Toggle("Demo history", isOn: demoBinding)
                 } header: {
                     Text("Data")
                 } footer: {
+                    Text(exportFooter)
                     Text(demoFooter)
                 }
             }
             .navigationTitle("Settings")
+            // A choice of two, rather than a format setting nobody would ever
+            // change twice. CSV opens in a spreadsheet; JSON parses.
+            .confirmationDialog(
+                "Export History",
+                isPresented: $isChoosingFormat,
+                titleVisibility: .visible
+            ) {
+                Button("CSV") { export(as: .csv) }
+                Button("JSON") { export(as: .json) }
+                Button("Cancel", role: .cancel) {}
+            }
+            // The share sheet is the only way out of the app, and it opens on
+            // a tap. Nothing here uploads.
+            .sheet(item: $exportFile) { file in
+                ShareSheet(url: file.url)
+            }
         }
         .onAppear { isDemoSeeded = DemoHistory(context: context).isSeeded }
         // Covers the toggle and the day picker both: the widget draws the same
         // week and withholds the same taps, and it is not told when the
         // setting moves.
         .onChange(of: restDay) { _, _ in WidgetCenter.shared.reloadAllTimelines() }
+    }
+
+    // MARK: - Export
+
+    enum ExportFormat { case csv, json }
+
+    /// Writes the file, then hands it to the share sheet.
+    ///
+    /// Written at the moment of the tap rather than kept ready: a history file
+    /// sitting on disk that nobody asked for is exactly the thing this feature
+    /// promises not to make. It goes to the app's own temporary directory,
+    /// which the system reclaims.
+    private func export(as format: ExportFormat) {
+        let now = Date()
+        let snapshots = habits.map { $0.snapshot() }
+        do {
+            let text: String
+            let name: String
+            switch format {
+            case .csv:
+                text = HistoryExport.csv(habits: snapshots)
+                name = HistoryExport.filename(on: now, extension: "csv")
+            case .json:
+                text = try HistoryExport.json(habits: snapshots, exportedAt: now)
+                name = HistoryExport.filename(on: now, extension: "json")
+            }
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+            try text.write(to: url, atomically: true, encoding: .utf8)
+            exportFile = HistoryFile(url: url)
+        } catch {
+            HabitStore.report(error, operation: "exportHistory")
+        }
+    }
+
+    private var exportFooter: String {
+        "Every habit and every day you logged it, as a file. It leaves this "
+            + "phone only when you send it somewhere — nothing is uploaded."
     }
 
     /// Seeds or removes the invented past. Errors leave the toggle where the
@@ -232,4 +303,27 @@ struct SettingsView: View {
         String(format: "%.1f×", UIScreen.main.potentialEDRHeadroom)
     }
 
+}
+
+/// The written file, identified so `sheet(item:)` can present it.
+private struct HistoryFile: Identifiable {
+    let url: URL
+    var id: String { url.path }
+}
+
+/// The system share sheet.
+///
+/// `ShareLink` would be the SwiftUI way and is not used here: it wants its item
+/// at the moment the *view* is built, and this file does not exist until the
+/// button is pressed. Writing one eagerly so a `ShareLink` could point at it
+/// would leave a history file on disk that nobody asked for, which is the one
+/// thing this feature promises not to do.
+private struct ShareSheet: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }

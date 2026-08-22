@@ -41,6 +41,13 @@ in one sentence.
   `Completion` row. For weekly-cadence habits the old sentence still holds,
   enforced by `toggleCompletion`.
 - **No notifications or reminders.**
+- ~~**No export.**~~ **There is one.** Settings → Data → Export History writes
+  a CSV or a JSON file and hands it to the share sheet. No account, no
+  destination the app chooses, and **nothing leaves the device unless a person
+  sends it** — the file is written at the moment of the tap, into the app's own
+  temporary directory, and never otherwise. That is a privacy claim true by
+  construction rather than by policy. `HistoryExport` is pure and its bytes are
+  asserted.
 - ~~**The home screen widget does not glow.**~~ **It does.** This was written as
   a non-goal on the reasoning that WidgetKit renders in a separate process and
   archives the result, so HDR could not survive. That was never measured, and it
