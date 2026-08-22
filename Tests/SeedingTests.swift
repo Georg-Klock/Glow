@@ -54,7 +54,7 @@ struct SeedingTests {
 
         let week = WeekCalendar.week(containing: today, calendar: calendar)
         for habit in try context.fetch(FetchDescriptor<Habit>()) where !habit.isSpacer {
-            let slots = WeekGrid.slots(for: habit.snapshot(), in: week, today: today, calendar: calendar)
+            let slots = WeekGrid.slots(for: habit.snapshot(), in: week, today: today, editing: .todayOnly, calendar: calendar)
             #expect(slots.filter { $0.state == .open }.count == 1, "\(habit.name)")
         }
     }
@@ -242,14 +242,14 @@ struct SpacerTests {
         // order, and anything rendered in it would be a mark for a habit that
         // does not exist.
         let spacer = HabitSnapshot.fixture(isSpacer: true)
-        #expect(WeekGrid.slots(for: spacer, in: week, today: today, calendar: calendar).isEmpty)
+        #expect(WeekGrid.slots(for: spacer, in: week, today: today, editing: .todayOnly, calendar: calendar).isEmpty)
     }
 
     @Test("A blank row draws nothing on a spanning cadence either")
     func spacerHasNoSpans() {
         let spacer = HabitSnapshot.fixture(frequency: .timesPerWeek(3), isSpacer: true)
         let spans = WeekSpans.spans(
-            for: spacer, in: week, today: today, target: 3, calendar: calendar
+            for: spacer, in: week, today: today, target: 3, editing: .todayOnly, calendar: calendar
         )
         #expect(spans.isEmpty)
     }

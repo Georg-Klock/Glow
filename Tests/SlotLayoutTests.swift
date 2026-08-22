@@ -76,6 +76,50 @@ struct SlotLayoutTests {
         #expect(SlotLayout.slotWidth(trackWidth: 100, slotCount: 0) == 0)
         #expect(SlotLayout.spanWidth(trackWidth: 220, dayCount: 0) == 0)
     }
+
+    // MARK: - The inverse
+
+    @Test("A touch on a column's centre resolves to that column", arguments: [120.0, 220.0, 338.0, 400.0])
+    func columnRoundTrips(width: CGFloat) {
+        // The forward direction places a mark on a weekday; the inverse reads a
+        // weekday off a finger. A span writes the day it was touched on, so the
+        // two have to be each other's undo.
+        for index in 0..<7 {
+            let centre = SlotLayout.columnCentre(trackWidth: width, index: index)
+            #expect(SlotLayout.column(atX: centre, trackWidth: width) == index)
+        }
+    }
+
+    @Test("A column's start and its far edge resolve to it too", arguments: [120.0, 220.0, 400.0])
+    func columnEdgesResolve(width: CGFloat) {
+        let slot = SlotLayout.dailySlot(trackWidth: width)
+        for index in 0..<7 {
+            let start = SlotLayout.columnStart(trackWidth: width, index: index)
+            #expect(SlotLayout.column(atX: start, trackWidth: width) == index)
+            #expect(SlotLayout.column(atX: start + slot, trackWidth: width) == index)
+        }
+    }
+
+    @Test("A column starts half a slot before its centre")
+    func columnStartAgreesWithCentre() {
+        let slot = SlotLayout.dailySlot(trackWidth: trackWidth)
+        for index in 0..<7 {
+            let centre = SlotLayout.columnCentre(trackWidth: trackWidth, index: index)
+            let start = SlotLayout.columnStart(trackWidth: trackWidth, index: index)
+            #expect(abs(centre - start - slot / 2) < 0.0001)
+        }
+    }
+
+    @Test("A touch off either end belongs to the column it left")
+    func touchesOutsideTheTrackClamp() {
+        #expect(SlotLayout.column(atX: -40, trackWidth: trackWidth) == 0)
+        #expect(SlotLayout.column(atX: trackWidth + 40, trackWidth: trackWidth) == 6)
+        // Layout hands out zero widths and non-finite numbers often enough that
+        // this is not theoretical — and `Int(_:)` traps on both.
+        #expect(SlotLayout.column(atX: 10, trackWidth: 0) == nil)
+        #expect(SlotLayout.column(atX: .nan, trackWidth: trackWidth) == nil)
+        #expect(SlotLayout.column(atX: .infinity, trackWidth: trackWidth) == nil)
+    }
 }
 
 @Suite("Frequency normalization")

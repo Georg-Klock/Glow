@@ -14,8 +14,8 @@ import Foundation
 /// **A span is not given a date it does not have.** A habit due N times a week
 /// is not day-pinned — `WeekSpans` divides the week into shares that say *how
 /// much*, and `WeekDots` says *when* — so a span speaks a day only when it
-/// carries one, which is today's, which is the day a tap would act on. See
-/// #47 and #104.
+/// carries one, and the one it carries is the day a tap on it would act on.
+/// See #47, #104 and #116.
 ///
 /// Pure, per the `WeekGrid` / `WeekDots` pattern, so the app and the widget
 /// cannot disagree about a word and the strings are testable without a
@@ -88,9 +88,12 @@ enum SlotVoice {
     /// One span: the habit, its state, and a day only when it has one.
     ///
     /// The day is `actionDay` rather than the span's own columns. A span
-    /// covers a run of days and a tap on it touches exactly one of them —
-    /// today — so that is the date the control is about, and the columns it
-    /// happens to cover would be a date it does not act on.
+    /// covers a run of days and an activation with no location touches exactly
+    /// one of them, so that is the date the control is about; the columns it
+    /// happens to cover would be a date it does not act on. On a widget that is
+    /// today. In the week view, which edits any day it shows, it is the last
+    /// day of the span that surface may write (#116) — still one date, still
+    /// the one a tap here would land on.
     static func span(
         habitName: String,
         state: SlotState,

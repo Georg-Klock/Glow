@@ -64,12 +64,17 @@ struct Slot: Identifiable, Equatable, Sendable {
     /// a view taps what it is handed and never works out which day that was.
     let actionDay: Date?
 
+    /// Whether this slot stands for today.
+    ///
+    /// A real comparison, made by the grid, rather than the alias for
+    /// `actionDay != nil` it used to be. That alias was true only while today
+    /// was the one day that carried an action; the week view now hands six more
+    /// days one, and a Monday completion would have started drawing itself as
+    /// today's (#116).
+    let isToday: Bool
+
     var id: Int { index }
     var isTappable: Bool { actionDay != nil }
-
-    /// Only today's slot ever carries an action, so this is also what separates
-    /// a completion made today from one made earlier in the week.
-    var isToday: Bool { actionDay != nil }
 
     var mark: SlotMark {
         switch state {
@@ -145,11 +150,17 @@ struct HabitSnapshot: Identifiable, Equatable, Sendable {
 ///
 /// The whole interaction model of the app is one rule, enforced here: at most
 /// one slot per habit is open, and only ever for the current day.
+///
+/// **What is open and what is editable are two questions** (#116). Exactly one
+/// slot is ever open, on today, on every surface — that has not moved. Which
+/// slots respond to a tap is the surface's business, and `SlotEditing` is how
+/// the surface says so.
 enum WeekGrid {
     static func slots(
         for habit: HabitSnapshot,
         in week: Week,
         today: Date,
+        editing: SlotEditing,
         calendar: Calendar = WeekCalendar.calendar
     ) -> [Slot] {
         guard !habit.isSpacer else { return [] }
@@ -157,7 +168,10 @@ enum WeekGrid {
 
         switch habit.frequency {
         case .daily:
-            return dailySlots(habit: habit, week: week, today: todayStart, calendar: calendar)
+            return dailySlots(
+                habit: habit, week: week, today: todayStart,
+                editing: editing, calendar: calendar
+            )
         case .timesPerWeek(let target):
             return frequencySlots(
                 habit: habit, week: week, today: todayStart, target: target, calendar: calendar
@@ -176,6 +190,7 @@ enum WeekGrid {
         habit: HabitSnapshot,
         week: Week,
         today: Date,
+        editing: SlotEditing,
         calendar: Calendar
     ) -> [Slot] {
         week.days.enumerated().map { index, day in
@@ -203,15 +218,29 @@ enum WeekGrid {
                 else if day < today { .missed }
                 else { .inactive }
 
-            // Past days are never editable, and a rest day has nothing to
-            // toggle toward, so only an expectant today carries an action.
-            return Slot(index: index, state: state, actionDay: isToday && !isRest ? day : nil)
+            // Which days carry an action is the surface's answer, not this
+            // grid's: the week view edits any day it shows, the widget and the
+            // month edit today. `SlotEditing` refuses the rest day on both, so
+            // the clause that used to be written out here lives in one place.
+            return Slot(
+                index: index,
+                state: state,
+                actionDay: editing.day(atColumn: index, in: week, today: today, calendar: calendar),
+                isToday: isToday
+            )
         }
     }
 
     /// Frequency rows are not day-pinned: pills fill left to right in the order
     /// completions are logged, and which weekday each landed on is not recorded
     /// in the layout at all.
+    ///
+    /// **`SlotEditing` does not reach here, and that is not an oversight.** A
+    /// pill is not a day, so there is no past day in this row for a surface to
+    /// widen to. The day-shaped editing of an N×/week habit happens on the
+    /// spans — `WeekSpans`, where a column under a finger *is* a weekday — and
+    /// these pills keep the one action they ever had: today's, or the undo of
+    /// today's. `MonthGrid` asks this function exactly that question.
     private static func frequencySlots(
         habit: HabitSnapshot,
         week: Week,
@@ -243,8 +272,16 @@ enum WeekGrid {
         return (0..<target).map { index in
             let state: SlotState =
                 index < filledCount ? .filled : (index == openIndex ? .open : .inactive)
+            // The open pill and the pill holding today's completion are the two
+            // that stand for today; the rest stand for whichever day happened
+            // to fill them, which this row does not record.
             let isTappable = index == openIndex || index == undoIndex
-            return Slot(index: index, state: state, actionDay: isTappable ? today : nil)
+            return Slot(
+                index: index,
+                state: state,
+                actionDay: isTappable ? today : nil,
+                isToday: isTappable
+            )
         }
     }
 }

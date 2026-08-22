@@ -99,6 +99,65 @@ struct PersistenceTests {
         #expect(try context.fetch(FetchDescriptor<Completion>()).isEmpty)
     }
 
+    @Test("The store refuses a day that has not happened yet")
+    func futureDaysAreRefused() throws {
+        let context = try makeContext()
+        // Real time rather than a fixture week: the guard is about *ahead of
+        // now*, and a fixture that drifts into the past would stop testing it.
+        let tomorrow = Date().addingTimeInterval(24 * 60 * 60)
+
+        try TestPreferences.withWeek(restDay: nil) {
+            let store = HabitStore(context: context)
+            let habit = try store.addHabit(name: "Walk", icon: "🚶", frequency: .daily)
+
+            // A completion logged ahead is a claim about something that has not
+            // happened. Refused on the path every surface shares, so a week
+            // rendered while the demo was in cannot write one after it went
+            // out. The calls are hoisted out of the macro: `#expect` around a
+            // `try` inside a rethrowing closure does not compile.
+            let refused = try store.toggleCompletion(for: habit, on: tomorrow)
+            #expect(refused == .refused)
+            let none = try context.fetch(FetchDescriptor<Completion>())
+            #expect(none.isEmpty)
+
+            // Demo history is the exception, and it says so at the call site.
+            let logged = try store.toggleCompletion(
+                for: habit, on: tomorrow, allowingFuture: true
+            )
+            #expect(logged == .completed)
+            let one = try context.fetch(FetchDescriptor<Completion>())
+            #expect(one.count == 1)
+
+            // And an invented future can be taken back the same way.
+            let undone = try store.toggleCompletion(
+                for: habit, on: tomorrow, allowingFuture: true
+            )
+            #expect(undone == .uncompleted)
+
+            // Today is not the future, however late in the day it is.
+            let now = try store.toggleCompletion(for: habit, on: Date())
+            #expect(now == .completed)
+        }
+    }
+
+    @Test("Permission to write ahead is not permission to write on the rest day")
+    func theRestDayOutranksTheDemo() throws {
+        let context = try makeContext()
+        let tomorrow = Date().addingTimeInterval(24 * 60 * 60)
+        let weekday = Calendar.current.component(.weekday, from: tomorrow)
+
+        try TestPreferences.withWeek(restDay: weekday) {
+            let store = HabitStore(context: context)
+            let habit = try store.addHabit(name: "Walk", icon: "🚶", frequency: .daily)
+            let outcome = try store.toggleCompletion(
+                for: habit, on: tomorrow, allowingFuture: true
+            )
+            #expect(outcome == .refused)
+            let stored = try context.fetch(FetchDescriptor<Completion>())
+            #expect(stored.isEmpty)
+        }
+    }
+
     @Test("New habits are appended, not prepended")
     func sortOrderIncrements() throws {
         let context = try makeContext()
@@ -142,7 +201,7 @@ struct PersistenceTests {
 
         // And the grid agrees that today is spent.
         let week = WeekCalendar.week(containing: today, calendar: calendar)
-        let slots = WeekGrid.slots(for: snapshot, in: week, today: today, calendar: calendar)
+        let slots = WeekGrid.slots(for: snapshot, in: week, today: today, editing: .todayOnly, calendar: calendar)
         #expect(slots.map(\.state) == [.filled, .inactive, .inactive])
     }
 
