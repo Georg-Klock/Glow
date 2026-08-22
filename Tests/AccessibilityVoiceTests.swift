@@ -28,7 +28,7 @@ struct SlotVoiceTests {
             TestPreferences.weekday(ofColumn: $0, in: week, calendar: calendar)
         }
         return TestPreferences.withWeek(restDay: restDay) {
-            WeekGrid.slots(for: habit, in: week, today: today, calendar: calendar)
+            WeekGrid.slots(for: habit, in: week, today: today, editing: .todayOnly, calendar: calendar)
         }
     }
 
@@ -134,7 +134,7 @@ struct SlotVoiceTests {
             name: "Workout", frequency: .timesPerWeek(3), completedDays: [day(0)]
         )
         let spans = TestPreferences.withWeek(restDay: nil) {
-            WeekSpans.spans(for: habit, in: week, today: today, target: 3, calendar: calendar)
+            WeekSpans.spans(for: habit, in: week, today: today, target: 3, editing: .todayOnly, calendar: calendar)
         }
         let spoken = spans.map {
             SlotVoice.span(
@@ -157,7 +157,7 @@ struct SlotVoiceTests {
             name: "Workout", frequency: .timesPerWeek(3), completedDays: [day(2)]
         )
         let spans = TestPreferences.withWeek(restDay: nil) {
-            WeekSpans.spans(for: habit, in: week, today: today, target: 3, calendar: calendar)
+            WeekSpans.spans(for: habit, in: week, today: today, target: 3, editing: .todayOnly, calendar: calendar)
         }
         let tappable = spans.filter(\.isTappable)
         #expect(tappable.count == 1)
@@ -178,7 +178,7 @@ struct SlotVoiceTests {
         let habit = HabitSnapshot.fixture(name: "Workout", frequency: .timesPerWeek(3))
         let spans = TestPreferences.withWeek(restDay: nil) {
             WeekSpans.spans(
-                for: habit, in: week, today: saturday, target: 3, calendar: calendar
+                for: habit, in: week, today: saturday, target: 3, editing: .todayOnly, calendar: calendar
             )
         }
         let missed = spans.filter { $0.state == .missed }
