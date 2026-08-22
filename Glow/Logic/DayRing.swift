@@ -82,6 +82,31 @@ enum DayRing {
         return current >= goal ? 0 : current + 1
     }
 
+    /// Where the logged line's head starts and ends when repetition `index` is
+    /// logged, as fractions of the circle.
+    ///
+    /// The head *is* where the pill now begins, so one number drives both the
+    /// line growing and the pill retreating ahead of it — the same grammar
+    /// `SlotView` and `SpanView` already use, expressed as an angle instead of
+    /// a diameter.
+    ///
+    /// It starts at the end of the run already logged rather than at the new
+    /// repetition's own start, so the line grows out of the existing line and
+    /// crosses the gap between the two before it reaches the new segment. That
+    /// gap-crossing *is* the merge; it is not a separate step.
+    ///
+    /// The last repetition runs a full turn, past its own end and on to the
+    /// first repetition's start plus one, so the line meets its own tail and
+    /// the break at twelve o'clock closes. The finished ring is arrived at
+    /// rather than cut to.
+    static func sweep(arcs: [Arc], index: Int) -> (from: Double, to: Double)? {
+        guard arcs.indices.contains(index), let first = arcs.first else { return nil }
+        let from = index > 0 ? arcs[index - 1].end : first.start
+        let to = index == arcs.count - 1 ? first.start + 1 : arcs[index].end
+        guard to > from else { return nil }
+        return (from, to)
+    }
+
     /// The clear space between two neighbouring repetitions: one band width of
     /// it, measured along the band's centreline.
     ///

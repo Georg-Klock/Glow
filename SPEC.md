@@ -243,6 +243,25 @@ and the two widget rings are one drawing at three sizes. This ring used to paint
 a logged repetition grey, which made it the one surface in the app where a
 completion went dark, against §1 (#75).
 
+**A tap sweeps.** The line grows clockwise out of the run already logged and
+the pill retreats ahead of its head — one number driving both, which is the
+grammar `SlotView` and `SpanView` already use, expressed as an angle instead of
+a diameter. It starts at the end of the existing run rather than at the new
+segment, so it crosses the gap between them on its way; that crossing *is* the
+merge. The last repetition runs a full turn and closes the circle. 0.35s,
+`.easeOut` — a sweep has nothing past its end to overshoot into, so the closing
+spring does not transfer.
+
+This is the completion transition §3 allows, not idle motion: nothing on any
+surface moves on its own, and a lit mark still holds still. **Everything other
+than a repetition being logged snaps.** The reset is instant, because animating
+a correction dresses a mistake up as an achievement. Any jump other than +1 is
+instant — a tap arriving from the widget, a day rolling over, an edit — because
+none of those is a gesture made on this ring. Reduce Motion snaps. The widget
+does not run it at all: a tap there goes through `TapHabitIntent` and WidgetKit
+renders the next entry, and all that is asked is that it lands on the settled
+drawing.
+
 **A tap on the ring is one more.** Once the ring is full, the next tap resets
 the day to zero — the reset is the whole undo, and the day's completion rows
 are genuinely deleted, not marked over. The rule is `DayRing.countAfterTap`,

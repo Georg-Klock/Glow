@@ -11,9 +11,16 @@ import SwiftUI
 /// Path construction only. Every number comes from the geometry.
 struct DayRingArcShape: Shape {
     /// Trim fractions of the full circle: 0 at twelve o'clock, clockwise.
-    let start: Double
-    let end: Double
+    var start: Double
+    var end: Double
     let geometry: DayRingGeometry
+
+    /// The start angle, so the pill can retreat ahead of the sweeping line
+    /// rather than cutting to its new width (#76).
+    var animatableData: Double {
+        get { start }
+        set { start = newValue }
+    }
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
@@ -102,9 +109,15 @@ struct DayRingArcShape: Shape {
 /// repetitions still open. That is the week grid's rule at a different shape: a
 /// run of days there is one bar, not a row of dots.
 struct DayRingRunShape: Shape {
-    let start: Double
-    let end: Double
+    var start: Double
+    var end: Double
     let geometry: DayRingGeometry
+
+    /// The head, so the line grows rather than appearing at its new length.
+    var animatableData: Double {
+        get { end }
+        set { end = newValue }
+    }
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
