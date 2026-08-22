@@ -22,7 +22,10 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
         switch state {
         case .open: .openToday
         case .filled: .donePast
-        case .missed, .inactive: .upcoming
+        // `.rest` never arrives here: a span covers a run of days rather than
+        // one, so the rest day is a hole *inside* a span rather than a state a
+        // whole span can be in. Subtracting that hole from the shape is #73.
+        case .missed, .inactive, .rest: .upcoming
         }
     }
 }

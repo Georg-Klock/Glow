@@ -77,6 +77,9 @@ struct SlotView: View {
         case .openToday: "due today"
         case .missed: "missed"
         case .upcoming: "upcoming"
+        // The line down the column is `accessibilityHidden`, so with the marks
+        // gone this is the only thing that explains the hole in the row.
+        case .rest: "rest day"
         }
         return "\(habitName), \(state)"
     }
