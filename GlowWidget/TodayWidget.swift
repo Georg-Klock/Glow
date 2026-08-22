@@ -16,7 +16,7 @@ import WidgetKit
 /// (`TodayWidgetConfig.swift`) — see the note there; defined only in this
 /// target, the stored choice never reached the provider.
 struct TodaySmallWidget: Widget {
-    let kind = "GlowTodaySmall"
+    let kind = WidgetKind.todaySmall.rawValue
 
     var body: some WidgetConfiguration {
         AppIntentConfiguration(
@@ -41,7 +41,7 @@ struct TodaySmallWidget: Widget {
 }
 
 struct TodayMediumWidget: Widget {
-    let kind = "GlowTodayMedium"
+    let kind = WidgetKind.todayMedium.rawValue
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: TodayMediumProvider()) { entry in

@@ -22,7 +22,19 @@ struct WeeklyGridView: View {
     /// is switched on rather than once per launch.
     @AppStorage("didAnnounceLowPower") private var didAnnounceLowPower = false
 
-    private var week: Week { WeekCalendar.week(containing: today) }
+    /// The week's first day, observed. `WeekCalendar` reads the same key, but a
+    /// value read only in `WeekCalendar` is a dependency SwiftUI cannot see —
+    /// so this grid kept its old columns until something else redrew it (#134).
+    /// It is read in `week` below, which is what registers the dependency; the
+    /// same trick `HabitRowView` uses for the rest day.
+    @AppStorage(WeekPreferences.firstWeekdayKey, store: GlowSettings.store)
+    private var firstWeekday: Int = WeekPreferences.defaultFirstWeekday
+
+    private var week: Week {
+        // `firstWeekday` is read, not used: reading it here is the whole point.
+        _ = firstWeekday
+        return WeekCalendar.week(containing: today)
+    }
     private var store: HabitStore { HabitStore(context: context) }
 
     /// Whether the grid has outgrown the widget.
@@ -226,7 +238,6 @@ struct WeeklyGridView: View {
     private func addSpacer() {
         do {
             try store.addSpacer()
-            WidgetCenter.shared.reloadAllTimelines()
         } catch {
             HabitStore.report(error, operation: "addSpacer")
         }
@@ -235,7 +246,9 @@ struct WeeklyGridView: View {
     private func seedIfNeeded() {
         do {
             let added = try HabitSeeder(context: context).seedIfNeeded()
-            if added > 0 { WidgetCenter.shared.reloadAllTimelines() }
+            // Seeding writes through its own path rather than `HabitStore`,
+            // so it says so itself. See `WidgetRefresh`.
+            if added > 0 { WidgetRefresh.invalidate() }
         } catch {
             HabitStore.report(error, operation: "seedDefaults")
         }
@@ -274,8 +287,6 @@ struct WeeklyGridView: View {
                 // nothing changed, so nothing haptic and nothing to reload.
                 return
             }
-            // The widget reads the same store but is not told when it changes.
-            WidgetCenter.shared.reloadAllTimelines()
         } catch {
             HabitStore.report(error, operation: "toggleCompletion")
         }

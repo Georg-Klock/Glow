@@ -59,7 +59,7 @@ struct HabitStore {
             blank.createdAt = now
             blank.isSpacer = false
             try clearHistory(of: blank)
-            try context.save()
+            try commit()
             return blank
         }
 
@@ -71,7 +71,7 @@ struct HabitStore {
             sortOrder: try nextSortOrder()
         )
         context.insert(habit)
-        try context.save()
+        try commit()
         return habit
     }
 
@@ -97,7 +97,7 @@ struct HabitStore {
             isSpacer: true
         )
         context.insert(spacer)
-        try context.save()
+        try commit()
         return spacer
     }
 
@@ -110,7 +110,7 @@ struct HabitStore {
         habit.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         habit.icon = icon
         habit.frequency = frequency
-        try context.save()
+        try commit()
     }
 
     /// Deleting a habit leaves a blank row where it was. Deleting a blank row
@@ -135,7 +135,7 @@ struct HabitStore {
             // week grid, so there is nothing to keep.
             try clearHistory(of: habit)
             context.delete(habit)
-            try context.save()
+            try commit()
             return
         }
 
@@ -153,7 +153,7 @@ struct HabitStore {
         habit.icon = ""
         habit.frequency = .daily
         habit.isSpacer = true
-        try context.save()
+        try commit()
     }
 
     /// Removes every completion a habit holds.
@@ -176,7 +176,23 @@ struct HabitStore {
         for (index, habit) in reordered.enumerated() {
             habit.sortOrder = index
         }
+        try commit()
+    }
+
+    /// Saves, and then tells the widgets.
+    ///
+    /// Every write in this type ends here, and that is the point (#134): a
+    /// reload called at the call site kept being forgotten — swipe-delete and
+    /// reorder both saved without one — and a widget then showed an order or a
+    /// row that no longer existed until something unrelated reloaded it. Now
+    /// forgetting to invalidate means forgetting to save, which is not a
+    /// mistake that survives a test run.
+    ///
+    /// `WidgetRefresh` coalesces, so a reorder rewriting `sortOrder` on ten
+    /// rows still costs one reload.
+    private func commit() throws {
         try context.save()
+        WidgetRefresh.invalidate()
     }
 
     private func nextSortOrder() throws -> Int {
@@ -239,14 +255,14 @@ struct HabitStore {
         if let existing = (habit.completions ?? []).first(where: { $0.day == day }) {
             habit.completions?.removeAll { $0.id == existing.id }
             context.delete(existing)
-            try context.save()
+            try commit()
             return .uncompleted
         }
 
         let completion = Completion(day: day, habit: habit)
         context.insert(completion)
         habit.completions?.append(completion)
-        try context.save()
+        try commit()
         return .completed
     }
 
@@ -279,7 +295,7 @@ struct HabitStore {
         let completion = Completion(day: day, habit: habit)
         context.insert(completion)
         habit.completions?.append(completion)
-        try context.save()
+        try commit()
         return (habit.completions ?? []).count { $0.day == day }
     }
 
@@ -319,7 +335,7 @@ struct HabitStore {
         for completion in doomed {
             context.delete(completion)
         }
-        try context.save()
+        try commit()
         return doomed.count
     }
 

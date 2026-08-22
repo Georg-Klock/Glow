@@ -13,7 +13,7 @@ import WidgetKit
 /// Small only, deliberately: one habit's month is one thing to say, and a
 /// bigger frame would only invite a second.
 struct MonthWidget: Widget {
-    let kind = "GlowMonthSmall"
+    let kind = WidgetKind.month.rawValue
 
     var body: some WidgetConfiguration {
         AppIntentConfiguration(

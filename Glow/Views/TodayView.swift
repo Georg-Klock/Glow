@@ -183,7 +183,6 @@ struct TodayView: View {
             // screen would request one, show nobody anything, and end it two
             // seconds later. The ring closing *is* this screen's
             // acknowledgement. See `GoalPopCentre` and #103.
-            WidgetCenter.shared.reloadAllTimelines()
         } catch {
             HabitStore.report(error, operation: "recordTap")
         }

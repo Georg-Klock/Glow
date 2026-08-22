@@ -14,7 +14,7 @@ import WidgetKit
 /// What it keeps beyond that is the part that matters daily: logging a habit
 /// without opening anything.
 struct GlowWidget: Widget {
-    let kind = "GlowWidget"
+    let kind = WidgetKind.week.rawValue
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: WeekProvider()) { entry in

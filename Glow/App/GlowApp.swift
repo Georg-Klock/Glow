@@ -46,7 +46,7 @@ struct GlowApp: App {
         // not honour Reduce Motion — the point of forcing one is to see it.
         WidgetBurst.record(habitID: habit.id, reduceMotion: false)
         WidgetTrace.record("forced burst for \(habit.id.uuidString), reloading")
-        WidgetCenter.shared.reloadAllTimelines()
+        WidgetRefresh.invalidate()
     }
     #endif
 
