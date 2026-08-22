@@ -47,22 +47,27 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
+            VStack(spacing: 0) {
+                preview
+                form
+            }
+            // True black under the whole screen rather than the grouped
+            // background, so the halo falls off into the same black the grid
+            // uses and there is no seam where the row would have been.
+            .background(Color.black)
+            .navigationTitle("Settings")
+            .onAppear { isDemoSeeded = DemoHistory(context: context).isSeeded }
+            // Covers the toggle and the day picker both: the widget draws the
+            // same week and withholds the same taps, and it is not told when
+            // the setting moves.
+            .onChange(of: restDay) { _, _ in WidgetCenter.shared.reloadAllTimelines() }
+        }
+    }
+
+    private var form: some View {
             Form {
                 // Glow leads: it is the one control here that is the product
                 // rather than a preference about it.
-                Section {
-                    // A live slot, rendered by the same code path the grid
-                    // uses, so the slider is judged against the real thing
-                    // rather than a swatch that approximates it.
-                    HStack {
-                        Spacer()
-                        GlowImageView(size: CGSize(width: 120, height: 40))
-                            .padding(.vertical, 22)
-                        Spacer()
-                    }
-                    .listRowBackground(Color.black)
-                }
-
                 Section {
                     Slider(
                         value: $peak,
@@ -158,7 +163,7 @@ struct SettingsView: View {
                     Text(demoFooter)
                 }
             }
-            .navigationTitle("Settings")
+            .scrollContentBackground(.hidden)
             // A choice of two, rather than a format setting nobody would ever
             // change twice. CSV opens in a spreadsheet; JSON parses.
             .confirmationDialog(
@@ -175,12 +180,42 @@ struct SettingsView: View {
             .sheet(item: $exportFile) { file in
                 ShareSheet(url: file.url)
             }
-        }
-        .onAppear { isDemoSeeded = DemoHistory(context: context).isSeeded }
-        // Covers the toggle and the day picker both: the widget draws the same
-        // week and withholds the same taps, and it is not told when the
-        // setting moves.
-        .onChange(of: restDay) { _, _ in WidgetCenter.shared.reloadAllTimelines() }
+    }
+
+    /// A live slot, rendered by the same code path the grid uses, so the
+    /// slider is judged against the real thing rather than a swatch that
+    /// approximates it.
+    ///
+    /// **Above the form, not inside it.** A `Form` row bounds its content, so a
+    /// halo drawn in one is clipped by the row's frame however much padding it
+    /// is given — padding only moves the edge. Measured: at exactly the
+    /// reserved 34.97pt the column stepped 33 → 0, which is a cut and not a
+    /// falloff, and a Gaussian has no end to reserve for anyway. Out here
+    /// nothing bounds it. The cost is that it no longer scrolls away, which is
+    /// the trade #91 names (#91).
+    ///
+    /// Which means its halo has to be the real thing too. It used to be cut a
+    /// third of the way through its falloff by a hand-typed 22pt of padding
+    /// inside a form row — and worst at the top of the slider, which is least
+    /// honest exactly where the setting matters most.
+    private var preview: some View {
+        GlowImageView(size: Self.previewSize)
+            .padding(.vertical, Self.previewHalo)
+            .frame(maxWidth: .infinity)
+            .background(Color.black)
+    }
+
+    /// The preview slot, and the room its halo needs.
+    ///
+    /// **Derived, never typed.** `GlowModifier` casts the halo at
+    /// `height * GlowPalette.haloRadius`, multiplied by
+    /// `GlowSettings.haloScale(peak)` — which reaches `maxHaloScale` at the
+    /// shipping default. Reserving anything less cuts the light mid-falloff,
+    /// and reserving a constant means it drifts the next time `haloRadius`
+    /// moves. This is the same expression the halo is drawn from.
+    private static let previewSize = CGSize(width: 120, height: 40)
+    private static var previewHalo: CGFloat {
+        previewSize.height * GlowPalette.haloRadius * CGFloat(GlowSettings.maxHaloScale)
     }
 
     /// The Dynamic Island's pop, on or off.
