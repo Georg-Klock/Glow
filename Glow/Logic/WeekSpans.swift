@@ -176,6 +176,9 @@ enum WeekSpans {
         // Reps with no day left to land on, and reps that still have one.
         let lost = max(0, repsLeft - actionableLeft)
         let live = repsLeft - lost
+        let restIndex = week.days.firstIndex {
+            WeekPreferences.isRestDay($0, calendar: calendar)
+        }
 
         var spans: [SlotSpan] = []
         var cursor = 0
@@ -187,7 +190,13 @@ enum WeekSpans {
         // #81 adds: without it a late day leaves fewer columns than there are
         // reps still to draw, and the surplus spans were silently dropped.
         if done > 0 {
-            let roomForTheRest = lastColumn - repsLeft
+            // One column more than the reps need, when a lost span may have to
+            // straddle the rest column — see `placeLost`. Reserving it when no
+            // straddle happens is harmless: the last span always runs to the
+            // end of the week, so the slack flows into the open span rather
+            // than leaving a hole.
+            let straddle = (restIndex != nil && lost > 0) ? 1 : 0
+            let roomForTheRest = lastColumn - repsLeft - straddle
             let doneLast: Int
             if let todayIndex {
                 // The first column the block must leave alone. Today belongs
@@ -212,21 +221,16 @@ enum WeekSpans {
         //
         // One column each while something is still live, because the open span
         // absorbs the slack. With nothing live they *are* the rest of the row,
-        // so they divide it — which is also the only way the seven columns stay
-        // covered when nothing was ever logged.
+        // so the last of them runs to the end — which is also the only way the
+        // seven columns stay covered when nothing was ever logged.
+        let lostSpans = placeLost(
+            count: lost, from: cursor, restIndex: restIndex,
+            runToEnd: live == 0 ? lastColumn : nil, startIndex: spans.count
+        )
+        spans += lostSpans
+        cursor = (lostSpans.last?.lastDay).map { $0 + 1 } ?? cursor
         guard live > 0 else {
-            spans += divide(cursor, lastColumn, into: lost, from: spans.count) { _ in .missed }
             return withUndo(spans, doneToday: doneToday, todayRests: todayRests, today: todayStart)
-        }
-        for _ in 0..<lost {
-            spans.append(SlotSpan(
-                index: spans.count, firstDay: cursor, lastDay: cursor,
-                // Inert and permanent for the week: never tappable, never
-                // undoable, and it does not take the row down with it — the
-                // reps still reachable keep glowing beside it.
-                state: .missed, actionDay: nil
-            ))
-            cursor += 1
         }
 
         // 3. The span today sits in.
@@ -256,6 +260,48 @@ enum WeekSpans {
         // 4. What is still to come.
         spans += divide(cursor, lastColumn, into: live - 1, from: spans.count) { _ in .inactive }
         return withUndo(spans, doneToday: doneToday, todayRests: todayRests, today: todayStart)
+    }
+
+    /// The reps that can no longer happen, one column each — except on the rest
+    /// day's column, where a span takes two.
+    ///
+    /// **A span exactly the width of the rest column is not drawn at all.**
+    /// `RestWindow` subtracts that column plus the gap either side from the
+    /// shape, which for a one-column span is the whole of it, so the ✕ simply
+    /// vanished and the row drew one fewer mark than its goal (#100). That was
+    /// tolerable while the casualty could only be an unlit socket; a ✕ is a
+    /// claim about what happened, and one silently not drawn is worse than one
+    /// that is wrong.
+    ///
+    /// Two columns rather than a skip, because the seven have to stay covered:
+    /// skipping would leave the rest column belonging to no span at all. The
+    /// mark then sits in whatever the window leaves — see `SlotMarkView`, which
+    /// centres a mark in the visible remainder rather than in the frame.
+    private static func placeLost(
+        count: Int,
+        from start: Int,
+        restIndex: Int?,
+        runToEnd lastColumn: Int?,
+        startIndex: Int
+    ) -> [SlotSpan] {
+        guard count > 0 else { return [] }
+        var spans: [SlotSpan] = []
+        var cursor = start
+        for i in 0..<count {
+            // The rest column cannot be a span's whole extent, so a span
+            // starting there takes the next column with it.
+            var last = cursor == restIndex ? cursor + 1 : cursor
+            if i == count - 1, let lastColumn { last = max(last, lastColumn) }
+            spans.append(SlotSpan(
+                index: startIndex + i, firstDay: cursor, lastDay: last,
+                // Inert and permanent for the week: never tappable, never
+                // undoable, and it does not take the row down with it — the
+                // reps still reachable keep glowing beside it.
+                state: .missed, actionDay: nil
+            ))
+            cursor = last + 1
+        }
+        return spans
     }
 
     /// Hands the undo to the most recent completion, which is today's.
