@@ -34,22 +34,43 @@ struct RowGeometry: Equatable {
     var iconGap: CGFloat { WidgetMetrics.iconGap * scale }
     /// How far a name may run before truncating: into the gap, never into the
     /// track. The widget's rule, at the screen's scale.
-    var nameMaxWidth: CGFloat { labelWidth + labelGap - iconWidth - iconGap }
+    ///
+    /// **Floored at zero, and that is not defensive padding** (#136). This is a
+    /// difference, not a product: the icon and its gap are subtracted from a
+    /// label column that a narrow proposal can shrink to nothing, and the
+    /// result then goes straight into `.frame(maxWidth:)`. At `totalWidth == 0`
+    /// it is −13.5pt, which SwiftUI reports as
+    /// `Invalid frame dimension (negative or non-finite)` — a line the suite
+    /// has been logging at test-host startup.
+    var nameMaxWidth: CGFloat { max(0, labelWidth + labelGap - iconWidth - iconGap) }
+
+    /// A width this can actually divide up.
+    ///
+    /// A `GeometryReader` proposes zero on its first pass, and `.infinity` and
+    /// `.nan` both arrive through layout often enough not to be theoretical.
+    /// Non-finite collapses to zero rather than propagating: every value below
+    /// is derived from this one, and one `.nan` here becomes a `.nan` in a
+    /// frame modifier three properties later, where the warning names no
+    /// source.
+    private static func usable(_ width: CGFloat) -> CGFloat {
+        width.isFinite ? max(0, width) : 0
+    }
 
     init(totalWidth: CGFloat) {
-        let scale = max(1, totalWidth / WidgetMetrics.largeWidth)
+        let width = Self.usable(totalWidth)
+        let scale = max(1, width / WidgetMetrics.largeWidth)
         self.scale = scale
 
         // The label column grows with the user's text size, but never past a
         // point where the track it is stealing from stops being a week.
         let scaledLabel = UIFontMetrics(forTextStyle: .subheadline)
             .scaledValue(for: WidgetMetrics.labelWidth * scale)
-        labelWidth = min(scaledLabel, max(0, totalWidth * 0.42))
+        labelWidth = max(0, min(scaledLabel, width * 0.42))
 
         textSize = UIFontMetrics(forTextStyle: .subheadline)
             .scaledValue(for: WidgetMetrics.textSize * scale)
 
-        let available = totalWidth
+        let available = width
             - WidgetMetrics.padLeading * scale * 2
             - labelWidth
             - WidgetMetrics.labelGap * scale
