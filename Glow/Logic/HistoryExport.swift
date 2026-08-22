@@ -48,7 +48,7 @@ enum HistoryExport {
         for row in rows(habits: habits, calendar: calendar) {
             lines.append([
                 row.day,
-                escape(row.name),
+                escape(defused(row.name)),
                 row.cadence,
                 String(row.target),
                 String(row.count),
@@ -143,11 +143,56 @@ enum HistoryExport {
     /// RFC 4180: quote anything containing a comma, a quote or a newline, and
     /// double the quotes inside it. A habit called `Read, properly` is a real
     /// name and must not become two columns.
+    ///
+    /// Applied *after* `defused`, because that is the order the two problems
+    /// occur in: one is about what a spreadsheet computes, the other about what
+    /// a parser splits.
     private static func escape(_ field: String) -> String {
         guard field.contains(where: { $0 == "," || $0 == "\"" || $0.isNewline }) else {
             return field
         }
         return "\"" + field.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+    }
+
+    /// The characters a spreadsheet reads as "this cell is a program".
+    ///
+    /// `=` and `+` start a formula outright; `-` does too, because `-1+1` is
+    /// arithmetic; `@` is Excel's old function-call sigil.
+    private static let formulaLeaders: Set<Character> = ["=", "+", "-", "@"]
+
+    /// What a spreadsheet discards before it decides. Excel strips these, so
+    /// they cannot protect a formula — and a check on the *raw* first character
+    /// would be fooled by every one of them.
+    private static let ignoredLeaders: Set<Character> = [" ", "\t", "\r", "\n"]
+
+    /// Stop a habit name from being executed by whatever opens the file.
+    ///
+    /// **The name is the only user-controlled field in the row**: the date is
+    /// formatted, and the cadence, target and count are ours. So this is the
+    /// one place a person's own text becomes a cell, and a habit called
+    /// `=1+1` — or something considerably less playful — is a name somebody can
+    /// type into this app today.
+    ///
+    /// A leading apostrophe is the escape every major spreadsheet understands.
+    ///
+    /// **Leading whitespace is trimmed before the test, not after.** Excel
+    /// discards it and then decides, so a name beginning with a space and an
+    /// `=` is still a formula, and a check on the raw first character misses
+    /// exactly the case an attacker would reach for.
+    ///
+    /// **The apostrophe stays in the data.** That is the cost, and it is the
+    /// right way round: a name that reads `'=1+1` in a spreadsheet cell is
+    /// mildly wrong, and one that *evaluates* is a vulnerability. JSON is left
+    /// alone — a parser has no notion of a formula, so there is nothing to
+    /// defuse and corrupting the value there would buy nothing.
+    static func defused(_ field: String) -> String {
+        let significant = field.drop { ignoredLeaders.contains($0) }
+        guard let first = significant.first, formulaLeaders.contains(first) else {
+            return field
+        }
+        // In front of the whitespace, not after it: the apostrophe has to be
+        // the cell's first character to do anything.
+        return "'" + field
     }
 
     private struct Export: Encodable {

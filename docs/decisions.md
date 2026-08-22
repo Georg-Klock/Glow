@@ -820,3 +820,52 @@ non-negative, named so a failure says which. Run against the unfixed code they
 report exactly the values the issue predicted: `-13.5`, `-13.08`, `-9.3`, `inf`.
 One more test pins the ordinary case, because a floor that also flattens a real
 layout would pass the sweep and fail the app.
+
+## An export is defused, and it does not outlive its share sheet
+
+**2026-08-22.** Two separate holes in the same feature (#142), both in the gap
+between "this is text" and "this is text somebody else's software will act on".
+
+**A habit name can be a formula.** The CSV escaped RFC 4180 syntax and nothing
+else, so a habit called `=1+1` — or something less playful — arrived in a
+spreadsheet cell as a program. The name is the *only* user-controlled field in
+the row: the date is formatted and the cadence, target and count are ours, so
+this is the single place a person's own text becomes a cell.
+
+`HistoryExport.defused` prefixes an apostrophe when the first significant
+character is `=`, `+`, `-` or `@`. Two details are the whole of it:
+
+- **Leading whitespace is dropped before the test.** Excel discards it and then
+  decides, so ` =1+1` is still a formula and a check on the raw first character
+  misses exactly the case worth defending against.
+- **The apostrophe goes in front of the whitespace**, because it only does
+  anything as the cell's first character.
+
+The cost is that the apostrophe stays in the data, and that is the right way
+round: a cell reading `'=1+1` is mildly wrong, one that evaluates is a
+vulnerability. **JSON is deliberately untouched** — a parser has no notion of a
+formula, so there is nothing to defuse and an apostrophe there is just a wrong
+name.
+
+**The file outlived its purpose.** The export was written into the temporary
+directory and never removed, so a full history sat on disk after the share sheet
+had gone. Not a breach of the feature's promise — the file never leaves without
+a tap — but exactly the kind of leftover that promise exists to rule out.
+
+`ExportStore` owns a subdirectory, and that scoping *is* the safety property:
+sweeping means deleting, and a sweep of the temporary directory itself would
+reach files this app never wrote. `discard` refuses any URL whose resolved
+parent is not the store's own folder, so neither a symlink nor a `../` can point
+it elsewhere. `write` sweeps first, which is the fallback for the one case no
+dismissal handler covers — being killed while the sheet is up.
+
+Cleanup hangs off `sheet(item:onDismiss:)`, because sharing and cancelling are
+the same event as far as the file is concerned and treating them as two is how
+one gets missed. The URL is held in its own state rather than read back off the
+sheet's item: `sheet(item:)` clears its binding **before** `onDismiss` runs, so
+a handler that asked the item for the URL would find nil every time and delete
+nothing.
+
+Verified in the simulator, both ways round: export → cancel leaves zero files,
+export → complete (Copy) leaves zero files, and the folder the file lands in is
+the store's own.
