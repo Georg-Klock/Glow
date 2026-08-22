@@ -265,6 +265,38 @@ than a solved one. What reopening this needs is a mechanism, not a second
 opinion. The measurements are in `GlowWidget.swift` and `GlowImageCache.swift`
 so that the flag is not tried a third time.
 
+## labelHalo is a radius, and the doc was quoting a blur
+
+**Question** (#63). A design document's effects table stated its own convention
+— a Figma shadow radius is roughly half a CSS blur and roughly equal to a
+SwiftUI `.shadow(radius:)` — and then two of its seven rows did not follow it.
+It published 1.5 and 2 for the due label and today's letter; `GlowPalette`
+computes 0.75 and 1.0. Is the doc wrong, or is every glowing label in the app
+under-blurred by half?
+
+**Decision** (2026-08-22). The doc was wrong, and it is already gone.
+
+The two cases are not inconsistent, they are read from different quantities.
+`haloRadius` and the ring's radii were taken from the file as *Figma shadow
+radii* and are used undivided, because a Figma radius is about a SwiftUI radius.
+`labelHalo` and `headerHalo` were taken as *CSS blurs at 2x*: halve for 1x,
+halve again to get from a blur to a radius. The table quoted the 1x blur for
+those two rows and the radius for the other five — one column, two quantities.
+
+This is the same arithmetic the project has already got wrong once in the
+opposite direction, halving numbers that were already halved and landing every
+glow at a quarter of its reach. The rule that separates the cases is whether the
+source number was a blur or a radius, and **nothing about the value itself says
+which** — so it is now written at the two lines it governs rather than in a
+table.
+
+**What would reopen it.** 0.75pt against 1.5pt of blur on 12pt text is not
+something a simulator can settle: it has no EDR headroom, and the halo is
+exactly the part that needs it. If a due label ever reads under-lit on a device,
+the thing to suspect is that the file's number was a radius after all and one of
+the two divisions is spurious. That is a device observation, not an argument,
+and it is the only thing that should move these numbers.
+
 ## The open ring has no fill
 
 **Question** (#65). `GlowPalette.ringWash` — a 1% white — was declared and never
