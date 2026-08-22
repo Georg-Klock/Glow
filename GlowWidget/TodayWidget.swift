@@ -56,12 +56,6 @@ struct TodayMediumWidget: Widget {
     }
 }
 
-struct TodayEntry: TimelineEntry {
-    let date: Date
-    /// Up to one habit for small, up to three for medium.
-    let habits: [DayRingSnapshot]
-}
-
 struct TodaySmallProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> TodayEntry {
         TodayEntry(date: Date(), habits: [])

@@ -473,6 +473,42 @@ glow on exactly this reasoning — a separate process that archives its render �
 and that was wrong when it was finally measured, so the assumption is not being
 made in either direction. The answer belongs in glow.md when there is one.
 
+## The container gradient is refused, permanently
+
+**Question** (#87). The design file draws the widget's container as a near-black
+gradient, about `#08080D` at the corners. The app draws pure black. Which is
+right, and what stops the file's version coming back?
+
+**Decision** (2026-08-22). Pure black, permanently, and this entry exists mostly
+to stop the reversal.
+
+The glow is a claim about light against dark, and every level the ground sits
+above zero is a level taken off it. On a home screen that matters most, because
+the wallpaper is right beside it: the gradient was followed for a while and read
+as a *panel sitting on* the wallpaper rather than marks floating on it.
+
+**The reversal is baited.** `RenderTests/DesignReference/README.md` records that
+the ~13-level container difference alone accounts for most of an **84%**
+render-diff against the design export. That number is a standing invitation to
+"fix" the diff by re-adding the gradient, and the diff would indeed collapse. It
+would be a regression wearing a green number, which is exactly why the harness
+has no pass/fail threshold and why this is written down.
+
+`GlowPalette.widgetBackground` is declared as `Color(.sRGB, 0, 0, 0, 1)` rather
+than `Color.black` for the same reason — `Color.black` is a system colour and
+free to be something other than zero. Nothing caught that before; a test does
+now, along with a pixel sweep of all five widget families.
+
+**What the halo does is not a violation.** A lit mark spreads white onto the
+ground on purpose. On the small Today family the ring's halo reaches 46.6pt and
+covers a 158pt frame corner to corner, so its corners read 1,1,1 with the glow
+up — and 0,0,0 with it down, which is how the sweep tells the two apart rather
+than loosening a tolerance until both pass.
+
+**Not settled here: Tinted and Clear.** They substitute glass for the declared
+background, and #53 records that the substitution cannot be opted out of. That
+is a different question from this one, which is about what Default renders.
+
 ## The open ring has no fill
 
 **Question** (#65). `GlowPalette.ringWash` — a 1% white — was declared and never

@@ -172,6 +172,9 @@ targets:
     sources:
       - path: RenderTests
       - path: GlowWidget/WeekWidgetView.swift
+      - path: GlowWidget/TodayWidgetView.swift
+      - path: GlowWidget/TodayEntry.swift
+      - path: GlowWidget/MonthWidget.swift
       - path: GlowWidget/WeekEntry.swift
       - path: Glow/Logic
       - path: Glow/Models
@@ -179,6 +182,8 @@ targets:
       - path: Glow/Glow
       - path: Glow/Views/HabitIconView.swift
       - path: Glow/Views/SlotMarkView.swift
+      - path: Glow/Views/DayRingView.swift
+      - path: Glow/Views/DayRingArcShape.swift
     # Hosted by the app, same as GlowTests — hostless, Bundle.main is the
     # xctest runner and HabitSymbol finds no SymbolCatalog.json, so "sunrise"
     # quietly renders as the text "s…" instead of a symbol. Measured, not

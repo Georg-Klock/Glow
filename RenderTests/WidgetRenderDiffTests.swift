@@ -347,6 +347,138 @@ struct WidgetRenderDiffTests {
         }
     }
 
+    // MARK: - The ground is 0,0,0 (#87)
+
+    /// Renders one view at a widget's own size, over the declared background,
+    /// exactly as the configurations do.
+    private func renderFamily(
+        _ view: some View, size: CGSize, vertical: CGFloat = WidgetMetrics.padVertical
+    ) throws -> CGImage {
+        let framed = view
+            .padding(.leading, WidgetMetrics.padLeading)
+            .padding(.trailing, WidgetMetrics.padTrailing)
+            .padding(.vertical, vertical)
+            .frame(width: size.width, height: size.height)
+            .background(GlowPalette.widgetBackground)
+            .environment(\.colorScheme, .dark)
+        let renderer = ImageRenderer(content: framed)
+        renderer.scale = Self.scale
+        renderer.proposedSize = ProposedViewSize(size)
+        return try #require(renderer.cgImage, "ImageRenderer produced nothing")
+    }
+
+    /// Every family, at the sizes a 6.1" phone gives them.
+    private func families() -> [(String, AnyView, CGSize)] {
+        let week = entry()
+        let today = TodayEntry(date: week.date, habits: [
+            DayRingSnapshot(id: UUID(), name: "Water", icon: "drop", target: 6, done: 2),
+        ])
+        return [
+            ("week small", AnyView(WeekWidgetView(entry: week, familyOverride: .systemSmall)),
+             CGSize(width: 158, height: 158)),
+            ("week medium", AnyView(WeekWidgetView(entry: week, familyOverride: .systemMedium)),
+             CGSize(width: 338, height: 158)),
+            ("week large", AnyView(WeekWidgetView(entry: week, familyOverride: .systemLarge)),
+             CGSize(width: 338, height: 354)),
+            ("today small", AnyView(TodaySmallView(entry: today)),
+             CGSize(width: 158, height: 158)),
+            ("today medium", AnyView(TodayMediumView(entry: today)),
+             CGSize(width: 338, height: 158)),
+        ]
+    }
+
+    /// Renders with the glow at the bottom of its range, where
+    /// `GlowSettings.haloScale` is 0 and no mark casts a shadow.
+    ///
+    /// The background cannot be measured with the halo on. A lit mark spreads
+    /// white onto the ground on purpose — that is the product, not a leak — and
+    /// on the small Today family the ring's halo reaches
+    /// `96 * ringHaloRadius * maxHaloScale` = 46.6pt, which covers a 158pt
+    /// frame corner to corner. Its corners read 1,1,1 with the glow up, and
+    /// **0,0,0 with it down**, which is what proves the one level is the halo
+    /// and not the ground.
+    private func withoutHalo<T>(_ body: () throws -> T) rethrows -> T {
+        let previous = GlowSettings.store.object(forKey: GlowSettings.key)
+        defer { GlowSettings.store.set(previous, forKey: GlowSettings.key) }
+        GlowSettings.store.set(GlowSettings.range.lowerBound, forKey: GlowSettings.key)
+        GlowImageCache.shared.removeAll()
+        return try body()
+    }
+
+    @Test("The ground is 0,0,0 in every family, exactly")
+    func groundIsPureBlack() throws {
+        try withoutHalo {
+        // The corners, which no halo reaches. Exactly zero, not a tolerance
+        // band: the claim is pure black, and "nearly" is the thing being
+        // ruled out — the design file's own container is a ~13-level gradient,
+        // and that is exactly the difference this refuses.
+        for (name, view, size) in families() {
+            let image = try renderFamily(view, size: size)
+            let pixels = try rgba(of: image)
+            let w = image.width, h = image.height
+            for (x, y) in [(1, 1), (w - 2, 1), (1, h - 2), (w - 2, h - 2)] {
+                let i = (y * w + x) * 4
+                #expect(pixels[i] == 0 && pixels[i + 1] == 0 && pixels[i + 2] == 0,
+                        "\(name) corner (\(x),\(y)) is \(pixels[i]),\(pixels[i+1]),\(pixels[i+2])")
+            }
+
+            // And most of the frame is exactly zero. A gradient, a tint or a
+            // material would lift every one of these off the floor at once,
+            // which a corner sample alone could miss if it were subtle at the
+            // edges.
+            var exact = 0
+            for i in stride(from: 0, to: pixels.count, by: 4)
+            where pixels[i] == 0 && pixels[i + 1] == 0 && pixels[i + 2] == 0 {
+                exact += 1
+            }
+            let share = Double(exact) * 100 / Double(w * h)
+            print("bg-audit: \(name) exact-black \(String(format: "%.1f", share))%")
+            // 95-98% measured across the five. A gradient, a tint or a material
+            // would lift every one of these off the floor at once, which a
+            // corner sample alone could miss if it were subtle at the edges.
+            #expect(share > 90, "\(name): only \(Int(share))% of the frame is pure black")
+        }
+        }
+    }
+
+    @Test("With the glow up, the only thing lifting the ground is the halo")
+    func haloIsWhatLiftsIt() throws {
+        // The other half of the same claim, and the reason the test above turns
+        // the glow down rather than loosening its tolerance. On the small Today
+        // family the ring's halo covers the whole frame — corner to corner —
+        // so there is nowhere in it that "no mark is near".
+        let (_, view, size) = families()[3]
+        let lit = try rgba(of: try renderFamily(view, size: size))
+        let dark = try withoutHalo { try rgba(of: try renderFamily(view, size: size)) }
+
+        func corner(_ p: [UInt8]) -> Int { Int(p[(1 * Int(size.width * Self.scale) + 1) * 4]) }
+        #expect(corner(dark) == 0, "the ground itself is not black")
+        #expect(corner(lit) > 0, "the halo does not reach the corner after all")
+        // And it is still neutral where it lands, which is the claim that
+        // survives the halo.
+        let i = (1 * Int(size.width * Self.scale) + 1) * 4
+        #expect(lit[i] == lit[i + 1] && lit[i + 1] == lit[i + 2])
+    }
+
+    @Test("No pixel the widget renders carries a hue")
+    func noHueAnywhere() throws {
+        // Two colours and no third. This also covers the halo, which is a white
+        // shadow: near a lit mark the ground is genuinely not zero, and that is
+        // the product rather than a leak — but it is still neutral.
+        for (name, view, size) in families() {
+            let pixels = try rgba(of: try renderFamily(view, size: size))
+            var worst = 0
+            for i in stride(from: 0, to: pixels.count, by: 4) {
+                let spread = Int(max(pixels[i], pixels[i + 1], pixels[i + 2]))
+                    - Int(min(pixels[i], pixels[i + 1], pixels[i + 2]))
+                worst = max(worst, spread)
+            }
+            // One level of slack for the encoder's own rounding between
+            // channels; anything with an actual tint lands far above it.
+            #expect(worst <= 1, "\(name) carries a hue: channels spread by \(worst)")
+        }
+    }
+
     // MARK: - The fixture
 
     /// The week the committed design export depicts — today is Tuesday — so
