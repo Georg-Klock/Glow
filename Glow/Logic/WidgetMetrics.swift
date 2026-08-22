@@ -39,7 +39,23 @@ enum WidgetMetrics {
     /// sitting hard against the widget's rounded corner.
     static let padLeading: CGFloat = 15
     static let padTrailing: CGFloat = 16
-    static let padVertical: CGFloat = 16
+    /// 15, not the file's 16 — the one number in this type that is not the
+    /// design's, and the point it gives up buys the medium widget's fifth row.
+    ///
+    /// The medium family missed five rows by hundredths of a row on every phone
+    /// measured: 126pt of content against a 27.45pt pitch is 4.95 rows, and the
+    /// hard cut takes the floor. One point anywhere in that sum closes it, and
+    /// there were two candidates. `rowGap` is the other, and it is the one that
+    /// must not move: it is set by how far a halo spills out of a row, so
+    /// closing it would put each row's light into its neighbour — a functional
+    /// number wearing a spacing number's clothes. `padVertical` is a margin
+    /// against the widget's own rounded edge and carries no such job, so it is
+    /// the one that gives.
+    ///
+    /// The large family is unaffected: 11 rows before and after, because its
+    /// spare change was never within a point of the next row. `WidgetMetricsTests`
+    /// asserts both counts. See #57.
+    static let padVertical: CGFloat = 15
 
     /// Header to the first row, and row to row.
     static let headerGap: CGFloat = 13
