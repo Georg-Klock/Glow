@@ -158,8 +158,53 @@ struct MonthWidgetView: View {
                         }
                     }
                 }
+                // Behind the marks, and behind the whole grid rather than per
+                // row: the month has no `RestCut` row range to honour, because
+                // every one of its rows is a week and the cut runs through all
+                // of them.
+                .background(alignment: .leading) {
+                    restCut(cells: cells, side: side, gap: gap, rows: rows, rowGap: rowGap)
+                }
                 Spacer(minLength: 0)
             }
+        }
+    }
+}
+
+private extension MonthWidgetView {
+    /// The rest day's column, marked the way every other surface marks it.
+    ///
+    /// #72 emptied this column and left nothing saying why — six or seven blank
+    /// cells with no more explanation than a rendering fault would have. The
+    /// week grid does not have that problem because it draws the cut, and the
+    /// month's columns are weekdays in exactly the same sense, so the same line
+    /// says the same thing here (#79).
+    ///
+    /// Same weight and same grey: `GlowShape.barThickness` in
+    /// `GlowPalette.restCut`. What does *not* carry over is `RestCut` itself —
+    /// its job is deciding which rows a week grid's line runs through, and here
+    /// every row is a week, so the line runs through all of them. The x is the
+    /// month's own column pitch rather than `RestCut.x`, which divides a track
+    /// after a label column the month does not have.
+    @ViewBuilder
+    func restCut(
+        cells: [MonthCell], side: CGFloat, gap: CGFloat, rows: Int, rowGap: CGFloat
+    ) -> some View {
+        if let column = cells.first(where: { WeekPreferences.isRestDay($0.date) })?.column {
+            let width = GlowShape.barThickness
+            let centre = CGFloat(column) * (side + gap) + side / 2
+            Rectangle()
+                .fill(GlowPalette.restCut)
+                .frame(
+                    width: width,
+                    // The whole grid, first row's top to last row's bottom —
+                    // the month's equivalent of ending on a habit.
+                    height: CGFloat(rows) * side + CGFloat(max(0, rows - 1)) * rowGap
+                )
+                // `.offset(x:)` moves the leading edge, so the centre has to
+                // have half the width taken off it. Same trap as #71.
+                .offset(x: centre - width / 2)
+                .accessibilityHidden(true)
         }
     }
 }
