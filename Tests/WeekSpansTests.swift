@@ -131,3 +131,153 @@ struct WeekSpansTests {
         #expect(row[0].lastDay == 6)
     }
 }
+
+/// #81: a weekly row draws exactly `target` spans, however late in the week it
+/// is. The suite above is the design file's examples; this one is the rule that
+/// covers the days the file did not draw.
+@Suite("Week spans, late in the week", .serialized)
+struct LateWeekSpansTests {
+    private let calendar = TestCalendar.monday
+    /// The week beginning Monday 2026-08-17.
+    private var week: Week {
+        WeekCalendar.week(containing: TestCalendar.date(2026, 8, 17), calendar: calendar)
+    }
+    private func day(_ column: Int) -> Date { week.days[column] }
+
+    private func withRest(_ column: Int?, _ body: () throws -> Void) rethrows {
+        let previous = WeekPreferences.restDay
+        defer { WeekPreferences.restDay = previous }
+        WeekPreferences.restDay = column.map {
+            calendar.component(.weekday, from: week.days[$0])
+        }
+        try body()
+    }
+
+    private func row(
+        target: Int, done: [Int] = [], todayColumn: Int
+    ) -> [SlotSpan] {
+        WeekSpans.spans(
+            for: .fixture(
+                frequency: .timesPerWeek(target),
+                completedDays: Set(done.map { day($0) })
+            ),
+            in: week,
+            today: day(todayColumn),
+            target: target,
+            calendar: calendar
+        )
+    }
+
+    /// Compact shorthand for a row: one `state:first-last` per span.
+    private func shape(_ spans: [SlotSpan]) -> String {
+        spans.map { "\($0.state.rawValue):\($0.firstDay)-\($0.lastDay)" }.joined(separator: " ")
+    }
+
+    // MARK: - The issue's tables
+
+    @Test("Nothing logged, no rest day: the squeeze arrives on the last days")
+    func blankWeekTable() {
+        #expect(shape(row(target: 2, todayColumn: 5)) == "open:0-5 inactive:6-6")
+        #expect(shape(row(target: 2, todayColumn: 6)) == "inactive:0-0 open:1-6")
+        #expect(shape(row(target: 3, todayColumn: 5)) == "inactive:0-0 open:1-5 inactive:6-6")
+        #expect(shape(row(target: 3, todayColumn: 6)) == "inactive:0-0 inactive:1-1 open:2-6")
+    }
+
+    @Test("The completed block yields once something is lost")
+    func completedBlockYields() {
+        // Three a week, one logged on Monday, and it is Sunday. Two reps are
+        // owed against one day: the done block gives up the columns the lost
+        // rep and the open one need, which it never did before #81.
+        #expect(shape(row(target: 3, done: [0], todayColumn: 6))
+            == "filled:0-4 inactive:5-5 open:6-6")
+    }
+
+    @Test("A rest day brings the squeeze forward a day")
+    func restDayTable() {
+        withRest(6) {
+            #expect(shape(row(target: 2, todayColumn: 4)) == "open:0-4 inactive:5-6")
+            #expect(shape(row(target: 2, todayColumn: 5)) == "inactive:0-0 open:1-6")
+        }
+    }
+
+    @Test("A week already over spends its last columns on what was not done")
+    func finishedWeek() {
+        // Looking back at a week from a later one. Two a week, one logged:
+        // one bar and one span for the rep that never happened, rather than
+        // two half-week bars.
+        let later = TestCalendar.date(2026, 8, 26)
+        let spans = WeekSpans.spans(
+            for: .fixture(frequency: .timesPerWeek(2), completedDays: [day(0)]),
+            in: week, today: later, target: 2, calendar: calendar
+        )
+        #expect(shape(spans) == "filled:0-5 inactive:6-6")
+    }
+
+    @Test("A week that has not started divides evenly")
+    func futureWeek() {
+        let earlier = TestCalendar.date(2026, 8, 10)
+        let spans = WeekSpans.spans(
+            for: .fixture(frequency: .timesPerWeek(2)),
+            in: week, today: earlier, target: 2, calendar: calendar
+        )
+        #expect(shape(spans) == "inactive:0-3 inactive:4-6")
+    }
+
+    // MARK: - The invariants, swept
+
+    @Test("Every row draws exactly its target, contiguous, covering all seven")
+    func invariantsHold() {
+        for rest in [nil, 0, 2, 5, 6] as [Int?] {
+            withRest(rest) {
+                for target in 1...6 {
+                    for todayColumn in 0...6 {
+                        for doneCount in 0..<target {
+                            // Completions on the earliest days, one per day,
+                            // and never on a day that could not carry one.
+                            let done = Array(0..<doneCount).filter { $0 <= todayColumn }
+                            guard done.count == doneCount else { continue }
+                            let spans = row(
+                                target: target, done: done, todayColumn: todayColumn
+                            )
+                            let what = "target \(target), today \(todayColumn), done \(doneCount), rest \(String(describing: rest)): \(shape(spans))"
+
+                            #expect(spans.count == target, "span count — \(what)")
+                            #expect(spans.allSatisfy { $0.dayCount >= 1 }, "empty span — \(what)")
+                            #expect(spans.first?.firstDay == 0, "starts at 0 — \(what)")
+                            #expect(spans.last?.lastDay == 6, "ends at 6 — \(what)")
+                            for (a, b) in zip(spans, spans.dropFirst()) {
+                                #expect(b.firstDay == a.lastDay + 1, "gap — \(what)")
+                            }
+                            // At most one open span, and it contains today.
+                            let open = spans.filter { $0.state == .open }
+                            #expect(open.count <= 1, "two open — \(what)")
+                            if let only = open.first {
+                                #expect(
+                                    only.firstDay <= todayColumn && todayColumn <= only.lastDay,
+                                    "open span does not contain today — \(what)"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test("Nothing is tappable on the rest day, and the open span is otherwise")
+    func tappability() {
+        withRest(3) {
+            // Today is the rest day: the middle span keeps its geometry and
+            // asks for nothing.
+            let resting = row(target: 3, todayColumn: 3)
+            #expect(!resting.contains { $0.state == .open })
+            #expect(resting.allSatisfy { !$0.isTappable })
+            #expect(resting.count == 3)
+
+            // The day after, it asks again.
+            let live = row(target: 3, todayColumn: 4)
+            #expect(live.count(where: { $0.isTappable }) == 1)
+            #expect(live.first { $0.isTappable }?.state == .open)
+        }
+    }
+}
