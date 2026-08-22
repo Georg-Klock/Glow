@@ -116,14 +116,47 @@ final class Habit {
     /// when two devices sync; a counter is last-writer-wins, so two glasses of
     /// water logged on two devices would come back as one.
     var completionCounts: [Date: Int] {
-        (completions ?? []).reduce(into: [:]) { counts, completion in
+        liveCompletions.reduce(into: [:]) { counts, completion in
             counts[completion.day, default: 0] += 1
         }
     }
 
     /// Every day with at least one completion.
     var completedDays: Set<Date> {
-        Set((completions ?? []).map(\.day))
+        Set(liveCompletions.map(\.day))
+    }
+
+    /// This habit's completions, fetched rather than remembered.
+    ///
+    /// **`completions` is a cached array and it can outlive its rows** (#145).
+    /// SwiftData fetches a to-many relationship once and holds it on the model
+    /// object; reading `.day` on an element whose row has since been deleted
+    /// trips `_InvalidFutureBackingData`, which is a `precondition` inside
+    /// SwiftData rather than a Swift error — nothing here could catch it even
+    /// if something were placed to try.
+    ///
+    /// The rows go out from under it because **two processes write this store**.
+    /// `ToggleHabitIntent` and `TapHabitIntent` open their own `ModelContainer`
+    /// against the same App Group file, and nothing tells the app's context to
+    /// re-fetch when the widget's deletes a completion. The app tells the widget
+    /// about every write it makes; the reverse path does not exist.
+    ///
+    /// So this reads through the context instead. A fetch cannot hand back a
+    /// row that is already gone, which sidesteps cross-process invalidation
+    /// rather than requiring it — that is the more complete fix and it is a
+    /// separate question, because whether SwiftData exposes persistent-history
+    /// notifications the way Core Data does is not established here.
+    ///
+    /// Falls back to the cached array only when there is no context to ask,
+    /// which is a model object that was built but never inserted — a fixture,
+    /// in practice, where the array is the only truth there is.
+    private var liveCompletions: [Completion] {
+        guard let modelContext else { return completions ?? [] }
+        let habitID = id
+        let descriptor = FetchDescriptor<Completion>(
+            predicate: #Predicate { $0.habit?.id == habitID }
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
     }
 
     func snapshot() -> HabitSnapshot {

@@ -4,9 +4,23 @@ import SwiftData
 /// The one container, shared by the app and the widget.
 ///
 /// Both processes open the same file in the App Group container. SwiftData
-/// handles the concurrent access; what it cannot do is tell the widget that the
-/// app just wrote something, which is why every write is followed by a timeline
-/// reload.
+/// keeps the *file* consistent; what it does not do is keep either process's
+/// already-fetched objects up to date, and that sentence used to say only the
+/// first half.
+///
+/// **Neither direction is automatic**, and only one of them was wired up:
+///
+///  - The app tells the widget, by following every write with a timeline
+///    reload. See `WidgetRefresh`.
+///  - Nothing tells the app when the *widget* writes. A `Habit` the app fetched
+///    earlier keeps a cached `completions` array, and the widget's process can
+///    delete a row out from under it — which crashed on the next render until
+///    `Habit.liveCompletions` stopped trusting the cache (#145).
+///
+/// The complete fix is a cross-process change notification, and whether
+/// SwiftData exposes persistent history the way Core Data does is not
+/// established here. Until it is, nothing should read a cached relationship
+/// array and assume its rows still exist.
 enum GlowStore {
     static let schema = Schema([Habit.self, Completion.self])
 

@@ -1089,3 +1089,47 @@ This is the same lesson as the pixel-scanning script that produced three code
 changes chasing a four-point baseline error. A timing comparison in this
 codebase is only a comparison when both arms run in the same process, alternated,
 and reported as a median.
+
+## A cached relationship array is not a source of truth
+
+**2026-08-22.** Three crash reports from one session, all the same frame:
+`_InvalidFutureBackingData.getValue` under `Habit.completionCounts`, under
+`snapshot()`, under `WeeklyGridView.grid` (#145).
+
+SwiftData fetches a to-many relationship once and caches it on the model
+object. Reading `.day` on an element whose row has since been deleted trips a
+`precondition` *inside SwiftData* — a hard trap, not a Swift error, so nothing
+in this codebase could have caught it.
+
+**The rows go out from under it because two processes write this store.** The
+intents open their own `ModelContainer` against the same App Group file, and
+nothing tells the app's context to re-fetch when the widget's deletes a
+completion. The app tells the widget about every write it makes; the reverse
+path does not exist and never did — `GlowStore`'s own comment said "SwiftData
+handles the concurrent access", which is true of the file and not of anybody's
+fetched objects. That comment is corrected.
+
+`completionCounts` and `completedDays` now fetch through the context instead. A
+fetch cannot hand back a row that is already gone, which **sidesteps
+cross-process invalidation rather than requiring it** — the complete fix is a
+change-notification path, and whether SwiftData exposes persistent history the
+way Core Data does is not established here. It should be its own investigation
+rather than this crash's blocker.
+
+They fall back to the cached array when there is no context to ask, which is a
+model object built but never inserted — a fixture, where the array is the only
+truth there is.
+
+**Two in-process contexts reproduce it exactly**, which is what made a
+cross-process crash testable at all. Against the unfixed model the suite does
+not fail, it *dies*:
+
+    SwiftData/BackingData.swift:1039: Fatal error: This model instance was
+    invalidated because its backing data could no longer be found the store.
+
+— the same file and line as the crash reports. Anyone reverting to check should
+expect an aborted run rather than a red test.
+
+One test covers the other direction, which never crashed and so was never
+noticed: a completion *added* by the other context was equally invisible to the
+cached array, and the fetch fixes both.
