@@ -3,12 +3,15 @@ import OSLog
 
 /// Where the store file lives.
 ///
-/// A widget runs in its own process and cannot see the app's private
-/// container, so the store has to sit in a shared App Group container that both
+/// A widget runs in its own process and cannot see the app's private container,
+/// so the store has to sit in a shared App Group container that both
 /// can open. This type owns that decision and the one-time move.
 enum StoreLocation {
     static let appGroupID = "group.com.georgklock.glow"
     static let fileName = "Glow.store"
+
+    /// The name SwiftData used before this indirection existed.
+    static let legacyFileName = "default.store"
 
     private static let log = Logger(subsystem: "com.georgklock.glow", category: "store")
 
@@ -31,36 +34,40 @@ enum StoreLocation {
         return URL.applicationSupportDirectory.appending(path: fileName)
     }
 
+    /// The store SwiftData wrote before any of this existed.
+    static var legacyURL: URL {
+        URL.applicationSupportDirectory.appending(path: legacyFileName)
+    }
+
     /// Moves a pre-App-Group store into the shared container, once.
     ///
-    /// SwiftData keeps a write-ahead log and a shared-memory file next to the
-    /// store, and moving the store without them loses every write still sitting
-    /// in the log. That is the whole reason this is not a one-line copy.
-    static func migrateIfNeeded() {
-        // Migrates to wherever the store now lives, shared or not. Guarding on
-        // the shared container being available was a bug: when the App Group is
-        // missing, the path still changes from default.store to Glow.store, and
-        // skipping the copy silently orphans every habit the user had.
-        let destination = url
-        let manager = FileManager.default
-        guard !manager.fileExists(atPath: destination.path) else { return }
-
-        // The name SwiftData used before this indirection existed.
-        let legacy = URL.applicationSupportDirectory.appending(path: "default.store")
-        guard manager.fileExists(atPath: legacy.path) else { return }
-
-        do {
-            for suffix in ["", "-wal", "-shm"] {
-                let from = URL(fileURLWithPath: legacy.path + suffix)
-                let to = URL(fileURLWithPath: destination.path + suffix)
-                guard manager.fileExists(atPath: from.path) else { continue }
-                try manager.copyItem(at: from, to: to)
-            }
-            log.info("Moved the store into the App Group container")
-        } catch {
-            // Leave the original alone: a half-migrated store that still opens
-            // from its old location beats a lost one.
-            log.error("Store migration failed: \(error.localizedDescription, privacy: .public)")
+    /// The mechanics — staging, validating, promoting, recording — are
+    /// `StoreMigration`'s. What lives here is only which two paths are involved,
+    /// and that this runs to *wherever the store now lives*, shared or not:
+    /// guarding on the shared container being available was a bug, because when
+    /// the App Group is missing the path still changes from default.store to
+    /// Glow.store, and skipping the copy silently orphans every habit the user
+    /// had.
+    ///
+    /// The outcome is returned rather than only logged. A migration that could
+    /// not be completed must stop the app opening a store on this path — an
+    /// empty store created beside the person's real one is the failure that is
+    /// hardest to undo.
+    @discardableResult
+    static func migrateIfNeeded() -> StoreMigration.Outcome {
+        let outcome = StoreMigration.run(from: legacyURL, to: url)
+        switch outcome {
+        case .notNeeded, .migrated, .adopted:
+            break
+        case .repaired(let quarantine):
+            log.error(
+                "Store repaired from the earlier copy; the incomplete one is at \(quarantine.lastPathComponent, privacy: .public)"
+            )
+        case .diverged:
+            log.error("Two stores diverged; the earlier one was left in place unmerged")
+        case .failed(let reason):
+            log.error("Store migration failed: \(reason, privacy: .public)")
         }
+        return outcome
     }
 }

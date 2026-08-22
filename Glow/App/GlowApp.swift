@@ -6,22 +6,35 @@ import WidgetKit
 struct GlowApp: App {
     /// One container for the whole app. Local only: no CloudKit in v1, though
     /// the model shape is kept sync-ready. See docs/ARCHITECTURE.md.
-    private let container: ModelContainer
+    ///
+    /// Optional, because opening it can fail and the app has something better
+    /// to do about that than die. `GlowStore.makeContainer()` refuses to open a
+    /// store whose migration did not complete, and the failure a person would
+    /// hit is therefore *recoverable by definition*: their history is still on
+    /// disk, at the path the app declined to abandon. A `fatalError` here
+    /// crash-looped instead, which looks exactly like the data being gone.
+    @State private var container: ModelContainer?
+    @State private var failure: String?
 
     init() {
-        do {
-            container = try GlowStore.makeContainer()
-        } catch {
-            // A store that cannot open is not recoverable from inside the app,
-            // and continuing would silently drop every write.
-            fatalError("Could not open the habit store: \(error)")
-        }
+        let attempt = Self.open()
+        _container = State(initialValue: attempt.container)
+        _failure = State(initialValue: attempt.failure)
 
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-glow-force-burst") {
+        if let container = attempt.container,
+           ProcessInfo.processInfo.arguments.contains("-glow-force-burst") {
             Self.forceBurst(in: container)
         }
         #endif
+    }
+
+    private static func open() -> (container: ModelContainer?, failure: String?) {
+        do {
+            return (try GlowStore.makeContainer(), nil)
+        } catch {
+            return (nil, error.localizedDescription)
+        }
     }
 
     #if DEBUG
@@ -52,10 +65,19 @@ struct GlowApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootTabView()
-                .tint(GlowPalette.color)
+            if let container {
+                RootTabView()
+                    .tint(GlowPalette.color)
+                    .preferredColorScheme(.dark)
+                    .modelContainer(container)
+            } else {
+                StoreUnavailableView(message: failure ?? "") {
+                    let attempt = Self.open()
+                    container = attempt.container
+                    failure = attempt.failure
+                }
                 .preferredColorScheme(.dark)
+            }
         }
-        .modelContainer(container)
     }
 }

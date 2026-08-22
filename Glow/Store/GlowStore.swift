@@ -24,8 +24,17 @@ import SwiftData
 enum GlowStore {
     static let schema = Schema([Habit.self, Completion.self])
 
+    /// Opens the one store, migrating an earlier one into place first.
+    ///
+    /// **Throws rather than opening when the migration could not be completed.**
+    /// Opening anyway would create an empty store at the new path while the
+    /// person's history sat unreachable at the old one, and the moment they
+    /// added a habit to the empty one the two would have diverged for good. A
+    /// launch that stops and says so is recoverable; that is not.
     static func makeContainer() throws -> ModelContainer {
-        StoreLocation.migrateIfNeeded()
+        if case .failed(let reason) = StoreLocation.migrateIfNeeded() {
+            throw StoreMigration.Failure(reason: reason)
+        }
         let configuration = ModelConfiguration(schema: schema, url: StoreLocation.url)
         return try ModelContainer(for: schema, configurations: configuration)
     }
