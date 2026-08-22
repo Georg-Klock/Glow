@@ -74,6 +74,13 @@ sentence with an exception is two sentences.
   identical whether it fired or not. A switch in Settings turns it off, default
   on.
 
+  **It fires from the home screen only** (#103). The Island does not render a
+  Live Activity while its own app is in the foreground, so a goal met inside
+  the app would spend its two seconds on nobody. `GoalPopCentre` is called from
+  `TapHabitIntent` and `ToggleHabitIntent` and from nowhere else; the app's
+  acknowledgement is the one it already had, which is the ring closing and the
+  row going quiet.
+
   The alternative was to rewrite §1 so that light may also mean *well done*.
   That was declined: it would put a second meaning on the one signal the app
   has. See docs/decisions.md.

@@ -178,14 +178,11 @@ struct TodayView: View {
             let count = try store.recordTap(for: habit, on: today)
             // A reset is a correction, and should not feel like progress.
             if count == 0 && done > 0 { Haptics.uncompleted() } else { Haptics.completed() }
-            // The day's goal, if this was the repetition that met it — the
-            // twelfth glass, not each of the twelve. A reset cannot meet a
-            // goal, so it falls out rather than needing a case.
-            GoalPopCentre.popIfMet(
-                habit: habit.snapshot(),
-                in: WeekCalendar.week(containing: today),
-                today: today
-            )
+            // No pop here, deliberately. The Island does not render an
+            // activity while its own app is in front, so a goal met on this
+            // screen would request one, show nobody anything, and end it two
+            // seconds later. The ring closing *is* this screen's
+            // acknowledgement. See `GoalPopCentre` and #103.
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
             HabitStore.report(error, operation: "recordTap")

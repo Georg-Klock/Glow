@@ -618,3 +618,57 @@ it, and that wrapping the dots in a `ZStack` to hang the element on moved
 nothing on screen — a full-screen diff of the two builds is 3160 pixels apart
 at one level out of 255, which is render dither and not a dot that shifted.
 The spoken result on a device is untested.
+
+## The pop fires from the home screen only
+
+**2026-08-22.** The Dynamic Island does not render a Live Activity while its
+own app is in the foreground. Measured when #58 landed: requested from inside
+the app, `Activity.request` succeeds and `chronod` subscribes an Island
+renderer with the right metrics, and the Island stays a plain pill until the
+app is backgrounded.
+
+So the app's own two call sites requested an activity, drew a Lock Screen
+presentation, showed nobody anything, and ended it two seconds later. Nothing
+harmful — but a feature whose entire content is two seconds on screen should
+not have a path that spends them on nothing.
+
+`GoalPopCentre.popIfMet` is now called from `TapHabitIntent` and
+`ToggleHabitIntent` and nowhere else. Those run in the app's *process* but not
+in its foreground, because a widget tap happens on the home screen — which is
+precisely where the pop is visible. The rule is therefore "the intents", not
+"the widget".
+
+**Two alternatives, both declined.**
+
+*Keep it, for the case where someone meets a goal and immediately swipes home.*
+Real, and narrow. It keeps the rule at one line — "a goal met fires a pop" —
+at the cost of that line being false almost every time it runs.
+
+*Gate on foreground rather than on caller*, so the rule matches the measured
+condition exactly and covers a Shortcuts run too. `UIApplication.shared` is
+unavailable in app extensions and `Glow/Store` is compiled into the widget
+target, so this needs a static the app updates from `scenePhase` — mutable
+global state introduced to fix two cosmetic seconds. Not worth it. The
+narrow case it would additionally catch is a habit logged through Siri while
+the app is open.
+
+**Not pursued: giving the app its own acknowledgement.** The app already has
+one — the ring closes, the label dims, the row goes quiet — and adding a second
+would reopen SPEC §3, which was amended once already to allow this much.
+
+Structurally there is nothing to test: the guarantee is that no view calls
+`popIfMet`, which is a property of the call graph rather than of a value. The
+note on the type is what carries it.
+
+**Both directions were measured on screen.** A goal met by tapping the week
+widget on the Home Screen expands the Island to "you did it / Early night", and
+the app process logs `pop: you did it`. The same goal met by tapping the same
+habit on This Week logs nothing at all — no request, no refusal — and the row
+simply closes.
+
+Getting there needed a temporary probe, because the first attempt produced no
+pop and no reason for one. `popIfMet`'s three conditions were traced and all
+three came back true — `enabled=true met=true auth=true` — with the pop
+following on the next tap. The first attempt had gone to a process that was
+one second old, launched by the intent immediately after an install. Worth
+knowing before reading a single silent run as a broken feature.

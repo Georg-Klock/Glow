@@ -262,13 +262,10 @@ struct WeeklyGridView: View {
             switch try store.toggleCompletion(for: habit, on: day) {
             case .completed:
                 Haptics.completed()
-                // The week's goal, if this was the one that met it. Read after
-                // the write, from the habit itself — `GoalMet` fires on the
-                // count being exactly the target, so it cannot double-fire on
-                // a completion past it.
-                GoalPopCentre.popIfMet(
-                    habit: habit.snapshot(), in: week, today: today
-                )
+                // No pop here, deliberately: the Island does not render an
+                // activity while its own app is in front. The haptic above is
+                // what this screen has to say about it. See `GoalPopCentre`
+                // and #103.
             case .uncompleted:
                 Haptics.uncompleted()
             case .refused:
