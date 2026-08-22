@@ -24,6 +24,19 @@ struct SettingsView: View {
     /// The file to hand to the share sheet, or nil while there is none.
     /// Written only when the button is pressed — see `HistoryFile`.
     @State private var exportFile: HistoryFile?
+
+    /// Where an export lives between being written and being shared, and what
+    /// takes it away again. See `ExportStore` and #142.
+    private let exportStore = ExportStore()
+
+    /// The file the share sheet is currently holding.
+    ///
+    /// Kept beside `exportFile` rather than read off it, because `sheet(item:)`
+    /// clears its own binding *before* `onDismiss` runs — so a cleanup that
+    /// asked `exportFile` for the URL would find nil every time and delete
+    /// nothing, which is the failure this issue is about wearing a different
+    /// hat.
+    @State private var pendingExport: URL?
     @State private var isChoosingFormat = false
 
     /// Mirrors `PopPreferences.isEnabled`, so the toggle animates its own flip.
@@ -220,7 +233,10 @@ struct SettingsView: View {
             }
             // The share sheet is the only way out of the app, and it opens on
             // a tap. Nothing here uploads.
-            .sheet(item: $exportFile) { file in
+            // `onDismiss` covers sharing and cancelling both, because they are
+            // the same event as far as the file is concerned — and treating
+            // them as two is how one of them gets missed.
+            .sheet(item: $exportFile, onDismiss: { discardExport() }) { file in
                 ShareSheet(url: file.url)
             }
     }
@@ -315,12 +331,22 @@ struct SettingsView: View {
                 text = try HistoryExport.json(habits: snapshots, exportedAt: now)
                 name = HistoryExport.filename(on: now, extension: "json")
             }
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
-            try text.write(to: url, atomically: true, encoding: .utf8)
+            // Written through `ExportStore` rather than straight into the
+            // temporary directory: the file has a lifetime now, and something
+            // has to own it. See #142.
+            let url = try exportStore.write(text, named: name)
+            pendingExport = url
             exportFile = HistoryFile(url: url)
         } catch {
             HabitStore.report(error, operation: "exportHistory")
         }
+    }
+
+    /// Takes the shared file away once the sheet has gone.
+    private func discardExport() {
+        guard let url = pendingExport else { return }
+        exportStore.discard(url)
+        pendingExport = nil
     }
 
     private var exportFooter: String {
