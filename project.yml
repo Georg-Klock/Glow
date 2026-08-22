@@ -21,6 +21,10 @@ targets:
     platform: iOS
     sources:
       - path: Glow
+      # Explicit, and as a resource, because it has to land at the bundle root
+      # of the shipped .app. See #132.
+      - path: Glow/Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
     # Picks up a gitignored Local.xcconfig if there is one, which is where a
     # development team goes. See Signing.xcconfig.
     configFiles:
@@ -105,6 +109,10 @@ targets:
       - path: Glow/Views/DayRingView.swift
       - path: Glow/Views/DayRingArcShape.swift
       - path: Glow/Resources/SymbolCatalog.json
+        buildPhase: resources
+      # An appex is independently shipped and needs its own manifest at its own
+      # bundle root; the app's does not cover it. See #132.
+      - path: GlowWidget/PrivacyInfo.xcprivacy
         buildPhase: resources
     configFiles:
       Debug: Signing.xcconfig
