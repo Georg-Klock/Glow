@@ -298,6 +298,11 @@ struct WeeklyGridView: View {
     private func delete(_ habit: Habit) {
         do {
             try store.delete(habit)
+            // The widget holds a rendered surface with this habit's row on it,
+            // and its buttons carry the id the store has just retired. Reloading
+            // replaces that surface; the store refuses the write either way, so
+            // this is about not offering a button that does nothing. See #129.
+            WidgetCenter.shared.reloadAllTimelines()
         } catch {
             HabitStore.report(error, operation: "delete")
         }
