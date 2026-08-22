@@ -718,3 +718,36 @@ setup: the taps cannot be driven closer than about 2.4s apart, and the window
 cannot be widened without crossing the cliff above. The logic is unit-tested;
 what was seen on screen is the second goal logging `(replacing)` and the Island
 carrying its new line in the same activity.
+
+## Every control states its own tint
+
+**2026-08-22.** `CLAUDE.md` already carries this trap for one control — "a root
+`.tint()` beats `role: .destructive`" — and #124 found it on a second. The
+three `Toggle`s in Settings never stated a tint, so they inherited the root's
+white.
+
+Which is worse than arbitrary here. White is what this app reserves for *lit*,
+and a switch track is not lit; the ON track was measured at pure 255,255,255,
+the same value as a completion. The Glow slider one section above already
+carries an explicit `.tint(GlowPalette.color)` that is a no-op today — it exists
+so the colour is a statement rather than an inheritance. The toggles now do the
+same with `GlowPalette.grey`.
+
+**The check that mattered was direction, not colour.** A toggle's whole job is
+to read as more-on than off, and Apple's OFF track is a system colour this app
+has never touched — so a grey chosen for text could in principle land *below*
+it and invert the control. Measured on screen, ON against OFF:
+
+| | ON track | OFF track |
+| --- | --- | --- |
+| before | 255, 255, 255 | 90, 90, 94 |
+| after | 181, 181, 183 | 90, 90, 94 |
+
+Twice the OFF track's brightness. The direction holds, and the value is
+`GlowPalette.grey` over the row rather than a number invented for this control.
+
+**Note for #111.** That issue would collapse `GlowPalette.grey` to an opaque
+`#171717`, which composites near black and would take this ON track from 181 to
+roughly 23 — below the untouched OFF track at 90, which inverts the switch. This
+call site is one #111 has to look at, and the number above is what it has to
+beat.
