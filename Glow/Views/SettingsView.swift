@@ -26,6 +26,9 @@ struct SettingsView: View {
     @State private var exportFile: HistoryFile?
     @State private var isChoosingFormat = false
 
+    /// Mirrors `PopPreferences.isEnabled`, so the toggle animates its own flip.
+    @State private var popIsOn = PopPreferences.isEnabled
+
     @AppStorage(GlowSettings.key, store: GlowSettings.store)
     private var peak: Double = GlowSettings.defaultValue
 
@@ -87,6 +90,12 @@ struct SettingsView: View {
                     Text("Glow")
                 } footer: {
                     Text("What the screen grants changes with ambient light, brightness and heat.")
+                }
+
+                Section {
+                    Toggle("Say well done", isOn: popBinding)
+                } footer: {
+                    Text(popFooter)
                 }
 
                 if peak <= GlowSettings.range.lowerBound {
@@ -172,6 +181,21 @@ struct SettingsView: View {
         // week and withholds the same taps, and it is not told when the
         // setting moves.
         .onChange(of: restDay) { _, _ in WidgetCenter.shared.reloadAllTimelines() }
+    }
+
+    /// The Dynamic Island's pop, on or off.
+    ///
+    /// A binding rather than `@AppStorage`, because the default is **on** and
+    /// `@AppStorage` hands back `false` for a key nobody has written — a plain
+    /// `@AppStorage("pop") var on = true` reads as off for everybody until they
+    /// toggle it twice. `PopPreferences` keeps the sentinel; this reflects it.
+    private var popBinding: Binding<Bool> {
+        Binding(get: { popIsOn }, set: { popIsOn = $0; PopPreferences.isEnabled = $0 })
+    }
+
+    private var popFooter: String {
+        "When you finish a habit for the day or the week, the Dynamic Island "
+            + "says so for a moment. It is the goal, not every repetition."
     }
 
     // MARK: - Export

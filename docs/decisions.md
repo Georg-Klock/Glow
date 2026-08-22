@@ -433,6 +433,46 @@ filed, which is why closing it as decided is now cheap. If the design ever wants
 the even-split reading, the place to change is `WeekSpans.divide` and the thing
 to check first is Touch Grass.
 
+## The Dynamic Island may say well done, because it is not a mark
+
+**Question** (#58). When a goal is met, the Dynamic Island says so — a short
+glowing line, then it goes away. SPEC §3 lists celebratory flourishes as a
+non-goal, and this is one. The issue offered two ways out and said the choice
+had to be made before it was built.
+
+**Decision** (2026-08-22). **Route 1: the pop is not a mark.** SPEC §3 gains a
+bounded exception rather than §1 being rewritten.
+
+The non-goal is about the surfaces that *record state* — the grid, the rings,
+the widgets — and about keeping one signal in one register on them. The pop is
+outside all of them, lasts two seconds, and records nothing: no streak is
+counted, no badge is kept, and the grid is identical whether it fired or not.
+
+Route 2 was to rewrite §1 so that light may also mean *well done*. Declined,
+and the reason is the same reason #75 was decided the way it was: the app has
+one signal, and it already means "this happened". Giving it a second meaning on
+the surfaces that carry it is the change that would actually cost something —
+and it is not needed to put words in the Island.
+
+**Two things were measured rather than assumed.**
+
+The Island **does not render an activity while its own app is in the
+foreground**. So a goal met inside the app fires a pop nobody sees, and the case
+the feature exists for is a goal met from the *home screen*. That inverts the
+issue's framing, where the widget case was "the hard one" — it is the only one.
+
+`LiveActivityIntent` **does not bring the app forward**. That was the property
+in doubt, because the whole point of `ToggleHabitIntent` and `TapHabitIntent` is
+that they never leave the home screen. Both now conform, and a widget tap still
+leaves the Home Screen in front, with the intent's own log line proving it ran.
+
+**Still unmeasured: whether it glows.** The pop uses the same `glowing` modifier
+and the same PQ tile as everything else, and whether that survives the Island's
+rendering needs a device. This project already wrote the widget off as unable to
+glow on exactly this reasoning — a separate process that archives its render —
+and that was wrong when it was finally measured, so the assumption is not being
+made in either direction. The answer belongs in glow.md when there is one.
+
 ## The open ring has no fill
 
 **Question** (#65). `GlowPalette.ringWash` — a 1% white — was declared and never

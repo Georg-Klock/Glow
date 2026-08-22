@@ -262,6 +262,13 @@ struct WeeklyGridView: View {
             switch try store.toggleCompletion(for: habit, on: day) {
             case .completed:
                 Haptics.completed()
+                // The week's goal, if this was the one that met it. Read after
+                // the write, from the habit itself — `GoalMet` fires on the
+                // count being exactly the target, so it cannot double-fire on
+                // a completion past it.
+                GoalPopCentre.popIfMet(
+                    habit: habit.snapshot(), in: week, today: today
+                )
             case .uncompleted:
                 Haptics.uncompleted()
             case .refused:
