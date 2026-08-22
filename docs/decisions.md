@@ -220,6 +220,35 @@ What replaces them where a document genuinely helps:
 Recoverable from git if this turns out to be wrong; the deleting commit is the
 one that carries this entry.
 
+## The widget's background is not the app's to keep
+
+**Question** (#53). Every widget should sit on pitch black, in every home
+screen appearance. Under Default it does. Under Tinted and Clear the system
+drops the declared background and substitutes glass, and the marks stop reading
+as lit and start reading as bright shapes on a photograph. The issue proposed
+`.containerBackgroundRemovable(false)` on all four configurations, knowingly
+paying for it with StandBy, the iPad Lock Screen gallery and foreground
+tinting.
+
+**Decision** (2026-08-21). Not taken, because it does not work. The flag was
+added to all four configurations, built, installed and read on screen: the
+widget renders on glass under Tinted and on the wallpaper under Clear, exactly
+as before. On iOS 26 `containerBackgroundRemovable` governs contexts that have
+no background at all; the Home Screen appearances are a restyling and are not
+one of them. Only the cost was real.
+
+The obvious second attempt fails too. A black image drawn as *content* behind
+the view, carrying the `.fullColor` accented rendering mode that keeps the glow
+tile from being flattened, is dropped as completely as the declared background
+is — run in red, it never appeared. Under Tinted and Clear the system keeps the
+silhouette of the marks and nothing else, halo included: today's ring has its
+glow under Default and is a bare white circle under both of the others.
+
+So the appearance stays the person's choice, and it stays a real cost rather
+than a solved one. What reopening this needs is a mechanism, not a second
+opinion. The measurements are in `GlowWidget.swift` and `GlowImageCache.swift`
+so that the flag is not tried a third time.
+
 ## Appearance: follow the system
 
 **Question.** Not in the spec's list. It arrived from the implementation, twice.
