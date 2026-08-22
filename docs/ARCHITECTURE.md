@@ -39,6 +39,20 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
   off day by day, and whether today is open or undoable is the week row's
   own verdict, asked rather than derived — so a change to the week's rules
   reaches the month without a second edit.
+- `SlotVoice` and `HistoryVoice` are what the marks say out loud. A day-pinned
+  column names its own date, because the header that carries the dates on
+  screen is a table when it is read aloud and stays hidden; a month or a year
+  of columns is counted into one sentence instead. Both are pure, so the app
+  and the widget cannot disagree about a word and the strings are asserted
+  without a renderer.
+- `YearHistory.fill(for:habits:today:)` is how a day of the long view went —
+  full, partial, empty or still to come. It is the year grid's own rule, out of
+  the view so that the sentence `HistoryVoice` speaks counts what the grid
+  draws rather than counting it a second way.
+- `MotionPolicy` decides whether a change moves. One completion is drawn four
+  ways — a ring closing, a bar closing, a label dimming, a line sweeping — and
+  Reduce Motion has to reach all four; a predicate left in a view is one no
+  test can reach.
 - `DayRing.arcs(target:done:gap:)` is the Today ring: one arc per repetition
   as trim fractions of a circle, the first `done` of them quiet. The ring
   starts full and glowing and closes clockwise from the top — the inverse of

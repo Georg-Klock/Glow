@@ -218,6 +218,25 @@ on the rest day counts everywhere it counted and is absent from this sentence,
 exactly as it is absent from the row. Weekday names and the way they are joined
 both come from the calendar's locale.
 
+**Every day-pinned column speaks its own date.** A slot is a circle in a
+column, and which column it is in is the whole answer to *which day* — read on
+screen off a header of seven letters over seven numbers, which is a table when
+it is read aloud, so the header stays hidden and the date rides on the mark:
+"Read, Tuesday 18 August, missed". All seven, not only the one that can be
+tapped, and in the widget as well as the app, because a widget row and an app
+row are the same row. A span is not given a date it does not have: it is a
+share of the week, the dots say when, and the one date it carries is the day a
+tap would act on. Dates come from the calendar's own locale and time zone,
+like the dots' weekday names.
+
+**A month and a year are counted, not listed.** The month widget hangs one
+sentence on the habit's name — "12 days logged this month, 3 days missed, due
+today and 9 days still to come" — and the year makes each week column one stop:
+"Week of 17 August, 4 days complete, 2 days partly done and 1 day with nothing
+logged". Fifty-two sentences is a year somebody can swipe through; 365 stops
+reading "complete" is a wall. Both are counted off the marks the grid actually
+draws, so what is spoken and what is drawn cannot disagree.
+
 **A weekly row draws exactly N shapes, however late in the week it is.** Each is
 at least one column wide and together they cover all seven with no gaps. A rep
 with no day left to land on still gets a column — it stops being the open one
@@ -337,7 +356,16 @@ merge. The last repetition runs a full turn and closes the circle. 0.35s,
 spring does not transfer.
 
 This is the completion transition §3 allows, not idle motion: nothing on any
-surface moves on its own, and a lit mark still holds still. **Everything other
+surface moves on its own, and a lit mark still holds still.
+
+**Reduce Motion snaps every drawing of it**, not only this one. One completion
+is drawn four ways — the ring closing in a slot, the bar closing across a span,
+the row's label dimming beside them, the line sweeping round this ring — and
+the setting switches off all four, along with the press that grows a mark under
+a fingertip. What it produces is the final state with nothing scheduled in
+between: a shorter animation is still an animation. `MotionPolicy` holds the
+rule; the widget's own completion already carried it, recorded at the tap and
+spent on a timeline of one still entry. **Everything other
 than a repetition being logged snaps.** The reset is instant, because animating
 a correction dresses a mistake up as an achievement. Any jump other than +1 is
 instant — a tap arriving from the widget, a day rolling over, an edit — because
