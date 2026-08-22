@@ -109,7 +109,7 @@ struct RestWindowTests {
             var result: [SlotSpan] = []
             withPreferences(restDay: restDay) {
                 result = WeekSpans.spans(
-                    for: habit, in: week, today: today, target: 2, calendar: calendar
+                    for: habit, in: week, today: today, target: 2, editing: .todayOnly, calendar: calendar
                 )
             }
             return result

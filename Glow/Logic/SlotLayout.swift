@@ -64,6 +64,41 @@ enum SlotLayout {
         return CGFloat(index) * (slot + gap(trackWidth: trackWidth)) + slot / 2
     }
 
+    /// The leading edge of one weekday's column, from the track's leading edge.
+    ///
+    /// Also where a span starting at that column begins, because the spans sit
+    /// in a stack whose spacing is exactly the gap.
+    static func columnStart(trackWidth: CGFloat, index: Int) -> CGFloat {
+        CGFloat(index) * (dailySlot(trackWidth: trackWidth) + gap(trackWidth: trackWidth))
+    }
+
+    /// The weekday column a touch at `x` lands on, `x` measured from the
+    /// track's leading edge.
+    ///
+    /// **The inverse of `columnCentre`, and the reason it exists**: a habit due
+    /// a number of times a week is drawn as spans, and a span covers several
+    /// columns while carrying one nominal day. Tapping one has to write the
+    /// weekday actually touched, so the view needs to run the row geometry
+    /// backwards — and that arithmetic belongs beside the forward direction,
+    /// where it is tested, rather than inside `SpanView` (#116).
+    ///
+    /// Nearest centre rather than containment, because the gaps are two thirds
+    /// of a slot wide and a finger that lands in one meant the column it is
+    /// closest to. Clamped to the week: a touch that slides off either end of
+    /// the track belongs to the column it left. Nil only for a track that
+    /// cannot be divided at all, or a non-finite `x` — both of which arrive
+    /// through layout often enough not to be theoretical.
+    static func column(atX x: CGFloat, trackWidth: CGFloat) -> Int? {
+        let slot = dailySlot(trackWidth: trackWidth)
+        let pitch = slot + gap(trackWidth: trackWidth)
+        guard pitch > 0, x.isFinite else { return nil }
+        // Clamped as a `CGFloat` and converted afterwards: `Int(_:)` traps on a
+        // value past `Int.max`, and a very large `x` is a layout artifact
+        // rather than something worth crashing over.
+        let raw = ((x - slot / 2) / pitch).rounded()
+        return Int(min(6, max(0, raw)))
+    }
+
     /// Width of a shape covering `dayCount` whole columns and the gaps between
     /// them — the unit a habit due a number of times a week is drawn in.
     static func spanWidth(trackWidth: CGFloat, dayCount: Int) -> CGFloat {

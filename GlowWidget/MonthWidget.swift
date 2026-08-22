@@ -230,9 +230,11 @@ private struct MonthCellView: View {
         if let cell {
             let mark = SlotMarkView(mark: cell.mark, size: CGSize(width: side, height: side))
             if cell.isTappable {
-                // Only today, which is R2 holding in this grid too. The same
-                // intent as the week widget's slot, so the store's rules —
-                // including a refusal — cannot differ by surface.
+                // Only today: `MonthGrid` asks `WeekGrid` with
+                // `SlotEditing.todayOnly`, so this grid edits what every widget
+                // surface edits and nothing more (#116). The same intent as the
+                // week widget's slot, so the store's rules — including a
+                // refusal — cannot differ by surface.
                 Button(intent: ToggleHabitIntent(habitID: habit.id)) { mark }
                     .buttonStyle(.plain)
                     .accessibilityLabel(SlotVoice.label(

@@ -84,13 +84,33 @@ the not-day-pinned rules for frequency rows both end up duplicated in the view
 layer, where they cannot be tested. Instead, "is this tappable" and "what does
 it do" are decided in one place, and R1 and R2 hold by construction.
 
+**Which days a surface may write is a parameter, not a fork** (#116).
+`SlotEditing` is `.todayOnly` or `.week(allowingFuture:)`, and `WeekGrid.slots`
+and `WeekSpans.spans` both require one — no default, so a new call site has to
+say which surface it is rather than inherit the permissive answer. The week view
+passes `.week`, everything else passes `.todayOnly`, and `SlotEditing.day(atColumn:in:today:)`
+is the single function that answers "may this column be written", asked by the
+grid, by the span pass, and again by the view for the column under a finger.
+`WeekSpans` runs the surface's answer as a pass over the finished row, so the
+division of the week — which spans exist, how wide, which one is open — is
+identical on both surfaces and only the actions differ.
+
+A span covers several columns, so the week view resolves a touch to a weekday
+with `SlotLayout.column(atX:trackWidth:)`, the inverse of `columnCentre`. The
+arithmetic lives beside the forward direction and is tested against it; the view
+adds the span's own origin and asks `SlotEditing` what that column allows.
+
 ### Store
 
 `HabitStore` wraps `ModelContext` and owns every write. Reads do not go through
 it: the grid uses `@Query`, so SwiftData drives updates.
 
-`toggleCompletion(for:on:)` normalizes the day itself, which is what makes R3
-and R4 hold no matter who calls it. Tapping twice quickly cannot create a
+`toggleCompletion(for:on:allowingFuture:)` normalizes the day itself, which is
+what makes R3 and R4 hold no matter who calls it. It refuses a rest day, a blank
+row, a habit of the wrong cadence, and — unless the caller asks otherwise — a day
+that has not happened yet. `allowingFuture` defaults to false, so the widget's
+intents get the strict answer without naming it and only the week view, with demo
+history in, opts out. Tapping twice quickly cannot create a
 duplicate, because the second call finds the first completion and removes it.
 It returns a `ToggleOutcome` rather than a Bool, because a third thing can
 happen: a write landing on the rest day is `.refused` — nothing logged, nothing
@@ -190,7 +210,9 @@ re-implement app logic in a test file: a mirror copy passes forever while the
 app regresses.
 
 `WeekGridTests` includes an exhaustive pass: for each cadence, all 128 possible
-completion histories of a week, asserting R1 and R2 hold for every one. That is
+completion histories of a week, asserting R1 and R2 hold for every one — R2 under
+each `SlotEditing` case, since it is now a difference between surfaces rather
+than one answer. That is
 cheap here because the logic is pure, and it is the reason those invariants can
 be stated as facts rather than as intentions.
 
@@ -320,7 +342,8 @@ the widget — checked in the exported IPA, not assumed from the archive.
 
 The week widget: small, medium and large, reading the same store through the
 App Group, with today's slot as an `AppIntent` button. Past days are not
-buttons, which is R2 holding in a second process.
+buttons: the widget passes `SlotEditing.todayOnly`, which is R2's asymmetry
+holding in a second process.
 
 It renders the same HDR tile as the app, via the same `GlowImageView`, with
 `fillsWidth` set because the widget's slots are distributed by an HStack rather

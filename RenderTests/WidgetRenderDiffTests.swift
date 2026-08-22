@@ -351,7 +351,8 @@ struct WidgetRenderDiffTests {
         let entry = oneHabit(.timesPerWeek(2), done: [], todayColumn: 4)
         try withRestColumn(2, of: entry.week) {
             let spans = WeekSpans.spans(
-                for: entry.habits[0], in: entry.week, today: entry.date, target: 2
+                for: entry.habits[0], in: entry.week, today: entry.date, target: 2,
+                editing: .todayOnly
             )
             let open = try #require(spans.first { $0.state == .open })
             #expect(open.firstDay < 2 && open.lastDay > 2, "the fixture does not straddle Wednesday")

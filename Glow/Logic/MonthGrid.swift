@@ -11,7 +11,10 @@ struct MonthCell: Identifiable, Equatable, Sendable {
     let column: Int
     let mark: SlotMark
     /// The day a tap would toggle, or nil when the cell is not tappable. Only
-    /// today ever carries one, which is R2 holding in this grid too.
+    /// today ever carries one: the month is a widget's grid and a read-only
+    /// screen, so it passes `SlotEditing.todayOnly` and edits today alone. What
+    /// changed with #116 is the justification, not the behaviour — R2 used to
+    /// say no grid could edit the past, and now the week view can.
     let actionDay: Date?
 
     var id: Date { date }
@@ -67,7 +70,8 @@ enum MonthGrid {
         // row withholds (a rest day, a spent week), this inherits.
         let thisWeek = WeekCalendar.week(containing: todayStart, calendar: calendar)
         let weekVerdict = WeekGrid.slots(
-            for: habit, in: thisWeek, today: todayStart, calendar: calendar
+            for: habit, in: thisWeek, today: todayStart,
+            editing: .todayOnly, calendar: calendar
         )
         let todayIsOpen = weekVerdict.contains { $0.state == .open }
         let todayHasUndo = weekVerdict.contains { $0.isTappable && $0.state == .filled }
@@ -82,7 +86,10 @@ enum MonthGrid {
         while weekStart < month.end {
             let week = WeekCalendar.week(containing: weekStart, calendar: calendar)
             let slots: [Slot]? = habit.frequency == .daily
-                ? WeekGrid.slots(for: habit, in: week, today: todayStart, calendar: calendar)
+                ? WeekGrid.slots(
+                    for: habit, in: week, today: todayStart,
+                    editing: .todayOnly, calendar: calendar
+                )
                 : nil
 
             // How many reps this week has run out of days for. Asked of
@@ -91,7 +98,7 @@ enum MonthGrid {
             let lostThisWeek = weeklyTarget.map { target in
                 WeekSpans.spans(
                     for: habit, in: week, today: todayStart,
-                    target: target, calendar: calendar
+                    target: target, editing: .todayOnly, calendar: calendar
                 ).count { $0.state == .missed }
             } ?? 0
 

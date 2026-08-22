@@ -97,6 +97,10 @@ struct HabitRowView: View {
     /// range says whether this row is inside the cut, and which end of it.
     let index: Int
     let cut: ClosedRange<Int>?
+    /// Which days this surface lets a tap touch. The row does not decide it —
+    /// the screen does, and hands the same answer to the grid, to the spans and
+    /// to the touch resolution below, so all three agree.
+    let editing: SlotEditing
     let onToggle: (Date) -> Void
     let onEdit: () -> Void
 
@@ -116,14 +120,16 @@ struct HabitRowView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var slots: [Slot] {
-        WeekGrid.slots(for: snapshot, in: week, today: today)
+        WeekGrid.slots(for: snapshot, in: week, today: today, editing: editing)
     }
 
     /// A habit due a number of times a week is not day-pinned, so it is drawn as
     /// shapes that stretch across the week rather than as seven columns.
     private var spans: [SlotSpan] {
         guard case .timesPerWeek(let target) = snapshot.frequency else { return [] }
-        return WeekSpans.spans(for: snapshot, in: week, today: today, target: target)
+        return WeekSpans.spans(
+            for: snapshot, in: week, today: today, target: target, editing: editing
+        )
     }
 
     private var slotHeight: CGFloat {
@@ -263,6 +269,14 @@ struct HabitRowView: View {
                             restIndex: restIndex,
                             trackWidth: geometry.trackWidth
                         ),
+                        // A span covers several columns, so where it was
+                        // touched decides which day a tap writes. The geometry
+                        // runs backwards in `SlotLayout` and the verdict is
+                        // `SlotEditing`'s; the view does neither.
+                        trackWidth: geometry.trackWidth,
+                        dayAtColumn: { column in
+                            editing.day(atColumn: column, in: week, today: today)
+                        },
                         onToggle: onToggle
                     )
                 }

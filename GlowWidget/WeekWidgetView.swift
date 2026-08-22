@@ -157,14 +157,18 @@ private struct WidgetRow: View {
     let burst: Double?
 
     private var slots: [Slot] {
-        WeekGrid.slots(for: habit, in: week, today: today)
+        // The widget edits today and nothing else, whatever the app can
+        // reach — a glance and a single confirmed action. See `SlotEditing`.
+        WeekGrid.slots(for: habit, in: week, today: today, editing: .todayOnly)
     }
 
     /// A habit due a number of times a week is not day-pinned, so it is drawn as
     /// shapes stretching across the week rather than as seven columns.
     private var spans: [SlotSpan] {
         guard case .timesPerWeek(let target) = habit.frequency else { return [] }
-        return WeekSpans.spans(for: habit, in: week, today: today, target: target)
+        return WeekSpans.spans(
+            for: habit, in: week, today: today, target: target, editing: .todayOnly
+        )
     }
 
     /// Still waiting on today. The label follows the slot, same rule as the app.
@@ -305,7 +309,9 @@ private struct WidgetRow: View {
     }
 }
 
-/// A span on a widget row. Tappable only when it is today's, same rule as a slot.
+/// A span on a widget row. Tappable only when it is today's, same rule as a
+/// slot — and the widget has no touch location to resolve a column with, which
+/// is a second reason its spans write today or nothing (#116).
 private struct WidgetSpan: View {
     let span: SlotSpan
     let track: CGFloat
@@ -370,10 +376,11 @@ private struct WidgetSlot: View {
     let burst: Double?
 
     var body: some View {
-        // Only today's slot is a button, which is the same rule the app
-        // enforces: past days are not editable, so they are not tappable here
-        // either. A Button wrapping an untappable slot would still highlight on
-        // touch and promise something it does not do.
+        // Only today's slot is a button, and since #116 that is the widget's
+        // own rule rather than the app's: the week view edits any day it shows,
+        // and a widget stays a glance and a single confirmed action. A Button
+        // wrapping an untappable slot would still highlight on touch and
+        // promise something it does not do.
         //
         // **Every column speaks, tappable or not** (#137). Only two of them did:
         // today's, and the rest day, which #72 gave a voice because it draws
