@@ -9,14 +9,25 @@ struct WeekGridTests {
     private let today = TestCalendar.date(2026, 8, 19)
     private var week: Week { WeekCalendar.week(containing: today, calendar: calendar) }
 
-    /// Every test in this suite runs on a week with **no rest day**, said out
-    /// loud rather than inherited. This suite asserts R1, R2, R5 and R7 —
+    /// Every test in this suite runs on a week with **no rest day** unless it
+    /// asks for one, said out loud rather than inherited. This suite asserts
+    /// R1, R2, R5 and R7 —
     /// including the exhaustive pass over all 128 completion histories — and a
     /// rest day arriving from elsewhere would change slot states underneath it
     /// (#105).
-    private func slots(_ habit: HabitSnapshot) -> [Slot] {
-        TestPreferences.withWeek(restDay: nil) {
-            WeekGrid.slots(for: habit, in: week, today: today, calendar: calendar)
+    ///
+    /// `.todayOnly` unless a test says otherwise, so every assertion written
+    /// before #116 still asserts what it was written to assert: the widget's
+    /// rule, which is also what the app's rule used to be.
+    private func slots(
+        _ habit: HabitSnapshot,
+        editing: SlotEditing = .todayOnly,
+        restDay: Int? = nil
+    ) -> [Slot] {
+        TestPreferences.withWeek(restDay: restDay) {
+            WeekGrid.slots(
+                for: habit, in: week, today: today, editing: editing, calendar: calendar
+            )
         }
     }
 
@@ -214,12 +225,108 @@ struct WeekGridTests {
         }
     }
 
+    // MARK: - Which surface is editing
+
+    @Test("The week view edits every day up to today, and the widget only today")
+    func surfacesDifferInWhatTheyEdit() {
+        let habit = HabitSnapshot.fixture()
+        // Today is Wednesday, column 2.
+        #expect(slots(habit, editing: .todayOnly).filter(\.isTappable).map(\.index) == [2])
+        #expect(
+            slots(habit, editing: .week(allowingFuture: false))
+                .filter(\.isTappable).map(\.index) == [0, 1, 2]
+        )
+        #expect(
+            slots(habit, editing: .week(allowingFuture: true))
+                .filter(\.isTappable).map(\.index) == [0, 1, 2, 3, 4, 5, 6]
+        )
+    }
+
+    @Test("A tappable past day acts on itself, not on today")
+    func pastDaysActOnThemselves() {
+        let row = slots(.fixture(), editing: .week(allowingFuture: false))
+        for slot in row where slot.isTappable {
+            #expect(slot.actionDay == week.days[slot.index])
+        }
+        // The whole point of the widening: a tap on Monday writes Monday.
+        #expect(row[0].actionDay == TestCalendar.date(2026, 8, 17))
+    }
+
+    @Test("A completion on a past day still draws as a past completion")
+    func editableDaysAreNotToday() {
+        // `Slot.isToday` used to be an alias for "carries an action", which was
+        // true only while today was the one day that did. Six more days carry
+        // one now, and Monday's completion must still draw unlit-of-today's
+        // mark rather than becoming today's.
+        let habit = HabitSnapshot.fixture(completedDays: [TestCalendar.date(2026, 8, 17), today])
+        let row = slots(habit, editing: .week(allowingFuture: false))
+
+        #expect(row[0].isTappable)
+        #expect(!row[0].isToday)
+        #expect(row[0].mark == .donePast)
+        #expect(row[2].isToday)
+        #expect(row[2].mark == .doneToday)
+    }
+
+    @Test("The rest day is never editable, on any surface")
+    func restDayIsNeverEditable() {
+        // Monday is the rest day, and Monday is in the past — the column the
+        // week view would otherwise now hand an action to.
+        let monday = TestPreferences.weekday(ofColumn: 0, in: week, calendar: calendar)
+        let cases: [SlotEditing] = [.todayOnly, .week(allowingFuture: false), .week(allowingFuture: true)]
+
+        for editing in cases {
+            let row = slots(.fixture(), editing: editing, restDay: monday)
+            #expect(row[0].state == .rest)
+            #expect(!row[0].isTappable, "\(editing) offered the rest day")
+        }
+    }
+
+    @Test("Every history, every surface: what is tappable is exactly what that surface allows")
+    func tappabilityOverEveryHistory() {
+        // The exhaustive pass, now run under each surface's rule rather than
+        // under the one rule there used to be.
+        for mask in 0..<(1 << 7) {
+            let completed = Set(week.days.enumerated().compactMap { index, day in
+                mask & (1 << index) != 0 ? day : nil
+            })
+            let habit = HabitSnapshot.fixture(completedDays: completed)
+
+            let todayOnly = slots(habit, editing: .todayOnly).filter(\.isTappable)
+            #expect(todayOnly.count == 1, "mask \(mask) offered \(todayOnly.count) days on a widget")
+            #expect(todayOnly.first?.actionDay == today)
+
+            let past = slots(habit, editing: .week(allowingFuture: false)).filter(\.isTappable)
+            #expect(past.map(\.index) == [0, 1, 2], "mask \(mask) reached the wrong days")
+
+            let all = slots(habit, editing: .week(allowingFuture: true)).filter(\.isTappable)
+            #expect(all.count == 7, "mask \(mask) withheld a day the demo allows")
+            #expect(all.allSatisfy { $0.actionDay == week.days[$0.index] })
+        }
+    }
+
+    @Test("A pill is not a day, so widening the surface does not widen a frequency row")
+    func frequencyRowsIgnoreTheSurface() {
+        // An N×/week row is not day-pinned: its pills stand for reps, not
+        // weekdays, so there is no past day here for a surface to reach. The
+        // day-shaped editing of these habits happens on the spans.
+        let habit = HabitSnapshot.fixture(
+            frequency: .timesPerWeek(4),
+            completedDays: [TestCalendar.date(2026, 8, 17)]
+        )
+        for editing in [SlotEditing.todayOnly, .week(allowingFuture: true)] {
+            let row = slots(habit, editing: editing)
+            #expect(row.filter(\.isTappable).map(\.index) == [1])
+            #expect(row.filter(\.isTappable).allSatisfy { $0.actionDay == today })
+        }
+    }
+
     @Test("A day outside the displayed week leaves no slot open")
     func todayOutsideTheWeek() {
         let otherWeek = WeekCalendar.week(containing: TestCalendar.date(2026, 8, 10), calendar: calendar)
         let habit = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
         let row = TestPreferences.withWeek(restDay: nil) {
-            WeekGrid.slots(for: habit, in: otherWeek, today: today, calendar: calendar)
+            WeekGrid.slots(for: habit, in: otherWeek, today: today, editing: .todayOnly, calendar: calendar)
         }
 
         #expect(row.allSatisfy { $0.state != .open })

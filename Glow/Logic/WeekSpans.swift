@@ -101,12 +101,72 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
 /// says a miss has *become unavoidable*; it is never a warning and never a
 /// prediction.
 enum WeekSpans {
+    /// The spans to draw, with each one's action decided by the surface.
+    ///
+    /// **The arithmetic below does not know about `SlotEditing`** (#116). Which
+    /// spans exist, how wide they are and which one is open are all decided by
+    /// today, on every surface, exactly as before — a span is a division of the
+    /// week, and the week does not divide differently because the app can edit
+    /// more of it. What the surface decides is only which spans carry an
+    /// action, and that is a pass over the finished row.
     static func spans(
         for habit: HabitSnapshot,
         in week: Week,
         today: Date,
         target: Int,
+        editing: SlotEditing,
         calendar: Calendar = WeekCalendar.calendar
+    ) -> [SlotSpan] {
+        let spans = divided(
+            for: habit, in: week, today: today, target: target, calendar: calendar
+        )
+        switch editing {
+        case .todayOnly:
+            // The widget's row, untouched: the open span writes today, the last
+            // filled span undoes today, and nothing else is a button.
+            return spans
+        case .week:
+            return withColumnActions(
+                spans, in: week, today: today, editing: editing, calendar: calendar
+            )
+        }
+    }
+
+    /// A span carries the last day inside it that this surface may write.
+    ///
+    /// A span is not day-pinned — it covers several columns — so the day a tap
+    /// writes is the column under the finger, which only the view knows. What
+    /// the span carries is the day a tap with no location lands on: VoiceOver's
+    /// activation, and the fallback for a touch that resolves to a column this
+    /// surface will not take. The *last* writable column, because for the span
+    /// today sits in that is today — every column after it is the future.
+    private static func withColumnActions(
+        _ spans: [SlotSpan],
+        in week: Week,
+        today: Date,
+        editing: SlotEditing,
+        calendar: Calendar
+    ) -> [SlotSpan] {
+        spans.map { span in
+            let day = (span.firstDay...span.lastDay).reversed().lazy.compactMap {
+                editing.day(atColumn: $0, in: week, today: today, calendar: calendar)
+            }.first
+            return SlotSpan(
+                index: span.index,
+                firstDay: span.firstDay,
+                lastDay: span.lastDay,
+                state: span.state,
+                actionDay: day
+            )
+        }
+    }
+
+    private static func divided(
+        for habit: HabitSnapshot,
+        in week: Week,
+        today: Date,
+        target: Int,
+        calendar: Calendar
     ) -> [SlotSpan] {
         guard !habit.isSpacer else { return [] }
         // A per-day habit is not spread across a week, so there is nothing here
@@ -294,9 +354,16 @@ enum WeekSpans {
             if i == count - 1, let lastColumn { last = max(last, lastColumn) }
             spans.append(SlotSpan(
                 index: startIndex + i, firstDay: cursor, lastDay: last,
-                // Inert and permanent for the week: never tappable, never
-                // undoable, and it does not take the row down with it — the
-                // reps still reachable keep glowing beside it.
+                // Inert as a mark: never a warning, never a prediction, and it
+                // does not take the row down with it — the reps still reachable
+                // keep glowing beside it.
+                //
+                // It carries no action *here*, which is the widget's answer and
+                // was everyone's until #116. On a surface that edits the past
+                // the pass above gives it one, and the ✕ then goes when the
+                // record does: logging a day the week had given up on means the
+                // rep happened, late, so it is no longer lost. What cannot
+                // happen is the mark changing on its own.
                 state: .missed, actionDay: nil
             ))
             cursor = last + 1

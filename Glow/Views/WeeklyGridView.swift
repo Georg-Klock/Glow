@@ -14,6 +14,9 @@ struct WeeklyGridView: View {
     private var habits: [Habit]
 
     @State private var today = WeekCalendar.day(Date())
+    /// Whether the invented past is in, mirrored from `DemoHistory` the way
+    /// Settings mirrors it. It is what opens the days ahead — see `editing`.
+    @State private var isDemoSeeded = false
     @State private var editingHabit: Habit?
     @State private var isAddingHabit = false
     @State private var isShowingLowPowerNotice = false
@@ -36,6 +39,21 @@ struct WeeklyGridView: View {
         return WeekCalendar.week(containing: today)
     }
     private var store: HabitStore { HabitStore(context: context) }
+
+    /// **This screen edits any day of the week it shows** (#116). Every slot is
+    /// a plain button — no edit mode, no long press, no confirmation — and the
+    /// cost is accepted: a stray tap on Monday changes Monday, and nothing
+    /// distinguishes a correction from an original. That is what editing the
+    /// past means.
+    ///
+    /// The days *ahead* open only with demo history in. Outside it a completion
+    /// logged forward would be a claim about something that has not happened,
+    /// and the app's one signal is a record of what did; with the demo in, the
+    /// whole screen is an invented past already, and painting days ahead is the
+    /// same job.
+    private var editing: SlotEditing {
+        .week(allowingFuture: isDemoSeeded)
+    }
 
     /// Whether the grid has outgrown the widget.
     ///
@@ -113,9 +131,21 @@ struct WeeklyGridView: View {
                 refreshToday()
                 // The power-state notification does not arrive while suspended.
                 lowPower.refresh()
+                refreshDemoHistory()
             }
         }
+        // Demo history is a record of invented completion ids in the App
+        // Group's defaults, which is not something `@AppStorage` can observe —
+        // it holds no scalar to bind to. The defaults' own notification is the
+        // signal, and it has to be one: Settings is a sibling tab, so this view
+        // stays alive and unredrawn while the toggle moves, and a value read
+        // once at appear would leave the days ahead open after the demo went
+        // out.
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+            refreshDemoHistory()
+        }
         .task { seedIfNeeded() }
+        .task { refreshDemoHistory() }
     }
 
     private var grid: some View {
@@ -138,7 +168,8 @@ struct WeeklyGridView: View {
                             today: today,
                             geometry: geometry,
                             index: index,
-                            cut: cut
+                            cut: cut,
+                            editing: editing
                         ) { day in
                             toggle(habit, on: day)
                         } onEdit: {
@@ -283,9 +314,22 @@ struct WeeklyGridView: View {
         if current != today { today = current }
     }
 
+    /// Re-reads whether the invented past is in. Compared before assigning, so
+    /// an unrelated defaults change — the glow's headroom, the rest day — costs
+    /// nothing.
+    private func refreshDemoHistory() {
+        let seeded = DemoHistory(context: context).isSeeded
+        if seeded != isDemoSeeded { isDemoSeeded = seeded }
+    }
+
     private func toggle(_ habit: Habit, on day: Date) {
         do {
-            switch try store.toggleCompletion(for: habit, on: day) {
+            // The same permission the grid drew with. The store guards the
+            // future itself, so a row rendered before the demo went out cannot
+            // write a day it was offered a moment ago.
+            switch try store.toggleCompletion(
+                for: habit, on: day, allowingFuture: isDemoSeeded
+            ) {
             case .completed:
                 Haptics.completed()
                 // No pop here, deliberately: the Island does not render an
@@ -295,9 +339,10 @@ struct WeeklyGridView: View {
             case .uncompleted:
                 Haptics.uncompleted()
             case .refused:
-                // The grid never hands out a rest-day tap, so this cannot be
-                // reached from here — but the store's answer is the truth, and
-                // nothing changed, so nothing haptic and nothing to reload.
+                // The grid never hands out a rest-day tap, and never a day
+                // ahead unless the demo is in — but the store's answer is the
+                // truth, and nothing changed, so nothing haptic and nothing to
+                // reload.
                 return
             }
         } catch {

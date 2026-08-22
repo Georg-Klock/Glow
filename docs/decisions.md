@@ -1392,3 +1392,69 @@ rather than at the root. That is a design decision, not a bug fix.
 
 **A third empty state has no button and so no bug**: Settings → History shows
 an icon and a sentence. Worth knowing before someone "fixes" it for symmetry.
+
+## The app edits any day of the week; the widget edits today
+
+**2026-08-22.** R2 read "Only today's slot responds to taps. Past days are never
+editable." It was one of the oldest rules here, and it was doing two jobs: it
+kept the interaction model at one tap, and it kept the record honest. The first
+job is worth keeping on a widget and is a limitation in the app, where the
+obvious thing to do with a day you forgot to log is to log it.
+
+**Decision.** R2 becomes a property of the surface rather than of the app.
+`SlotEditing` is `.todayOnly` — the widget, its intents, the month grid — or
+`.week(allowingFuture:)`, which is the week view and nothing else so far.
+`WeekGrid.slots` and `WeekSpans.spans` both take one, with **no default value**,
+so a new call site has to say which surface it is instead of inheriting the
+permissive answer by forgetting to think about it.
+
+**Why the asymmetry is the point.** A widget is a glance and a single confirmed
+action; it renders in another process from a snapshot that can outlive what it
+draws, and it has no touch location to resolve a span's column with. The app is
+where a record gets corrected. Making both surfaces editable would have been the
+easier change and a worse one.
+
+**The future is demo history's, and only its.** Outside the demo you can correct
+the past, not claim the future: a completion logged ahead is a claim about
+something that has not happened, and the app's one signal is a record of what
+did. With demo history in, the whole screen is already an invented past and
+painting days ahead is the same job, so the gate is `DemoHistory.isSeeded` — no
+new switch. `HabitStore.toggleCompletion` guards it as well as the grid, next to
+the rest day's refusal and for the same reason: a surface can outlive the setting
+it was built under.
+
+**What a past edit does to the ✕.** SPEC called a lost rep "inert and permanent
+for the week". Permanent is now wrong in the app and stays right everywhere else,
+and the reason is not that the mark became unstable: logging a day the week had
+given up on means the rep happened, late, so `WeekSpans` no longer counts it as
+lost. The mark still never changes on its own. SPEC §7 says so in those terms.
+
+**A span writes the weekday under the finger.** A span is not day-pinned, so a
+tap on one had to choose between the span's nominal day and the column actually
+touched. The column wins: the completion then draws on the day it really
+happened, which is already how the month grid and the row's own dots render
+these habits. The inverse geometry lives in `SlotLayout` beside the forward
+direction, tested as its round trip, rather than as arithmetic inside `SpanView`.
+Two fallbacks, deliberately different: the rest column refuses, because
+`RestWindow` subtracts it from the shape and there is visibly nothing there to
+press; a future column inside the lit open span falls back to the span's own day,
+because that part of the capsule is drawn identically to today's column and a lit
+shape that ignores a tap is worse than one that does the obvious thing.
+
+**The hit area had to become the slot rather than the ink.** A `Button` takes its
+label's drawn shape, and a ✕ is two 1pt bars — so the first build of this made a
+past day tappable only within about half a point of the crossing. It had never
+mattered, because until now every tappable mark was a ring or a dot filling its
+frame. `SlotView` and `SpanView` set `.contentShape(Rectangle())`; measured on
+the simulator by tapping a column centre before and after.
+
+**No edit mode, no long press, no confirmation.** Every slot in the week view is
+a plain button. A stray tap on Monday changes Monday, and nothing distinguishes a
+correction from an original — that is what "edit any day" means, and a mode to
+guard it would put the whole screen behind a switch to protect the rarer act.
+
+`Slot.isToday` was an alias for `actionDay != nil`, which was true only while
+today was the one day carrying an action. It is a real comparison now; without
+it a Monday completion would have started drawing as today's.
+
+Followed by #117, which widens the same case from one week to several.

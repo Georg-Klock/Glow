@@ -22,7 +22,7 @@ struct WeekSpansTests {
                 in: week,
                 today: today ?? friday,
                 target: target,
-                calendar: calendar
+                editing: .todayOnly, calendar: calendar
             )
         }
     }
@@ -157,8 +157,11 @@ struct LateWeekSpansTests {
         )
     }
 
+    /// `.todayOnly` unless a test says otherwise: the design file's examples and
+    /// the arithmetic tables are read against the widget's rule, which is what
+    /// every surface's rule used to be (#116).
     private func row(
-        target: Int, done: [Int] = [], todayColumn: Int
+        target: Int, done: [Int] = [], todayColumn: Int, editing: SlotEditing = .todayOnly
     ) -> [SlotSpan] {
         WeekSpans.spans(
             for: .fixture(
@@ -168,7 +171,7 @@ struct LateWeekSpansTests {
             in: week,
             today: day(todayColumn),
             target: target,
-            calendar: calendar
+            editing: editing, calendar: calendar
         )
     }
 
@@ -212,7 +215,7 @@ struct LateWeekSpansTests {
         let later = TestCalendar.date(2026, 8, 26)
         let spans = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2), completedDays: [day(0)]),
-            in: week, today: later, target: 2, calendar: calendar
+            in: week, today: later, target: 2, editing: .todayOnly, calendar: calendar
         )
         #expect(shape(spans) == "filled:0-5 missed:6-6")
     }
@@ -222,7 +225,7 @@ struct LateWeekSpansTests {
         let earlier = TestCalendar.date(2026, 8, 10)
         let spans = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2)),
-            in: week, today: earlier, target: 2, calendar: calendar
+            in: week, today: earlier, target: 2, editing: .todayOnly, calendar: calendar
         )
         #expect(shape(spans) == "inactive:0-3 inactive:4-6")
     }
@@ -320,7 +323,7 @@ struct LateWeekSpansTests {
                     frequency: .timesPerWeek(target),
                     completedDays: Set((0..<done).map { day($0) })
                 ),
-                in: week, today: later, target: target, calendar: calendar
+                in: week, today: later, target: target, editing: .todayOnly, calendar: calendar
             )
             #expect(spans.count { $0.state == .missed } == target - done,
                     "target \(target), done \(done): \(shape(spans))")
@@ -441,6 +444,70 @@ struct LateWeekSpansTests {
             #expect(live.first { $0.isTappable }?.state == .open)
         }
     }
+    @Test("The division does not change with the surface, only the actions do")
+    func surfaceDoesNotMoveTheGeometry() {
+        // The whole safety of #116: `SlotEditing` is a pass over the finished
+        // row, so a week divides the same way on both surfaces and only the
+        // days the spans carry differ.
+        for target in 1...6 {
+            for todayColumn in 0...6 {
+                let widget = row(target: target, done: [0], todayColumn: todayColumn)
+                let app = row(
+                    target: target, done: [0], todayColumn: todayColumn,
+                    editing: .week(allowingFuture: false)
+                )
+                #expect(shape(widget) == shape(app), "\(target)x on column \(todayColumn)")
+            }
+        }
+    }
+
+    @Test("In the week view a span carries the last day it may write")
+    func spansCarryTheirLastWritableDay() {
+        // Sunday, three a week, nothing logged: two reps have run out of days
+        // and the third is open. On the widget only the open span acts.
+        let widget = row(target: 3, todayColumn: 6)
+        #expect(shape(widget) == "missed:0-0 missed:1-1 open:2-6")
+        #expect(widget.map(\.actionDay) == [nil, nil, day(6)])
+
+        // In the app every span covers a day that can still be corrected, so
+        // every span acts — the ✕ included. A rep logged late is a rep that
+        // happened, and the arithmetic then stops calling it lost.
+        let app = row(target: 3, todayColumn: 6, editing: .week(allowingFuture: false))
+        #expect(app.map(\.actionDay) == [day(0), day(1), day(6)])
+    }
+
+    @Test("A span entirely ahead of today acts only with the demo in")
+    func futureSpansWaitForTheDemo() {
+        // Friday, two a week: the open span runs to today and the weekend span
+        // is entirely in the future.
+        #expect(shape(row(target: 2, todayColumn: 4)) == "open:0-4 inactive:5-6")
+
+        let plain = row(target: 2, todayColumn: 4, editing: .week(allowingFuture: false))
+        #expect(plain.map(\.actionDay) == [day(4), nil])
+
+        let demo = row(target: 2, todayColumn: 4, editing: .week(allowingFuture: true))
+        #expect(demo.map(\.actionDay) == [day(4), day(6)])
+    }
+
+    @Test("A span never carries the rest day, whatever the surface")
+    func spansNeverCarryTheRestDay() {
+        withRest(6) {
+            // Sunday rests, so the span covering the weekend hands out Saturday
+            // rather than the day nothing can happen on.
+            let demo = row(target: 2, todayColumn: 4, editing: .week(allowingFuture: true))
+            #expect(shape(demo) == "open:0-4 inactive:5-6")
+            #expect(demo.map(\.actionDay) == [day(4), day(5)])
+        }
+
+        withRest(0) {
+            // Monday rests and is in the past: the app reaches back past it.
+            let app = row(target: 3, todayColumn: 6, editing: .week(allowingFuture: false))
+            for span in app {
+                #expect(span.actionDay != day(0))
+            }
+        }
+    }
+
 }
 
 /// #47: the spans say how much, the dots say when.
@@ -588,13 +655,13 @@ struct WeekDotsTests {
         // marks, and the dots are what tell them apart.
         let met = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2), completedDays: [day(0), day(1)]),
-            in: week, today: day(4), target: 2, calendar: calendar
+            in: week, today: day(4), target: 2, editing: .todayOnly, calendar: calendar
         )
         #expect(met.allSatisfy { $0.mark == .upcoming })
         // And the two that are still marks keep their own.
         let partial = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2)),
-            in: week, today: day(6), target: 2, calendar: calendar
+            in: week, today: day(6), target: 2, editing: .todayOnly, calendar: calendar
         )
         #expect(partial.map(\.mark) == [.missed, .openToday])
     }

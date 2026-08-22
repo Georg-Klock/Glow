@@ -210,8 +210,8 @@ struct HabitStore {
     enum ToggleOutcome: Equatable {
         case completed
         case uncompleted
-        /// Nothing was logged and nothing removed. The rest day, a blank row,
-        /// or a habit this surface does not own.
+        /// Nothing was logged and nothing removed. The rest day, a day still to
+        /// come, a blank row, or a habit this surface does not own.
         case refused
     }
 
@@ -233,9 +233,31 @@ struct HabitStore {
     /// Idempotent in the sense that the stored state only ever has zero or one
     /// completion per day: a duplicate cannot be created by tapping twice
     /// quickly, because the second tap finds the first one and removes it.
+    ///
+    /// **Any day, and that is the point** (#116). This has always taken an
+    /// arbitrary date; what changed is that the week view now offers days other
+    /// than today. `allowingFuture` defaults to false, so the widget's intents
+    /// get the strict answer without having to name it, and only the week view
+    /// — with demo history in — opts out.
     @discardableResult
-    func toggleCompletion(for habit: Habit, on date: Date) throws -> ToggleOutcome {
+    func toggleCompletion(
+        for habit: Habit,
+        on date: Date,
+        allowingFuture: Bool = false
+    ) throws -> ToggleOutcome {
         let day = WeekCalendar.day(date, calendar: calendar)
+
+        // A completion logged ahead is a claim about something that has not
+        // happened, and the app's one signal is a record of what did. Demo
+        // history is the exception and says so at the call site: its whole job
+        // is an invented past, and painting days ahead is the same job.
+        //
+        // Guarded here as well as in the grid, for the reason the rest day is:
+        // a surface can outlive the setting it was built under, and this is the
+        // path every surface shares.
+        guard allowingFuture || day <= WeekCalendar.day(Date(), calendar: calendar) else {
+            return .refused
+        }
 
         // A rest day is true rest: nothing can be logged on it and nothing
         // un-logged. The grid withholds the tap, but the widget runs in a

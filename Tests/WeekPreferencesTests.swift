@@ -70,7 +70,7 @@ struct WeekPreferencesTests {
 
         withPreferences(restDay: calendar.component(.weekday, from: week.days[0])) {
             let row = WeekGrid.slots(
-                for: .fixture(), in: week, today: today, calendar: calendar
+                for: .fixture(), in: week, today: today, editing: .todayOnly, calendar: calendar
             )
             // Monday is the rest day and already gone: it would be a miss
             // otherwise, and a miss is exactly what a rest day is not. It is
@@ -89,7 +89,7 @@ struct WeekPreferencesTests {
 
         withPreferences(restDay: calendar.component(.weekday, from: today)) {
             let row = WeekGrid.slots(
-                for: .fixture(), in: week, today: today, calendar: calendar
+                for: .fixture(), in: week, today: today, editing: .todayOnly, calendar: calendar
             )
             #expect(row[2].state == .rest)
             #expect(row[2].mark == .rest)
@@ -113,7 +113,7 @@ struct WeekPreferencesTests {
 
         withPreferences(restDay: calendar.component(.weekday, from: monday)) {
             let habit = HabitSnapshot.fixture(completedDays: [monday])
-            let row = WeekGrid.slots(for: habit, in: week, today: today, calendar: calendar)
+            let row = WeekGrid.slots(for: habit, in: week, today: today, editing: .todayOnly, calendar: calendar)
             // Not drawn: rest wins over the completion.
             #expect(row[0].state == .rest)
             #expect(row[0].mark == .rest)
@@ -124,7 +124,7 @@ struct WeekPreferencesTests {
             let weekly = HabitSnapshot.fixture(
                 frequency: .timesPerWeek(3), completedDays: [monday]
             )
-            let spans = WeekGrid.slots(for: weekly, in: week, today: today, calendar: calendar)
+            let spans = WeekGrid.slots(for: weekly, in: week, today: today, editing: .todayOnly, calendar: calendar)
             #expect(spans.count { $0.state == .filled } == 1)
             #expect(habit.completedDays.contains(monday))
         }
@@ -143,7 +143,7 @@ struct WeekPreferencesTests {
             let weekday = calendar.component(.weekday, from: week.days[index])
             withPreferences(restDay: weekday) {
                 let row = WeekGrid.slots(
-                    for: .fixture(), in: week, today: today, calendar: calendar
+                    for: .fixture(), in: week, today: today, editing: .todayOnly, calendar: calendar
                 )
                 #expect(row[index].mark == .rest, "column \(index) should draw nothing")
                 #expect(row.count { $0.mark == .rest } == 1)
@@ -159,7 +159,7 @@ struct WeekPreferencesTests {
 
         withPreferences(restDay: nil) {
             let row = WeekGrid.slots(
-                for: .fixture(), in: week, today: today, calendar: calendar
+                for: .fixture(), in: week, today: today, editing: .todayOnly, calendar: calendar
             )
             #expect(!row.contains { $0.mark == .rest })
         }
@@ -175,7 +175,7 @@ struct WeekPreferencesTests {
             // The goal is nowhere near met, and still nothing is open: the
             // pill that would be waits, unlit, for a day that allows it.
             let habit = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
-            let row = WeekGrid.slots(for: habit, in: week, today: today, calendar: calendar)
+            let row = WeekGrid.slots(for: habit, in: week, today: today, editing: .todayOnly, calendar: calendar)
             #expect(!row.contains { $0.state == .open })
             #expect(row.allSatisfy { !$0.isTappable })
         }
@@ -193,7 +193,7 @@ struct WeekPreferencesTests {
             let habit = HabitSnapshot.fixture(
                 frequency: .timesPerWeek(3), completedDays: [today]
             )
-            let row = WeekGrid.slots(for: habit, in: week, today: today, calendar: calendar)
+            let row = WeekGrid.slots(for: habit, in: week, today: today, editing: .todayOnly, calendar: calendar)
             #expect(row.contains { $0.state == .filled })
             #expect(row.allSatisfy { !$0.isTappable })
         }
@@ -208,7 +208,7 @@ struct WeekPreferencesTests {
         withPreferences(restDay: calendar.component(.weekday, from: today)) {
             let habit = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
             let spans = WeekSpans.spans(
-                for: habit, in: week, today: today, target: 3, calendar: calendar
+                for: habit, in: week, today: today, target: 3, editing: .todayOnly, calendar: calendar
             )
             // The geometry holds — still three spans dividing the week — but
             // nothing is open and nothing takes a tap.
@@ -221,7 +221,7 @@ struct WeekPreferencesTests {
                 frequency: .timesPerWeek(1), completedDays: [today]
             )
             let metSpans = WeekSpans.spans(
-                for: met, in: week, today: today, target: 1, calendar: calendar
+                for: met, in: week, today: today, target: 1, editing: .todayOnly, calendar: calendar
             )
             #expect(metSpans.allSatisfy { !$0.isTappable })
         }
