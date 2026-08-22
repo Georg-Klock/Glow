@@ -1,5 +1,6 @@
 import AppIntents
 import Foundation
+import UIKit
 import SwiftData
 import WidgetKit
 
@@ -58,7 +59,11 @@ struct ToggleHabitIntent: LiveActivityIntent {
         // a stale widget can offer a button the store will not honour. The
         // store's answer wins, and the reload below replaces the stale surface.
         if result == .completed {
-            WidgetBurst.record(habitID: id)
+            // Read here, on the main actor, and carried with the note — see
+            // `WidgetBurst.record`.
+            WidgetBurst.record(
+                habitID: id, reduceMotion: UIAccessibility.isReduceMotionEnabled
+            )
             // The week's goal, if this was the tap that met it. This is the
             // path the pop is actually seen on: the Island does not render an
             // activity while its own app is in front, so a completion logged in

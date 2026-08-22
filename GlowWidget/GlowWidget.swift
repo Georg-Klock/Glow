@@ -119,7 +119,11 @@ struct WeekProvider: TimelineProvider {
         ) ?? now.addingTimeInterval(3600)
 
         // A tap animates. Everything else renders still.
-        guard let burst = WidgetBurst.pending(now: now), !reduceMotion else {
+        // Reduce Motion travels with the burst rather than being read here.
+        // `UIAccessibility.isReduceMotionEnabled` is main-actor isolated and a
+        // `TimelineProvider` is not; the intent that records the note is, so
+        // the value is read where it is safe to read. See `WidgetBurst.record`.
+        guard let burst = WidgetBurst.pending(now: now), !WidgetBurst.reduceMotion else {
             let why = WidgetBurst.pending(now: now) == nil ? "none pending" : "suppressed by reduce motion"
             GlowLog.widget.notice("timeline: 1 entry, still (burst \(why, privacy: .public))")
             WidgetTrace.record("timeline: 1 entry, still (burst \(why))")
@@ -156,10 +160,6 @@ struct WeekProvider: TimelineProvider {
         WidgetTrace.record(summary)
         completion(Timeline(entries: entries, policy: .after(midnight)))
     }
-
-    /// Pulsing content is what Reduce Motion exists to switch off, and an
-    /// extension can read it directly.
-    private var reduceMotion: Bool { UIAccessibility.isReduceMotionEnabled }
 
 
     /// Not main-actor isolated: `TimelineProvider` is called on whatever queue

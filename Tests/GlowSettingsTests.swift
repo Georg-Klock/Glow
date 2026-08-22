@@ -96,11 +96,24 @@ struct WidgetBurstTests {
         // re-animate somebody's last tap hours after they made it.
         let id = UUID()
         let started = Date()
-        WidgetBurst.record(habitID: id, at: started)
+        WidgetBurst.record(habitID: id, at: started, reduceMotion: false)
 
         #expect(WidgetBurst.pending(now: started.addingTimeInterval(0.1))?.habitID == id)
         #expect(WidgetBurst.pending(now: started.addingTimeInterval(WidgetBurst.duration + 1)) == nil)
         #expect(WidgetBurst.pending(now: started.addingTimeInterval(3600)) == nil)
+    }
+
+    @Test("Reduce Motion travels with the note, so the provider never reads UIKit")
+    func burstCarriesReduceMotion() {
+        // `UIAccessibility.isReduceMotionEnabled` is main-actor isolated and a
+        // `TimelineProvider` is not. The intent that records the note is, so
+        // the value is read there and carried — see `WidgetBurst.record`.
+        let id = UUID()
+        WidgetBurst.record(habitID: id, at: Date(), reduceMotion: true)
+        #expect(WidgetBurst.reduceMotion)
+
+        WidgetBurst.record(habitID: id, at: Date(), reduceMotion: false)
+        #expect(!WidgetBurst.reduceMotion)
     }
 
     @Test("The burst fits inside one timeline, so it spends no extra reloads")
