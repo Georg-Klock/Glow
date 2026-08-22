@@ -116,12 +116,21 @@ enum Frequency { case daily, timesPerWeek(Int), timesPerDay(Int) }
 // timesPerDay: 1...12, one ring arc per repetition
 
 struct Habit    { id, name, icon, frequency, accent, createdAt, sortOrder }
-struct Completion { id, habitId, day }             // day, not a timestamp
+struct Completion { id, habitId, dayKey, day }     // dayKey is the identity
 ```
 
-`Completion.day` is normalized to midnight in the user's calendar. Storing an
-instant instead would make two completions on the same day compare unequal,
-which is the bug the normalization exists to prevent.
+**A completion belongs to a civil day.** `dayKey` is that day as `yyyy-MM-dd`,
+and it is what grouping, uniqueness and lookup all use. `DayID` is the value
+type; nothing in it is an instant, so nothing in it moves when the device's zone
+does.
+
+`day` is the local midnight the row was normalized to when it was written. It is
+kept and never rewritten — it is the only evidence of where a pre-`dayKey` row
+came from, and the backfill that gave those rows a key had to infer one from
+exactly it. Storing only that instant was #130: local midnight is a different
+moment in every zone, so 19 August compared unequal to itself after a flight,
+left the grid, and let the next tap write a second row for a day that already
+had one.
 
 **Week boundary.** Weeks start Monday, matching the M T W T F S S header. All
 "this week" queries filter into `[startOfWeek(Monday), +7 days)` using the
@@ -142,7 +151,9 @@ A build that violates one of these is broken regardless of what else works.
 - **R3.** For a weekly-cadence habit, a day holds zero or one completion.
   Never two. A per-day habit stores one completion row per repetition, so a
   day holds up to its target.
-- **R4.** `Completion.day` is always midnight in the user's calendar.
+- **R4.** A completion names one civil day and keeps naming it. Changing time
+  zone, crossing a DST transition or relaunching does not move it, and a
+  completion the app can see is a completion the app can un-log.
 - **R5.** A daily row draws exactly 7 slots; an N-times row draws exactly N
   spans — plus one lit dot per completion, on the weekday it happened.
 - **R6.** Every row spans the same track width, whatever its slot count.
@@ -154,9 +165,11 @@ R1, R2, R5 and R7 are asserted in `Tests/WeekGridTests.swift`, including an
 exhaustive pass over all 128 possible completion histories of a week — run under
 each surface's rule, so R2 is asserted as the difference between them rather
 than as one answer. `Tests/SlotEditingTests.swift` covers the rule itself and
-the geometry that resolves a touch on a span into a weekday. R3 and R4 are
-asserted in `Tests/PersistenceTests.swift`, which also asserts the store's own
-refusal of a day still to come, R6 in `Tests/SlotLayoutTests.swift`, and R8 in
+the geometry that resolves a touch on a span into a weekday. R3 is asserted in
+`Tests/PersistenceTests.swift`, which also asserts the store's own refusal of a
+day still to come, and R4 in `Tests/DayIdentityTests.swift` — Los Angeles to
+Berlin and back, both DST directions, and a zone whose clocks move at midnight.
+R6 is in `Tests/SlotLayoutTests.swift`, and R8 in
 `Tests/GlowRendererTests.swift`, which asserts the encoded colour space rather
 than trusting it.
 

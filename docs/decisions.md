@@ -1839,3 +1839,97 @@ does not really have.
 `didSeedDefaultHabits` is a Bool with no version in it, for the reason recorded
 under #140: a version that bumped would push a new list onto people who had
 already arranged the old one.
+
+## A completion belongs to a day, not to a midnight
+
+**2026-08-22.** `Completion.day` stored local midnight and every lookup compared
+those instants by equality, against a calendar rebuilt from `Calendar.current`.
+The same civil date is a different instant in every zone, so a completion
+logged on 19 August in Los Angeles compared unequal to 19 August in Berlin: the
+mark left the grid, and the next tap wrote a second row for a day that already
+had one. That is #130.
+
+**`DayID` is the identity now** — year, month, day, no zone — stored as
+`yyyy-MM-dd` in `Completion.dayKey`. `Habit.completionDayCounts` is the one
+place rows become history, keyed by `DayID`, and everything week-shaped reads a
+projection of it onto whatever calendar is drawing. A midnight is still what the
+grid compares; it is just no longer what the store remembers.
+
+Measured on a store the app itself wrote, with the app launched under
+`SIMCTL_CHILD_TZ`: two habits logged on Saturday 22 in `America/Los_Angeles`,
+relaunched in `Europe/Berlin` where the same moment is Sunday 23. The stored row
+is `2026-08-22 07:00 UTC` — Los Angeles midnight, not Berlin's — and both marks
+stay on the 22nd, in both directions of travel. The same two taps against the
+build before this change go dark on the 22nd after the same relaunch.
+
+### The backfill reads a legacy row, it does not guess a zone
+
+A legacy row holds `utcMidnight(D) - offset` for some unrecoverable offset. The
+rule is **the UTC midnight nearest the stored instant**, which is D for every
+zone inside ±12 hours: Berlin's midnight sits at 22:00 the day before, Los
+Angeles' at 07:00 that morning, and both round to the right day.
+
+The alternative — read the instant in the device's current zone — was declined
+because it makes a person's history depend on where they are standing when the
+app happens to open. Two people with the same history would get different
+histories; one person would get a different one depending on which airport they
+landed in. Rounding gives the same answer everywhere.
+
+**The limit is stated rather than hidden.** A row written at UTC+12:45, +13 or
++14 — Chatham, Apia, Kiritimati — recovers as the day before, and one at UTC-12
+as the day after. There is nothing in the instant that separates those from a
+neighbouring day written in Europe. `Tests/DayIdentityTests.swift` asserts both
+the eleven zones it gets right and the three it does not, so the limit is a
+recorded fact rather than a lurking one.
+
+### The migration is not load-bearing, on purpose
+
+This is the change in the backlog that can destroy a year of somebody's
+history, so it is arranged so that no step of it has to succeed.
+
+- `Completion.dayID` infers a missing key with the same rule the backfill
+  writes, so an unmigrated store, a half-migrated store and a migrated store
+  all show the same history. The widget's read-only container cannot write at
+  all, and does not need to.
+- `Completion.day` is never rewritten. It is the only evidence a better
+  inference would have, so the backfill is reversible in the sense that
+  matters: a later build can redo it from the original observation.
+- The work is defined as "rows with no key", not as a cursor, so an interrupted
+  run leaves the rest for the next launch and a finished one finds nothing.
+- Nothing is created or deleted; the row count is checked either side of the
+  save, and the keys are proved readable *before* it, while a rollback is still
+  possible.
+- `StoreMigration.stampDayIdentities` returns rather than throws, and
+  `GlowStore.makeContainer` opens the store regardless.
+
+It builds on #131 rather than beside it: the durable record's `format` is the
+hook it was described as, now 2, with `dayFormat` and `stampedDays` beside it.
+Those two are optional rather than defaulted, and that is not a style choice —
+Swift's synthesized decoder does not apply a property's default to a missing
+key, so a non-optional addition would make every format-1 record already on
+disk fail to decode and read as absent. A store with no record does not gain
+one here: the backfill is defined by what is unstamped, not by a file, and
+inventing a record would hand `run` a reason to skip work it has not done.
+
+Verified on a real store by blanking every `ZDAYKEY` with `sqlite3` — which is
+exactly the shape SwiftData materializes for a store written before the column
+— and relaunching in Berlin. The marks were already correct on the first frame,
+the record went from `stampedDays: 0` to `2` with its `generation` unchanged,
+and `ZDAY` came out of it byte-identical.
+
+### What this cost elsewhere
+
+`HabitStore`'s day lookups now fetch through the context instead of reading
+`habit.completions`, which is #145's rule applied to the write path: a stale
+cached array on a read was a wrong number, and on a toggle it is a duplicate
+row. They filter on `DayID` in memory rather than on a `dayKey` predicate,
+because a legacy row's key is empty and a predicate would skip exactly the rows
+this is about. Once a store is fully stamped the predicate can be pushed into
+SQLite, which is #135's to take — `completionDayCounts` is the seam, and the
+migration record is how a caller can know the store is ready for it.
+
+Twenty assertions across five suites had to name their calendar. They were
+storing days through `TestCalendar.monday` and reading them back through
+`Calendar.current`, and passed only because the raw stored instant was the
+identity on both sides. Making the projection explicit is the point of the
+parameter.

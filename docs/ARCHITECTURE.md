@@ -69,6 +69,12 @@ August rather than against whenever they happen to run.
 `WeekGrid` operates on `HabitSnapshot`, a plain struct, not on the SwiftData
 `Habit`. A view calls `habit.snapshot()` and passes the result down.
 
+`snapshot(calendar:)` takes the calendar the days should be placed on, and
+defaults to `WeekCalendar.calendar` — the same one `WeekCalendar.week` builds
+from, which is what keeps the two comparable. A test that pins a calendar has to
+pin it here too; passing one side a fixed calendar and letting the other read
+the machine's is how a suite ends up asserting something about the runner.
+
 This costs one small allocation per row per redraw and buys three things: the
 logic is testable without a store, the logic is `Sendable`, and a view cannot
 accidentally mutate a model while drawing it.
@@ -105,13 +111,18 @@ adds the span's own origin and asks `SlotEditing` what that column allows.
 `HabitStore` wraps `ModelContext` and owns every write. Reads do not go through
 it: the grid uses `@Query`, so SwiftData drives updates.
 
-`toggleCompletion(for:on:allowingFuture:)` normalizes the day itself, which is
+`toggleCompletion(for:on:allowingFuture:)` resolves the `DayID` itself, which is
 what makes R3 and R4 hold no matter who calls it. It refuses a rest day, a blank
 row, a habit of the wrong cadence, and — unless the caller asks otherwise — a day
 that has not happened yet. `allowingFuture` defaults to false, so the widget's
 intents get the strict answer without naming it and only the week view, with demo
-history in, opts out. Tapping twice quickly cannot create a
-duplicate, because the second call finds the first completion and removes it.
+history in, opts out. Tapping twice quickly cannot create a duplicate, because
+the second call finds the first completion and removes it — and it finds it by
+*fetching* the habit's rows for that day rather than reading the cached
+relationship array, so a row the widget's process wrote is not missed and a row
+it deleted is not touched. Every row on the day comes off, not the first one
+found: a store written before #130 can hold two rows for one civil day, and
+un-marking a day has to mean the day is not marked.
 It returns a `ToggleOutcome` rather than a Bool, because a third thing can
 happen: a write landing on the rest day is `.refused` — nothing logged, nothing
 removed. The refusal lives here, on the one write path the app and the widget's
@@ -150,6 +161,23 @@ meaning "counted across a week" — a sentinel no real per-day habit can store,
 because the initializer clamps into 1...12. `Habit.countedPerWeek` and
 `Habit.countedPerDay` are the two fetch predicates, one definition each, so the
 week surfaces and Today cannot drift in how they split the kinds.
+
+`Completion.dayKey` is the civil day as `yyyy-MM-dd`, and it is what the app
+groups, counts and looks up on. `Completion.day` is still there and is still the
+local midnight the row was written at, but it is evidence rather than identity
+and nothing compares it. `Habit.completionDayCounts` is the single place rows
+become history — `[DayID: Int]`, fetched through the context — and
+`completionCounts(in:)` / `completedDays(in:)` project it onto whichever
+calendar is drawing. Keeping the projection separate is deliberate: the
+identity half depends on nothing but the store and is therefore cacheable, and
+the calendar half must not be.
+
+The backfill for stores written before that column lives in
+`StoreMigration.stampDayIdentities`, and the migration record's `format` is now
+2 with a `dayFormat` beside it. It is not on the critical path: `Completion.dayID`
+infers a missing key with the same rule, so a store reads identically before,
+during and after — which is what makes the riskiest migration in the app one
+that can be abandoned at any point. See decisions.md.
 
 `Completion.demoSessionID` is provenance: `nil` for a completion a person
 logged, and the seeding's id for one the demo invented. It is what the demo
