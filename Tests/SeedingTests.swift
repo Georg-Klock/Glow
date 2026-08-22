@@ -131,6 +131,77 @@ struct SeedingTests {
         #expect(try context.fetchCount(FetchDescriptor<Habit>()) == 0)
     }
 
+    @Test("A seed that could not save leaves nothing, and the next launch tries again")
+    func aFailedSeedIsRetried() throws {
+        // The partial-seed failure, which used to be permanent: the flag went
+        // in before the inserts, so an interruption anywhere in them left four
+        // habits of eleven and nothing that would ever repair them.
+        let url = TestStore.url()
+        defer { TestStore.discard(url) }
+        let defaults = makeDefaults()
+
+        // An empty store, made first: a read-only container cannot open a file
+        // that is not there yet, which is a fresh install's other problem.
+        let empty = try TestStore.writable(at: url)
+        try empty.save()
+
+        let blocked = try TestStore.readOnly(at: url)
+        #expect(throws: (any Error).self) {
+            try seeder(blocked, defaults).seedIfNeeded(now: today)
+        }
+        #expect(!defaults.bool(forKey: HabitSeeder.seededKey))
+
+        let after = try TestStore.writable(at: url)
+        #expect(try after.fetchCount(FetchDescriptor<Habit>()) == 0)
+        #expect(try seeder(after, defaults).seedIfNeeded(now: today) == DefaultHabits.all.count)
+        #expect(try after.fetchCount(FetchDescriptor<Habit>()) == DefaultHabits.all.count)
+    }
+
+    @Test("A flag that never landed does not seed the list twice")
+    func aLostFlagConvergesRatherThanDuplicating() throws {
+        // The one step that cannot be part of the transaction is the flag,
+        // because it lives in another store. So it converges: a launch that
+        // finds habits it has no record of putting there records that, rather
+        // than adding eleven more rows to a list somebody is already using.
+        let context = try makeContext()
+        let forgetful = try #require(ForgetfulDefaults(suiteName: "seeding-lost-flag-\(UUID().uuidString)"))
+        #expect(try seeder(context, forgetful).seedIfNeeded(now: today) == DefaultHabits.all.count)
+        #expect(!forgetful.bool(forKey: HabitSeeder.seededKey))
+
+        // Relaunch, with a defaults that keeps what it is given this time.
+        let defaults = makeDefaults()
+        #expect(try seeder(context, defaults).seedIfNeeded(now: today) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<Habit>()) == DefaultHabits.all.count)
+        #expect(defaults.bool(forKey: HabitSeeder.seededKey))
+        #expect(try seeder(context, defaults).seedIfNeeded(now: today) == 0)
+    }
+
+    @Test("A list goes in as it was written, blank rows in their places")
+    func addAllKeepsTheListItGaveIt() throws {
+        // `addAll` is where a seed set becomes rows, so it is what a change to
+        // the seed data has to keep working. It appends after whatever is
+        // already there, in order, and a template that says blank row arrives
+        // as a blank row rather than as a habit with no name.
+        let context = try makeContext()
+        let store = HabitStore(context: context, calendar: calendar)
+        try store.addHabit(name: "Mine", icon: "star", frequency: .daily, now: today)
+
+        let templates: [DefaultHabits.Template] = [
+            DefaultHabits.Template(name: " Read ", icon: "book", frequency: .daily),
+            DefaultHabits.Template(isSpacer: true, name: "", icon: "", frequency: .daily),
+            DefaultHabits.Template(name: "Walk", icon: "figure.run", frequency: .timesPerWeek(2))
+        ]
+        #expect(try store.addAll(templates, now: today) == 3)
+
+        let rows = try context.fetch(
+            FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder)])
+        )
+        #expect(rows.map(\.name) == ["Mine", "Read", "", "Walk"])
+        #expect(rows.map(\.isSpacer) == [false, false, true, false])
+        #expect(rows.map(\.sortOrder) == [0, 1, 2, 3])
+        #expect(rows[3].frequency == .timesPerWeek(2))
+    }
+
     @Test("An install that already has habits is left alone")
     func doesNotSeedOverExistingHabits() throws {
         let context = try makeContext()

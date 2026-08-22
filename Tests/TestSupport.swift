@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 @testable import Glow
 
 /// A calendar pinned to UTC, so a test asserting "Monday" means the same thing
@@ -73,6 +74,56 @@ enum TestPreferences {
     ) -> Int {
         calendar.component(.weekday, from: week.days[column])
     }
+}
+
+/// A store on a real file, for the tests that need to *fail* a write.
+///
+/// An in-memory container cannot be opened twice, and a save that throws is the
+/// only honest way to ask what a half-finished seeding leaves behind. So the
+/// file is opened writable to set the scene, opened again read-only to run the
+/// write that cannot land, and opened writable a third time to see what
+/// survived — which is also the relaunch, since nothing carries over between
+/// them but the file.
+@MainActor
+enum TestStore {
+    static func url() -> URL {
+        URL.temporaryDirectory.appending(path: "glow-tests-\(UUID().uuidString).store")
+    }
+
+    static func writable(at url: URL) throws -> ModelContext {
+        ModelContext(
+            try ModelContainer(
+                for: GlowStore.schema,
+                configurations: ModelConfiguration(schema: GlowStore.schema, url: url)
+            )
+        )
+    }
+
+    /// The same file, opened so that every `save()` through it throws.
+    static func readOnly(at url: URL) throws -> ModelContext {
+        ModelContext(
+            try ModelContainer(
+                for: GlowStore.schema,
+                configurations: ModelConfiguration(
+                    schema: GlowStore.schema, url: url, allowsSave: false
+                )
+            )
+        )
+    }
+
+    /// The store and the two files SwiftData keeps beside it.
+    static func discard(_ url: URL) {
+        for suffix in ["", "-wal", "-shm"] {
+            try? FileManager.default.removeItem(atPath: url.path + suffix)
+        }
+    }
+}
+
+/// Defaults that take a write and do not keep it — the flag that never landed,
+/// which is one half of every "the store and the record disagree" failure.
+final class ForgetfulDefaults: UserDefaults, @unchecked Sendable {
+    override func set(_ value: Any?, forKey defaultName: String) {}
+    override func set(_ value: Bool, forKey defaultName: String) {}
 }
 
 extension HabitSnapshot {

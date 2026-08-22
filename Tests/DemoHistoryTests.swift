@@ -140,6 +140,120 @@ struct DemoHistoryTests {
         #expect(!habit.completionCounts.isEmpty)
     }
 
+    @Test("What the demo added is known to the store, not to the defaults")
+    func provenanceOutlivesTheDefaults() throws {
+        // The crash-in-the-gap case, in the only form it can be observed from:
+        // everything outside the store is gone, and the demo is still exactly
+        // as identifiable as it was. Under the old record this is the failure —
+        // the toggle reads off, and ten weeks of fiction are on the grid for
+        // good.
+        let defaults = makeDefaults()
+        let context = try seededContext(defaults)
+        let store = HabitStore(context: context, calendar: calendar)
+        try demo(context, defaults).seed(now: today)
+
+        let habit = try #require(
+            try context.fetch(FetchDescriptor<Habit>()).first { !$0.isSpacer }
+        )
+        try store.addCompletion(for: habit, on: today)
+
+        let amnesiac = makeDefaults()
+        let reopened = demo(context, amnesiac)
+        #expect(reopened.isSeeded)
+
+        try reopened.remove()
+        #expect(!reopened.isSeeded)
+        #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 1)
+        #expect(store.count(for: habit, on: today) == 1)
+    }
+
+    @Test("A seeding that was interrupted half-way is still removable")
+    func partialSeedIsRemovable() throws {
+        // What termination mid-seed leaves: some of the rows, each carrying the
+        // mark the rest would have carried. Removal is by that mark, so there
+        // is no such thing as a row it wrote and cannot take back.
+        let defaults = makeDefaults()
+        let context = try seededContext(defaults)
+        let habit = try #require(
+            try context.fetch(FetchDescriptor<Habit>()).first { !$0.isSpacer }
+        )
+
+        let session = UUID()
+        for offset in 1...3 {
+            let day = calendar.date(byAdding: .day, value: -offset, to: today) ?? today
+            context.insert(Completion(day: day, habit: habit, demoSessionID: session))
+        }
+        try context.save()
+
+        let demo = demo(context, defaults)
+        #expect(demo.isSeeded)
+        try demo.remove()
+        #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
+    }
+
+    @Test("A demo that failed to save leaves nothing behind, and can be retried")
+    func aFailedSeedWritesNothing() throws {
+        let url = TestStore.url()
+        defer { TestStore.discard(url) }
+        let defaults = makeDefaults()
+
+        let setUp = try TestStore.writable(at: url)
+        try HabitSeeder(context: setUp, defaults: defaults, calendar: calendar)
+            .seedIfNeeded(now: today)
+
+        // The same file, opened so that the save cannot land.
+        let blocked = try TestStore.readOnly(at: url)
+        #expect(throws: (any Error).self) {
+            try demo(blocked, defaults).seed(now: today)
+        }
+
+        // Reopened: no orphan demo, and the toggle agrees.
+        let after = try TestStore.writable(at: url)
+        #expect(try after.fetchCount(FetchDescriptor<Completion>()) == 0)
+        #expect(!demo(after, defaults).isSeeded)
+
+        try demo(after, defaults).seed(now: today)
+        #expect(demo(after, defaults).isSeeded)
+        #expect(try after.fetchCount(FetchDescriptor<Completion>()) > 0)
+    }
+
+    @Test("A demo recorded before provenance existed is adopted, not stranded")
+    func legacyRecordIsAdopted() throws {
+        // The upgrade path. An install that switched the demo on under the old
+        // record has its ids in the defaults and nothing on the rows, so
+        // dropping that key unread would hand exactly these people the bug.
+        let defaults = makeDefaults()
+        let context = try seededContext(defaults)
+        let store = HabitStore(context: context, calendar: calendar)
+        let habit = try #require(
+            try context.fetch(FetchDescriptor<Habit>()).first { !$0.isSpacer }
+        )
+
+        var invented: [String] = []
+        for offset in 1...4 {
+            let day = calendar.date(byAdding: .day, value: -offset, to: today) ?? today
+            let completion = Completion(day: day, habit: habit)
+            context.insert(completion)
+            invented.append(completion.id.uuidString)
+        }
+        // One logged by hand, and one id for a completion that no longer
+        // exists — a habit deleted since is not an error here.
+        try store.addCompletion(for: habit, on: today)
+        invented.append(UUID().uuidString)
+        try context.save()
+        defaults.set(invented, forKey: DemoHistory.legacyIDsKey)
+
+        let demo = demo(context, defaults)
+        #expect(demo.isSeeded)
+        // Adopted onto the rows, and the old record retired in the same breath.
+        #expect(defaults.stringArray(forKey: DemoHistory.legacyIDsKey) == nil)
+
+        try demo.remove()
+        #expect(!demo.isSeeded)
+        #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 1)
+        #expect(store.count(for: habit, on: today) == 1)
+    }
+
     @Test("The first habit's demo past is perfect, so a full streak is on screen")
     func firstHabitIsPerfect() throws {
         // Position, not identity: SeededHistory.form(at: 0) is .perfect, and

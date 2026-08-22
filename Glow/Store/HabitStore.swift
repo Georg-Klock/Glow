@@ -75,6 +75,47 @@ struct HabitStore {
         return habit
     }
 
+    /// Appends a whole list of rows as one transaction, in the order given.
+    /// Returns how many were added.
+    ///
+    /// **One save, not one per row**, and that is the whole reason this exists
+    /// rather than a loop over `addHabit` (#140). A list committed row by row
+    /// is a list that can be interrupted half-way, and what it leaves behind is
+    /// a set of habits nobody chose — the first four of a design, say — which
+    /// the caller then has to be able to tell apart from a list somebody
+    /// edited down to four. Either the whole list is there or none of it is,
+    /// so "did this install get its defaults" stays a question with an answer.
+    ///
+    /// Blank rows are inserted as blank rows: a template that says spacer
+    /// carries no name, icon or cadence into the store, whatever else it holds.
+    ///
+    /// The blank-row filling `addHabit` does is deliberately not applied here.
+    /// These rows arrive with their own positions and their own gaps, and
+    /// dropping the first of them into a gap that a previous one just made
+    /// would rearrange the list on its way in.
+    @discardableResult
+    func addAll(_ templates: [DefaultHabits.Template], now: Date = Date()) throws -> Int {
+        guard !templates.isEmpty else { return 0 }
+
+        var order = try nextSortOrder()
+        for template in templates {
+            let habit = Habit(
+                name: template.isSpacer
+                    ? "" : template.name.trimmingCharacters(in: .whitespacesAndNewlines),
+                icon: template.isSpacer ? "" : template.icon,
+                frequency: template.isSpacer ? .daily : template.frequency,
+                createdAt: now,
+                sortOrder: order,
+                isSpacer: template.isSpacer
+            )
+            context.insert(habit)
+            order += 1
+        }
+
+        try commit()
+        return templates.count
+    }
+
     /// The topmost blank row, or nil when the grid has none.
     private func firstBlankRow() throws -> Habit? {
         var descriptor = FetchDescriptor<Habit>(
@@ -190,8 +231,19 @@ struct HabitStore {
     ///
     /// `WidgetRefresh` coalesces, so a reorder rewriting `sortOrder` on ten
     /// rows still costs one reload.
+    ///
+    /// A failed save rolls back (#140). A `ModelContext` keeps its pending
+    /// changes when a save throws, and the next save from anywhere else in the
+    /// app commits them — so a write that was reported as failed would arrive
+    /// later, out of order, attached to an unrelated gesture. Leaving the store
+    /// as it was is the only outcome a caller can do anything with.
     private func commit() throws {
-        try context.save()
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
         WidgetRefresh.invalidate()
     }
 
