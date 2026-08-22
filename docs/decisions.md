@@ -584,3 +584,37 @@ not have today" had landed, and the "Deliberately later" section still deferred
 export, which shipped in #23. Both are corrected in place rather than deleted —
 the value of the list is what the vision *asked for*, and a target with nothing
 left to hit is worth being able to see.
+
+## The week row's dots get one voice, not six
+
+**2026-08-22.** #47 put a lit dot on each day a weekly habit was logged, which
+is the whole *when* of the row. VoiceOver could not reach any of it: the dots
+are `GlowImageView`s, hidden from accessibility from the inside, drawn in an
+overlay with no label of its own. A sighted reader got which days; a VoiceOver
+user got what the row said before #47 existed.
+
+**One element for the run**, not one per dot. The dots are one fact — a list of
+days — and the row already carries up to six span elements announcing how much
+is left. Six more stops saying "logged Tuesday", "logged Friday" would make the
+row longer to swipe through in order to say something a single sentence says
+better. `WeekDots.spokenDays` builds it, so the app and the widget cannot
+disagree about it any more than they can about which dots to draw.
+
+**No button trait**, matching the rest slot from #72: the dots carry no
+`actionDay` and nothing there is tappable. Editing the past is a different
+question and not this one.
+
+**The list's locale is the calendar's, explicitly.** A bare
+`.list(type: .and)` takes the *process* locale, so the days were named out of
+an en_GB calendar and then joined by en_US rules — measured as "Monday,
+Wednesday, and Sunday". Naming and joining now come from the same place.
+
+**What could not be verified here.** The intended check was VoiceOver in the
+simulator, swiping the row. VoiceOver does not engage there: the Accessibility
+toggles ignore automated taps, and setting `VoiceOverTouchEnabled` with the
+cache notifications and a respring leaves it off. What was verified instead is
+the string, against the real types and including the rest day's absence from
+it, and that wrapping the dots in a `ZStack` to hang the element on moved
+nothing on screen — a full-screen diff of the two builds is 3160 pixels apart
+at one level out of 255, which is render dither and not a dot that shifted.
+The spoken result on a device is untested.

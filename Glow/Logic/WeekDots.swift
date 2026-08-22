@@ -38,4 +38,42 @@ enum WeekDots {
                 && !WeekPreferences.isRestDay(day, calendar: calendar)
         }
     }
+
+    /// The same fact spoken: which days, once, as a sentence — or nil when
+    /// there is nothing lit and so nothing to say.
+    ///
+    /// **The dots are a fact, not six facts** (#104). A sighted reader takes
+    /// them in at a glance and the row's spans already carry its state, so the
+    /// days want one more stop in a swipe-through rather than up to six. They
+    /// are also not controls: no `actionDay`, nothing to tap, so no button
+    /// trait — the shape `SpanView` uses for the rest slot.
+    ///
+    /// Without this the row said only *how much is left*, which is what it said
+    /// before #47 existed. The dots were the whole point of that change and
+    /// they were the one part of it VoiceOver could not reach.
+    ///
+    /// Locale comes from the calendar, both for the names
+    /// (`standaloneWeekdaySymbols`, as Settings already does) and for how a
+    /// list of them is joined.
+    static func spokenDays(
+        for habit: HabitSnapshot,
+        in week: Week,
+        calendar: Calendar = WeekCalendar.calendar
+    ) -> String? {
+        let lit = columns(for: habit, in: week, calendar: calendar)
+        let symbols = calendar.standaloneWeekdaySymbols
+        guard !lit.isEmpty, symbols.count == 7 else { return nil }
+        let names = lit.map { column in
+            symbols[calendar.component(.weekday, from: week.days[column]) - 1]
+        }
+        // The calendar's locale, explicitly, on both halves. The names come
+        // from the calendar already; a bare `.list(type: .and)` would take the
+        // *process* locale instead and join them by a different rule than it
+        // named them by — measured as "Monday, Wednesday, and Sunday" out of a
+        // calendar set to en_GB.
+        let days = names.formatted(
+            .list(type: .and).locale(calendar.locale ?? .current)
+        )
+        return "logged \(days)"
+    }
 }
