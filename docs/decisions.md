@@ -3289,6 +3289,7 @@ test demands, not what the widget draws.
 
 **The rest of the file was left alone, deliberately.** `metGoalStopsBeforeSunday`
 and `metGoalIsCutInTheMiddle` bound the rest column with `< clear` and have the
-same one-sided shape, and `groundIsPureBlack` and `noHueAnywhere` would both
-pass on a blank frame. Catalogued rather than fixed here, the way #199
-catalogued the bands: one reviewable change at a time.
+same one-sided shape — measured, they read 0 and 1 beside a rest cut at 36, so
+they are vacuous today too — and `groundIsPureBlack` and `noHueAnywhere` would
+both pass on a blank frame. Catalogued in #226 rather than fixed here, the way
+#199 catalogued the bands: one reviewable change at a time.
