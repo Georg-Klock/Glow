@@ -280,6 +280,29 @@ struct HabitStore {
         !habit.isSpacer && !habit.frequency.isCountedPerDay
     }
 
+    /// This habit's completions on one civil day, fetched rather than
+    /// remembered.
+    ///
+    /// **A fetch, for the same reason `Habit.liveCompletions` is one** (#145):
+    /// the cached `completions` array can be missing a row the widget's process
+    /// wrote and can be holding one it deleted. On a read that only cost a
+    /// wrong number; here it decides whether a tap creates a row or removes
+    /// one, so a stale array is how a day ends up with two completions on it.
+    ///
+    /// Filtered in memory rather than by a predicate on `dayKey`, because a
+    /// legacy row's key is empty and its day is inferred — a predicate would
+    /// silently skip exactly the rows #130 is about. Once a store has been
+    /// through `StoreMigration.stampDayIdentities` the predicate could be
+    /// pushed down; that is #135's to take, and it needs a way to know the
+    /// store is fully stamped, which the migration record now says.
+    private func completions(of habit: Habit, on dayID: DayID) throws -> [Completion] {
+        let habitID = habit.id
+        let descriptor = FetchDescriptor<Completion>(
+            predicate: #Predicate { $0.habit?.id == habitID }
+        )
+        return try context.fetch(descriptor).filter { $0.dayID == dayID }
+    }
+
     /// Marks the habit done on `date`, or un-marks it if it already is.
     ///
     /// Idempotent in the sense that the stored state only ever has zero or one
@@ -291,13 +314,21 @@ struct HabitStore {
     /// than today. `allowingFuture` defaults to false, so the widget's intents
     /// get the strict answer without having to name it, and only the week view
     /// — with demo history in — opts out.
+    ///
+    /// **Every row on the day goes, not the first one found** (#130). A store
+    /// written by a build before day identities can hold two rows for one civil
+    /// day — that is the bug's own residue, a completion logged in Berlin and
+    /// logged again after landing in Los Angeles — and leaving one behind would
+    /// make the slot flicker back to done on the next redraw. Un-marking a day
+    /// means the day is not marked.
     @discardableResult
     func toggleCompletion(
         for habit: Habit,
         on date: Date,
         allowingFuture: Bool = false
     ) throws -> ToggleOutcome {
-        let day = WeekCalendar.day(date, calendar: calendar)
+        let dayID = DayID(date, calendar: calendar)
+        let day = dayID.date(in: calendar)
 
         // A completion logged ahead is a claim about something that has not
         // happened, and the app's one signal is a record of what did. Demo
@@ -326,14 +357,18 @@ struct HabitStore {
         // used to be accepted. See `acceptsDayWrite` and #129.
         guard acceptsDayWrite(habit) else { return .refused }
 
-        if let existing = (habit.completions ?? []).first(where: { $0.day == day }) {
-            habit.completions?.removeAll { $0.id == existing.id }
-            context.delete(existing)
+        let existing = try completions(of: habit, on: dayID)
+        if !existing.isEmpty {
+            let ids = Set(existing.map(\.id))
+            habit.completions?.removeAll { ids.contains($0.id) }
+            for completion in existing {
+                context.delete(completion)
+            }
             try commit()
             return .uncompleted
         }
 
-        let completion = Completion(day: day, habit: habit)
+        let completion = Completion(day: day, habit: habit, calendar: calendar)
         context.insert(completion)
         habit.completions?.append(completion)
         try commit()
@@ -349,9 +384,12 @@ struct HabitStore {
     // a day.
 
     /// How many times the habit is logged on `date`.
+    ///
+    /// Non-throwing, so a failed fetch reads as an empty day rather than as a
+    /// broken ring. The write paths below do not get that luxury.
     func count(for habit: Habit, on date: Date) -> Int {
-        let day = WeekCalendar.day(date, calendar: calendar)
-        return (habit.completions ?? []).count { $0.day == day }
+        let dayID = DayID(date, calendar: calendar)
+        return ((try? completions(of: habit, on: dayID)) ?? []).count
     }
 
     /// Records one more completion on `date`, and returns the new count.
@@ -365,12 +403,14 @@ struct HabitStore {
         // under and no surface to show it on, and a completion written here
         // would belong to whatever habit fills the row next (#129).
         guard !habit.isSpacer else { return 0 }
-        let day = WeekCalendar.day(date, calendar: calendar)
-        let completion = Completion(day: day, habit: habit)
+        let dayID = DayID(date, calendar: calendar)
+        let completion = Completion(
+            day: dayID.date(in: calendar), habit: habit, calendar: calendar
+        )
         context.insert(completion)
         habit.completions?.append(completion)
         try commit()
-        return (habit.completions ?? []).count { $0.day == day }
+        return try completions(of: habit, on: dayID).count
     }
 
     /// Applies one tap to a per-day habit: one more repetition, or — from a
@@ -400,8 +440,7 @@ struct HabitStore {
     @discardableResult
     func clearDay(for habit: Habit, on date: Date) throws -> Int {
         guard !habit.isSpacer else { return 0 }
-        let day = WeekCalendar.day(date, calendar: calendar)
-        let doomed = (habit.completions ?? []).filter { $0.day == day }
+        let doomed = try completions(of: habit, on: DayID(date, calendar: calendar))
         guard !doomed.isEmpty else { return 0 }
 
         let ids = Set(doomed.map(\.id))

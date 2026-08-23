@@ -108,23 +108,49 @@ final class Habit {
     /// week grid, so it belongs to that side and never appears here.
     static let countedPerDay = #Predicate<Habit> { $0.timesPerDay > 0 }
 
-    /// How many completions fall on each day that has any.
+    /// How many completions fall on each civil day that has any.
+    ///
+    /// **The one place rows become history**, and the only one that reads
+    /// `Completion` at all. Everything below is a projection of this small
+    /// dictionary, which is deliberate on two counts: the identity stays
+    /// zone-free right up to the moment something has to draw it, and the
+    /// expensive half — a fetch and a reduce over every row a habit has — is one
+    /// value that depends on nothing but the store. That is the seam a cache
+    /// belongs behind (#135); a projection keyed by a calendar is not, because
+    /// the calendar can change under it.
     ///
     /// A weekly-cadence habit only ever reaches one per day. A per-day habit is
     /// the reason this is a count and not a set — and the reason a repetition is
     /// stored as its own row rather than as a number on a single row. Rows merge
     /// when two devices sync; a counter is last-writer-wins, so two glasses of
     /// water logged on two devices would come back as one.
-    var completionCounts: [Date: Int] {
+    var completionDayCounts: [DayID: Int] {
         liveCompletions.reduce(into: [:]) { counts, completion in
-            counts[completion.day, default: 0] += 1
+            counts[completion.dayID, default: 0] += 1
         }
     }
 
-    /// Every day with at least one completion.
-    var completedDays: Set<Date> {
-        Set(liveCompletions.map(\.day))
+    /// The same counts, placed on the timeline `calendar` describes.
+    ///
+    /// Everything week-shaped compares days by equality against the midnights
+    /// `WeekCalendar.week` produces, so the projection has to use the same
+    /// calendar those came from. In the app that is `WeekCalendar.calendar` on
+    /// both sides; a test that pins a calendar has to pin it here too, and
+    /// saying so is the point of the parameter.
+    func completionCounts(in calendar: Calendar) -> [Date: Int] {
+        completionDayCounts.reduce(into: [:]) { counts, entry in
+            counts[entry.key.date(in: calendar)] = entry.value
+        }
     }
+
+    var completionCounts: [Date: Int] { completionCounts(in: WeekCalendar.calendar) }
+
+    /// Every day with at least one completion.
+    func completedDays(in calendar: Calendar) -> Set<Date> {
+        Set(completionDayCounts.keys.map { $0.date(in: calendar) })
+    }
+
+    var completedDays: Set<Date> { completedDays(in: WeekCalendar.calendar) }
 
     /// This habit's completions, fetched rather than remembered.
     ///
@@ -159,13 +185,13 @@ final class Habit {
         return (try? modelContext.fetch(descriptor)) ?? []
     }
 
-    func snapshot() -> HabitSnapshot {
+    func snapshot(calendar: Calendar = WeekCalendar.calendar) -> HabitSnapshot {
         HabitSnapshot(
             id: id,
             name: name,
             icon: icon,
             frequency: frequency,
-            completionCounts: completionCounts,
+            completionCounts: completionCounts(in: calendar),
             isSpacer: isSpacer
         )
     }

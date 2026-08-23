@@ -105,10 +105,27 @@ enum StoreMigration {
     /// own version here and bumps it; a record this build cannot read is
     /// treated as absent, which costs one revalidation and never adopts
     /// anything unproven.
+    ///
+    /// **Format 2 is the day-identity migration** (#130). The two fields it
+    /// added are optional rather than defaulted, and that is not a style
+    /// choice: Swift's synthesized decoder does not apply a property's default
+    /// value to a missing key, so a non-optional addition would make every
+    /// format-1 record on every phone fail to decode and read as absent.
+    /// Optional decodes cleanly from the records already written, and nil there
+    /// means exactly what it says — this store predates the backfill.
     struct Record: Codable, Equatable, Sendable {
-        static let currentFormat = 1
+        static let currentFormat = 2
+
+        /// The version of the day-identity backfill this store has been
+        /// through. Nil, or a value below `currentDayFormat`, means the store
+        /// may still hold completions whose day is inferred rather than
+        /// recorded — which reads the same but cannot be queried on.
+        static let currentDayFormat = 1
 
         var format: Int = currentFormat
+        var dayFormat: Int?
+        /// How many legacy completions have been given a `DayID`, cumulative.
+        var stampedDays: Int?
         /// Identifies this copy, so a later merge can say which one it means.
         var generation: UUID = UUID()
         var migratedAt: Date = Date()
@@ -249,6 +266,117 @@ enum StoreMigration {
         }
     }
 
+    // MARK: - Day identities
+
+    /// What the day-identity backfill did.
+    enum DayStamping: Equatable, Sendable {
+        /// Every completion already carries its own day.
+        case notNeeded
+        /// This many legacy rows were given one.
+        case stamped(Int)
+        /// Nothing was written. The store is exactly as it was, and reads still
+        /// answer correctly — see `Completion.dayID`.
+        case failed(String)
+    }
+
+    /// Writes down the day each pre-#130 completion belongs to.
+    ///
+    /// **This does not change what the app shows, and that is the design.**
+    /// `Completion.dayID` infers a legacy row's day with the same rule this
+    /// uses, so a store reads identically before, during and after. What the
+    /// backfill buys is a day that is *recorded* rather than derived: queryable
+    /// in the store, visible to a person opening the file, and — once every row
+    /// has one — a `dayKey` predicate that #135 can push into SQLite instead of
+    /// filtering in memory.
+    ///
+    /// That makes the riskiest change in the store the one that can be
+    /// abandoned at any point:
+    ///
+    /// - **Nothing is destroyed.** `Completion.day` is untouched, so the
+    ///   original observation survives and a later build with a better
+    ///   inference can redo this from it.
+    /// - **Nothing is created or removed.** Only an empty column is filled, and
+    ///   the row count is checked either side of the save to say so.
+    /// - **It resumes rather than restarts.** The work is defined as "rows with
+    ///   no key", so a run cut off half-way leaves the rest for the next
+    ///   launch, and a completed run finds nothing to do.
+    /// - **A failure is survivable.** It returns rather than throws, and the
+    ///   caller opens the store anyway, because a store whose days are inferred
+    ///   is a store that works.
+    ///
+    /// Safe to call from either process on every launch. On a stamped store it
+    /// is one fetch that returns nothing.
+    @discardableResult
+    static func stampDayIdentities(
+        in context: ModelContext,
+        storeAt destination: URL? = nil
+    ) -> DayStamping {
+        do {
+            let legacy = try context.fetch(
+                FetchDescriptor<Completion>(predicate: #Predicate { $0.dayKey == "" })
+            )
+            let totalBefore = try context.fetchCount(FetchDescriptor<Completion>())
+
+            guard !legacy.isEmpty else {
+                note(dayIdentitiesFor: destination, stamped: 0)
+                return .notNeeded
+            }
+
+            for completion in legacy {
+                completion.dayKey = DayID.recovered(fromLegacyMidnight: completion.day).text
+            }
+
+            // Proved before the save, not after it: a row that came out of the
+            // rule without a readable key would be a row whose day this build
+            // just made worse, and rolling back is only possible while the
+            // change is still pending.
+            guard legacy.allSatisfy({ DayID($0.dayKey) != nil }) else {
+                context.rollback()
+                return .failed("a day identity did not read back")
+            }
+
+            try context.save()
+
+            // And again from the store, because "the objects in memory look
+            // right" is what the partial copy in #131 also looked like.
+            let remaining = try context.fetchCount(
+                FetchDescriptor<Completion>(predicate: #Predicate { $0.dayKey == "" })
+            )
+            let totalAfter = try context.fetchCount(FetchDescriptor<Completion>())
+            guard remaining == 0, totalAfter == totalBefore else {
+                return .failed(
+                    "the store still holds \(remaining) undated rows of \(totalAfter)"
+                )
+            }
+
+            note(dayIdentitiesFor: destination, stamped: legacy.count)
+            log.info("Gave \(legacy.count, privacy: .public) completions a recorded day")
+            return .stamped(legacy.count)
+        } catch {
+            context.rollback()
+            log.error(
+                "Day identities were not recorded: \(error.localizedDescription, privacy: .public)"
+            )
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    /// Annotates an existing migration record with what the backfill did.
+    ///
+    /// Only annotates. A store with no record has never been migrated from
+    /// anywhere — a fresh install — and inventing one here would hand `run` a
+    /// reason to skip work it has not done. The backfill needs no marker to be
+    /// correct: it is defined by what is still unstamped, not by what a file
+    /// says.
+    private static func note(dayIdentitiesFor destination: URL?, stamped: Int) {
+        guard let destination, var record = readRecord(for: destination) else { return }
+        guard record.dayFormat != Record.currentDayFormat || stamped > 0 else { return }
+        record.format = Record.currentFormat
+        record.dayFormat = Record.currentDayFormat
+        record.stampedDays = (record.stampedDays ?? 0) + stamped
+        write(record, for: destination)
+    }
+
     // MARK: - Steps
 
     /// Copies the database and every sidecar into a private directory.
@@ -354,12 +482,18 @@ enum StoreMigration {
     private static func writeRecord(
         for destination: URL, source: URL, inventory: Inventory, unmerged: URL? = nil
     ) {
-        let record = Record(
-            source: source.lastPathComponent,
-            habitCount: inventory.habitCount,
-            completionCount: inventory.completionCount,
-            unmergedSource: unmerged?.path
+        write(
+            Record(
+                source: source.lastPathComponent,
+                habitCount: inventory.habitCount,
+                completionCount: inventory.completionCount,
+                unmergedSource: unmerged?.path
+            ),
+            for: destination
         )
+    }
+
+    private static func write(_ record: Record, for destination: URL) {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

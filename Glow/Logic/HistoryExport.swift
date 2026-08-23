@@ -130,14 +130,16 @@ enum HistoryExport {
             .sorted { ($0.day, $0.name) < ($1.day, $1.name) }
     }
 
-    /// `yyyy-MM-dd` in the user's own calendar, which is the calendar the day
-    /// was normalized to when it was stored.
+    /// `yyyy-MM-dd`, which is the stored identity's own spelling.
+    ///
+    /// The snapshot hands over midnights that `Habit.completionCounts` has
+    /// already projected out of each completion's `DayID` using this same
+    /// calendar, so reading the components back recovers exactly the day the
+    /// row records — the file names the civil day, not wherever the phone is.
+    /// One implementation, in `DayID`, so the store and the export cannot spell
+    /// a date two ways.
     private static func day(_ date: Date, _ calendar: Calendar) -> String {
-        let parts = calendar.dateComponents([.year, .month, .day], from: date)
-        return String(
-            format: "%04d-%02d-%02d",
-            parts.year ?? 0, parts.month ?? 0, parts.day ?? 0
-        )
+        DayID(date, calendar: calendar).text
     }
 
     /// RFC 4180: quote anything containing a comma, a quote or a newline, and

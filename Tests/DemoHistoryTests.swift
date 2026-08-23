@@ -110,7 +110,7 @@ struct DemoHistoryTests {
         func snapshot() throws -> [String: [Date: Int]] {
             var result: [String: [Date: Int]] = [:]
             for habit in try context.fetch(FetchDescriptor<Habit>()) where !habit.isSpacer {
-                result["\(habit.name) \(habit.frequency)"] = habit.completionCounts
+                result["\(habit.name) \(habit.frequency)"] = habit.completionCounts(in: calendar)
             }
             return result
         }

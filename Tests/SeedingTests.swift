@@ -59,7 +59,7 @@ struct SeedingTests {
         let rows = try context.fetch(FetchDescriptor<Habit>(predicate: Habit.countedPerWeek))
         for habit in rows where !habit.isSpacer {
             let slots = WeekGrid.slots(
-                for: habit.snapshot(), in: week, today: today,
+                for: habit.snapshot(calendar: calendar), in: week, today: today,
                 editing: .todayOnly, calendar: calendar
             )
             #expect(slots.filter { $0.state == .open }.count == 1, "\(habit.name)")

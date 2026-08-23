@@ -29,8 +29,15 @@ enum WeekCalendar {
         return calendar
     }
 
-    /// Normalizes an instant to the midnight that owns it. `Completion.day` is
-    /// always this, never a timestamp, so completions compare by equality.
+    /// Normalizes an instant to the midnight that owns it — the value every
+    /// week-shaped surface compares by equality.
+    ///
+    /// **A midnight is a position on a timeline, not an identity** (#130). It
+    /// is the right thing to draw a week from and the wrong thing to store a
+    /// completion as, because the same civil day is a different midnight in
+    /// every zone. What a completion records is a `DayID`; this is where one is
+    /// placed on the calendar in front of the person looking at it, and
+    /// `DayID.date(in:)` produces exactly this value for the same day.
     static func day(_ date: Date, calendar: Calendar = WeekCalendar.calendar) -> Date {
         calendar.startOfDay(for: date)
     }

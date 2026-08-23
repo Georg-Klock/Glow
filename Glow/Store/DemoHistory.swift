@@ -103,7 +103,9 @@ struct DemoHistory {
             position += 1
 
             for day in days {
-                let completion = Completion(day: day, habit: habit, demoSessionID: session)
+                let completion = Completion(
+                    day: day, habit: habit, demoSessionID: session, calendar: calendar
+                )
                 context.insert(completion)
                 habit.completions?.append(completion)
             }

@@ -122,9 +122,9 @@ struct DailyCountTests {
         // Three rows, one day. This is the shape that merges when two devices
         // sync; a single row carrying a 3 would not.
         #expect((habit.completions ?? []).count == 3)
-        #expect(habit.completedDays == [friday])
-        #expect(habit.completionCounts == [friday: 3])
-        #expect(habit.snapshot().count(on: friday) == 3)
+        #expect(habit.completedDays(in: calendar) == [friday])
+        #expect(habit.completionCounts(in: calendar) == [friday: 3])
+        #expect(habit.snapshot(calendar: calendar).count(on: friday) == 3)
 
         #expect(try store.clearDay(for: habit, on: friday) == 3)
         #expect(store.count(for: habit, on: friday) == 0)
@@ -148,7 +148,7 @@ struct DailyCountTests {
         try store.addCompletion(for: habit, on: morning)
         try store.addCompletion(for: habit, on: evening)
 
-        #expect(habit.completionCounts == [friday: 2])
+        #expect(habit.completionCounts(in: calendar) == [friday: 2])
     }
 
     @MainActor
@@ -169,7 +169,7 @@ struct DailyCountTests {
         try store.addCompletion(for: habit, on: friday)
 
         #expect(try store.clearDay(for: habit, on: friday) == 1)
-        #expect(habit.completionCounts == [thursday: 2])
+        #expect(habit.completionCounts(in: calendar) == [thursday: 2])
         #expect(try store.clearDay(for: habit, on: friday) == 0)
     }
 
