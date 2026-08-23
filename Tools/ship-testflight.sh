@@ -17,9 +17,33 @@
 # The build number is stamped with the current UTC time rather than taken from
 # project.yml, so every upload is unique without a commit per upload and
 # without touching MARKETING_VERSION, which is not this script's to move.
+# Stamping it works on both bundles only since #133: the host target did not
+# read CURRENT_PROJECT_VERSION at all, so this override moved the widget's
+# build number and left the app's at xcodegen's literal 1.
+#
+# Nothing is uploaded that has not been validated. Tools/check-release-build.py
+# reads the archive before the export and the exported .ipa before the upload —
+# the same script CI runs on its Release build, so a version mismatch is caught
+# on a pull request rather than by App Store Connect after the fact.
+#
+#     Tools/ship-testflight.sh [--skip-tests]
+#
+# --skip-tests is deliberate and says so on the way past: a build that goes to
+# testers without the suite having run is a decision, not a default.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+RUN_TESTS=1
+for argument in "$@"; do
+  case "$argument" in
+    --skip-tests) RUN_TESTS=0 ;;
+    *)
+      echo "error: unknown argument $argument. Usage: Tools/ship-testflight.sh [--skip-tests]" >&2
+      exit 1
+      ;;
+  esac
+done
 
 ENV_FILE="Tools/local.env"
 if [[ ! -f "$ENV_FILE" ]]; then
@@ -58,6 +82,13 @@ BUILD_NUMBER=$(date -u +%Y%m%d%H%M)
 echo "==> Generating the project"
 Tools/generate.sh
 
+if [[ "$RUN_TESTS" -eq 1 ]]; then
+  echo "==> Running the suite before archiving"
+  Tools/test.sh
+else
+  echo "==> Skipping the suite (--skip-tests). This build has not been tested."
+fi
+
 echo "==> Archiving (build $BUILD_NUMBER)"
 xcodebuild \
   -project Glow.xcodeproj \
@@ -74,6 +105,13 @@ xcodebuild \
   -authenticationKeyID "$ASC_KEY_ID" \
   -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
   -quiet
+
+# Before the export, because an export takes minutes and a version mismatch is
+# already decided by now. Signing is not asserted here — the archive is signed
+# for distribution, but the thing that goes up is the .ipa, and that is where
+# the entitlement and the profile are checked.
+echo "==> Validating the archive"
+/usr/bin/python3 Tools/check-release-build.py "$ARCHIVE"
 
 echo "==> Exporting for App Store"
 EXPORT_PLIST="$BUILD_DIR/exportOptions.plist"
@@ -108,7 +146,30 @@ xcodebuild \
   -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
   -quiet
 
-IPA=$(ls "$EXPORT_DIR"/*.ipa | head -1)
+# Not `ls … | head -1`. Two .ipas in the export directory means the last export
+# left one behind, and uploading whichever sorted first is how a stale build
+# reaches testers.
+shopt -s nullglob
+EXPORTED=("$EXPORT_DIR"/*.ipa)
+if [[ ${#EXPORTED[@]} -ne 1 ]]; then
+  echo "error: the export directory holds ${#EXPORTED[@]} .ipa files; it should hold one." >&2
+  # `"${EXPORTED[@]}"` on its own is an unbound variable in bash 3.2 — which is
+  # the bash macOS ships — so the zero case would die reporting the wrong thing.
+  if [[ ${#EXPORTED[@]} -gt 0 ]]; then
+    printf '  %s\n' "${EXPORTED[@]}" >&2
+  fi
+  echo "Delete $BUILD_DIR and run this again." >&2
+  exit 1
+fi
+IPA="${EXPORTED[0]}"
+
+# The last thing before the upload, on the artifact that is uploaded — not on
+# the archive it came from, because the export re-signs. --require-signing adds
+# what only a signed bundle can answer: that the App Group survived codesign,
+# and that the embedded profile has not expired.
+echo "==> Validating $IPA"
+/usr/bin/python3 Tools/check-release-build.py --require-signing "$IPA"
+
 echo "==> Uploading $IPA"
 xcrun altool --upload-app --type ios \
   -f "$IPA" \
