@@ -56,7 +56,14 @@ struct WeekReach: Equatable, Sendable {
         let latest = WeekCalendar.startOfWeek(containing: today, calendar: calendar)
         guard let recordStart else { return WeekReach(latest: latest, earliest: latest) }
 
-        let cap = calendar.date(byAdding: .day, value: -7 * maximumWeeksBack, to: latest) ?? latest
+        // Both floors are week starts. The cap is twelve weeks of days back
+        // from one, which is the same weekday but not reliably the same
+        // instant — a zone that changes its clocks at midnight can put it an
+        // hour inside or outside the week it names — and an `earliest` that is
+        // not a week start is compared against week starts by `contains`,
+        // `clamped` and the pager's own `.disabled` (#242).
+        let capDay = calendar.date(byAdding: .day, value: -7 * maximumWeeksBack, to: latest) ?? latest
+        let cap = WeekCalendar.startOfWeek(containing: capDay, calendar: calendar)
         let recorded = WeekCalendar.startOfWeek(containing: recordStart, calendar: calendar)
         // The later of the two floors, and never past the current week: a
         // record that starts in the future — a demo, a sync, a clock that went

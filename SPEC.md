@@ -207,7 +207,9 @@ each surface's rule, so R2 is asserted as the difference between them rather
 than as one answer, and run again over an earlier week, which is the branch with
 no today in it. `Tests/SlotEditingTests.swift` covers the rule itself and the
 geometry that resolves a touch on a span into a weekday.
-`Tests/WeekReachTests.swift` covers how far back the pager goes. R3 is asserted
+`Tests/WeekReachTests.swift` covers how far back the pager goes, and asserts the
+pager's one invariant — an enabled back chevron always lands on a *different
+week* — over nine time zones, three week starts and a year of days (#242). R3 is asserted
 in `Tests/PersistenceTests.swift`, which also asserts the store's own refusal of
 a day still to come, and R4 in `Tests/DayIdentityTests.swift` — Los Angeles to
 Berlin and back, both DST directions, and a zone whose clocks move at midnight.
