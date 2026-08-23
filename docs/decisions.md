@@ -3368,3 +3368,68 @@ No mechanism was found. The design argument for pitch black in every appearance 
 **What this does not reopen.** #111's grey-as-`ShapeStyle` resolution does not depend on this — it was built to survive accented rendering regardless of whether the background is ever forced to black, and the measured hierarchy (Default 255/23, Tinted 255/149, Clear 255/162) holds under the platform default exactly as it would have under a forced one. Nothing about closing this changes that.
 
 **If this is ever reopened**, it needs a new mechanism to have appeared — a future `containerBackgroundRemovable`-shaped API that actually distinguishes Tinted/Clear from StandBy, or a way to keep the halo under accented rendering — not a second attempt at the same flag.
+
+## A presence claim that landed on the wrong mark (#230)
+
+The third variety in the family #219 opened and #226 catalogued, and the
+hardest of the three to see by reading: not a bound with nothing under it, but
+a floor that measures something real and unrelated to what it claims.
+
+`WidgetRenderDiffTests.metGoalIsCutInTheMiddle` says a met-goal span with
+Wednesday resting is drawn as two pieces, and evidenced the left one with
+`tuesday > lineFloor`. Wednesday's window cuts that span at columns `0...1` and
+`3...6`, and the fixture logged Monday **and Tuesday** — so both columns of the
+left piece carried a lit dot and the floor read **255**, the completion, rather
+than the line's 36. A completion dot is there whether or not the span was
+drawn.
+
+**Measured, not reasoned.** Rendering the frame and printing the row:
+
+| sample | `done: [0, 1]` | `done: [0, 4]` |
+| --- | --- | --- |
+| `columnCentre(1)` — the floor's own scan | 255 (the dot) | **36** (the line) |
+| a quarter-slot either side of it | 39 | 37 |
+| midway between columns 0 and 1 | 38 | 37 |
+| `columnCentre(3)` — the right piece | 36 | 36 |
+
+**The issue's premise was half right.** It supposed no sample point could be
+moved to, because both columns of the left piece are logged. True at column
+granularity — but sub-column points do exist and do discriminate: erase the
+left piece and the quarter-slot sample falls 39 → 3, the midpoint 38 → 2, both
+under `lineFloor`. What the sweep also shows is why they are the weaker
+evidence. Nowhere in the left piece does the line read 36 with that fixture:
+the two dots' halos raise the whole two-column piece to 38–39, so any floor
+there is reading the line plus two or three levels of light it did not ask for,
+and the distance to a floor of 15 is halo the palette can move. On the far side
+of the cut, where no dot is near, the same line reads exactly 36.
+
+**So the fixture moved instead**, by one column: `done: [0, 4]` — Monday and
+today — rather than `[0, 1]`. The goal is met either way, so `WeekSpans` still
+returns one span across the whole week and the cut is the same cut; what changes
+is only which columns carry dots. Tuesday now carries the line and nothing else
+and the floor stays exactly where it was, which is the point: the assertion is
+unchanged and now means what it says.
+
+The fixture is per-test — every call to `oneHabit` builds its own entry — so
+`metGoalStopsBeforeSunday` and `daysCarryTheLight` keep theirs, and no frame in
+the render baseline moved.
+
+**Proved in both arms.** The left piece was erased in `SlotMarkView` — the
+span's line masked off everything before `restWindow.lowerBound`, leaving the
+right piece and both dots alone — and then `RestWindow` was forced to nil, with
+both fixtures read out of the same run:
+
+| perturbation | old fixture `[0, 1]` | new fixture `[0, 4]` |
+| --- | --- | --- |
+| the span's left piece not drawn | **passes**: Tuesday 255, the dot | fails: left piece missing (0) |
+| `restWindow` forced to nil — the line crosses | fails: Wednesday 37 | fails: Wednesday 36 |
+
+The first row is #230: the old floor is green with the thing it names missing.
+The second is the regression the test was written for, and the new fixture still
+catches it.
+
+**And both floors now say which mark they found.** `isUnlit(_:beside:)` on the
+left piece and on the right, against the frame's own dots — a floor says a
+column is not empty, and a column is not empty for lots of reasons. Naming the
+tone is what stops the next fixture edit putting a dot back on a sample point
+without anything noticing.
