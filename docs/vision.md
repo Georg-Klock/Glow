@@ -1,8 +1,18 @@
 # Vision
 
-Dated 2026-08-20, revised 2026-08-22. This is the product intent, cleaned up
-from a brain dump and kept short on purpose. Where it disagrees with what is
-built, this document is the target and the code is the backlog.
+Dated 2026-08-20, revised 2026-08-22 and 2026-08-23. This is the product
+intent, cleaned up from a brain dump and kept short on purpose. Where it
+disagrees with what is built, this document is the target and the code is the
+backlog.
+
+**Today and the per-day habits are 2.0, not MVP** (#209, 2026-08-23). They were
+built exactly as described below and then taken out of the shipped app — the
+screen, the two widget families, `Frequency.timesPerDay` and the five seeded
+habits — and preserved whole on `feature/daily-habits-2.0`. Nothing here is
+withdrawn: the target is unchanged and the code is the backlog, which is what
+this document has always meant. What changed is the order, and this note is
+here so that a later reader does not have to wonder whether it was ever built.
+The three screens below are two in the shipped app until it comes back.
 
 That last sentence is why the revision exists rather than a footnote. A stale
 line here does not read as stale — it reads as an instruction — so when the
@@ -113,7 +123,8 @@ rather than discovered:
 - **Everything else opens the app**, on the screen matching that widget.
 
 **On a cold launch This Week opens**, since the app icon has no widget to ask.
-It is the denser screen and Today is one tap away.
+It is the denser screen and Today is one tap away. In the shipped app it is
+every launch, because Today is not there to arrive at (#209).
 
 ## What this changes
 
@@ -122,9 +133,12 @@ It is the denser screen and Today is one tap away.
 - **Habits gain a second kind** — a per-day count — which the data model did
   not have when this was written.
 
-All three have landed. They are kept here rather than deleted because the point
-of the list is what the vision *asked for*, and a target with nothing left to
-hit is worth being able to see.
+All three landed. They are kept here rather than deleted because the point of
+the list is what the vision *asked for*, and a target with nothing left to hit
+is worth being able to see.
+
+The third has since been taken back out of the shipped app and held for 2.0
+(#209). It landed; it is not shipping. See the note at the top.
 
 ## Deliberately later
 

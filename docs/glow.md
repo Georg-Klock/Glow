@@ -183,6 +183,11 @@ takes it for a change to interpolate and repeats it forever.
 The marks never showed it because a mark is a fixed-size image with nothing
 left to measure, which is why This Week looked right the whole time.
 
+`DayRingView` is no longer in the app — the per-day kind moved to
+`feature/daily-habits-2.0` (#209) — and the finding is not about it. It is about
+a greedy shape under `GlowModifier`, which the next one will be too. The
+`geometryGroup()` guard stays where it is.
+
 The fix was `geometryGroup()` on the content, in `GlowModifier`, before either
 the caster or the mask is built from it. **Placement is the whole fix**: the
 same call written above `.opacity`, where it reads just as sensibly, was

@@ -3044,3 +3044,92 @@ review, and does nothing. What ships instead is the measurement, as a comment
 on `popBinding`, so the next reader does not re-derive it. #215 carries the
 open design question: accept the snap, or move the explanation out of the
 section footer and into a row, where ordinary layout animates ordinarily.
+
+## Per-day habits move to a branch (#209)
+
+**2026-08-23.** `Frequency.timesPerDay`, the Today screen, the Today ring and
+the two Today widget families come out of the shipped app. They are 2.0 scope
+rather than MVP. Nothing is deleted from the record: the state they were in is
+pushed as `feature/daily-habits-2.0` **before** the removal, so the branch is a
+snapshot somebody can check out rather than something reconstructed later from
+`git log`.
+
+**`Frequency.daily` is not what came out, and the word is the whole hazard.**
+The editor's `Daily` segment meant *counted within a day* — a ring, N
+repetitions resetting at midnight. `Frequency.daily` means a habit due all seven
+days of the week: seven columns on the week grid, Gratitude and Early night in
+the seed set, untouched. The two senses shared a screen for as long as the
+feature shipped and `HabitEditorView` carried a paragraph warning about it. One
+of them is gone and the warning is now a note in CLAUDE.md, where the next
+person reading "remove daily habits" will meet it first.
+
+**The widget kinds are removed, not renamed, and that costs somebody a widget.**
+`WidgetKind`'s own comment says a kind is a persistent identifier: WidgetKit
+stores it against every widget a person has placed. Renaming one orphans their
+widget — it stops being the thing they configured. Removing `GlowTodaySmall` and
+`GlowTodayMedium` does something different and more honest: the extension that
+drew those families stops shipping, so the widget leaves the Home Screen with
+it. That is what pulling a feature does. It is intended here rather than routed
+around, and it is said plainly in the pull request rather than left to look
+accidental.
+
+**Existing installs are swept, and it deletes real history.** #123 shipped five
+per-day defaults — Sunlight, Protein Meal, Move, Breathe, Hydration — so an
+install seeded by a build that carried them holds habits nothing can now draw.
+`DailyHabitMigration` deletes them and their completions once at launch, on the
+same flag shape `HabitSeeder.seededKey` uses, written after the save so a
+failure is retried rather than recorded. Anybody who logged repetitions during
+the window the feature shipped in loses those days. The alternative — leaving
+the rows in the store, invisible and uneditable — is worse: they would still be
+counted by anything that counts habits, and they would reappear the moment a
+later build queried without the filter.
+
+**`countedPerWeek` is renamed rather than deleted, because it still excludes
+something.** Its clause is `timesPerDay == 0`, which is now true of everything
+the app writes — the name stopped meaning anything the moment nothing set
+`timesPerDay`. Deleting it was the obvious move and it is wrong: the rows the
+migration has not swept yet are real, and **the widget's process never runs the
+migration**. A home screen redrawing between the update and the next launch of
+the app would show habits the app has no screen for. So it survives as
+`Habit.weekly` — a residue filter with a stated end, which is when
+`DailyHabitMigration` goes.
+
+**`Frequency.slotCount` stays optional with no case answering nil.** The per-day
+kind was the nil, and the optionality made a caller reaching for a week say what
+it meant when there wasn't one. Flattening it to `Int` would rewrite every one
+of those call sites in the change that removes the feature and again in the one
+that restores it, so it is left as it is and the comment says why.
+
+**`GoalMet.justMet` loses `today:` and `calendar:`.** They were read only to
+find *which* day to count, which was the per-day branch's question; the week is
+the only window left. A parameter nothing reads is a parameter a caller can pass
+wrong for years without finding out, so it goes rather than sitting there
+against a future restoration.
+
+**What moved in the render baseline: two frames, and nothing else.** The `today
+small` and `today medium` families are removed from
+`RenderTests/Baselines/render-signatures.json`. Every surviving frame is
+byte-identical — same 16 × 16 cell grid, same tone census, same exact-black
+share — which is the evidence that this removal touched no drawing that still
+ships. #213 recorded that the two Today frames contained no unlit pixel; with
+the frames gone it is moot, and the `toneFloor` comment that carried it now says
+what the floor is still for.
+
+**One render test had to be rewritten rather than re-pointed.**
+`haloIsWhatLiftsIt` read one corner of the small Today family, whose ring halo
+reached `96 * ringHaloRadius * maxHaloScale` = 46.6pt and so covered a 158pt
+frame corner to corner. Measured on the four families that remain, **no corner
+is lifted at all**: that reach was a property of the ring, not of the halo. The
+test now samples the difference itself — every pixel that is exactly 0,0,0 with
+the glow down and is not with it up, wherever it falls — which is the same claim
+without depending on one frame's geometry.
+
+**The floors in `Tools/test-inventory.json` are not lowered.** `GlowTests` goes
+from 486 to 441 and `GlowRenderTests` stays at 13, against floors of 398 and 12.
+A floor is a minimum and both still clear it; lowering one that is not binding
+would weaken the gate in exchange for nothing. The reviewable event is lowering
+a floor, and there was no need to.
+
+**The Today tab's slot is left empty rather than collapsed.** #210 puts the
+Widgets tab in the same position. Reflowing the tab bar twice in two builds is a
+worse thing to ship than two tabs for one build.
