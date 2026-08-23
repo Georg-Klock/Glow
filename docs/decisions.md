@@ -3801,3 +3801,60 @@ install: no icon, no title, no paragraph, two centred buttons. #162's white-on-
 white trap is still absent — the capsule's interior measures 89.1% white with
 **5,610 pure-black label pixels** in it, and the secondary's band is black with
 **7,374 white label pixels**. Both say something.
+
+### An accessibility test needs accessibility switched on (#245)
+
+**2026-08-23.** `EmptyStateAccessibilityTests` was green on the machine it was
+written on and red on every CI run, with all three hosted-view tests failing the
+same way: the accessibility tree was **empty**. Not a wrong label, not a crash —
+no elements at all.
+
+**The cause is not layout, and not the window.** The obvious suspicion was the
+harness's window: it joins the host app's scene only `if` one exists, and a
+`UIWindow` outside the accessibility hierarchy vends nothing. Instrumented on an
+erased simulator, that is not what happens. One `UIWindowScene`, foreground
+active; `window.windowScene` non-nil; the window key; `host.view.window` set;
+the view laid out at 402×874 with the navigation bar measured at its real
+frame. The hierarchy is on screen and correct.
+
+What is missing is the accessibility runtime. UIKit loads the accessibility
+bundles into an app only when the device says accessibility is enabled, and on a
+device where it never was, `_AXSApplicationAccessibilityEnabled()` is false, the
+UIKit accessibility bundle is absent from the process, and **every node reports
+`isAccessibilityElement = false`** — the buttons, the hosting view and UIKit's
+own navigation bar alike. An empty tree is what an absent runtime looks like,
+which is exactly why it read as a layout failure and is not one.
+
+**Why it split by machine.** `Tools/test.sh` erases the simulator on CI, so CI's
+phone is always a fresh one. Of the simulators on the machine the suite was
+written on, exactly one carried `ApplicationAccessibilityEnabled`, left by some
+earlier session that had turned VoiceOver on; the suite was measured and run
+there. The tests were never CI-specific — they fail on any simulator that has
+never had accessibility switched on, which is how the diagnosis was made
+locally rather than by pushing to CI.
+
+**The fix is to state the requirement rather than work around it.**
+`Tools/test.sh` now writes `AccessibilityEnabled` and
+`ApplicationAccessibilityEnabled` into the chosen simulator's
+`com.apple.Accessibility` domain before handing the device to `xcodebuild`. It
+cannot be done from inside a test: the preference is read as the test host
+launches. Proof that this and nothing else is the difference — the same built
+binary, on the same machine, in the same minute: on the erased device three
+tests fail with an empty tree; on a device differing only in those two
+preferences, all four pass and the walk finds the two `AccessibilityNode`s
+labelled "Add Your First Habit" and "Start with a Pre-Selected Set".
+
+No assertion was relaxed and nothing is retried or skipped — a poll loop around
+an empty tree would only have bought a slow red test and eventually a flaky
+green one, and `Tools/validate-test-result.py` fails a run that skips anything.
+The suite carries a comment saying what it needs, because it is the only one in
+the repository that hosts a live view and now the only one with a requirement on
+the device: a hand-typed `xcodebuild test` on a fresh simulator still fails
+these four and nothing else, and that shape of failure is the diagnosis.
+
+**What this does not change.** The measurement in the entry above stands. It was
+taken with accessibility on, which is the condition a VoiceOver user is in — the
+tree the tests walk is the tree the accessibility server hands out. That
+`ContentUnavailableView` vended four separate elements rather than one, that the
+icon vended none, and that the empty state's spoken content is exactly its two
+buttons are all unaffected.

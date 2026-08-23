@@ -82,6 +82,13 @@ settled did not go with it.
   one is the reviewable event**, and it belongs in the same change as the
   deletion that caused it.
 
+  It also switches accessibility on for the simulator it chose, because
+  `EmptyStateAccessibilityTests` hosts a live view and walks the tree UIKit
+  hands the accessibility server — and UIKit builds no tree at all in a process
+  on a device where accessibility was never enabled. A fresh phone is such a
+  device, so that suite passed wherever a session had once turned VoiceOver on
+  and failed on every CI run, which erases its phone. See #245.
+
   It holds a lock on the simulator it chose, so two checkouts testing at once
   queue instead of installing competing bundles onto one device. That collision
   does not read as a device conflict — it reads as a dead host, a bundle under

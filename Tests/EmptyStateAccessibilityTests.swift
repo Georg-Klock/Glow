@@ -34,6 +34,31 @@ import UIKit
 /// The navigation bar is walked past on purpose: the week readout and the plus
 /// button are `WeeklyGridView`'s toolbar, present with habits and without, and
 /// what is under test is the screen's own content.
+///
+/// **This is the only suite in the repository that hosts a live view, and it is
+/// the only one with a requirement on the simulator** (#245). Read this before
+/// suspecting your own change.
+///
+/// UIKit loads the accessibility bundles into an app only when the device says
+/// accessibility is enabled, and a fresh simulator does not say that. In a
+/// process without them *nothing* vends an element — not the buttons, not the
+/// navigation bar, not the hosting view — so the walk below finds an empty tree
+/// and every assertion here fails on a screen that is perfectly correct. That
+/// is what an absent runtime looks like: empty, rather than wrong, which is why
+/// it reads as a layout problem and is not one. Measured on an erased device:
+/// `_AXSApplicationAccessibilityEnabled` false, the root's element count zero,
+/// every node `isAccessibilityElement = false`. With the preference set, on the
+/// same binary and the same machine, the two `AccessibilityNode`s appear.
+///
+/// `Tools/test.sh` writes `AccessibilityEnabled` and
+/// `ApplicationAccessibilityEnabled` into the device's `com.apple.Accessibility`
+/// domain before it hands the simulator to `xcodebuild`, which is why the
+/// command in CLAUDE.md is the one to run. **A hand-typed `xcodebuild test` on a
+/// simulator that has never had accessibility switched on will fail these four
+/// and nothing else** — that shape of failure is the diagnosis.
+///
+/// The preference cannot be set from in here: it is read as the test host
+/// launches, long before any test runs.
 @MainActor
 struct EmptyStateAccessibilityTests {
     @Test func theEmptyStateSpeaksItsTwoButtonsAndNothingElse() throws {
