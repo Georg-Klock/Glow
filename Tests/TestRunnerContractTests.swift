@@ -114,4 +114,52 @@ struct TestIsolationTests {
             )
         }
     }
+
+    /// #204: and no decision logic reads the clock, for the same reason.
+    ///
+    /// The rule has always been "no views, no store, no `Date()`" — the rest
+    /// day was the exception that proved it, and it cost four issues. #204
+    /// added a second thing a surface has to be *told*: which day is today.
+    /// Its `WeekCalendar.today()` reads the clock and the App Group both, and
+    /// it is declared in `Glow/Store/DebugToday.swift` rather than beside the
+    /// rest of `WeekCalendar` precisely so that `Glow/Logic/` keeps neither
+    /// read. Nothing but a scan can hold that: the extension is in the same
+    /// module, so a call to it from inside `Glow/Logic/` compiles.
+    ///
+    /// A scan for the same reason the one above is one — the property is the
+    /// *absence* of a call, and no runtime assertion can watch an absence.
+    /// Doc comments are dropped first: the files in here name `Date()`
+    /// constantly, saying they do not call it.
+    @Test("No decision logic reads the clock")
+    func logicDoesNotReadTheClock() throws {
+        let logic = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Glow/Logic")
+        let files = try FileManager.default.contentsOfDirectory(
+            at: logic, includingPropertiesForKeys: nil
+        ).filter { $0.pathExtension == "swift" }
+
+        #expect(files.count > 10, "Glow/Logic looks wrong: \(files.count) files")
+
+        for file in files {
+            let source = try String(contentsOf: file, encoding: .utf8)
+            let code = source
+                .split(separator: "\n", omittingEmptySubsequences: false)
+                .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+                .joined(separator: "\n")
+            #expect(
+                !code.contains("Date()"),
+                "\(file.lastPathComponent) reads the clock; a day arrives as a parameter"
+            )
+            #expect(
+                !code.contains("DebugToday"),
+                "\(file.lastPathComponent) reads the debug override rather than being told a day"
+            )
+            #expect(
+                !code.contains("WeekCalendar.today"),
+                "\(file.lastPathComponent) asks what today is; it should be told"
+            )
+        }
+    }
 }

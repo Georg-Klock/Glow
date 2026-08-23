@@ -182,6 +182,12 @@ A build that violates one of these is broken regardless of what else works.
 - **R8.** The glow is encoded in a colour space with headroom above SDR white.
   Without EDR the app renders flat colour, never a broken or blank slot.
 
+**"Today" is whatever `WeekCalendar.today()` answers**, not what the clock says
+(#204). R1 and R2 are stated against that rather than against the clock, so the
+debug override below moves them without weakening them: exactly one slot is
+open, on exactly the day the app believes it is on, and the write path refuses
+anything after it.
+
 R1, R2, R5 and R7 are asserted in `Tests/WeekGridTests.swift`, including an
 exhaustive pass over all 128 possible completion histories of a week — run under
 each surface's rule, so R2 is asserted as the difference between them rather
@@ -333,6 +339,16 @@ hierarchy in §1, and only because it is the product rather than a style.
 If `count < N` and today is not already logged, pill index `count` is open.
 Otherwise no slot is open: everything filled stays filled, unfilled pills stay
 inactive.
+
+**"Today" can be simulated, deliberately and visibly** (#204). Settings → Data
+→ **Debug: Override Today** picks another day of the current week and the whole
+app treats it as today: the open slot moves to it, the edit rules move with it,
+the widgets follow from their own process, and **a tap logs a real completion
+dated to that day**. It is a simulation, not a preview — which is why it is
+scoped to the real current week, cleared whenever the app relaunches, and
+announced by a persistent banner on every screen that reads it, with one tap on
+the banner to turn it off. It ships in every build, TestFlight included, for the
+reason demo history does: the phone is where this app is tested.
 
 **A rest day stops the week.** One optional weekday, set in Settings
 (`WeekPreferences.restDay`) and handed to the grids as a parameter rather than

@@ -22,6 +22,13 @@ struct Week: Equatable, Sendable {
 
 /// Every date question in the app goes through here, so "what day is it" is
 /// answered one way rather than five.
+///
+/// **Including `today()`, which is declared in `Glow/Store/DebugToday.swift`
+/// rather than in this file** (#204). Everything here is pure — it takes the
+/// dates it is asked about — and `today()` is the one that has to read the
+/// clock and the App Group to answer. It is spelled `WeekCalendar.today()` at
+/// every call site all the same, so the claim above stays true; only the
+/// declaration sits at the boundary, where a store read belongs.
 enum WeekCalendar {
     /// The user's own calendar, with the week start taken from settings rather
     /// than from locale.

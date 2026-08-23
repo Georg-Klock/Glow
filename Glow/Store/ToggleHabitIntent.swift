@@ -47,7 +47,11 @@ struct ToggleHabitIntent: LiveActivityIntent {
         let descriptor = FetchDescriptor<Habit>(predicate: #Predicate { $0.id == id })
 
         guard let habit = try context.fetch(descriptor).first else { return .result() }
-        let result = try HabitStore(context: context).toggleCompletion(for: habit, on: Date())
+        // One reading of "today" for the whole tap (#204), for the reason
+        // `TapHabitIntent` gives: the widget's write has to land on the day the
+        // widget drew as open, and this asked the clock three times.
+        let today = WeekCalendar.today()
+        let result = try HabitStore(context: context).toggleCompletion(for: habit, on: today)
 
         // A tap already costs a timeline reload, so the completion can animate
         // inside the timeline that reload produces. This is the note the
@@ -79,11 +83,11 @@ struct ToggleHabitIntent: LiveActivityIntent {
             // The week, not the history: `GoalMet` counts inside the week it
             // is given and asks nothing about any day outside it, so a tap no
             // longer reads a year to decide whether it was the seventh (#135).
-            let week = WeekCalendar.week(containing: Date())
+            let week = WeekCalendar.week(containing: today)
             GoalPopCentre.popIfMet(
                 habit: habit.snapshot(within: week.dayIDs()),
                 in: week,
-                today: Date()
+                today: today
             )
         }
 

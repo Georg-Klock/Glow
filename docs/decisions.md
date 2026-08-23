@@ -3187,3 +3187,62 @@ held bar — the rest of the screen is unchanged in those frames, so it is that
 one view. It is not this change: for the transition being recorded the identity
 is the same before and after the fix — index 0, columns 0-2 — so both builds run
 the same code path. Worth a look when something else touches `GlowImageView`.
+
+## Overriding which day the app thinks it is (#204)
+
+A debug control with real write powers: pick another day of the current week in
+Settings and the whole app treats it as today, including the widgets, and a tap
+logs a genuine completion dated to it.
+
+**`WeekCalendar.today()` is declared in `Glow/Store/DebugToday.swift`, not in
+`Glow/Logic/WeekCalendar.swift`.** The issue's sketch put it beside the rest of
+`WeekCalendar`, which would have made that file the first in `Glow/Logic/` to
+read the clock *and* the first to read the App Group — the exact rule #181 spent
+four issues restoring. The spelling is what the call sites wanted, so the
+spelling stayed and the declaration moved to the boundary; `WeekCalendar`'s
+header now says where the function lives and why. Nothing but a scan can hold
+that line, because an extension in the same module compiles from anywhere, so
+`TestIsolationTests` gained a second scan of `Glow/Logic/` — for `Date()`,
+`DebugToday` and `WeekCalendar.today` — beside the rest-day one it already had.
+
+**The issue's list of ten call sites predates #209.** Four of the ten were in
+`TodayView` and `TodayWidgetConfig` and went to `feature/daily-habits-2.0` with
+the per-day kind. Six survive, and the enumeration found five more the issue
+never listed:
+
+- `WeeklyGridView.weekStart` established the week on screen through
+  `startOfWeek(containing: Date())` — a different spelling, and the one place a
+  grep for `WeekCalendar.day(Date())` would have missed.
+- `ToggleHabitIntent` and `TapHabitIntent` each read the clock **three times**
+  in one tap — the write, the week the goal is counted in, and the pop. That is
+  the widget's own write path, so leaving them would have meant a widget tap
+  landing on a different day from the one the widget drew as open. Each is now
+  one read, handed down. (`TapHabitIntent` went with #209 before this landed.)
+- `MonthProvider.entry(for:)` establishes today as `entry.date`, which
+  `MonthWidgetView` reads back as today. Its *refresh policy* still runs off the
+  real clock: when to reload is not a thing the override has an opinion about.
+- `DemoHistory.seed(now:)`. Handled at the Settings call site rather than by
+  changing the default, because `now` is an *instant* normalized by that type's
+  own calendar, and a default of `WeekCalendar.today()` would hand a midnight
+  taken in one calendar to a store built on another. The suites here inject a
+  UTC calendar, so that is not hypothetical.
+
+**Three fences, and each of them exists because the failure is a write.** A
+forgotten override does not merely mis-render; it dates real rows to the wrong
+day, and once written nothing in the store distinguishes them. So: the stored
+day is compared against the real current week and cleared when it falls outside
+it; `GlowApp.init` clears it at every launch, before the store is opened; and a
+persistent banner sits on every screen that reads it, clearing it in one tap.
+The banner is the one that matters most — the other two bound how long a
+mistake lasts, and the banner is what stops it being made.
+
+**It ships in every build, not behind `#if DEBUG`.** A `#if DEBUG` version
+compiles out of every Release archive, including the one installed through
+TestFlight, which is where this app is actually used. That is the same tier as
+demo history, and it is why the footer says in plain words that what you log
+while it is on is logged for real.
+
+**The banner's padding is applied inside its own `if`.** Padding applied by the
+caller is still padding when the banner is absent, which would put a 10pt gap
+above every screen whenever the override is off. The change has to be inert with
+the override off, and the render baseline is the evidence: no frame moved.

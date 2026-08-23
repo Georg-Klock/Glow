@@ -21,7 +21,7 @@ struct YearView: View {
     @Query(filter: Habit.weekly, sort: [SortDescriptor(\Habit.sortOrder)])
     private var habits: [Habit]
 
-    @State private var today = WeekCalendar.day(Date())
+    @State private var today = WeekCalendar.today()
 
     /// The rest day, observed, and handed to `YearHistory` as a parameter
     /// (#181). A rest day expects nothing, so it decides what a day's fill is;
@@ -83,6 +83,24 @@ struct YearView: View {
     private static let partialStroke: CGFloat = 0.25
 
     var body: some View {
+        VStack(spacing: 0) {
+            // The year paints today's column too — an open day is not a missed
+            // one — so this screen reads the override and says so.
+            DebugTodayBanner()
+            yearBody
+        }
+        .navigationTitle(String(calendar.component(.year, from: today)))
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { today = WeekCalendar.today() }
+        }
+        // See `TodayView`: the override moves from another screen entirely.
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+            let current = WeekCalendar.today()
+            if current != today { today = current }
+        }
+    }
+
+    private var yearBody: some View {
         Group {
             if realHabits.isEmpty {
                 ContentUnavailableView {
@@ -93,10 +111,6 @@ struct YearView: View {
             } else {
                 grid
             }
-        }
-        .navigationTitle(String(calendar.component(.year, from: today)))
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active { today = WeekCalendar.day(Date()) }
         }
     }
 

@@ -160,6 +160,12 @@ lives has already been seen to differ between platform versions.
   day was the exception and cost four issues in one night (#105, #168, #175,
   #179) before #181 removed it; `TestIsolationTests` now scans for the read.
 
+  **So does "today".** `WeekCalendar.today()` reads the clock and the App Group
+  — the debug override (#204) lives there — so it is declared in
+  `Glow/Store/DebugToday.swift`, not beside the rest of `WeekCalendar`, and
+  `TestIsolationTests` scans `Glow/Logic/` for `Date()` as well. The spelling is
+  still `WeekCalendar.today()`; only the declaration sits at the boundary.
+
 - **Per-day habits are on `feature/daily-habits-2.0`, not in the app** (#209).
   `Frequency.timesPerDay`, the Today screen, the Today ring and the two Today
   widget families were built, shipped, and pulled back to 2.0 scope. The branch

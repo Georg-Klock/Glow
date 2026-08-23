@@ -13,7 +13,7 @@ struct WeeklyGridView: View {
     @Query(filter: Habit.weekly, sort: [SortDescriptor(\Habit.sortOrder)])
     private var habits: [Habit]
 
-    @State private var today = WeekCalendar.day(Date())
+    @State private var today = WeekCalendar.today()
     /// The first day of the week on screen, which is not always this one
     /// (#117).
     ///
@@ -21,7 +21,7 @@ struct WeeklyGridView: View {
     /// the screen is up moves *this* week and leaves the one being looked at
     /// where it is. An offset would silently slide the whole view back a week
     /// at 00:00.
-    @State private var weekStart = WeekCalendar.startOfWeek(containing: Date())
+    @State private var weekStart = WeekCalendar.startOfWeek(containing: WeekCalendar.today())
     /// The earliest day anything is on record for, from `HabitStore`. Held
     /// rather than recomputed per redraw — see `earliestRecordedDay`.
     @State private var recordStart: Date?
@@ -107,6 +107,11 @@ struct WeeklyGridView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // Above the Low Power strip, because it is the more
+                // consequential of the two: one explains why the marks look
+                // dimmer, the other says the app is writing to a day that is
+                // not today. See `DebugTodayBanner`.
+                DebugTodayBanner(horizontalPadding: GridMetrics.horizontalPadding)
                 if lowPower.isLowPowerMode {
                     LowPowerBanner { isShowingLowPowerNotice = true }
                         .padding(.horizontal, GridMetrics.horizontalPadding)
@@ -219,10 +224,18 @@ struct WeeklyGridView: View {
         // out.
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
             refreshDemoHistory()
-            // The same signal carries the pager's other end: switching the demo
-            // on puts ten weeks of past on record and switching it off takes
-            // them back out, and both move how far back this screen can go.
-            refreshReach()
+            // And the debug override, which is a defaults key in the same
+            // store (#204). Settings is a sibling tab, so this view stays
+            // alive and unredrawn while the override moves — the same reason
+            // demo history needs a notification rather than a value read once
+            // at appear.
+            //
+            // Through `refreshToday`, which also carries the pager's other
+            // end: switching the demo on puts ten weeks of past on record and
+            // switching it off takes them back out, and both move how far back
+            // this screen can go. That is `refreshReach`, which `refreshToday`
+            // calls — this handler used to call it directly.
+            refreshToday()
         }
         // Before seeding, not after: the sweep is about rows a *previous*
         // build wrote, and running it first means the seeder's "does this
@@ -525,7 +538,7 @@ struct WeeklyGridView: View {
     }
 
     private func refreshToday() {
-        let current = WeekCalendar.day(Date())
+        let current = WeekCalendar.today()
         if current != today { today = current }
         refreshReach()
     }
