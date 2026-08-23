@@ -358,6 +358,17 @@ with the tolerance at 3 for headroom. A change that is deliberate is approved by
 copying the manifest the run attached over the committed file; `Tools/test.sh`
 prints that command with the run's own path in it.
 
+The grid is a gate on **geometry**, and it took #199 to say so: a mean dilutes,
+and the marks that carry the unlit colour are thin, so #194 moved the whole
+palette thirteen levels and no cell moved more than three against a tolerance of
+three. The signature therefore carries a second statistic that thinness cannot
+dilute — a **tone census**, the count of pixels painted flat at each level the
+app is declared to paint, standing above the halo gradient that passes through
+it. That number moves by the full population when a colour moves, and it caught
+#194's move by a factor of a hundred where the grid caught it by nothing.
+`Tools/test-inventory.json` says which claims the baseline makes and which it
+does not.
+
 CI runs the same script on pull requests and on merges to `main`, plus an
 unsigned Release build against the device SDK — the configuration and the SDK
 that ship, which the simulator test lane never compiles. Every run uploads its
