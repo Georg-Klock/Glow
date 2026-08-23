@@ -20,6 +20,13 @@ failure — and CI has been treating that answer as three. It is not:
   * **A warning is not nothing.** The compiler's opinion arrives in the result
     bundle and, until now, in nobody's terminal.
 
+**Runtime warnings are counted, reported, and not yet fatal.** The result bundle
+records them as one opaque `Multiple Runtime Warnings` node per test — 92 of
+them on a run that passes — so making them fail the build means enumerating them
+first, and that is its own piece of work rather than a line in this file. The
+count is in `validation.json` and in CI's run summary, where a person sees it
+beside gates that do fail.
+
 The floors are minima, not equalities, so adding a test never touches this
 file. Lowering one is the reviewable event: it means tests were deleted, and it
 should be as visible in a diff as deleting them was.
@@ -93,7 +100,9 @@ def bundles_in(tests: dict) -> dict[str, dict]:
         kind = node.get("nodeType")
         if kind == "Unit test bundle" or kind == "UI test bundle":
             bundle = node.get("name")
-            found.setdefault(bundle, {"total": 0, "byResult": {}, "notPassed": []})
+            found.setdefault(
+                bundle, {"total": 0, "byResult": {}, "notPassed": [], "runtimeWarnings": 0}
+            )
         if kind == "Test Case" and bundle is not None:
             entry = found[bundle]
             result = node.get("result", "Unknown")
@@ -101,6 +110,10 @@ def bundles_in(tests: dict) -> dict[str, dict]:
             entry["byResult"][result] = entry["byResult"].get(result, 0) + 1
             if result != PASSING:
                 entry["notPassed"].append(f"{node.get('name')} [{result}]")
+        # Counted, reported, and deliberately not fatal yet — see the note at
+        # the top of this file.
+        if kind == "Runtime Warning" and bundle is not None:
+            found[bundle]["runtimeWarnings"] += 1
         for child in node.get("children") or []:
             walk(child, bundle)
 
@@ -244,6 +257,7 @@ def validate(build: dict, tests: dict, summary: dict, manifest: list[dict], inve
                 "total": entry["total"],
                 "byResult": entry["byResult"],
                 "minimum": inventory.get("bundles", {}).get(name, {}).get("minimum"),
+                "runtimeWarnings": entry.get("runtimeWarnings", 0),
             }
             for name, entry in sorted(found.items())
         },
@@ -258,10 +272,12 @@ def validate(build: dict, tests: dict, summary: dict, manifest: list[dict], inve
 def markdown(report: dict) -> str:
     """The same verdict, for a CI run summary."""
     lines = [f"### Tests: {report['result']} — {report['total']} tests", ""]
-    lines += ["| bundle | tests | floor |", "| --- | --- | --- |"]
+    lines += ["| bundle | tests | floor | runtime warnings |", "| --- | --- | --- | --- |"]
     for name, entry in report["bundles"].items():
         floor = entry["minimum"] if entry["minimum"] is not None else "undeclared"
-        lines.append(f"| {name} | {entry['total']} | {floor} |")
+        lines.append(
+            f"| {name} | {entry['total']} | {floor} | {entry.get('runtimeWarnings', 0)} |"
+        )
     if report["failures"]:
         lines += ["", "### Why this is not a pass", ""]
         lines += [f"- {failure.splitlines()[0]}" for failure in report["failures"]]

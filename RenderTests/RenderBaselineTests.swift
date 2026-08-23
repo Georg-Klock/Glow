@@ -302,9 +302,11 @@ struct RenderBaselineTests {
     /// picture of a claim this gate does not make.
     private func attachFailure(name: String, expected: RenderSignature, actual: RenderSignature) {
         let slug = name.replacingOccurrences(of: " ", with: "-")
-        if let png = try? RenderBaselineTests.render(
-            RenderBaselineTests.frames.first { $0.name == name }!
-        ), let data = UIImage(cgImage: png).pngData() {
+        // Nothing here traps. This runs only on the failing path, and a crash
+        // while collecting evidence for a failure destroys the evidence.
+        if let frame = RenderBaselineTests.frames.first(where: { $0.name == name }),
+           let png = try? RenderBaselineTests.render(frame),
+           let data = UIImage(cgImage: png).pngData() {
             Attachment.record(data, named: "\(slug)-actual.png")
         }
         if let data = expected.gridImage(width: actual.width, height: actual.height) {

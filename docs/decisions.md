@@ -2147,6 +2147,13 @@ four-point mutation above; the inventory and diagnostics gates were proved by
 running one bundle instead of two with a warning injected, which named the
 missing bundle and the warning separately.
 
+**Runtime warnings are counted and not yet fatal, on purpose.** The result
+bundle records them as one opaque `Multiple Runtime Warnings` node per test —
+92 of them on a run that passes — so a gate on them would either go red on
+every build or need every one enumerated first. The count is in
+`validation.json` and in CI's run summary, beside gates that do fail. Naming
+them is the next piece of work, not a line in the validator.
+
 **What CI still cannot do.** An iOS 18 lane was in scope and is not possible on
 the pinned runner: `macos-26` carries iOS 26.2, 26.4 and 26.5 simulator runtimes
 and no 18.x at all, so a minimum-deployment-target *test* lane would have to
