@@ -2346,3 +2346,37 @@ made that harmless in one more situation rather than removing it. The real
 answer is still what #105 named: the rest day should arrive as a parameter, the
 way `calendar:` already does. This entry is not that fix either — but the count
 of interims is now four, and that is the argument for doing it.
+
+## A host that dies mid-run says so
+
+**2026-08-22.** `Tools/test.sh` now classifies four outcomes rather than three,
+and the new one is the host being killed (#175).
+
+Three separate investigations tonight went looking for a bug in whichever test
+happened to be running when the process died — a parameterised `WeekReach` case
+in #117, an unnamed one during #130's verification, and a third during #138's,
+which is where the load correlation was finally measured. The failure names an
+innocent test every time, because it names whatever was in flight.
+
+It now says the host died, quotes the fatal error, and prints the load average
+beside the threshold this machine was measured at. The advice is to re-run
+before reading anything into which test failed.
+
+**A second red herring went with it.** #148 removed a bare `failed` from the
+pattern, because the simulator logs `IOSurfaceClientSetSurfaceNotify failed` on
+runs that pass. `error:` had exactly the same defect one layer down: CoreData
+logs `CoreData: error:` lines, and the migration suite plants a malformed store
+on purpose, so a crashed run reported that noise under "Failing assertions".
+The pattern now requires a file and a position — a compiler error carries one;
+a log line does not.
+
+Both directions were induced rather than reasoned about. A deliberate
+out-of-range subscript produces the crash message with
+`ContiguousArrayBuffer.swift:692: Fatal error: Index out of range` and the load
+average; a deliberate type error still produces
+`FAILED. Failing assertions:` with the file, line and column. Both probes were
+removed.
+
+The two layers are complementary, which is worth noting because they were
+built hours apart: the script says the host died, and #138's validator
+independently names the test the result bundle recorded as failed.
