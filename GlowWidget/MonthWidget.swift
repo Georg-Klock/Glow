@@ -109,7 +109,10 @@ struct MonthWidgetView: View {
 
     private func month(for habit: HabitSnapshot) -> some View {
         let today = WeekCalendar.day(entry.date)
-        let cells = MonthGrid.cells(for: habit, today: today)
+        // The widget's one read of the rest day, as in `WeekWidgetView` (#181):
+        // once per render, then passed to the grid and to the cut below.
+        let restDay = WeekPreferences.restDay
+        let cells = MonthGrid.cells(for: habit, today: today, restDay: restDay)
         let rows = MonthGrid.rowCount(of: cells)
         let isDue = cells.contains { $0.mark == .openToday }
 
@@ -169,7 +172,10 @@ struct MonthWidgetView: View {
                 // every one of its rows is a week and the cut runs through all
                 // of them.
                 .background(alignment: .leading) {
-                    restCut(cells: cells, side: side, gap: gap, rows: rows, rowGap: rowGap)
+                    restCut(
+                        cells: cells, restDay: restDay,
+                        side: side, gap: gap, rows: rows, rowGap: rowGap
+                    )
                 }
                 Spacer(minLength: 0)
             }
@@ -194,9 +200,12 @@ private extension MonthWidgetView {
     /// after a label column the month does not have.
     @ViewBuilder
     func restCut(
-        cells: [MonthCell], side: CGFloat, gap: CGFloat, rows: Int, rowGap: CGFloat
+        cells: [MonthCell], restDay: Int?,
+        side: CGFloat, gap: CGFloat, rows: Int, rowGap: CGFloat
     ) -> some View {
-        if let column = cells.first(where: { WeekPreferences.isRestDay($0.date) })?.column {
+        if let column = cells.first(where: {
+            WeekPreferences.isRestDay($0.date, restDay: restDay)
+        })?.column {
             let width = GlowShape.barThickness
             let centre = CGFloat(column) * (side + gap) + side / 2
             Rectangle()

@@ -156,11 +156,15 @@ struct HabitSnapshot: Identifiable, Equatable, Sendable {
 /// slots respond to a tap is the surface's business, and `SlotEditing` is how
 /// the surface says so.
 enum WeekGrid {
+    /// `restDay` is the weekday nothing is expected on, or nil for none. A
+    /// parameter, like the calendar, rather than a read of `WeekPreferences`
+    /// (#181) — the caller has already read it once at its own boundary.
     static func slots(
         for habit: HabitSnapshot,
         in week: Week,
         today: Date,
         editing: SlotEditing,
+        restDay: Int?,
         calendar: Calendar = WeekCalendar.calendar
     ) -> [Slot] {
         guard !habit.isSpacer else { return [] }
@@ -170,11 +174,12 @@ enum WeekGrid {
         case .daily:
             return dailySlots(
                 habit: habit, week: week, today: todayStart,
-                editing: editing, calendar: calendar
+                editing: editing, restDay: restDay, calendar: calendar
             )
         case .timesPerWeek(let target):
             return frequencySlots(
-                habit: habit, week: week, today: todayStart, target: target, calendar: calendar
+                habit: habit, week: week, today: todayStart, target: target,
+                restDay: restDay, calendar: calendar
             )
         case .timesPerDay:
             // A per-day habit has no week row. It is one ring on Today, and the
@@ -191,6 +196,7 @@ enum WeekGrid {
         week: Week,
         today: Date,
         editing: SlotEditing,
+        restDay: Int?,
         calendar: Calendar
     ) -> [Slot] {
         week.days.enumerated().map { index, day in
@@ -209,7 +215,7 @@ enum WeekGrid {
             // History still shows it — but the week grid stops drawing it. The
             // grid's job is to say what is open, and on a rest day that is
             // nothing.
-            let isRest = WeekPreferences.isRestDay(day, calendar: calendar)
+            let isRest = WeekPreferences.isRestDay(day, restDay: restDay, calendar: calendar)
 
             let state: SlotState =
                 if isRest { .rest }
@@ -225,7 +231,10 @@ enum WeekGrid {
             return Slot(
                 index: index,
                 state: state,
-                actionDay: editing.day(atColumn: index, in: week, today: today, calendar: calendar),
+                actionDay: editing.day(
+                    atColumn: index, in: week, today: today,
+                    restDay: restDay, calendar: calendar
+                ),
                 isToday: isToday
             )
         }
@@ -246,6 +255,7 @@ enum WeekGrid {
         week: Week,
         today: Date,
         target: Int,
+        restDay: Int?,
         calendar: Calendar
     ) -> [Slot] {
         let completionsThisWeek = habit.completedDays.count { week.contains($0) }
@@ -259,7 +269,7 @@ enum WeekGrid {
         // waits, unlit, and the undo waits with it. Not day-pinned does not
         // mean not day-bound — the only day a tap can ever touch is today,
         // and on the rest day today refuses.
-        let todayRests = WeekPreferences.isRestDay(today, calendar: calendar)
+        let todayRests = WeekPreferences.isRestDay(today, restDay: restDay, calendar: calendar)
 
         // Open only when the goal is still reachable and today is unspent.
         let openIndex: Int? =

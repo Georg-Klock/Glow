@@ -67,4 +67,51 @@ struct TestIsolationTests {
 
         #expect(group?.object(forKey: WeekPreferences.restDayKey) as? Int == before)
     }
+
+    /// #181: the read itself is gone, which is what ends the series above.
+    ///
+    /// The three issues before it each made a process-wide store *harmless* in
+    /// one more situation — serialised suites, a private defaults suite, a host
+    /// that draws nothing — and every one of them left the read in place. The
+    /// rest day is a parameter now, so a grid cannot inherit one from whatever
+    /// else the process has been doing.
+    ///
+    /// A source scan, the way #141, #168 and #179 assert claims a test cannot
+    /// watch from inside: the property is *the absence of a call*, and no
+    /// runtime assertion can observe an absence — a test that set no rest day
+    /// and found nothing resting would pass whether or not the read existed.
+    ///
+    /// `WeekPreferences.swift` is the one exemption, because that is where the
+    /// stored value lives. Everything else in `Glow/Logic/` takes it as an
+    /// argument.
+    @Test("No decision logic reads the stored rest day")
+    func logicTakesTheRestDayAsAParameter() throws {
+        let logic = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Glow/Logic")
+        let files = try FileManager.default.contentsOfDirectory(
+            at: logic, includingPropertiesForKeys: nil
+        ).filter { $0.pathExtension == "swift" }
+
+        // The scan is only worth anything if it found the directory.
+        #expect(files.count > 10, "Glow/Logic looks wrong: \(files.count) files")
+
+        for file in files where file.lastPathComponent != "WeekPreferences.swift" {
+            let source = try String(contentsOf: file, encoding: .utf8)
+            // Code only: the doc comments in here name the property constantly,
+            // and they should.
+            let code = source
+                .split(separator: "\n", omittingEmptySubsequences: false)
+                .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+                .joined(separator: "\n")
+                // The *key* is a name, not a read — a view binds `@AppStorage`
+                // to it. Removed first so it cannot look like the property.
+                .replacingOccurrences(of: "WeekPreferences.restDayKey", with: "")
+            #expect(
+                !code.contains("WeekPreferences.restDay"),
+                "\(file.lastPathComponent) reads the stored rest day"
+            )
+        }
+    }
 }

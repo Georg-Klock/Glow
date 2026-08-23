@@ -26,7 +26,13 @@ struct WidgetRefreshTests {
         var kinds: Set<String> { calls.reduce(into: []) { $0.formUnion($1) } }
     }
 
-    private func withSpy(_ body: (Spy, HabitStore, ModelContext) throws -> Void) throws {
+    /// `restDay` is the store's, stated here rather than pinned in the process
+    /// (#181): `HabitStore` takes it at construction, like its calendar, so a
+    /// test that wants a refusal builds a store that rests on that day.
+    private func withSpy(
+        restDay: Int? = nil,
+        _ body: (Spy, HabitStore, ModelContext) throws -> Void
+    ) throws {
         let spy = Spy()
         let previous = WidgetRefresh.sink
         defer { WidgetRefresh.sink = previous; WidgetRefresh.flush() }
@@ -34,7 +40,11 @@ struct WidgetRefreshTests {
         WidgetRefresh.sink = { [spy] kinds in spy.calls.append(kinds) }
 
         let context = try makeContext()
-        try body(spy, HabitStore(context: context, calendar: calendar), context)
+        try body(
+            spy,
+            HabitStore(context: context, calendar: calendar, restDay: restDay),
+            context
+        )
     }
 
     // MARK: - Every write asks
@@ -65,23 +75,18 @@ struct WidgetRefreshTests {
     func refusalDoesNotInvalidate() throws {
         // A rest-day refusal saves nothing, so there is nothing to redraw. The
         // intents ask separately in that case, for their own stale surface.
-        try withSpy { spy, store, _ in
+        let week = WeekCalendar.week(containing: today, calendar: calendar)
+        let monday = TestPreferences.weekday(ofColumn: 0, in: week)
+
+        try withSpy(restDay: monday) { spy, store, _ in
             let habit = try store.addHabit(name: "Read", icon: "📖", frequency: .timesPerWeek(3))
             WidgetRefresh.flush()
             let before = spy.count
 
-            try TestPreferences.withWeek(
-                restDay: TestPreferences.weekday(
-                    ofColumn: 0,
-                    in: WeekCalendar.week(containing: today, calendar: calendar)
-                )
-            ) {
-                // The call is hoisted out of the macro: `#expect` around a
-                // `try` inside a rethrowing closure does not compile.
-                let day = WeekCalendar.week(containing: today, calendar: calendar).days[0]
-                let outcome = try store.toggleCompletion(for: habit, on: day)
-                #expect(outcome == .refused)
-            }
+            // The call is hoisted out of the macro: `#expect` around a `try`
+            // inside a rethrowing closure does not compile.
+            let outcome = try store.toggleCompletion(for: habit, on: week.days[0])
+            #expect(outcome == .refused)
 
             WidgetRefresh.flush()
             #expect(spy.count == before)

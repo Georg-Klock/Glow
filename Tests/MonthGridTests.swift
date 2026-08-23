@@ -10,14 +10,18 @@ struct MonthGridTests {
     /// case, which is why it is the fixture.
     private let today = TestCalendar.date(2026, 8, 19)
 
-    /// One implementation, in `TestSupport`. See `TestPreferences`.
-    private func withRestDay(_ restDay: Int?, _ body: () throws -> Void) rethrows {
-        try TestPreferences.withWeek(restDay: restDay, body)
+    /// The weekday a date falls on, which is what a rest day is.
+    ///
+    /// This used to pin `WeekPreferences.restDay` around a body and let
+    /// `MonthGrid` read it back out. Since #181 the grid takes the rest day as
+    /// an argument, so there is nothing to pin — only a conversion.
+    private func weekday(of date: Date) -> Int {
+        calendar.component(.weekday, from: date)
     }
 
     @Test("The 1st sits under its real weekday, and the rows are ragged")
     func monthShape() {
-        let cells = MonthGrid.cells(for: .fixture(), today: today, calendar: calendar)
+        let cells = MonthGrid.cells(for: .fixture(), today: today, restDay: nil, calendar: calendar)
 
         #expect(cells.count == 31)
         #expect(MonthGrid.rowCount(of: cells) == 6)
@@ -38,7 +42,7 @@ struct MonthGridTests {
     func dailyMarks() {
         let done = TestCalendar.date(2026, 8, 10)
         let habit = HabitSnapshot.fixture(completedDays: [done])
-        let cells = MonthGrid.cells(for: habit, today: today, calendar: calendar)
+        let cells = MonthGrid.cells(for: habit, today: today, restDay: nil, calendar: calendar)
         let byDay = { (day: Int) in
             cells.first { self.calendar.component(.day, from: $0.date) == day }
         }
@@ -60,8 +64,11 @@ struct MonthGridTests {
         // not a cross, and since #72 not a socket either. Not re-decided here:
         // MonthGrid asks WeekGrid, so whatever the rest day means there is
         // what it means here, and the whole Tuesday column empties with it.
-        withRestDay(calendar.component(.weekday, from: TestCalendar.date(2026, 8, 18))) {
-            let cells = MonthGrid.cells(for: .fixture(), today: today, calendar: calendar)
+        do {
+            let restDay = weekday(of: TestCalendar.date(2026, 8, 18))
+            let cells = MonthGrid.cells(
+                for: .fixture(), today: today, restDay: restDay, calendar: calendar
+            )
             let tuesday = cells.first { calendar.component(.day, from: $0.date) == 18 }
             #expect(tuesday?.mark == .rest)
 
@@ -88,7 +95,7 @@ struct MonthGridTests {
             frequency: .timesPerWeek(3),
             completedDays: [TestCalendar.date(2026, 8, 10), TestCalendar.date(2026, 8, 12)]
         )
-        let cells = MonthGrid.cells(for: habit, today: today, calendar: calendar)
+        let cells = MonthGrid.cells(for: habit, today: today, restDay: nil, calendar: calendar)
 
         #expect(cells.count { $0.mark == .donePast } == 2)
         // This week holds nothing yet, so today is open by the week row's own
@@ -112,7 +119,7 @@ struct MonthGridTests {
             frequency: .timesPerWeek(3),
             completedDays: [TestCalendar.date(2026, 8, 10), TestCalendar.date(2026, 8, 12)]
         )
-        let cells = MonthGrid.cells(for: habit, today: today, calendar: calendar)
+        let cells = MonthGrid.cells(for: habit, today: today, restDay: nil, calendar: calendar)
         let lostWeek = WeekCalendar.week(containing: TestCalendar.date(2026, 8, 10), calendar: calendar)
 
         let inWeek = cells.filter { lostWeek.contains($0.date) }
@@ -125,14 +132,17 @@ struct MonthGridTests {
 
     @Test("A lost week never crosses the rest day")
     func lostWeekSparesTheRestDay() {
-        withRestDay(calendar.component(.weekday, from: TestCalendar.date(2026, 8, 12))) {
+        do {
+            let restDay = weekday(of: TestCalendar.date(2026, 8, 12))
             let habit = HabitSnapshot.fixture(
                 frequency: .timesPerWeek(3),
                 completedDays: [TestCalendar.date(2026, 8, 10)]
             )
-            let cells = MonthGrid.cells(for: habit, today: today, calendar: calendar)
+            let cells = MonthGrid.cells(
+                for: habit, today: today, restDay: restDay, calendar: calendar
+            )
             let rest = cells.filter {
-                WeekPreferences.isRestDay($0.date, calendar: calendar)
+                WeekPreferences.isRestDay($0.date, restDay: restDay, calendar: calendar)
             }
             #expect(!rest.isEmpty)
             #expect(!rest.contains { $0.mark == .missed })
@@ -145,7 +155,7 @@ struct MonthGridTests {
             frequency: .timesPerWeek(2),
             completedDays: [TestCalendar.date(2026, 8, 10), TestCalendar.date(2026, 8, 12)]
         )
-        let cells = MonthGrid.cells(for: habit, today: today, calendar: calendar)
+        let cells = MonthGrid.cells(for: habit, today: today, restDay: nil, calendar: calendar)
         let lastWeek = WeekCalendar.week(containing: TestCalendar.date(2026, 8, 10), calendar: calendar)
         #expect(!cells.contains { $0.mark == .missed && lastWeek.contains($0.date) })
     }
@@ -158,7 +168,7 @@ struct MonthGridTests {
         let met = HabitSnapshot.fixture(
             frequency: .timesPerWeek(2), completedDays: [monday, tuesday]
         )
-        let metCells = MonthGrid.cells(for: met, today: today, calendar: calendar)
+        let metCells = MonthGrid.cells(for: met, today: today, restDay: nil, calendar: calendar)
         #expect(!metCells.contains { $0.mark == .openToday })
         #expect(metCells.allSatisfy { !$0.isTappable })
 
@@ -167,7 +177,7 @@ struct MonthGridTests {
         let doneToday = HabitSnapshot.fixture(
             frequency: .timesPerWeek(3), completedDays: [today]
         )
-        let doneCells = MonthGrid.cells(for: doneToday, today: today, calendar: calendar)
+        let doneCells = MonthGrid.cells(for: doneToday, today: today, restDay: nil, calendar: calendar)
         let todayCell = doneCells.first { $0.date == today }
         #expect(todayCell?.mark == .doneToday)
         #expect(todayCell?.isTappable == true)
@@ -176,9 +186,9 @@ struct MonthGridTests {
     @Test("Per-day habits and blank rows have no month")
     func backstops() {
         let perDay = HabitSnapshot.fixture(frequency: .timesPerDay(3))
-        #expect(MonthGrid.cells(for: perDay, today: today, calendar: calendar).isEmpty)
+        #expect(MonthGrid.cells(for: perDay, today: today, restDay: nil, calendar: calendar).isEmpty)
 
         let spacer = HabitSnapshot.fixture(isSpacer: true)
-        #expect(MonthGrid.cells(for: spacer, today: today, calendar: calendar).isEmpty)
+        #expect(MonthGrid.cells(for: spacer, today: today, restDay: nil, calendar: calendar).isEmpty)
     }
 }

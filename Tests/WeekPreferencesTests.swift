@@ -68,17 +68,16 @@ struct WeekPreferencesTests {
         let today = TestCalendar.date(2026, 8, 19)
         let week = WeekCalendar.week(containing: today, calendar: calendar)
 
-        withPreferences(restDay: calendar.component(.weekday, from: week.days[0])) {
-            let row = WeekGrid.slots(
-                for: .fixture(), in: week, today: today, editing: .todayOnly, calendar: calendar
-            )
-            // Monday is the rest day and already gone: it would be a miss
-            // otherwise, and a miss is exactly what a rest day is not. It is
-            // not an upcoming socket either — see `restDayDrawsNothing`.
-            #expect(row[0].state == .rest)
-            #expect(row[0].mark == .rest)
-            #expect(row[1].state == .missed)
-        }
+        let row = WeekGrid.slots(
+            for: .fixture(), in: week, today: today, editing: .todayOnly,
+            restDay: calendar.component(.weekday, from: week.days[0]), calendar: calendar
+        )
+        // Monday is the rest day and already gone: it would be a miss
+        // otherwise, and a miss is exactly what a rest day is not. It is
+        // not an upcoming socket either — see `restDayDrawsNothing`.
+        #expect(row[0].state == .rest)
+        #expect(row[0].mark == .rest)
+        #expect(row[1].state == .missed)
     }
 
     @Test("A rest day that is today has nothing to tap")
@@ -87,15 +86,14 @@ struct WeekPreferencesTests {
         let today = TestCalendar.date(2026, 8, 19)
         let week = WeekCalendar.week(containing: today, calendar: calendar)
 
-        withPreferences(restDay: calendar.component(.weekday, from: today)) {
-            let row = WeekGrid.slots(
-                for: .fixture(), in: week, today: today, editing: .todayOnly, calendar: calendar
-            )
-            #expect(row[2].state == .rest)
-            #expect(row[2].mark == .rest)
-            #expect(!row.contains { $0.state == .open })
-            #expect(row.allSatisfy { !$0.isTappable })
-        }
+        let row = WeekGrid.slots(
+            for: .fixture(), in: week, today: today, editing: .todayOnly,
+            restDay: calendar.component(.weekday, from: today), calendar: calendar
+        )
+        #expect(row[2].state == .rest)
+        #expect(row[2].mark == .rest)
+        #expect(!row.contains { $0.state == .open })
+        #expect(row.allSatisfy { !$0.isTappable })
     }
 
     @Test("A completion already stored on a rest day still counts, and is not drawn")
@@ -111,23 +109,28 @@ struct WeekPreferencesTests {
         let week = WeekCalendar.week(containing: today, calendar: calendar)
         let monday = week.days[0]
 
-        withPreferences(restDay: calendar.component(.weekday, from: monday)) {
-            let habit = HabitSnapshot.fixture(completedDays: [monday])
-            let row = WeekGrid.slots(for: habit, in: week, today: today, editing: .todayOnly, calendar: calendar)
-            // Not drawn: rest wins over the completion.
-            #expect(row[0].state == .rest)
-            #expect(row[0].mark == .rest)
-            // Still counts. Asserted through a frequency row over the same
-            // week rather than by re-reading `completedDays`, so "counts but
-            // is not drawn" is a claim about the grid rather than about the
-            // fixture.
-            let weekly = HabitSnapshot.fixture(
-                frequency: .timesPerWeek(3), completedDays: [monday]
-            )
-            let spans = WeekGrid.slots(for: weekly, in: week, today: today, editing: .todayOnly, calendar: calendar)
-            #expect(spans.count { $0.state == .filled } == 1)
-            #expect(habit.completedDays.contains(monday))
-        }
+        let restDay = calendar.component(.weekday, from: monday)
+        let habit = HabitSnapshot.fixture(completedDays: [monday])
+        let row = WeekGrid.slots(
+            for: habit, in: week, today: today, editing: .todayOnly,
+            restDay: restDay, calendar: calendar
+        )
+        // Not drawn: rest wins over the completion.
+        #expect(row[0].state == .rest)
+        #expect(row[0].mark == .rest)
+        // Still counts. Asserted through a frequency row over the same
+        // week rather than by re-reading `completedDays`, so "counts but
+        // is not drawn" is a claim about the grid rather than about the
+        // fixture.
+        let weekly = HabitSnapshot.fixture(
+            frequency: .timesPerWeek(3), completedDays: [monday]
+        )
+        let spans = WeekGrid.slots(
+            for: weekly, in: week, today: today, editing: .todayOnly,
+            restDay: restDay, calendar: calendar
+        )
+        #expect(spans.count { $0.state == .filled } == 1)
+        #expect(habit.completedDays.contains(monday))
     }
 
     @Test("A rest day draws nothing, whichever way it faces")
@@ -141,13 +144,12 @@ struct WeekPreferencesTests {
 
         for index in [0, 2, 5] {
             let weekday = calendar.component(.weekday, from: week.days[index])
-            withPreferences(restDay: weekday) {
-                let row = WeekGrid.slots(
-                    for: .fixture(), in: week, today: today, editing: .todayOnly, calendar: calendar
-                )
-                #expect(row[index].mark == .rest, "column \(index) should draw nothing")
-                #expect(row.count { $0.mark == .rest } == 1)
-            }
+            let row = WeekGrid.slots(
+                for: .fixture(), in: week, today: today, editing: .todayOnly,
+                restDay: weekday, calendar: calendar
+            )
+            #expect(row[index].mark == .rest, "column \(index) should draw nothing")
+            #expect(row.count { $0.mark == .rest } == 1)
         }
     }
 
@@ -157,12 +159,11 @@ struct WeekPreferencesTests {
         let today = TestCalendar.date(2026, 8, 19)
         let week = WeekCalendar.week(containing: today, calendar: calendar)
 
-        withPreferences(restDay: nil) {
-            let row = WeekGrid.slots(
-                for: .fixture(), in: week, today: today, editing: .todayOnly, calendar: calendar
-            )
-            #expect(!row.contains { $0.mark == .rest })
-        }
+        let row = WeekGrid.slots(
+            for: .fixture(), in: week, today: today, editing: .todayOnly,
+            restDay: nil, calendar: calendar
+        )
+        #expect(!row.contains { $0.mark == .rest })
     }
 
     @Test("A rest-day today opens nothing on a frequency row")
@@ -171,14 +172,15 @@ struct WeekPreferencesTests {
         let today = TestCalendar.date(2026, 8, 19)
         let week = WeekCalendar.week(containing: today, calendar: calendar)
 
-        withPreferences(restDay: calendar.component(.weekday, from: today)) {
-            // The goal is nowhere near met, and still nothing is open: the
-            // pill that would be waits, unlit, for a day that allows it.
-            let habit = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
-            let row = WeekGrid.slots(for: habit, in: week, today: today, editing: .todayOnly, calendar: calendar)
-            #expect(!row.contains { $0.state == .open })
-            #expect(row.allSatisfy { !$0.isTappable })
-        }
+        // The goal is nowhere near met, and still nothing is open: the
+        // pill that would be waits, unlit, for a day that allows it.
+        let habit = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
+        let row = WeekGrid.slots(
+            for: habit, in: week, today: today, editing: .todayOnly,
+            restDay: calendar.component(.weekday, from: today), calendar: calendar
+        )
+        #expect(!row.contains { $0.state == .open })
+        #expect(row.allSatisfy { !$0.isTappable })
     }
 
     @Test("A rest-day today withholds the undo too")
@@ -187,16 +189,17 @@ struct WeekPreferencesTests {
         let today = TestCalendar.date(2026, 8, 19)
         let week = WeekCalendar.week(containing: today, calendar: calendar)
 
-        withPreferences(restDay: calendar.component(.weekday, from: today)) {
-            // Today already holds a completion — stored before the rest day
-            // was set. It still draws filled, and it cannot be un-logged.
-            let habit = HabitSnapshot.fixture(
-                frequency: .timesPerWeek(3), completedDays: [today]
-            )
-            let row = WeekGrid.slots(for: habit, in: week, today: today, editing: .todayOnly, calendar: calendar)
-            #expect(row.contains { $0.state == .filled })
-            #expect(row.allSatisfy { !$0.isTappable })
-        }
+        // Today already holds a completion — stored before the rest day
+        // was set. It still draws filled, and it cannot be un-logged.
+        let habit = HabitSnapshot.fixture(
+            frequency: .timesPerWeek(3), completedDays: [today]
+        )
+        let row = WeekGrid.slots(
+            for: habit, in: week, today: today, editing: .todayOnly,
+            restDay: calendar.component(.weekday, from: today), calendar: calendar
+        )
+        #expect(row.contains { $0.state == .filled })
+        #expect(row.allSatisfy { !$0.isTappable })
     }
 
     @Test("A rest-day today stops the spans as well")
@@ -205,31 +208,77 @@ struct WeekPreferencesTests {
         let today = TestCalendar.date(2026, 8, 19)
         let week = WeekCalendar.week(containing: today, calendar: calendar)
 
-        withPreferences(restDay: calendar.component(.weekday, from: today)) {
-            let habit = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
-            let spans = WeekSpans.spans(
-                for: habit, in: week, today: today, target: 3, editing: .todayOnly, calendar: calendar
-            )
-            // The geometry holds — still three spans dividing the week — but
-            // nothing is open and nothing takes a tap.
-            #expect(spans.count == 3)
-            #expect(!spans.contains { $0.state == .open })
-            #expect(spans.allSatisfy { !$0.isTappable })
+        let restDay = calendar.component(.weekday, from: today)
+        let habit = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
+        let spans = WeekSpans.spans(
+            for: habit, in: week, today: today, target: 3,
+            editing: .todayOnly, restDay: restDay, calendar: calendar
+        )
+        // The geometry holds — still three spans dividing the week — but
+        // nothing is open and nothing takes a tap.
+        #expect(spans.count == 3)
+        #expect(!spans.contains { $0.state == .open })
+        #expect(spans.allSatisfy { !$0.isTappable })
 
-            // The met goal's whole-week span loses its undo the same way.
-            let met = HabitSnapshot.fixture(
-                frequency: .timesPerWeek(1), completedDays: [today]
-            )
-            let metSpans = WeekSpans.spans(
-                for: met, in: week, today: today, target: 1, editing: .todayOnly, calendar: calendar
-            )
-            #expect(metSpans.allSatisfy { !$0.isTappable })
-        }
+        // The met goal's whole-week span loses its undo the same way.
+        let met = HabitSnapshot.fixture(
+            frequency: .timesPerWeek(1), completedDays: [today]
+        )
+        let metSpans = WeekSpans.spans(
+            for: met, in: week, today: today, target: 1,
+            editing: .todayOnly, restDay: restDay, calendar: calendar
+        )
+        #expect(metSpans.allSatisfy { !$0.isTappable })
     }
 
     @Test("The store refuses a rest-day write in both directions")
     @MainActor
     func restDayRefusesWrites() throws {
+        let calendar = TestCalendar.monday
+        let today = TestCalendar.date(2026, 8, 19)
+
+        let container = try ModelContainer(
+            for: Habit.self, Completion.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        // The store takes its rest day the way it takes its calendar (#181),
+        // so the refusal can be asserted without setting a process-wide
+        // preference and hoping nothing else reads it.
+        let store = HabitStore(
+            context: context, calendar: calendar,
+            restDay: calendar.component(.weekday, from: today)
+        )
+        let habit = try store.addHabit(name: "Run", icon: "🏃", frequency: .daily)
+
+        // This is the write path `ToggleHabitIntent` calls, so the widget
+        // process is refused here too — a stale widget can still offer the
+        // button, and the store rather than the surface is what says no.
+        #expect(try store.toggleCompletion(for: habit, on: today) == .refused)
+        #expect(try context.fetch(FetchDescriptor<Completion>()).isEmpty)
+
+        // A completion already stored on the rest day cannot be un-logged
+        // on it either: refused, and the record stays.
+        let stored = Completion(day: today, habit: habit)
+        context.insert(stored)
+        habit.completions?.append(stored)
+        try context.save()
+        #expect(try store.toggleCompletion(for: habit, on: today) == .refused)
+        #expect(try context.fetch(FetchDescriptor<Completion>()).count == 1)
+
+        // The day beside it writes as ever.
+        let thursday = TestCalendar.date(2026, 8, 20)
+        #expect(try store.toggleCompletion(for: habit, on: thursday) == .completed)
+    }
+
+    @Test("The store reads the rest day itself when it is not told one")
+    @MainActor
+    func storeDefaultsToTheStoredRestDay() throws {
+        // The other half of #181: the *store* is a boundary and may read the
+        // preference, and it must — the refusal exists because a surface can
+        // outlive the setting it was rendered under, so a rest day supplied by
+        // that stale surface would make the guard agree with it. Every real
+        // caller builds a store per write and so re-reads it here.
         let calendar = TestCalendar.monday
         let today = TestCalendar.date(2026, 8, 19)
 
@@ -241,25 +290,7 @@ struct WeekPreferencesTests {
             let context = ModelContext(container)
             let store = HabitStore(context: context, calendar: calendar)
             let habit = try store.addHabit(name: "Run", icon: "🏃", frequency: .daily)
-
-            // This is the write path `ToggleHabitIntent` calls, so the widget
-            // process is refused here too — a stale widget can still offer the
-            // button, and the store rather than the surface is what says no.
             #expect(try store.toggleCompletion(for: habit, on: today) == .refused)
-            #expect(try context.fetch(FetchDescriptor<Completion>()).isEmpty)
-
-            // A completion already stored on the rest day cannot be un-logged
-            // on it either: refused, and the record stays.
-            let stored = Completion(day: today, habit: habit)
-            context.insert(stored)
-            habit.completions?.append(stored)
-            try context.save()
-            #expect(try store.toggleCompletion(for: habit, on: today) == .refused)
-            #expect(try context.fetch(FetchDescriptor<Completion>()).count == 1)
-
-            // The day beside it writes as ever.
-            let thursday = TestCalendar.date(2026, 8, 20)
-            #expect(try store.toggleCompletion(for: habit, on: thursday) == .completed)
         }
     }
 }

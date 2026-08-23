@@ -27,9 +27,10 @@ struct SlotVoiceTests {
         let restDay = restColumn.map {
             TestPreferences.weekday(ofColumn: $0, in: week, calendar: calendar)
         }
-        return TestPreferences.withWeek(restDay: restDay) {
-            WeekGrid.slots(for: habit, in: week, today: today, editing: .todayOnly, calendar: calendar)
-        }
+        return WeekGrid.slots(
+            for: habit, in: week, today: today, editing: .todayOnly,
+            restDay: restDay, calendar: calendar
+        )
     }
 
     // MARK: - All seven columns
@@ -133,9 +134,10 @@ struct SlotVoiceTests {
         let habit = HabitSnapshot.fixture(
             name: "Workout", frequency: .timesPerWeek(3), completedDays: [day(0)]
         )
-        let spans = TestPreferences.withWeek(restDay: nil) {
-            WeekSpans.spans(for: habit, in: week, today: today, target: 3, editing: .todayOnly, calendar: calendar)
-        }
+        let spans = WeekSpans.spans(
+            for: habit, in: week, today: today, target: 3,
+            editing: .todayOnly, restDay: nil, calendar: calendar
+        )
         let spoken = spans.map {
             SlotVoice.span(
                 habitName: habit.name, state: $0.state,
@@ -156,9 +158,10 @@ struct SlotVoiceTests {
         let habit = HabitSnapshot.fixture(
             name: "Workout", frequency: .timesPerWeek(3), completedDays: [day(2)]
         )
-        let spans = TestPreferences.withWeek(restDay: nil) {
-            WeekSpans.spans(for: habit, in: week, today: today, target: 3, editing: .todayOnly, calendar: calendar)
-        }
+        let spans = WeekSpans.spans(
+            for: habit, in: week, today: today, target: 3,
+            editing: .todayOnly, restDay: nil, calendar: calendar
+        )
         let tappable = spans.filter(\.isTappable)
         #expect(tappable.count == 1)
         #expect(
@@ -176,11 +179,10 @@ struct SlotVoiceTests {
         // what it is and nothing more.
         let saturday = TestCalendar.date(2026, 8, 22)
         let habit = HabitSnapshot.fixture(name: "Workout", frequency: .timesPerWeek(3))
-        let spans = TestPreferences.withWeek(restDay: nil) {
-            WeekSpans.spans(
-                for: habit, in: week, today: saturday, target: 3, editing: .todayOnly, calendar: calendar
-            )
-        }
+        let spans = WeekSpans.spans(
+            for: habit, in: week, today: saturday, target: 3,
+            editing: .todayOnly, restDay: nil, calendar: calendar
+        )
         let missed = spans.filter { $0.state == .missed }
         #expect(!missed.isEmpty)
         for span in missed {
@@ -213,9 +215,9 @@ struct HistoryVoiceTests {
             name: "Read",
             completedDays: [TestCalendar.date(2026, 8, 3), TestCalendar.date(2026, 8, 4)]
         )
-        let cells = TestPreferences.withWeek(restDay: nil) {
-            MonthGrid.cells(for: habit, today: today, calendar: calendar)
-        }
+        let cells = MonthGrid.cells(
+            for: habit, today: today, restDay: nil, calendar: calendar
+        )
         let spoken = HistoryVoice.month(cells, calendar: calendar)
 
         // Counted off the marks rather than off the completions, so the
@@ -229,9 +231,9 @@ struct HistoryVoiceTests {
 
     @Test("A month with nothing in it says so, once")
     func emptyMonth() {
-        let cells = TestPreferences.withWeek(restDay: nil) {
-            MonthGrid.cells(for: .fixture(name: "Read"), today: today, calendar: calendar)
-        }
+        let cells = MonthGrid.cells(
+            for: .fixture(name: "Read"), today: today, restDay: nil, calendar: calendar
+        )
         #expect(
             HistoryVoice.month(cells, calendar: calendar)?
                 .hasPrefix("nothing logged this month") == true
@@ -243,9 +245,9 @@ struct HistoryVoiceTests {
         let habit = HabitSnapshot.fixture(
             name: "Read", completedDays: [TestCalendar.date(2026, 8, 3)]
         )
-        let cells = TestPreferences.withWeek(restDay: nil) {
-            MonthGrid.cells(for: habit, today: today, calendar: calendar)
-        }
+        let cells = MonthGrid.cells(
+            for: habit, today: today, restDay: nil, calendar: calendar
+        )
         #expect(HistoryVoice.month(cells, calendar: calendar)?.hasPrefix("1 day logged this month") == true)
     }
 
@@ -296,45 +298,45 @@ struct YearHistoryTests {
 
     @Test("A day everything was done on is full; some of it is partial")
     func fullAndPartial() {
-        TestPreferences.withWeek(restDay: nil) {
-            let read = HabitSnapshot.fixture(name: "Read", completedDays: [day(0)])
-            let walk = HabitSnapshot.fixture(name: "Walk", completedDays: [day(0), day(1)])
-            #expect(YearHistory.fill(
-                for: day(0), habits: [read, walk], today: today, calendar: calendar
-            ) == .full)
-            #expect(YearHistory.fill(
-                for: day(1), habits: [read, walk], today: today, calendar: calendar
-            ) == .partial)
-            #expect(YearHistory.fill(
-                for: day(2), habits: [read, walk], today: today, calendar: calendar
-            ) == .empty)
-        }
+        let read = HabitSnapshot.fixture(name: "Read", completedDays: [day(0)])
+        let walk = HabitSnapshot.fixture(name: "Walk", completedDays: [day(0), day(1)])
+        #expect(YearHistory.fill(
+            for: day(0), habits: [read, walk], today: today,
+            restDay: nil, calendar: calendar
+        ) == .full)
+        #expect(YearHistory.fill(
+            for: day(1), habits: [read, walk], today: today,
+            restDay: nil, calendar: calendar
+        ) == .partial)
+        #expect(YearHistory.fill(
+            for: day(2), habits: [read, walk], today: today,
+            restDay: nil, calendar: calendar
+        ) == .empty)
     }
 
     @Test("A day that has not arrived is not a day that went badly")
     func futureIsNotEmpty() {
-        TestPreferences.withWeek(restDay: nil) {
-            #expect(YearHistory.fill(
-                for: day(3), habits: [.fixture()], today: today, calendar: calendar
-            ) == .future)
-        }
+        #expect(YearHistory.fill(
+            for: day(3), habits: [.fixture()], today: today,
+            restDay: nil, calendar: calendar
+        ) == .future)
     }
 
     @Test("Nothing expected is not a failure")
     func nothingExpected() {
-        TestPreferences.withWeek(restDay: nil) {
-            // A weekly-cadence habit has no opinion about a given weekday, so a
-            // day with only those on it expects nothing and is empty rather
-            // than missed.
-            let weekly = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
-            #expect(YearHistory.fill(
-                for: day(0), habits: [weekly], today: today, calendar: calendar
-            ) == .empty)
-            // And a spacer is a position in a list, never a habit.
-            #expect(YearHistory.fill(
-                for: day(0), habits: [.fixture(isSpacer: true)], today: today, calendar: calendar
-            ) == .empty)
-        }
+        // A weekly-cadence habit has no opinion about a given weekday, so a
+        // day with only those on it expects nothing and is empty rather
+        // than missed.
+        let weekly = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
+        #expect(YearHistory.fill(
+            for: day(0), habits: [weekly], today: today,
+            restDay: nil, calendar: calendar
+        ) == .empty)
+        // And a spacer is a position in a list, never a habit.
+        #expect(YearHistory.fill(
+            for: day(0), habits: [.fixture(isSpacer: true)], today: today,
+            restDay: nil, calendar: calendar
+        ) == .empty)
     }
 
     @Test("A rest day expects nothing, and a completion on one still counts")
@@ -342,25 +344,23 @@ struct YearHistoryTests {
         // #72 stopped the week grid *drawing* a rest-day completion. It never
         // stopped it counting, and the year is where it still shows.
         let monday = TestPreferences.weekday(ofColumn: 0, in: week, calendar: calendar)
-        TestPreferences.withWeek(restDay: monday) {
-            let habit = HabitSnapshot.fixture(completedDays: [day(0)])
-            #expect(YearHistory.fill(
-                for: day(0), habits: [habit], today: today, calendar: calendar
-            ) == .full)
-            #expect(YearHistory.fill(
-                for: day(0), habits: [.fixture()], today: today, calendar: calendar
-            ) == .empty)
-        }
+        let habit = HabitSnapshot.fixture(completedDays: [day(0)])
+        #expect(YearHistory.fill(
+            for: day(0), habits: [habit], today: today,
+            restDay: monday, calendar: calendar
+        ) == .full)
+        #expect(YearHistory.fill(
+            for: day(0), habits: [.fixture()], today: today,
+            restDay: monday, calendar: calendar
+        ) == .empty)
     }
 
     @Test("A column is seven verdicts in the calendar's own day order")
     func columnIsAWeek() {
-        TestPreferences.withWeek(restDay: nil) {
-            let habit = HabitSnapshot.fixture(completedDays: [day(0)])
-            let fills = YearHistory.fills(
-                in: week, habits: [habit], today: today, calendar: calendar
-            )
-            #expect(fills == [.full, .empty, .empty, .future, .future, .future, .future])
-        }
+        let habit = HabitSnapshot.fixture(completedDays: [day(0)])
+        let fills = YearHistory.fills(
+            in: week, habits: [habit], today: today, restDay: nil, calendar: calendar
+        )
+        #expect(fills == [.full, .empty, .empty, .future, .future, .future, .future])
     }
 }

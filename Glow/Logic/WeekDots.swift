@@ -29,13 +29,14 @@ enum WeekDots {
     static func columns(
         for habit: HabitSnapshot,
         in week: Week,
+        restDay: Int?,
         calendar: Calendar = WeekCalendar.calendar
     ) -> [Int] {
         guard !habit.isSpacer, !habit.frequency.isCountedPerDay else { return [] }
         return week.days.indices.filter { index in
             let day = week.days[index]
             return habit.completedDays.contains(day)
-                && !WeekPreferences.isRestDay(day, calendar: calendar)
+                && !WeekPreferences.isRestDay(day, restDay: restDay, calendar: calendar)
         }
     }
 
@@ -58,9 +59,10 @@ enum WeekDots {
     static func spokenDays(
         for habit: HabitSnapshot,
         in week: Week,
+        restDay: Int?,
         calendar: Calendar = WeekCalendar.calendar
     ) -> String? {
-        let lit = columns(for: habit, in: week, calendar: calendar)
+        let lit = columns(for: habit, in: week, restDay: restDay, calendar: calendar)
         let symbols = calendar.standaloneWeekdaySymbols
         guard !lit.isEmpty, symbols.count == 7 else { return nil }
         let names = lit.map { column in

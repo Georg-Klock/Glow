@@ -358,7 +358,10 @@ struct WidgetRenderDiffTests {
         try withRestColumn(2, of: entry.week) {
             let spans = WeekSpans.spans(
                 for: entry.habits[0], in: entry.week, today: entry.date, target: 2,
-                editing: .todayOnly
+                editing: .todayOnly,
+                restDay: WeekCalendar.calendar.component(
+                    .weekday, from: entry.week.days[2]
+                )
             )
             let open = try #require(spans.first { $0.state == .open })
             #expect(open.firstDay < 2 && open.lastDay > 2, "the fixture does not straddle Wednesday")

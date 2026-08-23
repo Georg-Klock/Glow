@@ -12,11 +12,6 @@ struct RestWindowTests {
     private var slot: CGFloat { SlotLayout.dailySlot(trackWidth: track) }
     private var gap: CGFloat { SlotLayout.gap(trackWidth: track) }
 
-    /// One implementation, in `TestSupport`. See `TestPreferences`.
-    private func withPreferences(restDay: Int?, _ body: () throws -> Void) rethrows {
-        try TestPreferences.withWeek(restDay: restDay, body)
-    }
-
     // MARK: - The window
 
     @Test("A span that does not reach the rest day loses nothing")
@@ -106,13 +101,10 @@ struct RestWindowTests {
         )
 
         func spans(restDay: Int?) -> [SlotSpan] {
-            var result: [SlotSpan] = []
-            withPreferences(restDay: restDay) {
-                result = WeekSpans.spans(
-                    for: habit, in: week, today: today, target: 2, editing: .todayOnly, calendar: calendar
-                )
-            }
-            return result
+            WeekSpans.spans(
+                for: habit, in: week, today: today, target: 2,
+                editing: .todayOnly, restDay: restDay, calendar: calendar
+            )
         }
 
         let withoutRest = spans(restDay: nil)

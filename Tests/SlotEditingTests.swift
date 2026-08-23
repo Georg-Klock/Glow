@@ -17,9 +17,9 @@ struct SlotEditingTests {
     private var week: Week { WeekCalendar.week(containing: today, calendar: calendar) }
 
     private func day(_ editing: SlotEditing, column: Int, restDay: Int? = nil) -> Date? {
-        TestPreferences.withWeek(restDay: restDay) {
-            editing.day(atColumn: column, in: week, today: today, calendar: calendar)
-        }
+        editing.day(
+            atColumn: column, in: week, today: today, restDay: restDay, calendar: calendar
+        )
     }
 
     // MARK: - The policy
@@ -73,9 +73,9 @@ struct SlotEditingTests {
     }
 
     private func pastDay(_ editing: SlotEditing, column: Int, restDay: Int? = nil) -> Date? {
-        TestPreferences.withWeek(restDay: restDay) {
-            editing.day(atColumn: column, in: pastWeek, today: today, calendar: calendar)
-        }
+        editing.day(
+            atColumn: column, in: pastWeek, today: today, restDay: restDay, calendar: calendar
+        )
     }
 
     @Test("A week entirely in the past is editable end to end", arguments: 0..<7)
@@ -131,12 +131,10 @@ struct SlotEditingTests {
         // activation falls back to.
         let track: CGFloat = 220
         let habit = HabitSnapshot.fixture(frequency: .timesPerWeek(2))
-        let spans = TestPreferences.withWeek(restDay: nil) {
-            WeekSpans.spans(
-                for: habit, in: week, today: today, target: 2,
-                editing: .week(allowingFuture: false), calendar: calendar
-            )
-        }
+        let spans = WeekSpans.spans(
+            for: habit, in: week, today: today, target: 2,
+            editing: .week(allowingFuture: false), restDay: nil, calendar: calendar
+        )
         let span = try #require(spans.first { $0.state == .open })
         #expect(span.firstDay == 0)
 

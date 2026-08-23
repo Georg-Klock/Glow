@@ -55,11 +55,17 @@ struct WeekWidgetView: View {
                     height: proxy.size.height, slot: side, hasHeader: showsHeader
                 )
                 let shown = Array(entry.habits.prefix(capacity))
+                // **The widget's one read of the rest day** (#181). A widget
+                // renders out of process from an archived surface, so there is
+                // no `@AppStorage` to observe and nothing to observe it for:
+                // the value is read once per render and handed to every row,
+                // which is the same shape the app's row uses.
+                let restDay = WeekPreferences.restDay
                 // The rest day's line, decided once for the whole widget: which
                 // column it falls in, and which of the rows it actually shows
                 // run through it. Both ends land on a habit — see RestCut.
                 let restIndex = entry.week.days.firstIndex(where: {
-                    WeekPreferences.isRestDay($0)
+                    WeekPreferences.isRestDay($0, restDay: restDay)
                 })
                 let cut = RestCut.rows(entry.habits, capacity: capacity)
 
@@ -89,6 +95,7 @@ struct WeekWidgetView: View {
                             index: index,
                             cut: cut,
                             restIndex: restIndex,
+                            restDay: restDay,
                             burst: entry.burstHabit == habit.id ? entry.progress : nil
                         )
                     }
@@ -153,13 +160,18 @@ private struct WidgetRow: View {
     let index: Int
     let cut: ClosedRange<Int>?
     let restIndex: Int?
+    /// The weekday nothing is expected on, read once by the widget and handed
+    /// down with the rest (#181).
+    let restDay: Int?
     /// Non-nil while this habit's completion is animating.
     let burst: Double?
 
     private var slots: [Slot] {
         // The widget edits today and nothing else, whatever the app can
         // reach — a glance and a single confirmed action. See `SlotEditing`.
-        WeekGrid.slots(for: habit, in: week, today: today, editing: .todayOnly)
+        WeekGrid.slots(
+            for: habit, in: week, today: today, editing: .todayOnly, restDay: restDay
+        )
     }
 
     /// A habit due a number of times a week is not day-pinned, so it is drawn as
@@ -167,7 +179,8 @@ private struct WidgetRow: View {
     private var spans: [SlotSpan] {
         guard case .timesPerWeek(let target) = habit.frequency else { return [] }
         return WeekSpans.spans(
-            for: habit, in: week, today: today, target: target, editing: .todayOnly
+            for: habit, in: week, today: today, target: target,
+            editing: .todayOnly, restDay: restDay
         )
     }
 
@@ -253,9 +266,11 @@ private struct WidgetRow: View {
             // mark and same column centres as a daily row, so the two put their
             // light in exactly the same places. See #47.
             .overlay(alignment: .leading) {
-                let voice = WeekDots.spokenDays(for: habit, in: week)
+                let voice = WeekDots.spokenDays(for: habit, in: week, restDay: restDay)
                 ZStack(alignment: .leading) {
-                    ForEach(WeekDots.columns(for: habit, in: week), id: \.self) { column in
+                    ForEach(
+                        WeekDots.columns(for: habit, in: week, restDay: restDay), id: \.self
+                    ) { column in
                         SlotMarkView(mark: .donePast, size: CGSize(width: side, height: side))
                             .offset(
                                 x: SlotLayout.columnCentre(trackWidth: track, index: column)

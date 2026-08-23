@@ -23,6 +23,14 @@ struct YearView: View {
 
     @State private var today = WeekCalendar.day(Date())
 
+    /// The rest day, observed, and handed to `YearHistory` as a parameter
+    /// (#181). A rest day expects nothing, so it decides what a day's fill is;
+    /// read through `@AppStorage` so that changing it in Settings redraws the
+    /// year rather than waiting for the next launch.
+    @AppStorage(WeekPreferences.restDayKey, store: GlowSettings.store)
+    private var restDayStorage: Int = 0
+    private var restDay: Int? { WeekPreferences.restDay(stored: restDayStorage) }
+
     private var calendar: Calendar { WeekCalendar.calendar }
 
     /// Every week of the current year, as columns of seven days.
@@ -115,8 +123,8 @@ struct YearView: View {
                         HStack(alignment: .top, spacing: gap) {
                             ForEach(Array(weeks.enumerated()), id: \.offset) { index, week in
                                 let fills = YearHistory.fills(
-                                    in: week, habits: snapshots,
-                                    today: today, calendar: calendar
+                                    in: week, habits: snapshots, today: today,
+                                    restDay: restDay, calendar: calendar
                                 )
                                 VStack(spacing: gap) {
                                     ForEach(Array(fills.enumerated()), id: \.offset) { _, fill in

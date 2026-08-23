@@ -260,7 +260,10 @@ struct PersistenceTests {
 
         // And the grid agrees that today is spent.
         let week = WeekCalendar.week(containing: today, calendar: calendar)
-        let slots = WeekGrid.slots(for: snapshot, in: week, today: today, editing: .todayOnly, calendar: calendar)
+        let slots = WeekGrid.slots(
+            for: snapshot, in: week, today: today, editing: .todayOnly,
+            restDay: nil, calendar: calendar
+        )
         #expect(slots.map(\.state) == [.filled, .inactive, .inactive])
     }
 
