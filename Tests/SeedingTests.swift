@@ -478,3 +478,206 @@ struct AddingTests {
         #expect(all.map(\.name) == ["Three", "Two"])
     }
 }
+
+/// #193: the opt-in way back to the shipped defaults, for a store the seeding
+/// guard will never touch again.
+@Suite("Reset to defaults")
+@MainActor
+struct ResetToDefaultsTests {
+    private let calendar = TestCalendar.monday
+    private let today = TestCalendar.date(2026, 8, 19)
+
+    private func makeContext() throws -> ModelContext {
+        let container = try ModelContainer(
+            for: Habit.self, Completion.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        return ModelContext(container)
+    }
+
+    private func makeDefaults() -> UserDefaults {
+        let suite = "reset-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite) ?? .standard
+        defaults.removePersistentDomain(forName: suite)
+        return defaults
+    }
+
+    /// A store somebody has actually used: their own habits, their own days.
+    private func handTypedStore() throws -> (ModelContext, HabitStore) {
+        let context = try makeContext()
+        let store = HabitStore(context: context, calendar: calendar, restDay: nil)
+        let mine = try store.addHabit(name: "Mine", icon: "star", frequency: .daily, now: today)
+        try store.addSpacer(now: today)
+        let counted = try store.addHabit(
+            name: "Water", icon: "drop", frequency: .timesPerDay(3), now: today
+        )
+        _ = try store.toggleCompletion(for: mine, on: today)
+        _ = try store.toggleCompletion(for: mine, on: TestCalendar.date(2026, 8, 18))
+        _ = try store.addCompletion(for: counted, on: today)
+        return (context, store)
+    }
+
+    @Test("A reset leaves exactly the shipped defaults, in their order")
+    func resetInstallsTheDefaults() throws {
+        let (context, store) = try handTypedStore()
+
+        #expect(try store.resetToDefaults(now: today) == DefaultHabits.all.count)
+
+        let rows = try context.fetch(
+            FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder)])
+        )
+        #expect(rows.map(\.name) == DefaultHabits.all.map { $0.isSpacer ? "" : $0.name })
+        #expect(rows.map(\.isSpacer) == DefaultHabits.all.map(\.isSpacer))
+        #expect(
+            rows.map(\.frequency)
+                == DefaultHabits.all.map { $0.isSpacer ? Frequency.daily : $0.frequency }
+        )
+        // Numbered from zero, exactly as a first launch numbers them. Appending
+        // after rows that are on their way out would leave the same list at
+        // sortOrder 3…17 — invisible on screen, and a difference between
+        // "reset" and "fresh install" that nothing would ever reconcile.
+        #expect(rows.map(\.sortOrder) == Array(0..<DefaultHabits.all.count))
+    }
+
+    @Test("Nothing that was logged survives a reset")
+    func resetTakesEveryCompletion() throws {
+        let (context, store) = try handTypedStore()
+        #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 3)
+
+        try store.resetToDefaults(now: today)
+
+        #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
+    }
+
+    @Test("A completion with no habit on it goes too")
+    func resetTakesOrphanedCompletions() throws {
+        // What the `.cascade` rule cannot reach. A store in this state is not
+        // one this app writes, but "nothing survives" is the whole promise
+        // here, and a promise with an exception in it is a different promise.
+        let (context, store) = try handTypedStore()
+        context.insert(Completion(day: today, habit: nil, calendar: calendar))
+        try context.save()
+
+        try store.resetToDefaults(now: today)
+
+        #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
+    }
+
+    @Test("The demo reads as out afterwards, however it was recorded")
+    func resetLeavesNoDemoBehind() throws {
+        let defaults = makeDefaults()
+        let context = try makeContext()
+        try HabitSeeder(context: context, defaults: defaults, calendar: calendar)
+            .seedIfNeeded(now: today)
+        let demo = DemoHistory(
+            context: context, defaults: defaults, calendar: calendar, restDay: nil
+        )
+        try demo.seed(now: today)
+        #expect(demo.isSeeded)
+
+        try HabitStore(context: context, calendar: calendar, restDay: nil)
+            .resetToDefaults(now: today)
+
+        // Provenance is on the row now (#140), so this holds because the rows
+        // are gone — not because anything was told to forget them.
+        #expect(!demo.isSeeded)
+        #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
+    }
+
+    @Test("The pre-provenance record is dropped rather than left naming nothing")
+    func discardingTheLegacyRecordEmptiesTheKey() throws {
+        let defaults = makeDefaults()
+        let context = try makeContext()
+        defaults.set([UUID().uuidString], forKey: DemoHistory.legacyIDsKey)
+        let demo = DemoHistory(
+            context: context, defaults: defaults, calendar: calendar, restDay: nil
+        )
+
+        demo.discardLegacyRecord()
+
+        #expect(defaults.stringArray(forKey: DemoHistory.legacyIDsKey) == nil)
+    }
+
+    @Test("A reset does not re-arm first-run seeding")
+    func resetLeavesTheSeededFlagAlone() throws {
+        // `seededKey` means "this install has at some point ended up seeded",
+        // and a store holding exactly the defaults is that state. Clearing it
+        // would arm a seeder that then refuses the store anyway — and on the
+        // one path where it would not refuse, it would be adding a second copy
+        // of the list this call just installed.
+        let defaults = makeDefaults()
+        let context = try makeContext()
+        let seeder = HabitSeeder(context: context, defaults: defaults, calendar: calendar)
+        try seeder.seedIfNeeded(now: today)
+        #expect(defaults.bool(forKey: HabitSeeder.seededKey))
+
+        try HabitStore(context: context, calendar: calendar, restDay: nil)
+            .resetToDefaults(now: today)
+
+        #expect(defaults.bool(forKey: HabitSeeder.seededKey))
+        #expect(try seeder.seedIfNeeded(now: today) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<Habit>()) == DefaultHabits.all.count)
+    }
+
+    @Test("Resetting twice is resetting once")
+    func resetIsIdempotent() throws {
+        let (context, store) = try handTypedStore()
+
+        try store.resetToDefaults(now: today)
+        try store.resetToDefaults(now: today)
+
+        #expect(try context.fetchCount(FetchDescriptor<Habit>()) == DefaultHabits.all.count)
+        #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
+        let rows = try context.fetch(
+            FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder)])
+        )
+        #expect(rows.map(\.sortOrder) == Array(0..<DefaultHabits.all.count))
+    }
+
+    @Test("An empty store resets to the defaults just as well")
+    func resetSeedsAnEmptyStore() throws {
+        let context = try makeContext()
+        let store = HabitStore(context: context, calendar: calendar, restDay: nil)
+
+        #expect(try store.resetToDefaults(now: today) == DefaultHabits.all.count)
+        #expect(try context.fetchCount(FetchDescriptor<Habit>()) == DefaultHabits.all.count)
+    }
+}
+
+/// The gate in front of the reset. It stands in front of the one action that
+/// deletes everything at once, so it is a pure rule with assertions on it
+/// rather than an expression inside a `.disabled(…)`.
+@Suite("Reset confirmation")
+struct ResetConfirmationTests {
+    @Test("Nothing short of the whole word opens the gate")
+    func onlyTheWholeWordConfirms() {
+        #expect(!ResetConfirmation.isConfirmed(""))
+        #expect(!ResetConfirmation.isConfirmed(" "))
+        #expect(!ResetConfirmation.isConfirmed("RESE"))
+        #expect(!ResetConfirmation.isConfirmed("RESETT"))
+        #expect(!ResetConfirmation.isConfirmed("RE SET"))
+        #expect(!ResetConfirmation.isConfirmed("please RESET"))
+        #expect(!ResetConfirmation.isConfirmed("delete"))
+    }
+
+    @Test("Case and surrounding whitespace are not the point")
+    func caseAndPaddingAreForgiven() {
+        // Typing `reset` is as deliberate an act as typing `RESET`, and a
+        // confirm button that stays dead over a shift key says nothing about
+        // why. A trailing space from an autocomplete is not a change of mind.
+        #expect(ResetConfirmation.isConfirmed("RESET"))
+        #expect(ResetConfirmation.isConfirmed("reset"))
+        #expect(ResetConfirmation.isConfirmed("Reset"))
+        #expect(ResetConfirmation.isConfirmed(" RESET "))
+        #expect(ResetConfirmation.isConfirmed("RESET\n"))
+    }
+
+    @Test("The word is declared once")
+    func theWordIsShared() {
+        // The placeholder, the footer and the check all read this, so a change
+        // of word cannot leave the field asking for one thing and the gate
+        // waiting for another.
+        #expect(ResetConfirmation.word == "RESET")
+        #expect(ResetConfirmation.isConfirmed(ResetConfirmation.word))
+    }
+}

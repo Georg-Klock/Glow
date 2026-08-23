@@ -56,6 +56,18 @@ sentence with an exception is two sentences.
   temporary directory, and never otherwise. That is a privacy claim true by
   construction rather than by policy. `HistoryExport` is pure and its bytes are
   asserted.
+- **No undo — and one action that therefore has to ask twice.** Settings → Data
+  → **Reset to Default Habits** deletes every habit and every completion and
+  installs `DefaultHabits.all` fresh, which is the only way back to the shipped
+  list once a store holds anything: first-run seeding refuses a non-empty store
+  on purpose, so that a changed seed set never rewrites a list somebody
+  arranged. Because nothing here is recoverable, the confirmation is **typed
+  rather than tapped**: the destructive button stays disabled until the word
+  `RESET` is in the field — `ResetConfirmation` is the rule, and it forgives
+  case and surrounding whitespace and nothing else. The reset is one transaction
+  — either the defaults are in or the store is untouched — and it leaves
+  `didSeedDefaultHabits` alone, because a store holding exactly the defaults
+  *is* the seeded state.
 - ~~**The home screen widget does not glow.**~~ **It does.** This was written as
   a non-goal on the reasoning that WidgetKit renders in a separate process and
   archives the result, so HDR could not survive. That was never measured, and it

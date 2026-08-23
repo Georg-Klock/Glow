@@ -115,7 +115,25 @@ struct HabitStore {
     func addAll(_ templates: [DefaultHabits.Template], now: Date = Date()) throws -> Int {
         guard !templates.isEmpty else { return 0 }
 
-        var order = try nextSortOrder()
+        insert(templates, from: try nextSortOrder(), now: now)
+        try commit()
+        return templates.count
+    }
+
+    /// Turns templates into rows, numbered from `start`, and saves nothing.
+    ///
+    /// Split out of `addAll` so that `resetToDefaults` can put the same list in
+    /// **inside a transaction that also empties the store** — a save between
+    /// the delete and the insert is a window in which the store holds nothing,
+    /// which is the half-seeded state #140 exists to make impossible, wearing
+    /// its worst face.
+    ///
+    /// The starting number is a parameter for the same reason: after the
+    /// deletes are staged, `nextSortOrder` would be answering from rows that
+    /// are on their way out, so the caller that knows the store is being
+    /// emptied says zero instead of asking.
+    private func insert(_ templates: [DefaultHabits.Template], from start: Int, now: Date) {
+        var order = start
         for template in templates {
             let habit = Habit(
                 name: template.isSpacer
@@ -129,9 +147,49 @@ struct HabitStore {
             context.insert(habit)
             order += 1
         }
+    }
 
+    /// Throws away everything the store holds and puts the current defaults in.
+    /// Returns how many habits were added.
+    ///
+    /// The opt-in escape hatch from `HabitSeeder`'s guard (#193). Seeding
+    /// refuses to touch a store that holds anything, deliberately — a seed set
+    /// that changed would otherwise rewrite lists people had arranged — so an
+    /// install that wants the shipped defaults after its first launch has no
+    /// way to ask. This is that way, and it is destructive on purpose: not a
+    /// merge, not a reconciliation by name, a return to zero.
+    ///
+    /// **One transaction.** Every delete and every insert is staged and then
+    /// committed once, so a failure anywhere leaves the store exactly as it
+    /// was — with the person's habits still in it. That is the property #140
+    /// established for seeding and it matters more here, because the thing a
+    /// half-finished run would be half-way through is a deletion.
+    ///
+    /// Completions are deleted explicitly rather than left to the `.cascade`
+    /// rule. The cascade does reach every completion that is attached to a
+    /// habit, which is all of them in a healthy store — but the whole promise
+    /// of this call is that nothing survives it, and a completion whose habit
+    /// reference is nil would survive a cascade. Saying it outright costs one
+    /// fetch and removes the word "should" from the promise.
+    ///
+    /// `HabitSeeder.seededKey` is deliberately untouched: it records that this
+    /// install has at some point ended up in a seeded state, and a store
+    /// holding exactly `DefaultHabits.all` is that state. Clearing it would
+    /// only arm first-run seeding against a store it would then refuse to
+    /// touch anyway.
+    @discardableResult
+    func resetToDefaults(now: Date = Date()) throws -> Int {
+        for completion in try context.fetch(FetchDescriptor<Completion>()) {
+            completion.habit?.completions?.removeAll { $0.id == completion.id }
+            context.delete(completion)
+        }
+        for habit in try context.fetch(FetchDescriptor<Habit>()) {
+            context.delete(habit)
+        }
+
+        insert(DefaultHabits.all, from: 0, now: now)
         try commit()
-        return templates.count
+        return DefaultHabits.all.count
     }
 
     /// The topmost blank row, or nil when the grid has none.

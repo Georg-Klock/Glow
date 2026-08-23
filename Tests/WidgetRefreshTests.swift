@@ -71,6 +71,26 @@ struct WidgetRefreshTests {
         }
     }
 
+    @Test("A reset asks for a redraw, once for the whole thing")
+    func resetInvalidatesOnce() throws {
+        // #193 empties the store and refills it, which is every row the widget
+        // draws changing at once — and it is one commit, so it is one reload.
+        // The issue's sketch called `reloadAllTimelines` at the call site; that
+        // is the habit #134 removed, and going through `commit()` is what makes
+        // this coalesce like every other write.
+        try withSpy { spy, store, _ in
+            try store.addHabit(name: "Read", icon: "📖", frequency: .timesPerWeek(3))
+            WidgetRefresh.flush()
+            let before = spy.count
+
+            try store.resetToDefaults()
+
+            WidgetRefresh.flush()
+            #expect(spy.count == before + 1)
+            #expect(spy.calls.last == WidgetRefresh.allKinds)
+        }
+    }
+
     @Test("A refused write does not pretend anything changed")
     func refusalDoesNotInvalidate() throws {
         // A rest-day refusal saves nothing, so there is nothing to redraw. The
