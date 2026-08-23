@@ -398,7 +398,10 @@ App ID, the Apple Development certificate, both devices) and drop them into
 with the Apple ID would remove that dependency and let automatic signing work.
 
 Verify the whole chain with `Tools/check-app-group.sh`, which reports which
-profiles grant the group and whether the last device build actually carries it.
+profiles grant the group and whether a named device build actually carries it.
+It takes the app's path (defaulting to `build/device`'s Debug product) rather
+than searching for one, and an app that is not there is a failure: a check that
+reports success when it found nothing to check is worse than no check.
 
 Two of those four fixes live in generated files, which nothing reviews. So
 `Tools/check-project.py` runs at the end of every `Tools/generate.sh`, reads the
@@ -427,9 +430,34 @@ to carry.
 
 The build number is stamped from the UTC clock at upload (`YYYYMMDDHHmm`), so
 every upload is unique without a commit per upload; `MARKETING_VERSION` stays
-where `project.yml` puts it and stays Georg's call. The first upload verified
-the App Groups entitlement survives distribution signing in both the app and
-the widget — checked in the exported IPA, not assumed from the archive.
+where `project.yml` puts it and stays Georg's call. That stamp reaches both
+bundles only since #133: the host target did not read `CURRENT_PROJECT_VERSION`
+or `MARKETING_VERSION` at all, so xcodegen's own defaults shipped a `1.0` / `1`
+app beside a `0.1` widget, and the override on the archive command moved the
+widget's build number while the app kept the literal.
+
+**Nothing is uploaded that has not been read back.**
+`Tools/check-release-build.py` opens a built product — a `.app`, an
+`.xcarchive` or an `.ipa` — and fails on a host and appex that disagree on
+either version key (naming both values), on an appex that is missing or
+undeclared, on a bundle identifier that is not the declared one or is not the
+host's plus one component, on an unexpanded `$(BUILD_SETTING)` still sitting in
+a shipped plist, and on a missing `PrivacyInfo.xcprivacy`. With
+`--require-signing` it adds what only a signed bundle answers: that the App
+Group survived codesign, read out of the signature rather than out of the
+source file, and that the embedded profile has not expired.
+
+What it checks is declared in `Tools/test-inventory.json`, beside the test
+floors, and it runs from two places on purpose — CI's unsigned Release build
+for the device SDK, and `Tools/ship-testflight.sh` on the archive before the
+export and on the exported `.ipa` immediately before the upload. One file, two
+callers: a gate and a release path that each carry their own idea of "matching"
+will eventually disagree, and the release path is the one nobody watches. The
+first upload verified the App Groups entitlement survives distribution signing
+by hand; that is now the last thing that happens before `altool` runs.
+
+The script also runs `Tools/test.sh` before archiving. `--skip-tests` skips it
+and says so on the way past.
 
 ## The widgets
 

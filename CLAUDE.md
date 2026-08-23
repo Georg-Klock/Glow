@@ -91,11 +91,26 @@ overshot it into contradicting §1. See #75 and docs/decisions.md.
   trap: a screen without headroom tone-maps the result to grey, so the page has
   to test for headroom before showing it at all.
 - **Read the widget's trace off a tethered phone:** `Tools/pull-widget-log.sh`
-- **Check the App Group entitlement survived signing:** `Tools/check-app-group.sh`
+- **Check the App Group entitlement survived signing:**
+  `Tools/check-app-group.sh [path/to/Glow.app]`
+- **Validate a built product before it ships:**
+  `Tools/check-release-build.py <Glow.app | Glow.xcarchive | Glow.ipa>`
+
+  Host and widget agreeing on both version keys, the appex being there at all,
+  the declared bundle identifiers, the privacy manifests, and — with
+  `--require-signing` — the App Group as codesign left it and the embedded
+  profile's expiry. None of those is a build failure; the answer used to arrive
+  from App Store Connect after the upload. CI runs it on the Release build for
+  the device SDK and `Tools/ship-testflight.sh` runs it on the archive and on
+  the exported `.ipa`, so the gate and the release path cannot disagree about
+  what "matching" means. What it checks is declared in
+  `Tools/test-inventory.json`. See #133.
 - **Validate the generated project on its own:** `Tools/check-project.py`
 - **Validate a kept result bundle on its own:**
   `Tools/validate-test-result.py --xcresult Artifacts/latest/Glow.xcresult`
-- **Check the gate itself:** `Tools/validate-test-result.py --self-test`
+- **Check the gates themselves:** `Tools/validate-test-result.py --self-test`
+  and `Tools/check-release-build.py --self-test`. Both run on every push, on a
+  Linux runner: a checker nobody checks can weaken silently.
 
 CI runs the tests on every pull request and on merges to `main`
 (`.github/workflows/ci.yml`), on a pinned macOS runner — pinned rather than

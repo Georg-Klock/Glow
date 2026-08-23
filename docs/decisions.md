@@ -2220,3 +2220,79 @@ the way, and it leaves. The number lives on `HabitRowView.editFade` and the
 header borrows it, so the two cannot drift apart. Reduce Motion snaps it, as it
 snaps everything else the grid does — the label changes width and position here,
 and a shorter version of that is still a version of it.
+
+## The host app read no version at all (#133)
+
+**2026-08-22.** `project.yml` sets `MARKETING_VERSION` and
+`CURRENT_PROJECT_VERSION`, the widget's generated `Info.plist` reads both as
+`$(MARKETING_VERSION)` and `$(CURRENT_PROJECT_VERSION)`, and the host's read
+neither. Omitting the two keys does not leave them out: xcodegen writes its own
+defaults, so every build this repository has ever produced shipped an app at
+`1.0` / `1` embedding a widget at `0.1` / `1`. An extension whose version
+differs from its host is an App Store rejection, and nothing anywhere says so —
+the app builds, installs and runs, and the answer arrives from App Store Connect
+after the upload.
+
+It also made `Tools/ship-testflight.sh` do half of what its own header claims.
+The script overrides `CURRENT_PROJECT_VERSION` on the archive command so that
+every upload gets a unique build number; that override reached the widget and
+left the host on the literal `1`.
+
+**The host now reads the same two settings the widget does**, which is the whole
+fix for the mismatch. Measured on the Release build for the device SDK:
+`Glow.app` and `GlowWidget.appex` both report `0.1 (1)`, where before the app
+reported `1.0 (1)`.
+
+**A build is now read back before it ships.**
+`Tools/check-release-build.py` opens a `.app`, an `.xcarchive` or an `.ipa` and
+fails on: a host and appex that disagree on either version key, naming both
+values; a declared appex that is not embedded; an appex that is embedded and not
+declared; a bundle identifier that is not the declared one, or is not the host's
+plus one component; an unexpanded `$(BUILD_SETTING)` still sitting in a shipped
+plist; and a missing `PrivacyInfo.xcprivacy` at either bundle root. With
+`--require-signing` it adds the two facts only a signed bundle carries — the App
+Group as **codesign left it**, read out of the signature rather than out of the
+entitlements file that asked for it, and an embedded profile that has not
+expired.
+
+**One file, two callers, and that is the point.** CI runs it on the unsigned
+Release build for the device SDK, so a mismatch is a red pull request;
+`Tools/ship-testflight.sh` runs it on the archive before the export and on the
+exported `.ipa` immediately before `altool`. A gate and a release path that each
+carry their own idea of what "matching" means will eventually disagree, and the
+release path is the one nobody watches. What is checked is declared in
+`Tools/test-inventory.json`, next to the test floors, so the bundle identifiers
+and the App Group are reviewable in a diff rather than spelled out as script
+arguments.
+
+**Watched failing on real artifacts, not only on fabricated ones.** Each
+mutation below was applied to a copy of the actual Release build and named its
+values: the host put back to the pre-fix `1.0`; a stamped host build number
+against an unstamped widget; both plists left holding `$(MARKETING_VERSION)`;
+the widget deleted from `PlugIns`; a second appex added; the widget's privacy
+manifest removed; an empty directory in place of an archive; a path that does
+not exist; the app ad-hoc signed with the group stripped from the appex; and an
+`.ipa` repackaged with a host at `9.9`. Sixteen fabricated scenarios run under
+`--self-test` on every push, on the Linux runner beside
+`validate-test-result.py`'s, and they were themselves watched failing: with the
+version comparison replaced by `if False`, three of the sixteen go red.
+
+**Signing checks are separable from reading them, deliberately.** The Linux
+runner has no `codesign` and no `security`, so the self-test exercises the
+*decision* on fabricated facts and the macOS callers supply real ones. What
+could not be verified in this session: an expired profile and a distribution
+signature, both of which need signing credentials this checkout does not have.
+The entitlement check was proved with an ad-hoc signature instead, which is the
+same read through the same `codesign -d --entitlements`.
+
+**The App Group check no longer passes hardest when there is nothing to
+check.** `Tools/check-app-group.sh` searched for a built app with `find … |
+head -1`, reported success when it found none, and declared a `BUNDLE`
+identifier it never used. It now takes the app's path, reads the identifier it
+declared, fails when the app or the widget is absent, and says what to build.
+
+**The build-number allocator is left alone.** #133 also proposed replacing the
+minute-resolution UTC stamp with a monotonic allocator, because two uploads in
+one minute collide. That is a real problem and a separate one: it changes what
+goes to App Store Connect, and it cannot be tested without uploading. The
+mismatch this entry is about is fixed and verified; the allocator is still open.
