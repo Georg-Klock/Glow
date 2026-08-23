@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The app's tabs: This Week and Settings.
+/// The app's tabs: Widgets, This Week and Settings.
 ///
 /// A system `TabView`, so the bar is the platform's — its height, its blur, its
 /// behaviour when a keyboard appears, its accessibility.
@@ -11,11 +11,22 @@ import SwiftUI
 /// tabs were no longer three depths of one thing. The year moved into Settings
 /// as History, where the things that are neither today nor this week live.
 ///
-/// **Today's slot holds the Widgets tab** (#210). The per-day screen came out
-/// with the kind it drew (#209) and the slot was left empty rather than
-/// collapsed, so the bar reflowed once rather than twice: middle position,
-/// same neighbours, new content. This Week is still where every launch lands,
-/// which is what a cold launch already did.
+/// **The Widgets tab took Today's slot** (#210) and then moved out of it
+/// (#238). The per-day screen came out with the kind it drew (#209) and the
+/// slot was left empty rather than collapsed, so the bar reflowed once rather
+/// than twice. That was a transitional shape: Widgets inherited a position
+/// chosen for a screen about today, and kept it only until the order was
+/// looked at on its own terms.
+///
+/// It now leads, with This Week centred. `docs/vision.md` says the widget is
+/// the product and the app is where you go when the widget is not enough —
+/// leading with the widgets is that sentence in the tab bar. Centring This
+/// Week puts the screen people actually work in under the thumb.
+///
+/// **This Week is still where every launch lands.** That is `selection`'s
+/// default below, not a consequence of declaration order, so the two can
+/// disagree on purpose: the first tab is what the app says it is about, the
+/// landing tab is what it opens to.
 struct RootTabView: View {
     /// The landing screen. Deep links overwrite it before anything shows.
     @State private var selection: Screen = .week
@@ -28,14 +39,14 @@ struct RootTabView: View {
 
     var body: some View {
         TabView(selection: $selection) {
-            Tab("This Week", systemImage: "calendar", value: Screen.week) {
-                WeeklyGridView()
-            }
             // `square.grid.2x2` is the Home Screen's own arrangement — a
             // drawing of where these things go, in the same spirit as the
             // calendar and the cog beside it.
             Tab("Widgets", systemImage: "square.grid.2x2", value: Screen.widgets) {
                 WidgetsView()
+            }
+            Tab("This Week", systemImage: "calendar", value: Screen.week) {
+                WeeklyGridView()
             }
             // `gear` rather than `gearshape`: the cog with teeth and a hole,
             // not the rounded outline. Every other tab icon here is a drawing
