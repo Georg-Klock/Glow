@@ -5,6 +5,16 @@ import Foundation
 /// In the App Group, because the widget draws the same seven columns and a
 /// widget whose week started on a different day from the app would be a bug
 /// nobody could explain.
+///
+/// **This is where the stored rest day lives, and the only place it is read**
+/// (#181). Every surface reads it once — a view through `@AppStorage`, a widget
+/// once per render, `HabitStore` once per instance — and hands the value down
+/// as a parameter, exactly as the calendar arrives. Nothing in `Glow/Logic/`
+/// reaches back here for it, which is what `TestRunnerContractTests` scans for.
+///
+/// It was the one thing that broke the rule that decision logic takes no store,
+/// and four issues in one night were spent making that harmless in one more
+/// situation each: #105, #168, #175, #179.
 enum WeekPreferences {
     static let firstWeekdayKey = "weekFirstWeekday"
     static let restDayKey = "weekRestDay"
@@ -35,12 +45,23 @@ enum WeekPreferences {
     /// The day of the week nothing is expected on, or nil for none — which is
     /// the default, because a tracker that assumes you rest on Sunday is wrong
     /// about most people.
+    ///
+    /// **Read at a boundary, then passed down.** A view reads it through
+    /// `@AppStorage` so SwiftUI can see the dependency, the widget reads it once
+    /// per render, and `HabitStore` takes it as an initializer argument the way
+    /// it takes a calendar. See `restDay(stored:)`.
     static var restDay: Int? {
-        get {
-            guard let stored = store.object(forKey: restDayKey) as? Int else { return nil }
-            return stored == 0 ? nil : clampWeekday(stored)
-        }
+        get { restDay(stored: store.object(forKey: restDayKey) as? Int ?? 0) }
         set { store.set(newValue.map(clampWeekday) ?? 0, forKey: restDayKey) }
+    }
+
+    /// The stored integer as a rest day: 0 is none, anything else is a weekday.
+    ///
+    /// The conversion lives here rather than at each `@AppStorage` — the raw
+    /// value is what a view can observe, and the meaning of that raw value is
+    /// this type's. Clamped for the reason `clampWeekday` gives.
+    static func restDay(stored: Int) -> Int? {
+        stored == 0 ? nil : clampWeekday(stored)
     }
 
     /// Out-of-range values could arrive from a synced default or a future
@@ -57,8 +78,15 @@ enum WeekPreferences {
     static let pickerOrder = Array(1...7)
 
     /// Whether a date falls on the rest day.
-    static func isRestDay(_ date: Date, calendar: Calendar = WeekCalendar.calendar) -> Bool {
+    ///
+    /// **The rest day is the argument, not a lookup** (#181). This used to read
+    /// the stored value itself, which put a process-wide store inside every
+    /// grid, span and month that asked. It takes the answer now, so a caller
+    /// that has not decided cannot silently inherit one.
+    static func isRestDay(
+        _ date: Date, restDay: Int?, calendar: Calendar = WeekCalendar.calendar
+    ) -> Bool {
         guard let restDay else { return false }
-        return calendar.component(.weekday, from: date) == restDay
+        return calendar.component(.weekday, from: date) == clampWeekday(restDay)
     }
 }

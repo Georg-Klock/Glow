@@ -109,16 +109,20 @@ enum WeekSpans {
     /// week, and the week does not divide differently because the app can edit
     /// more of it. What the surface decides is only which spans carry an
     /// action, and that is a pass over the finished row.
+    /// `restDay` is the weekday nothing is expected on, or nil for none — a
+    /// parameter for the same reason the calendar is one (#181).
     static func spans(
         for habit: HabitSnapshot,
         in week: Week,
         today: Date,
         target: Int,
         editing: SlotEditing,
+        restDay: Int?,
         calendar: Calendar = WeekCalendar.calendar
     ) -> [SlotSpan] {
         let spans = divided(
-            for: habit, in: week, today: today, target: target, calendar: calendar
+            for: habit, in: week, today: today, target: target,
+            restDay: restDay, calendar: calendar
         )
         switch editing {
         case .todayOnly:
@@ -127,7 +131,8 @@ enum WeekSpans {
             return spans
         case .week:
             return withColumnActions(
-                spans, in: week, today: today, editing: editing, calendar: calendar
+                spans, in: week, today: today, editing: editing,
+                restDay: restDay, calendar: calendar
             )
         }
     }
@@ -145,11 +150,15 @@ enum WeekSpans {
         in week: Week,
         today: Date,
         editing: SlotEditing,
+        restDay: Int?,
         calendar: Calendar
     ) -> [SlotSpan] {
         spans.map { span in
             let day = (span.firstDay...span.lastDay).reversed().lazy.compactMap {
-                editing.day(atColumn: $0, in: week, today: today, calendar: calendar)
+                editing.day(
+                    atColumn: $0, in: week, today: today,
+                    restDay: restDay, calendar: calendar
+                )
             }.first
             return SlotSpan(
                 index: span.index,
@@ -166,6 +175,7 @@ enum WeekSpans {
         in week: Week,
         today: Date,
         target: Int,
+        restDay: Int?,
         calendar: Calendar
     ) -> [SlotSpan] {
         guard !habit.isSpacer else { return [] }
@@ -186,7 +196,9 @@ enum WeekSpans {
         // on it and nothing un-logged, so no span carries an action and the
         // span that would be open waits, unlit. Same rule as `WeekGrid`, and
         // the store refuses the write even if a stale surface offers one.
-        let todayRests = WeekPreferences.isRestDay(todayStart, calendar: calendar)
+        let todayRests = WeekPreferences.isRestDay(
+            todayStart, restDay: restDay, calendar: calendar
+        )
         let lastColumn = dayCount - 1
 
         // The goal is met: one span, the whole week, and the only thing left to
@@ -223,7 +235,7 @@ enum WeekSpans {
         // bring the squeeze forward by a day, which is a fact about the week
         // rather than about the drawing.
         let actionable = (0...lastColumn).filter {
-            !WeekPreferences.isRestDay(week.days[$0], calendar: calendar)
+            !WeekPreferences.isRestDay(week.days[$0], restDay: restDay, calendar: calendar)
         }
         let actionableLeft: Int
         if let todayIndex {
@@ -237,7 +249,7 @@ enum WeekSpans {
         let lost = max(0, repsLeft - actionableLeft)
         let live = repsLeft - lost
         let restIndex = week.days.firstIndex {
-            WeekPreferences.isRestDay($0, calendar: calendar)
+            WeekPreferences.isRestDay($0, restDay: restDay, calendar: calendar)
         }
 
         var spans: [SlotSpan] = []

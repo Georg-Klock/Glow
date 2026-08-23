@@ -39,15 +39,23 @@ struct DemoHistory {
     private let context: ModelContext
     private let calendar: Calendar
     private let defaults: UserDefaults
+    /// The weekday nothing is expected on, or nil for none.
+    ///
+    /// Read here, at the store boundary, exactly as the calendar is (#181):
+    /// `SeededHistory` invents no completion on a rest day, and it is handed
+    /// the answer rather than looking one up from inside the decision logic.
+    private let restDay: Int?
 
     init(
         context: ModelContext,
         defaults: UserDefaults = GlowSettings.store,
-        calendar: Calendar = WeekCalendar.calendar
+        calendar: Calendar = WeekCalendar.calendar,
+        restDay: Int? = WeekPreferences.restDay
     ) {
         self.context = context
         self.defaults = defaults
         self.calendar = calendar
+        self.restDay = restDay
     }
 
     /// Whether a demo is currently in, for the toggle to sit at.
@@ -98,6 +106,7 @@ struct DemoHistory {
                 form: SeededHistory.form(at: position),
                 seed: SeededHistory.seed(for: habit.id),
                 today: today,
+                restDay: restDay,
                 calendar: calendar
             )
             position += 1

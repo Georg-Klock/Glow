@@ -104,14 +104,21 @@ struct HabitRowView: View {
     let onToggle: (Date) -> Void
     let onEdit: () -> Void
 
-    /// The rest day, observed. The logic reads the same key through
-    /// `WeekPreferences`; the row reads it *here* so the dependency is one
-    /// SwiftUI can see. It is not enough for the property to exist — a row
-    /// whose slots did not change was measured keeping the cut line on the
-    /// old day until relaunch — the value has to be read in `body`, which
-    /// `restDayCut` does.
+    /// The rest day, observed — and since #181 this is the *only* read of it on
+    /// this screen. The logic no longer looks the value up; it takes it as a
+    /// parameter, and this is where the parameter comes from.
+    ///
+    /// `@AppStorage` rather than `WeekPreferences.restDay` because the row has
+    /// to redraw when Settings moves the day, and only a value SwiftUI can see
+    /// does that. It is not enough for the property to exist — a row whose slots
+    /// did not change was measured keeping the cut line on the old day until
+    /// relaunch — it has to be read in `body`, which every use below is.
     @AppStorage(WeekPreferences.restDayKey, store: GlowSettings.store)
     private var restDayStorage: Int = 0
+
+    /// The stored value as a rest day. `WeekPreferences` owns the conversion,
+    /// including the clamp; this view owns only the observation.
+    private var restDay: Int? { WeekPreferences.restDay(stored: restDayStorage) }
 
     /// The label dims on exactly the spring the mark closes on, so the row
     /// reads as one movement — which means it has to snap when the mark snaps.
@@ -147,7 +154,9 @@ struct HabitRowView: View {
     static let editFade = Animation.easeOut(duration: 0.15)
 
     private var slots: [Slot] {
-        WeekGrid.slots(for: snapshot, in: week, today: today, editing: editing)
+        WeekGrid.slots(
+            for: snapshot, in: week, today: today, editing: editing, restDay: restDay
+        )
     }
 
     /// A habit due a number of times a week is not day-pinned, so it is drawn as
@@ -155,7 +164,8 @@ struct HabitRowView: View {
     private var spans: [SlotSpan] {
         guard case .timesPerWeek(let target) = snapshot.frequency else { return [] }
         return WeekSpans.spans(
-            for: snapshot, in: week, today: today, target: target, editing: editing
+            for: snapshot, in: week, today: today, target: target,
+            editing: editing, restDay: restDay
         )
     }
 
@@ -165,13 +175,12 @@ struct HabitRowView: View {
 
     /// Which column the rest day falls in, or nil for none.
     ///
-    /// Reads `restDayStorage` rather than `WeekPreferences.restDay` for the
-    /// same reason `restDayCut` does: the raw value is what this view observes,
-    /// and a row whose slots did not change has to redraw when Settings moves
-    /// the day. Called from `body`, which is what registers the dependency.
+    /// Derived from the observed value, so a row whose slots did not change
+    /// still redraws when Settings moves the day. Called from `body`, which is
+    /// what registers the dependency.
     private var restIndex: Int? {
-        guard restDayStorage != 0 else { return nil }
-        return week.days.firstIndex { WeekPreferences.isRestDay($0) }
+        guard let restDay else { return nil }
+        return week.days.firstIndex { WeekPreferences.isRestDay($0, restDay: restDay) }
     }
 
     var body: some View {
@@ -231,14 +240,12 @@ struct HabitRowView: View {
         // same geometry as the track and marks a weekday exactly as the track
         // does, so drawn beside a week that has gone it would point at nothing.
         //
-        // `restDayStorage`, not `WeekPreferences.restDay`: the raw value is
-        // what this view observes, and reading it here is what makes every
-        // row — including one whose slots are unchanged — redraw the line on
-        // the new day the moment Settings moves it.
+        // `restIndex` reads the observed value, which is what makes every row —
+        // including one whose slots are unchanged — redraw the line on the new
+        // day the moment Settings moves it.
         if !isEditing,
-           restDayStorage != 0,
            let cut, cut.contains(index),
-           let restIndex = week.days.firstIndex(where: { WeekPreferences.isRestDay($0) }) {
+           let restIndex {
             let width = GlowShape.barThickness
             let x = RestCut.x(
                 restIndex: restIndex,
@@ -273,11 +280,11 @@ struct HabitRowView: View {
 
     /// Which weekdays this row was logged on, for the dots over the spans.
     private var dotColumns: [Int] {
-        // Read here rather than in `WeekDots` for the same reason `restIndex`
-        // is: moving the rest day has to redraw a row whose spans did not
-        // change, and only a value read in `body` does that.
-        _ = restDayStorage
-        return WeekDots.columns(for: snapshot, in: week)
+        // The rest day is passed in rather than looked up, which also settles
+        // what used to need a bare `_ = restDayStorage` here: the value is now
+        // read in `body` because it is an argument, so moving the rest day
+        // redraws a row whose spans did not change.
+        WeekDots.columns(for: snapshot, in: week, restDay: restDay)
     }
 
     @ViewBuilder
@@ -326,7 +333,9 @@ struct HabitRowView: View {
                         // `SlotEditing`'s; the view does neither.
                         trackWidth: geometry.trackWidth,
                         dayAtColumn: { column in
-                            editing.day(atColumn: column, in: week, today: today)
+                            editing.day(
+                                atColumn: column, in: week, today: today, restDay: restDay
+                            )
                         },
                         onToggle: onToggle
                     )
@@ -350,7 +359,7 @@ struct HabitRowView: View {
     /// with nothing lit adds no stop to a swipe-through, and a row with three
     /// lit adds one rather than three. See `WeekDots.spokenDays` and #104.
     private var dotVoice: String? {
-        WeekDots.spokenDays(for: snapshot, in: week)
+        WeekDots.spokenDays(for: snapshot, in: week, restDay: restDay)
     }
 
     @ViewBuilder

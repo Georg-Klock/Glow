@@ -16,6 +16,10 @@ struct WeekGridTests {
     /// rest day arriving from elsewhere would change slot states underneath it
     /// (#105).
     ///
+    /// Since #181 that is a property of the call rather than a hope about what
+    /// else is running: the rest day is an argument, so nothing outside this
+    /// file can set one for these assertions.
+    ///
     /// `.todayOnly` unless a test says otherwise, so every assertion written
     /// before #116 still asserts what it was written to assert: the widget's
     /// rule, which is also what the app's rule used to be.
@@ -24,11 +28,10 @@ struct WeekGridTests {
         editing: SlotEditing = .todayOnly,
         restDay: Int? = nil
     ) -> [Slot] {
-        TestPreferences.withWeek(restDay: restDay) {
-            WeekGrid.slots(
-                for: habit, in: week, today: today, editing: editing, calendar: calendar
-            )
-        }
+        WeekGrid.slots(
+            for: habit, in: week, today: today, editing: editing,
+            restDay: restDay, calendar: calendar
+        )
     }
 
     // MARK: - Daily
@@ -330,11 +333,10 @@ struct WeekGridTests {
     }
 
     private func pastSlots(_ habit: HabitSnapshot, editing: SlotEditing) -> [Slot] {
-        TestPreferences.withWeek(restDay: nil) {
-            WeekGrid.slots(
-                for: habit, in: pastWeek, today: today, editing: editing, calendar: calendar
-            )
-        }
+        WeekGrid.slots(
+            for: habit, in: pastWeek, today: today, editing: editing,
+            restDay: nil, calendar: calendar
+        )
     }
 
     @Test("Every history of an earlier week: the week view reaches all seven days")
@@ -392,9 +394,10 @@ struct WeekGridTests {
     func todayOutsideTheWeek() {
         let otherWeek = WeekCalendar.week(containing: TestCalendar.date(2026, 8, 10), calendar: calendar)
         let habit = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
-        let row = TestPreferences.withWeek(restDay: nil) {
-            WeekGrid.slots(for: habit, in: otherWeek, today: today, editing: .todayOnly, calendar: calendar)
-        }
+        let row = WeekGrid.slots(
+            for: habit, in: otherWeek, today: today, editing: .todayOnly,
+            restDay: nil, calendar: calendar
+        )
 
         #expect(row.allSatisfy { $0.state != .open })
         #expect(row.allSatisfy { !$0.isTappable })

@@ -133,7 +133,11 @@ struct HistoryProjectionTests {
 
     @Test("A week's worth draws the same week as the whole history")
     func boundedWeekDrawsTheSame() throws {
-        try TestPreferences.withWeek(firstWeekday: 2, restDay: 1) {
+        // Sunday rests, stated in each call below rather than pinned in the
+        // process (#181). The week start still is pinned: `WeekCalendar` reads
+        // that one, and that is not this change.
+        let restDay = WeekPreferences.sunday
+        try TestPreferences.withWeek(firstWeekday: 2) {
             let (_, habits) = try makeStore(habits: 3, days: 400)
             let shown = WeekCalendar.week(containing: today, calendar: calendar)
             let whole = habits.map { $0.snapshot(calendar: calendar) }
@@ -144,23 +148,28 @@ struct HistoryProjectionTests {
             for (full, part) in zip(whole, bounded) {
                 #expect(
                     WeekGrid.slots(
-                        for: part, in: shown, today: today, editing: .todayOnly, calendar: calendar
+                        for: part, in: shown, today: today, editing: .todayOnly,
+                        restDay: restDay, calendar: calendar
                     ) == WeekGrid.slots(
-                        for: full, in: shown, today: today, editing: .todayOnly, calendar: calendar
+                        for: full, in: shown, today: today, editing: .todayOnly,
+                        restDay: restDay, calendar: calendar
                     )
                 )
                 #expect(
                     WeekSpans.spans(
                         for: part, in: shown, today: today, target: 3,
-                        editing: .todayOnly, calendar: calendar
+                        editing: .todayOnly, restDay: restDay, calendar: calendar
                     ) == WeekSpans.spans(
                         for: full, in: shown, today: today, target: 3,
-                        editing: .todayOnly, calendar: calendar
+                        editing: .todayOnly, restDay: restDay, calendar: calendar
                     )
                 )
                 #expect(
-                    WeekDots.columns(for: part, in: shown, calendar: calendar)
-                        == WeekDots.columns(for: full, in: shown, calendar: calendar)
+                    WeekDots.columns(
+                        for: part, in: shown, restDay: restDay, calendar: calendar
+                    ) == WeekDots.columns(
+                        for: full, in: shown, restDay: restDay, calendar: calendar
+                    )
                 )
                 #expect(
                     GoalMet.justMet(habit: part, in: shown, today: today, calendar: calendar)
@@ -172,7 +181,8 @@ struct HistoryProjectionTests {
 
     @Test("A month's worth draws the same month as the whole history")
     func boundedMonthDrawsTheSame() throws {
-        try TestPreferences.withWeek(firstWeekday: 2, restDay: 1) {
+        let restDay = WeekPreferences.sunday
+        try TestPreferences.withWeek(firstWeekday: 2) {
             let (_, habits) = try makeStore(habits: 2, days: 400)
             let days = try #require(MonthGrid.dayRange(containing: today, calendar: calendar))
             let whole = habits.map { $0.snapshot(calendar: calendar) }
@@ -180,8 +190,11 @@ struct HistoryProjectionTests {
 
             for (full, part) in zip(whole, bounded) {
                 #expect(
-                    MonthGrid.cells(for: part, today: today, calendar: calendar)
-                        == MonthGrid.cells(for: full, today: today, calendar: calendar)
+                    MonthGrid.cells(
+                        for: part, today: today, restDay: restDay, calendar: calendar
+                    ) == MonthGrid.cells(
+                        for: full, today: today, restDay: restDay, calendar: calendar
+                    )
                 )
             }
         }
@@ -189,7 +202,8 @@ struct HistoryProjectionTests {
 
     @Test("A year's worth fills the same year as the whole history")
     func boundedYearFillsTheSame() throws {
-        try TestPreferences.withWeek(firstWeekday: 2, restDay: 1) {
+        let restDay = WeekPreferences.sunday
+        try TestPreferences.withWeek(firstWeekday: 2) {
             let (_, habits) = try makeStore(habits: 2, days: 500)
             let weeks = (0..<52).map { index -> Week in
                 let start = calendar.date(
@@ -209,9 +223,11 @@ struct HistoryProjectionTests {
             for week in weeks {
                 #expect(
                     YearHistory.fills(
-                        in: week, habits: bounded, today: today, calendar: calendar
+                        in: week, habits: bounded, today: today,
+                        restDay: restDay, calendar: calendar
                     ) == YearHistory.fills(
-                        in: week, habits: whole, today: today, calendar: calendar
+                        in: week, habits: whole, today: today,
+                        restDay: restDay, calendar: calendar
                     )
                 )
             }
@@ -223,7 +239,7 @@ struct HistoryProjectionTests {
     /// short by up to twelve days and the marks in them would go missing.
     @Test("A month's range covers the weeks the month grid draws")
     func monthRangeCoversWholeWeeks() throws {
-        try TestPreferences.withWeek(firstWeekday: 2, restDay: nil) {
+        try TestPreferences.withWeek(firstWeekday: 2) {
             // 1 September 2026 is a Tuesday and 30 September a Wednesday, so
             // both ends of this month spill into a neighbouring one.
             let september = TestCalendar.date(2026, 9, 15)

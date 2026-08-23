@@ -60,7 +60,7 @@ struct SeedingTests {
         for habit in rows where !habit.isSpacer {
             let slots = WeekGrid.slots(
                 for: habit.snapshot(calendar: calendar), in: week, today: today,
-                editing: .todayOnly, calendar: calendar
+                editing: .todayOnly, restDay: nil, calendar: calendar
             )
             #expect(slots.filter { $0.state == .open }.count == 1, "\(habit.name)")
         }
@@ -91,10 +91,12 @@ struct SeedingTests {
         // day is visible. If every habit came out the same these would be eight
         // rows of identical noise.
         let perfect = SeededHistory.completions(
-            for: .daily, form: .perfect, seed: 1, today: today, calendar: calendar
+            for: .daily, form: .perfect, seed: 1, today: today,
+            restDay: nil, calendar: calendar
         )
         let uneven = SeededHistory.completions(
-            for: .daily, form: .uneven, seed: 1, today: today, calendar: calendar
+            for: .daily, form: .uneven, seed: 1, today: today,
+            restDay: nil, calendar: calendar
         )
         #expect(perfect.count > uneven.count)
 
@@ -112,7 +114,8 @@ struct SeedingTests {
         // Seeded per day, a 2x-a-week habit lands six completions in one week
         // and none in the next, and every row reads as broken.
         let days = SeededHistory.completions(
-            for: .timesPerWeek(2), form: .perfect, seed: 5, today: today, calendar: calendar
+            for: .timesPerWeek(2), form: .perfect, seed: 5, today: today,
+            restDay: nil, calendar: calendar
         )
         let byWeek = Dictionary(grouping: days) {
             WeekCalendar.startOfWeek(containing: $0, calendar: calendar)
@@ -287,14 +290,18 @@ struct SpacerTests {
         // order, and anything rendered in it would be a mark for a habit that
         // does not exist.
         let spacer = HabitSnapshot.fixture(isSpacer: true)
-        #expect(WeekGrid.slots(for: spacer, in: week, today: today, editing: .todayOnly, calendar: calendar).isEmpty)
+        #expect(WeekGrid.slots(
+            for: spacer, in: week, today: today, editing: .todayOnly,
+            restDay: nil, calendar: calendar
+        ).isEmpty)
     }
 
     @Test("A blank row draws nothing on a spanning cadence either")
     func spacerHasNoSpans() {
         let spacer = HabitSnapshot.fixture(frequency: .timesPerWeek(3), isSpacer: true)
         let spans = WeekSpans.spans(
-            for: spacer, in: week, today: today, target: 3, editing: .todayOnly, calendar: calendar
+            for: spacer, in: week, today: today, target: 3,
+            editing: .todayOnly, restDay: nil, calendar: calendar
         )
         #expect(spans.isEmpty)
     }

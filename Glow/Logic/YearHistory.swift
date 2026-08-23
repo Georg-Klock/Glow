@@ -36,6 +36,7 @@ enum YearHistory {
         for day: Date,
         habits: [HabitSnapshot],
         today: Date,
+        restDay: Int?,
         calendar: Calendar = WeekCalendar.calendar
     ) -> DayFill {
         guard day <= today else { return .future }
@@ -51,7 +52,7 @@ enum YearHistory {
                 if done { met += 1; expected += 1 }
                 continue
             }
-            if WeekPreferences.isRestDay(day, calendar: calendar) {
+            if WeekPreferences.isRestDay(day, restDay: restDay, calendar: calendar) {
                 if done { met += 1; expected += 1 }
                 continue
             }
@@ -69,8 +70,11 @@ enum YearHistory {
         in week: Week,
         habits: [HabitSnapshot],
         today: Date,
+        restDay: Int?,
         calendar: Calendar = WeekCalendar.calendar
     ) -> [DayFill] {
-        week.days.map { fill(for: $0, habits: habits, today: today, calendar: calendar) }
+        week.days.map {
+            fill(for: $0, habits: habits, today: today, restDay: restDay, calendar: calendar)
+        }
     }
 }

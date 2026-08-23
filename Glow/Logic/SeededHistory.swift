@@ -86,6 +86,7 @@ enum SeededHistory {
         form: Form,
         seed: UInt64,
         today: Date,
+        restDay: Int?,
         calendar: Calendar = WeekCalendar.calendar
     ) -> [Date] {
         var generator = Generator(seed: seed)
@@ -104,7 +105,9 @@ enum SeededHistory {
         case .daily:
             var day = firstDay
             while day < today {
-                let isRest = WeekPreferences.isRestDay(day, calendar: calendar)
+                let isRest = WeekPreferences.isRestDay(
+                    day, restDay: restDay, calendar: calendar
+                )
                 if !isRest, Double.random(in: 0..<1, using: &generator) < form.rate {
                     days.append(day)
                 }

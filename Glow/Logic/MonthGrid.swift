@@ -79,9 +79,13 @@ enum MonthGrid {
         return DayID.range(from: first, through: last, calendar: calendar)
     }
 
+    /// `restDay` is the weekday nothing is expected on, or nil for none — the
+    /// widget reads it once and hands it down, rather than this grid reaching
+    /// into a store (#181).
     static func cells(
         for habit: HabitSnapshot,
         today: Date,
+        restDay: Int?,
         calendar: Calendar = WeekCalendar.calendar
     ) -> [MonthCell] {
         guard !habit.isSpacer, !habit.frequency.isCountedPerDay else { return [] }
@@ -96,7 +100,7 @@ enum MonthGrid {
         let thisWeek = WeekCalendar.week(containing: todayStart, calendar: calendar)
         let weekVerdict = WeekGrid.slots(
             for: habit, in: thisWeek, today: todayStart,
-            editing: .todayOnly, calendar: calendar
+            editing: .todayOnly, restDay: restDay, calendar: calendar
         )
         let todayIsOpen = weekVerdict.contains { $0.state == .open }
         let todayHasUndo = weekVerdict.contains { $0.isTappable && $0.state == .filled }
@@ -113,7 +117,7 @@ enum MonthGrid {
             let slots: [Slot]? = habit.frequency == .daily
                 ? WeekGrid.slots(
                     for: habit, in: week, today: todayStart,
-                    editing: .todayOnly, calendar: calendar
+                    editing: .todayOnly, restDay: restDay, calendar: calendar
                 )
                 : nil
 
@@ -122,8 +126,8 @@ enum MonthGrid {
             // cannot disagree about whether a week is lost.
             let lostThisWeek = weeklyTarget.map { target in
                 WeekSpans.spans(
-                    for: habit, in: week, today: todayStart,
-                    target: target, editing: .todayOnly, calendar: calendar
+                    for: habit, in: week, today: todayStart, target: target,
+                    editing: .todayOnly, restDay: restDay, calendar: calendar
                 ).count { $0.state == .missed }
             } ?? 0
 
@@ -142,7 +146,9 @@ enum MonthGrid {
                     mark = .openToday
                     actionDay = todayStart
                 } else if lostThisWeek > 0, day < todayStart,
-                          !WeekPreferences.isRestDay(day, calendar: calendar) {
+                          !WeekPreferences.isRestDay(
+                              day, restDay: restDay, calendar: calendar
+                          ) {
                     // A day of a lost week that went unlogged. Strictly past:
                     // today and the days after it can still be acted on, and an
                     // X there would be a prediction.

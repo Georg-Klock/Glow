@@ -26,18 +26,24 @@ enum TestCalendar {
 /// The App Group's week preferences, set for the length of one test and put
 /// back afterwards.
 ///
-/// `WeekPreferences.firstWeekday` and `restDay` live in `UserDefaults` — one
-/// value for the whole process, shared by every suite. Five suites write them
-/// and several more read them through `WeekGrid`, `WeekSpans`, `WeekDots`,
-/// `MonthGrid` and `HabitStore.toggleCompletion`, which is a hazard if any two
-/// of those ever run at once.
+/// **The readers are gone** (#181). `WeekPreferences.restDay` used to be read
+/// inside `WeekGrid`, `WeekSpans`, `WeekDots`, `MonthGrid`, `SeededHistory` and
+/// `HabitStore` — decision logic taking a process-wide store — so a rest day
+/// pinned here changed what every one of those computed, for every suite
+/// running at the time. #105 named that as the real fix and took an interim;
+/// three more issues took three more interims. The rest day is a parameter now,
+/// so a test states the one it means in the call and cannot leak it.
 ///
-/// **Two things stop that, and the first one is the real one.** The scheme runs
-/// tests sequentially (`parallelizable: false`, stated in project.yml with the
-/// measurement that established it), so no two tests overlap at all. The lock
-/// below is the belt to that brace: it serialises the *writers* against each
-/// other, so turning parallel testing on would leave only the readers to fix
-/// rather than everything. See #105.
+/// What is left is `firstWeekday`, which `WeekCalendar.calendar` reads and which
+/// is not this issue's to move, and the store boundary — `HabitStore` and
+/// `DemoHistory` read the rest day when they are not told one, and one test
+/// asserts exactly that.
+///
+/// **Two things still stop an overlap, and the first one is the real one.** The
+/// scheme runs tests sequentially (`parallelizable: false`, stated in
+/// project.yml with the measurement that established it), so no two tests
+/// overlap at all. The lock below is the belt to that brace: it serialises the
+/// writers against each other.
 ///
 /// Recursive, because a suite that nests one of these inside another is
 /// reasonable and should not deadlock.

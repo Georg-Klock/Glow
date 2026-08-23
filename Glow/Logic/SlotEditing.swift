@@ -16,6 +16,10 @@ import Foundation
 /// is refused by `HabitStore` as well as here — a widget renders in a second
 /// process and can hold a surface built before the setting changed, so the rule
 /// cannot live in "no button was offered".
+///
+/// It arrives beside this, as a parameter, for the same reason this one does
+/// (#181): a surface says which days it edits *and* which day it rests, and
+/// neither is read out of a store from in here.
 enum SlotEditing: Equatable, Sendable {
     /// The widget, its intents, and the month grid: today and nothing else.
     case todayOnly
@@ -61,11 +65,14 @@ enum SlotEditing: Equatable, Sendable {
         atColumn column: Int,
         in week: Week,
         today: Date,
+        restDay: Int?,
         calendar: Calendar = WeekCalendar.calendar
     ) -> Date? {
         guard week.days.indices.contains(column) else { return nil }
         let day = week.days[column]
-        guard !WeekPreferences.isRestDay(day, calendar: calendar) else { return nil }
+        guard !WeekPreferences.isRestDay(day, restDay: restDay, calendar: calendar) else {
+            return nil
+        }
         guard allows(day, today: WeekCalendar.day(today, calendar: calendar)) else { return nil }
         return day
     }

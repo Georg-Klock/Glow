@@ -233,19 +233,24 @@ schemes:
       # `parallelizable: false` is load-bearing, and it is stated here rather
       # than left to xcodegen's default because something depends on it.
       #
-      # Both suites and tests run sequentially, so a test that writes
-      # `WeekPreferences.restDay` — which lives in the App Group's shared
-      # defaults, one value for the whole process — cannot overlap a test that
-      # reads it. `WeekGridTests` asserts R1, R2, R5 and R7 over all 128
-      # completion histories of a week and never sets a rest day; it is correct
-      # only because nothing else is setting one at the same time.
+      # Both suites and tests run sequentially, so a test that writes a
+      # preference living in the App Group's shared defaults — one value for
+      # the whole process — cannot overlap a test that reads it.
       #
       # Measured rather than assumed: two suites, one holding a rest day for
       # 1.5s and one reading 0.4s in, ran strictly one after the other.
       #
-      # Turning this on is a real change, not a speed-up. `TestPreferences`
-      # serialises the *writers* against each other, but the readers above
-      # would need the same treatment first. See #105.
+      # **The rest day is no longer one of those readers** (#181). It arrives
+      # as a parameter, so `WeekGridTests` asserting R1, R2, R5 and R7 over all
+      # 128 completion histories of a week is now correct by construction
+      # rather than because nothing else happens to be setting one. What is
+      # still shared is `WeekPreferences.firstWeekday`, which
+      # `WeekCalendar.calendar` reads.
+      #
+      # Turning this on is still a real change, not a speed-up:
+      # `TestPreferences` serialises the writers against each other, and the
+      # week start would need the same treatment the rest day has had. See
+      # #105 and #181.
       targets:
         - name: GlowTests
           parallelizable: false

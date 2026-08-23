@@ -11,11 +11,29 @@ import SwiftData
 struct HabitStore {
     private let context: ModelContext
     private let calendar: Calendar
+    /// The weekday nothing may be logged on, or nil for none.
+    ///
+    /// **Read here, once per instance, exactly as the calendar is** (#181). The
+    /// store is a boundary — the last one a write crosses — so this is one of
+    /// the few places the stored preference is legitimately looked up. It is
+    /// deliberately *not* asked of the caller: the refusal below exists because
+    /// a surface can outlive the setting it was rendered under, and a rest day
+    /// supplied by that stale surface would make the guard agree with it.
+    ///
+    /// Every real caller builds a store per operation — `WeeklyGridView.store`
+    /// is a computed property, and both intents construct one — so "once per
+    /// instance" is once per write.
+    private let restDay: Int?
     private static let log = Logger(subsystem: "com.georgklock.glow", category: "store")
 
-    init(context: ModelContext, calendar: Calendar = WeekCalendar.calendar) {
+    init(
+        context: ModelContext,
+        calendar: Calendar = WeekCalendar.calendar,
+        restDay: Int? = WeekPreferences.restDay
+    ) {
         self.context = context
         self.calendar = calendar
+        self.restDay = restDay
     }
 
     // MARK: - Habits
@@ -349,7 +367,9 @@ struct HabitStore {
         // processes share, rather than in trust that no button was offered.
         // A completion already stored on a rest day stays: records of what
         // happened remain records of what happened.
-        guard !WeekPreferences.isRestDay(day, calendar: calendar) else { return .refused }
+        guard !WeekPreferences.isRestDay(day, restDay: restDay, calendar: calendar) else {
+            return .refused
+        }
 
         // A blank row has no habit to log, and a per-day habit is not
         // day-toggled — its surface is a ring, and one tap there means "one

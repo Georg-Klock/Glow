@@ -34,8 +34,13 @@ struct DemoHistoryTests {
         return context
     }
 
+    /// No rest day, stated in the call rather than inherited from whatever the
+    /// process happens to hold (#181) — the invented past is asserted day by
+    /// day below, and a rest day would put holes in it.
     private func demo(_ context: ModelContext, _ defaults: UserDefaults) -> DemoHistory {
-        DemoHistory(context: context, defaults: defaults, calendar: calendar)
+        DemoHistory(
+            context: context, defaults: defaults, calendar: calendar, restDay: nil
+        )
     }
 
     @Test("Seeding fills a past for every real habit, and today is never part of it")
@@ -271,7 +276,7 @@ struct DemoHistoryTests {
         )
         var day = try #require(first.completedDays.min())
         while day < today {
-            let isRest = WeekPreferences.isRestDay(day, calendar: calendar)
+            let isRest = WeekPreferences.isRestDay(day, restDay: nil, calendar: calendar)
             #expect(isRest || first.completedDays.contains(day), "hole at \(day)")
             day = calendar.date(byAdding: .day, value: 1, to: day) ?? today
         }

@@ -69,6 +69,16 @@ Every function takes its `Calendar` and its `today` as parameters. Nothing here
 reads the clock, which is what lets the tests assert against a fixed Tuesday in
 August rather than against whenever they happen to run.
 
+**The rest day arrives the same way** (#181). `WeekPreferences` is where the
+stored value lives; nothing else in here reads it. `WeekGrid`, `WeekSpans`,
+`WeekDots`, `MonthGrid`, `SeededHistory`, `YearHistory` and `SlotEditing` all
+take `restDay: Int?` — the weekday nothing is expected on, or nil for none — and
+the boundaries read it once: a view through `@AppStorage`, so SwiftUI can see
+the dependency; a widget once per render, because it has no live hierarchy to
+observe with; `HabitStore` and `DemoHistory` at construction, beside their
+calendar. `TestIsolationTests` scans this directory for the read, because the
+property is the absence of a call and no runtime assertion can watch an absence.
+
 ### The snapshot boundary
 
 `WeekGrid` operates on `HabitSnapshot`, a plain struct, not on the SwiftData
@@ -156,6 +166,14 @@ happen: a write landing on the rest day is `.refused` — nothing logged, nothin
 removed. The refusal lives here, on the one write path the app and the widget's
 intent share, rather than in trust that no surface offered a button; the grid
 withholding the rest-day tap is the same rule at the surface.
+
+Which day that is arrives at `init`, beside the calendar, and defaults to
+`WeekPreferences.restDay` (#181). The default is the point rather than a
+convenience: the refusal exists because a surface can outlive the setting it was
+rendered under, so a rest day supplied by that stale surface would make the
+guard agree with it. Every caller builds a store per operation — the week view's
+`store` is a computed property, and both intents construct one — so this is one
+read per write.
 
 `recordTap(for:on:)` is the per-day counterpart: it asks `DayRing.countAfterTap`
 what the tap means and translates the answer into rows — one more `Completion`,
@@ -299,6 +317,11 @@ than one answer, and the same sweep again over a week already over, which is the
 branch with no today in it. That is
 cheap here because the logic is pure, and it is the reason those invariants can
 be stated as facts rather than as intentions.
+
+Those sweeps name the rest day they mean, in the call (#181). They used to be
+correct only because nothing else was setting one at the same time — a claim
+about the scheme's ordering, restated in `project.yml` — and they are now
+correct by construction.
 
 `GlowRenderTests` is a second test target: it renders the real `WeekWidgetView`
 at the design frame's own 338 × 354 and, once a design export is committed

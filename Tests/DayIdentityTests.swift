@@ -137,6 +137,7 @@ struct DayIdentityTests {
                 in: week,
                 today: midday(2026, 8, 20, in: berlin),
                 editing: .week(allowingFuture: false),
+                restDay: nil,
                 calendar: berlin
             )
             // Monday-first, so Wednesday is column two, and it is spent.
@@ -166,6 +167,7 @@ struct DayIdentityTests {
                 in: week,
                 today: midday(2026, 8, 20, in: losAngeles),
                 editing: .week(allowingFuture: false),
+                restDay: nil,
                 calendar: losAngeles
             )
             #expect(slots[2].state == .filled)

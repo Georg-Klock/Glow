@@ -144,6 +144,11 @@ lives has already been seen to differ between platform versions.
 - **Decision logic lives in `Glow/Logic/`, pure and testable** — no views, no
   store, no `Date()`. `WeekGrid`, `WeekSpans` and `Frequency` are the pattern.
   Do not grow decision logic inline in a view.
+
+  A preference a rule depends on **arrives as a parameter**, the way `calendar:`
+  and `restDay:` do, read once at the view, widget or store boundary. The rest
+  day was the exception and cost four issues in one night (#105, #168, #175,
+  #179) before #181 removed it; `TestIsolationTests` now scans for the read.
 - **When behaviour changes, update the docs in the same session.** Drifted docs
   are worse than none.
 - **Machine-local values are never committed.** `Tools/local.env`,

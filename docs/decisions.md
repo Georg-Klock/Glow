@@ -2380,3 +2380,70 @@ removed.
 The two layers are complementary, which is worth noting because they were
 built hours apart: the script says the host died, and #138's validator
 independently names the test the result bundle recorded as failed.
+
+## The rest day is a parameter (#181)
+
+**2026-08-22.** The entry above ends "the count of interims is now four, and
+that is the argument for doing it." This is it. `WeekPreferences.restDay` is no
+longer read by anything that decides what a week looks like.
+
+It arrives the way `calendar:` has always arrived: `WeekGrid.slots`,
+`WeekSpans.spans`, `WeekDots.columns`, `MonthGrid.cells`,
+`SeededHistory.completions`, `YearHistory.fill` and `SlotEditing.day` all take
+`restDay: Int?`, with **no default anywhere**, so a new call site has to say
+which day it rests on rather than inheriting an answer by forgetting to think
+about it. That is `SlotEditing`'s own rule (#116), and #116 is also the shape
+this copied: a decision threaded through the same two functions without changing
+what either computes.
+
+**Read once, at four boundaries.** A view reads it through `@AppStorage` —
+`HabitRowView` and now `YearView` — because a value SwiftUI cannot see is a row
+that keeps the cut line on the old day until relaunch (#134's lesson, applied
+again). A widget reads it once per render, because it renders out of process
+from an archived surface and has no live hierarchy to observe with.
+`HabitStore` and `DemoHistory` read it at `init`, beside their calendar.
+
+**The store's default is deliberate, and it is not an exemption.** `HabitStore`
+could have been made to take the rest day from its caller like everything else.
+It must not: the refusal exists precisely because a surface can outlive the
+setting it was rendered under — a widget holds a rendered button in a second
+process — so a rest day supplied by that stale surface would make the guard
+agree with it and refuse nothing. The store is a boundary; boundaries read.
+There is a test for each half: one builds a store with an explicit rest day and
+asserts the refusal, one pins the preference and asserts the store finds it
+unaided.
+
+**No assertion changed.** 476 tests before, 478 after — the two new ones are the
+source scan and the store's default. Every existing test kept its content and
+gained an argument, which was the acceptance criterion: a behaviour change here
+would have been a bug in the refactor rather than a finding. One test's
+*scaffolding* had to move rather than its claim: `WidgetRefreshTests` built its
+store outside the block that pinned the rest day and relied on the read
+happening at toggle time. It now builds a store that rests on that day, which is
+what the app does.
+
+**What is asserted is the absence of a call**, and no runtime assertion can
+watch an absence — a test that sets no rest day and finds nothing resting passes
+whether or not the read exists. So `TestIsolationTests` scans `Glow/Logic/` for
+`WeekPreferences.restDay`, exempting the file the stored value lives in. The
+technique is #141's, #168's and #179's. It was checked by putting the read back
+into `WeekDots`: the scan failed, and named the file.
+
+**What this ends, and what it does not.**
+
+- `TestPreferences.withWeek` stops being load-bearing for the rest day. It still
+  pins `WeekPreferences.firstWeekday`, which `WeekCalendar.calendar` reads, and
+  which is the same shape of problem one type away.
+- #168's private defaults suite and #179's inert test host stay. They are
+  belt-and-braces now rather than the only thing holding, which is the point of
+  doing this after them rather than instead of them.
+- `project.yml`'s note on `parallelizable: false` no longer rests part of its
+  case on `WeekGridTests` being lucky. That suite's sweep over all 128
+  completion histories names the rest day it means.
+- **#175 is not closed by this, and was not expected to be.** It is the test
+  host being killed, not a value being read. Checked rather than assumed: the
+  full suite was run with the machine deliberately loaded to a 1-minute load
+  average of 285 — four times the ~70 the issue names as its threshold — and
+  passed 478/478. That is one data point against a correlation, and the load was
+  CPU-only where the original was concurrent *builds*, which also bring memory
+  and I/O pressure this probe did not. #175 stays open.

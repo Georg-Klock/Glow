@@ -12,19 +12,17 @@ struct WeekSpansTests {
     private let friday = TestCalendar.date(2026, 8, 21)
     private var week: Week { WeekCalendar.week(containing: friday, calendar: calendar) }
 
-    /// No rest day, said out loud. These are the design file's own examples and
-    /// they are read against a plain week; a rest day arriving from elsewhere
-    /// would move the boundaries they exist to pin (#105).
+    /// No rest day, said out loud — and since #181 said *in the call*, so no
+    /// rest day can arrive from elsewhere and move the boundaries these exist
+    /// to pin (#105). These are the design file's own examples.
     private func spans(_ habit: HabitSnapshot, target: Int, today: Date? = nil) -> [SlotSpan] {
-        TestPreferences.withWeek(restDay: nil) {
-            WeekSpans.spans(
-                for: habit,
-                in: week,
-                today: today ?? friday,
-                target: target,
-                editing: .todayOnly, calendar: calendar
-            )
-        }
+        WeekSpans.spans(
+            for: habit,
+            in: week,
+            today: today ?? friday,
+            target: target,
+            editing: .todayOnly, restDay: nil, calendar: calendar
+        )
     }
 
     @Test("Two a week, nothing done: the open span runs to today and the rest waits")
@@ -149,19 +147,22 @@ struct LateWeekSpansTests {
     }
     private func day(_ column: Int) -> Date { week.days[column] }
 
-    /// One implementation, in `TestSupport`. See `TestPreferences`.
-    private func withRest(_ column: Int?, _ body: () throws -> Void) rethrows {
-        try TestPreferences.withWeek(
-            restDay: column.map { TestPreferences.weekday(ofColumn: $0, in: week) },
-            body
-        )
+    /// One column of this week as a rest day, handed to the body to pass on.
+    ///
+    /// It used to pin `WeekPreferences.restDay` around the body and let the
+    /// rows pick it up out of the store. Since #181 the rest day is an argument
+    /// to `WeekSpans`, so this only converts a column to a weekday — nothing is
+    /// set, and nothing can leak into another suite (#105, #168).
+    private func withRest(_ column: Int?, _ body: (Int?) throws -> Void) rethrows {
+        try body(column.map { TestPreferences.weekday(ofColumn: $0, in: week) })
     }
 
     /// `.todayOnly` unless a test says otherwise: the design file's examples and
     /// the arithmetic tables are read against the widget's rule, which is what
-    /// every surface's rule used to be (#116).
+    /// every surface's rule used to be (#116). No rest day unless one is named.
     private func row(
-        target: Int, done: [Int] = [], todayColumn: Int, editing: SlotEditing = .todayOnly
+        target: Int, done: [Int] = [], todayColumn: Int,
+        editing: SlotEditing = .todayOnly, restDay: Int? = nil
     ) -> [SlotSpan] {
         WeekSpans.spans(
             for: .fixture(
@@ -171,7 +172,7 @@ struct LateWeekSpansTests {
             in: week,
             today: day(todayColumn),
             target: target,
-            editing: editing, calendar: calendar
+            editing: editing, restDay: restDay, calendar: calendar
         )
     }
 
@@ -201,9 +202,9 @@ struct LateWeekSpansTests {
 
     @Test("A rest day brings the squeeze forward a day")
     func restDayTable() {
-        withRest(6) {
-            #expect(shape(row(target: 2, todayColumn: 4)) == "open:0-4 inactive:5-6")
-            #expect(shape(row(target: 2, todayColumn: 5)) == "missed:0-0 open:1-6")
+        withRest(6) { rest in
+            #expect(shape(row(target: 2, todayColumn: 4, restDay: rest)) == "open:0-4 inactive:5-6")
+            #expect(shape(row(target: 2, todayColumn: 5, restDay: rest)) == "missed:0-0 open:1-6")
         }
     }
 
@@ -215,7 +216,8 @@ struct LateWeekSpansTests {
         let later = TestCalendar.date(2026, 8, 26)
         let spans = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2), completedDays: [day(0)]),
-            in: week, today: later, target: 2, editing: .todayOnly, calendar: calendar
+            in: week, today: later, target: 2,
+            editing: .todayOnly, restDay: nil, calendar: calendar
         )
         #expect(shape(spans) == "filled:0-5 missed:6-6")
     }
@@ -225,7 +227,8 @@ struct LateWeekSpansTests {
         let earlier = TestCalendar.date(2026, 8, 10)
         let spans = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2)),
-            in: week, today: earlier, target: 2, editing: .todayOnly, calendar: calendar
+            in: week, today: earlier, target: 2,
+            editing: .todayOnly, restDay: nil, calendar: calendar
         )
         #expect(shape(spans) == "inactive:0-3 inactive:4-6")
     }
@@ -235,7 +238,7 @@ struct LateWeekSpansTests {
     @Test("Every row draws exactly its target, contiguous, covering all seven")
     func invariantsHold() {
         for rest in [nil, 0, 2, 5, 6] as [Int?] {
-            withRest(rest) {
+            withRest(rest) { restDay in
                 for target in 1...6 {
                     for todayColumn in 0...6 {
                         for doneCount in 0..<target {
@@ -244,7 +247,8 @@ struct LateWeekSpansTests {
                             let done = Array(0..<doneCount).filter { $0 <= todayColumn }
                             guard done.count == doneCount else { continue }
                             let spans = row(
-                                target: target, done: done, todayColumn: todayColumn
+                                target: target, done: done,
+                                todayColumn: todayColumn, restDay: restDay
                             )
                             let what = "target \(target), today \(todayColumn), done \(doneCount), rest \(String(describing: rest)): \(shape(spans))"
 
@@ -289,12 +293,17 @@ struct LateWeekSpansTests {
 
     @Test("A rest day brings the cross forward a day too")
     func theCrossFollowsTheRestDay() {
-        withRest(6) {
+        withRest(6) { rest in
             for todayColumn in 0...4 {
-                #expect(!row(target: 2, todayColumn: todayColumn).contains { $0.state == .missed },
-                        "crossed on column \(todayColumn)")
+                #expect(
+                    !row(target: 2, todayColumn: todayColumn, restDay: rest)
+                        .contains { $0.state == .missed },
+                    "crossed on column \(todayColumn)"
+                )
             }
-            #expect(row(target: 2, todayColumn: 5).count { $0.state == .missed } == 1)
+            #expect(
+                row(target: 2, todayColumn: 5, restDay: rest).count { $0.state == .missed } == 1
+            )
         }
     }
 
@@ -323,7 +332,8 @@ struct LateWeekSpansTests {
                     frequency: .timesPerWeek(target),
                     completedDays: Set((0..<done).map { day($0) })
                 ),
-                in: week, today: later, target: target, editing: .todayOnly, calendar: calendar
+                in: week, today: later, target: target,
+                editing: .todayOnly, restDay: nil, calendar: calendar
             )
             #expect(spans.count { $0.state == .missed } == target - done,
                     "target \(target), done \(done): \(shape(spans))")
@@ -365,13 +375,14 @@ struct LateWeekSpansTests {
     /// Every row this suite can build, as `(rest, target, today, done)`.
     private func everyRow(_ check: (Int, [SlotSpan], String) -> Void) {
         for restColumn in 0...6 {
-            withRest(restColumn) {
+            withRest(restColumn) { restDay in
                 for target in 1...6 {
                     for todayColumn in 0...6 {
                         for doneCount in 0..<target where doneCount <= todayColumn {
                             let done = Array(0..<doneCount)
                             let spans = row(
-                                target: target, done: done, todayColumn: todayColumn
+                                target: target, done: done,
+                                todayColumn: todayColumn, restDay: restDay
                             )
                             let what = "rest \(restColumn), target \(target), today \(todayColumn), done \(doneCount): \(shape(spans))"
                             check(restColumn, spans, what)
@@ -418,7 +429,7 @@ struct LateWeekSpansTests {
     @Test("The row that reported it draws five crosses, not four")
     func theReportedRow() {
         var spans: [SlotSpan] = []
-        withRest(2) { spans = row(target: 6, todayColumn: 6) }
+        withRest(2) { rest in spans = row(target: 6, todayColumn: 6, restDay: rest) }
         let drawn = shape(spans)
         let crosses = spans.filter { $0.state == .missed }.count
         #expect(crosses == 5, "\(drawn)")
@@ -430,16 +441,16 @@ struct LateWeekSpansTests {
 
     @Test("Nothing is tappable on the rest day, and the open span is otherwise")
     func tappability() {
-        withRest(3) {
+        withRest(3) { rest in
             // Today is the rest day: the middle span keeps its geometry and
             // asks for nothing.
-            let resting = row(target: 3, todayColumn: 3)
+            let resting = row(target: 3, todayColumn: 3, restDay: rest)
             #expect(!resting.contains { $0.state == .open })
             #expect(resting.allSatisfy { !$0.isTappable })
             #expect(resting.count == 3)
 
             // The day after, it asks again.
-            let live = row(target: 3, todayColumn: 4)
+            let live = row(target: 3, todayColumn: 4, restDay: rest)
             #expect(live.count(where: { $0.isTappable }) == 1)
             #expect(live.first { $0.isTappable }?.state == .open)
         }
@@ -496,25 +507,27 @@ struct LateWeekSpansTests {
     private var later: Date { TestCalendar.date(2026, 8, 31) }
 
     private func pastRow(
-        target: Int, done: [Int] = [], editing: SlotEditing = .week(allowingFuture: false)
+        target: Int, done: [Int] = [], editing: SlotEditing = .week(allowingFuture: false),
+        restDay: Int? = nil
     ) -> [SlotSpan] {
         WeekSpans.spans(
             for: .fixture(
                 frequency: .timesPerWeek(target),
                 completedDays: Set(done.map { day($0) })
             ),
-            in: week, today: later, target: target, editing: editing, calendar: calendar
+            in: week, today: later, target: target,
+            editing: editing, restDay: restDay, calendar: calendar
         )
     }
 
     @Test("A finished week still draws exactly its target, and every span acts")
     func pastWeekInvariantsHold() {
         for rest in [nil, 0, 3, 6] as [Int?] {
-            withRest(rest) {
+            withRest(rest) { restDay in
                 for target in 1...6 {
                     for doneCount in 0...target {
                         let done = Array(0..<doneCount)
-                        let spans = pastRow(target: target, done: done)
+                        let spans = pastRow(target: target, done: done, restDay: restDay)
                         let what = "target \(target), done \(doneCount), rest \(String(describing: rest)): \(shape(spans))"
 
                         // A met goal is one span across the whole week; short of
@@ -534,7 +547,9 @@ struct LateWeekSpansTests {
 
                         for span in spans {
                             let writable = (span.firstDay...span.lastDay).filter {
-                                !WeekPreferences.isRestDay(week.days[$0], calendar: calendar)
+                                !WeekPreferences.isRestDay(
+                                    week.days[$0], restDay: restDay, calendar: calendar
+                                )
                             }
                             guard let action = span.actionDay else {
                                 // The only span with nothing to write is one
@@ -555,9 +570,12 @@ struct LateWeekSpansTests {
 
     @Test("The rest day is refused in an earlier week too")
     func theRestDayHoldsInThePast() {
-        withRest(3) {
-            #expect(pastRow(target: 2).allSatisfy { $0.actionDay != day(3) })
-            #expect(pastRow(target: 4, done: [0, 1]).allSatisfy { $0.actionDay != day(3) })
+        withRest(3) { rest in
+            #expect(pastRow(target: 2, restDay: rest).allSatisfy { $0.actionDay != day(3) })
+            #expect(
+                pastRow(target: 4, done: [0, 1], restDay: rest)
+                    .allSatisfy { $0.actionDay != day(3) }
+            )
         }
     }
 
@@ -603,17 +621,23 @@ struct LateWeekSpansTests {
 
     @Test("A span never carries the rest day, whatever the surface")
     func spansNeverCarryTheRestDay() {
-        withRest(6) {
+        withRest(6) { rest in
             // Sunday rests, so the span covering the weekend hands out Saturday
             // rather than the day nothing can happen on.
-            let demo = row(target: 2, todayColumn: 4, editing: .week(allowingFuture: true))
+            let demo = row(
+                target: 2, todayColumn: 4,
+                editing: .week(allowingFuture: true), restDay: rest
+            )
             #expect(shape(demo) == "open:0-4 inactive:5-6")
             #expect(demo.map(\.actionDay) == [day(4), day(5)])
         }
 
-        withRest(0) {
+        withRest(0) { rest in
             // Monday rests and is in the past: the app reaches back past it.
-            let app = row(target: 3, todayColumn: 6, editing: .week(allowingFuture: false))
+            let app = row(
+                target: 3, todayColumn: 6,
+                editing: .week(allowingFuture: false), restDay: rest
+            )
             for span in app {
                 #expect(span.actionDay != day(0))
             }
@@ -631,18 +655,19 @@ struct WeekDotsTests {
     }
     private func day(_ column: Int) -> Date { week.days[column] }
 
-    /// One implementation, in `TestSupport`. See `TestPreferences`.
-    private func withRest(_ column: Int?, _ body: () throws -> Void) rethrows {
-        try TestPreferences.withWeek(
-            restDay: column.map { TestPreferences.weekday(ofColumn: $0, in: week) },
-            body
-        )
+    /// One column of this week as a rest day, handed to the body to pass on.
+    /// See the note on `LateWeekSpansTests.withRest` and #181.
+    private func withRest(_ column: Int?, _ body: (Int?) throws -> Void) rethrows {
+        try body(column.map { TestPreferences.weekday(ofColumn: $0, in: week) })
     }
 
-    private func columns(_ frequency: Frequency, done: [Int]) -> [Int] {
+    private func columns(
+        _ frequency: Frequency, done: [Int], restDay: Int? = nil
+    ) -> [Int] {
         WeekDots.columns(
             for: .fixture(frequency: frequency, completedDays: Set(done.map { day($0) })),
             in: week,
+            restDay: restDay,
             calendar: calendar
         )
     }
@@ -668,8 +693,8 @@ struct WeekDotsTests {
         // Not this type's opinion: #72 settled that the rest column draws
         // nothing at all, a stored completion included. It still counts
         // everywhere it counted; a dot would be drawing it.
-        withRest(2) {
-            #expect(columns(.timesPerWeek(3), done: [1, 2, 5]) == [1, 5])
+        withRest(2) { rest in
+            #expect(columns(.timesPerWeek(3), done: [1, 2, 5], restDay: rest) == [1, 5])
         }
     }
 
@@ -679,10 +704,10 @@ struct WeekDotsTests {
         // light on the day; a per-day habit has no week row at all.
         #expect(WeekDots.columns(
             for: .fixture(frequency: .timesPerDay(3), completedDays: [day(1)]),
-            in: week, calendar: calendar
+            in: week, restDay: nil, calendar: calendar
         ).isEmpty)
         #expect(WeekDots.columns(
-            for: .fixture(isSpacer: true), in: week, calendar: calendar
+            for: .fixture(isSpacer: true), in: week, restDay: nil, calendar: calendar
         ).isEmpty)
     }
 
@@ -696,7 +721,7 @@ struct WeekDotsTests {
             completedDays: [day(1), day(4)]
         )
         #expect(
-            WeekDots.spokenDays(for: habit, in: week, calendar: calendar)
+            WeekDots.spokenDays(for: habit, in: week, restDay: nil, calendar: calendar)
                 == "logged Tuesday and Friday"
         )
     }
@@ -706,12 +731,13 @@ struct WeekDotsTests {
         // nil rather than an empty string, so the view can drop the element
         // instead of adding a stop that speaks nothing.
         #expect(WeekDots.spokenDays(
-            for: .fixture(frequency: .timesPerWeek(3)), in: week, calendar: calendar
+            for: .fixture(frequency: .timesPerWeek(3)), in: week,
+            restDay: nil, calendar: calendar
         ) == nil)
         // And the two rows that have no dots at all keep their silence.
         #expect(WeekDots.spokenDays(
             for: .fixture(frequency: .timesPerDay(3), completedDays: [day(1)]),
-            in: week, calendar: calendar
+            in: week, restDay: nil, calendar: calendar
         ) == nil)
     }
 
@@ -719,12 +745,12 @@ struct WeekDotsTests {
     func restDayIsNotSpoken() {
         // The rest column draws nothing (#72), so it says nothing — otherwise
         // VoiceOver would report a day the screen does not show.
-        withRest(2) {
+        withRest(2) { rest in
             let habit = HabitSnapshot.fixture(
                 frequency: .timesPerWeek(3), completedDays: [day(1), day(2), day(4)]
             )
             #expect(
-                WeekDots.spokenDays(for: habit, in: week, calendar: calendar)
+                WeekDots.spokenDays(for: habit, in: week, restDay: rest, calendar: calendar)
                     == "logged Tuesday and Friday"
             )
         }
@@ -736,7 +762,7 @@ struct WeekDotsTests {
             frequency: .timesPerWeek(3), completedDays: [day(0)]
         )
         #expect(
-            WeekDots.spokenDays(for: habit, in: week, calendar: calendar)
+            WeekDots.spokenDays(for: habit, in: week, restDay: nil, calendar: calendar)
                 == "logged Monday"
         )
     }
@@ -747,7 +773,7 @@ struct WeekDotsTests {
             frequency: .timesPerWeek(3), completedDays: [day(0), day(2), day(6)]
         )
         #expect(
-            WeekDots.spokenDays(for: habit, in: week, calendar: calendar)
+            WeekDots.spokenDays(for: habit, in: week, restDay: nil, calendar: calendar)
                 == "logged Monday, Wednesday and Sunday"
         )
     }
@@ -758,7 +784,9 @@ struct WeekDotsTests {
             frequency: .timesPerWeek(3),
             completedDays: [TestCalendar.date(2026, 8, 10), day(1)]
         )
-        #expect(WeekDots.columns(for: habit, in: week, calendar: calendar) == [1])
+        #expect(
+            WeekDots.columns(for: habit, in: week, restDay: nil, calendar: calendar) == [1]
+        )
     }
 
     @Test("An achieved span draws the same line as one still to come")
@@ -767,13 +795,15 @@ struct WeekDotsTests {
         // marks, and the dots are what tell them apart.
         let met = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2), completedDays: [day(0), day(1)]),
-            in: week, today: day(4), target: 2, editing: .todayOnly, calendar: calendar
+            in: week, today: day(4), target: 2,
+            editing: .todayOnly, restDay: nil, calendar: calendar
         )
         #expect(met.allSatisfy { $0.mark == .upcoming })
         // And the two that are still marks keep their own.
         let partial = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2)),
-            in: week, today: day(6), target: 2, editing: .todayOnly, calendar: calendar
+            in: week, today: day(6), target: 2,
+            editing: .todayOnly, restDay: nil, calendar: calendar
         )
         #expect(partial.map(\.mark) == [.missed, .openToday])
     }
