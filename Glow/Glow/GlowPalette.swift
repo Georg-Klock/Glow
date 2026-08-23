@@ -3,7 +3,7 @@ import WidgetKit
 
 /// Every colour and every effect in the grid.
 ///
-/// **Two colours, both opaque.** White is anything lit; `#171717` is everything
+/// **Two colours, both opaque.** White is anything lit; `#242424` is everything
 /// else. There is no third, and there is no scale between them — a slot is
 /// identified by whether there is light in it and by its silhouette, never by
 /// how far down a grey ramp it sits (#111).
@@ -12,9 +12,14 @@ import WidgetKit
 /// on black, and two more stacked on top of it at 71 and 23. Four names, three
 /// steps, for a distinction the app does not make. The grid, and the widgets
 /// most of all, read as a grey scale when the whole premise is that brightness
-/// means one thing. `#171717` is not a new colour: it is exactly what the socket
-/// already composited to, so the sockets stayed where they were and every other
-/// grey darkened to meet them.
+/// means one thing.
+///
+/// #111 collapsed that ramp onto the socket's own value, `#171717`, so the one
+/// grey was inherited rather than invented. **`#242424` is not inherited from
+/// anything** (#194): 23 was too dark in use, and this is a value picked by eye
+/// for marks that have to be *findable* while staying unmistakably unlit. It
+/// measures about 1.35:1 on black against the 4.5:1 body text asks for, so what
+/// is dark is still plainly dark; it is just no longer at the edge of vanishing.
 ///
 /// **Two values below still carry alpha, and neither is a colour the app
 /// draws.** `greyAccented` is what the system is handed once it has already
@@ -65,20 +70,24 @@ enum GlowPalette {
     /// `greyOpaque`; see `GlowGrey`.
     static let grey = GlowGrey()
 
-    /// The second colour, as declared. `#171717`, opaque.
+    /// The second colour, as declared. `#242424`, opaque.
     ///
-    /// Exactly what the old socket composited to on black: the old ramp was
-    /// 55.3% white with 16% on top of it, and 0.553 × 0.16 × 255 = 22.6 → 23 =
-    /// 0x17. Confirmed on screen rather than trusted — SwiftUI blends alpha in
-    /// gamma-encoded sRGB, and a linear blend would have put the same alpha near
-    /// `#545454`. Sampled off a simulator screenshot the socket reads 23, 23, 23.
+    /// **Chosen, not derived** (#194). It was `#171717` from #111 until 2026-08-23,
+    /// and that value *was* a derivation — 0.553 × 0.16 × 255 = 22.6 → 23 = 0x17,
+    /// exactly what the old ramp's socket composited to. 23 turned out to be too
+    /// dark in use: on a real screen a ✕ and a weekday letter at that level are
+    /// nearly gone. 36 is a judgement about what reads, so there is no arithmetic
+    /// to check it against and none is asserted; what the tests hold are the two
+    /// bounds it has to stay inside. About 1.35:1 on black, where legible body
+    /// text is 4.5:1 — still far below anything that could be mistaken for lit,
+    /// which is `greyIncreasedContrast`'s job and not this value's.
     static let greyOpaque = Color(
-        .sRGB, red: 23 / 255, green: 23 / 255, blue: 23 / 255, opacity: 1
+        .sRGB, red: 36 / 255, green: 36 / 255, blue: 36 / 255, opacity: 1
     )
 
     /// The grey when the reader has asked for **Increase Contrast**.
     ///
-    /// `#171717` against black is about 1.1:1, and a resting habit name is body
+    /// `#242424` against black is about 1.35:1, and a resting habit name is body
     /// text. The design says so on purpose — what stays dark is what never
     /// happened, carried through to type — so the answer is not to compromise it
     /// for everyone but to honour the setting for the people who asked.
@@ -115,8 +124,11 @@ enum GlowPalette {
     /// Not `greyOpaque`, and the reason is measured. #124 gave the Settings
     /// toggles an explicit tint because white is what this app reserves for lit
     /// and a switch track is not lit; the ON track landed at 181,181,183 against
-    /// an untouched system OFF track at 90,90,94. `#171717` would take that ON
-    /// track to roughly 23 — *below* the OFF track — and invert the control.
+    /// an untouched system OFF track at 90,90,94. The body grey would take that
+    /// ON track to roughly its own level — 23 when it was `#171717`, 36 now that
+    /// it is `#242424` — well *below* the OFF track, inverting the control. #194
+    /// lightened the grey and does not come close to changing that: 36 is still
+    /// less than half of 90.
     ///
     /// A `Toggle` in a `Form` is one of iOS's own components on a support
     /// screen, which is the boundary #111 draws its own scope at. So it keeps

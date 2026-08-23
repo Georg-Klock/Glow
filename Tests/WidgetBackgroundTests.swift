@@ -31,7 +31,7 @@ struct WidgetBackgroundTests {
     @Test("Every colour the widget draws is neutral")
     @MainActor
     func nothingCarriesAHue() {
-        // Two colours, and there is no third: white is anything lit, #171717 is
+        // Two colours, and there is no third: white is anything lit, #242424 is
         // anything that is not. A hue anywhere would also break the widget's
         // accented rendering, where the system keeps alpha and discards colour.
         let neutral: [Color] = [
@@ -52,13 +52,21 @@ struct WidgetBackgroundTests {
     }
 }
 
-/// Two colours, both opaque (#111).
+/// Two colours, both opaque (#111, #194).
 ///
 /// The palette used to be a ramp: one grey and three more stacked on top of it
-/// by opacity. What replaced it is one grey at the value the darkest step
-/// already composited to, and the tests below are the arithmetic that claim
-/// rests on — `0.553 × 0.16 × 255 = 22.6 → 23` — plus the two places a grey is
-/// still allowed to be alpha and why each is not a third colour.
+/// by opacity. #111 replaced it with one grey at the value the darkest step
+/// already composited to, `#171717`, and this suite used to assert that
+/// derivation — `0.553 × 0.16 × 255 = 22.6 → 23` — because the claim was that
+/// the grey was inherited rather than invented.
+///
+/// **That claim is over.** #194 moved the grey to `#242424` because 23 was too
+/// dark to read on a real screen, and 36 is not derived from anything. So there
+/// is no arithmetic left to assert, and the tests below assert instead what
+/// actually has to hold: the value the app draws, the two bounds it lives
+/// between — visible enough for the render suite's own unlit-line scans to find
+/// it, dark enough that it can never be mistaken for lit — and the two places a
+/// grey is still allowed to be alpha and why neither is a third colour.
 @Suite("Two colours")
 struct TwoColoursTests {
     /// Resolves a `Color` the way the screen does.
@@ -69,13 +77,13 @@ struct TwoColoursTests {
         return (r, g, b, a)
     }
 
-    @Test("The grey the app draws is #171717, and it is opaque")
+    @Test("The grey the app draws is #242424, and it is opaque")
     @MainActor
-    func greyIsOpaqueSeventeen() {
+    func greyIsOpaqueTwentyFour() {
         let grey = components(GlowPalette.greyOpaque)
-        #expect((grey.r * 255).rounded() == 23)
-        #expect((grey.g * 255).rounded() == 23)
-        #expect((grey.b * 255).rounded() == 23)
+        #expect((grey.r * 255).rounded() == 36)
+        #expect((grey.g * 255).rounded() == 36)
+        #expect((grey.b * 255).rounded() == 36)
         #expect(grey.a == 1, "the grey carries alpha: \(grey.a)")
 
         // And white is still white, still opaque.
@@ -83,15 +91,26 @@ struct TwoColoursTests {
         #expect(white.r == 1 && white.g == 1 && white.b == 1 && white.a == 1)
     }
 
-    @Test("#171717 is what the old socket composited to, not a new colour")
+    /// Replaces `greyIsTheOldSocket`, which asserted `0.553 × 0.16 × 255 == 23`
+    /// and that the palette matched it. Its premise — that the grey is not a
+    /// new colour — stopped being true with #194, and there is no derivation
+    /// for `#242424` to put in its place: reconstructing 36 from 36 would be a
+    /// test that cannot fail. This is the claim that survives the move.
+    @Test("The unlit grey clears the ground the render suite scans against")
     @MainActor
-    func greyIsTheOldSocket() {
-        // The socket was `white.opacity(0.553).opacity(0.16)`. Composited on
-        // black in gamma-encoded sRGB — which is what SwiftUI does, confirmed
-        // against a screenshot rather than assumed — that is 23.
-        let old = 0.553 * 0.16 * 255
-        #expect((old).rounded() == 23, "the derivation moved: \(old)")
-        #expect((components(GlowPalette.greyOpaque).r * 255).rounded() == 23)
+    func theUnlitGreyClearsTheGround() {
+        // Not an arbitrary floor. `WidgetRenderDiffTests` finds an unlit line —
+        // a span, the rest cut — by scanning for anything brighter than
+        // `lineFloor`, which is 15, and its content check bands the grey. Both
+        // live in the render bundle and cannot import this one, so the coupling
+        // is asserted from this side: a grey at or below 15 stops being
+        // separable from black there, and those scans would pass on nothing.
+        //
+        // This is also the half of #194 that is the *reason* for the move. 23
+        // cleared 15 arithmetically and still read as almost nothing on screen;
+        // 36 is the value picked for what it reads as.
+        let level = (components(GlowPalette.greyOpaque).r * 255).rounded()
+        #expect(level > 15, "the unlit grey is at \(level); the render scans floor at 15")
     }
 
     @Test("Increase Contrast gets the grey the app used to draw")
@@ -99,14 +118,26 @@ struct TwoColoursTests {
     func increasedContrastIsTheOldGrey() {
         // #8D8D8D: what `white.opacity(0.553)` composited to on black, and so
         // not a number invented for the setting. It clears 4.5:1 on black,
-        // which #171717 at about 1.1:1 does not.
+        // which the shipping grey at about 1.35:1 does not.
         let lifted = components(GlowPalette.greyIncreasedContrast)
         #expect((lifted.r * 255).rounded() == 141)
         #expect(lifted.a == 1)
         #expect(Self.contrastOnBlack(141 / 255.0) > 4.5,
                 "the lifted grey no longer clears 4.5:1")
-        #expect(Self.contrastOnBlack(23 / 255.0) < 1.2,
-                "#171717 is supposed to be far below legible; it moved")
+
+        // The ceiling on the *shipping* grey, read off the declaration rather
+        // than from a literal, so it cannot pass while the palette moves.
+        //
+        // The bound was `< 1.2`, chosen to defend `#171717` at 1.17:1, and #194
+        // fired it on purpose. `< 1.5` is what replaces it: 1.35:1 is where
+        // `#242424` sits, and 1.5:1 is 44/255 — `#2C2C2C`. So the grey may be
+        // nudged by eye the way #194 nudged it, and a change that starts
+        // walking it toward legible body text fails here and has to say so.
+        // Legibility is `greyIncreasedContrast`'s job; this value's job is to
+        // stay unmistakably not-lit.
+        let shipping = Self.contrastOnBlack(Double(components(GlowPalette.greyOpaque).r))
+        #expect(shipping < 1.5,
+                "the unlit grey is at \(shipping):1 on black; it is supposed to stay under 1.5:1")
     }
 
     @Test("The two greys that still carry alpha are the two the app does not paint")
@@ -127,13 +158,13 @@ struct TwoColoursTests {
         }
     }
 
-    @Test("Outside accented rendering and Increase Contrast, the grey resolves to #171717")
+    @Test("Outside accented rendering and Increase Contrast, the grey resolves to #242424")
     @MainActor
     func defaultEnvironmentResolvesToTheOpaqueGrey() {
         // The default environment is what every app surface draws in: no widget
         // rendering mode, standard contrast.
         let resolved = GlowGrey().resolve(in: EnvironmentValues())
-        #expect((components(resolved).r * 255).rounded() == 23)
+        #expect((components(resolved).r * 255).rounded() == 36)
         #expect(components(resolved).a == 1)
     }
 
