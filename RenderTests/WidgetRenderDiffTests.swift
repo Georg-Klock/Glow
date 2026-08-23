@@ -329,6 +329,17 @@ struct WidgetRenderDiffTests {
     /// than a mark, so "is the span there" is a question about the grey line,
     /// not about light — `GlowPalette.grey` composites to 36 on black.
     private static let lineFloor = 15
+
+    /// Nothing drawn here at all — not "unlit", which is a different claim.
+    ///
+    /// The two are not interchangeable and #226 is where that matters.
+    /// `isUnlit(_:beside:)` asks whether a tone is grey rather than white, and
+    /// admits everything up to a quarter of the frame's lit level; the scans
+    /// below rule out a *grey line* running where it should not, which sits
+    /// well inside that. So this stays a level. It is a level against the
+    /// ground rather than against the palette, which is why it does not move
+    /// when the palette does — and why `lineFloor` sits above it: between them
+    /// is the band nothing is ever painted in.
     private static let clear = 10
 
     @Test("A met goal with Sunday resting stops at Saturday")
@@ -338,8 +349,35 @@ struct WidgetRenderDiffTests {
             let pixels = try rgba(of: try render(entry))
             let saturday = brightest(atColumn: columnCentre(5), in: pixels)
             let sunday = brightestInRestColumn(6, in: pixels)
+            // Sunday's own line down the centre of its column, and the lit
+            // level of this very frame to judge it against: the two logged days
+            // carry lit dots here, which is what `daysCarryTheLight` renders
+            // this same fixture to say.
+            let restLine = brightestAtRestLine(6, in: pixels)
+            let dots = min(
+                brightest(atColumn: columnCentre(0), in: pixels),
+                brightest(atColumn: columnCentre(1), in: pixels)
+            )
+
             #expect(saturday > Self.lineFloor,
                     "the met-goal line is missing at Saturday (\(saturday))")
+
+            // **Sunday's column has something in it.** #226. `sunday < clear`
+            // is an upper bound, and measured, the region it reads holds
+            // exactly **0**: the span has been subtracted there, and
+            // `brightestInRestColumn` steps a quarter-slot around the rest cut
+            // on purpose, so what is left is empty. The bound was being met by
+            // emptiness rather than by the line stopping — delete the rest
+            // day's mark and it still passes. The floor on Saturday next door
+            // does not notice, because it is in another column.
+            //
+            // The pairing is `restCutStartsAndStopsOnAHabit`'s: a claim about
+            // absence is worth something only beside a claim that the same
+            // column was drawn at all.
+            #expect(restLine > Self.lineFloor,
+                    "nothing is drawn in Sunday's column at all (\(restLine))")
+            #expect(isUnlit(restLine, beside: dots),
+                    "Sunday's line is lit (\(restLine), against the dots at \(dots))")
             #expect(sunday < Self.clear,
                     "the line runs into Sunday's column (\(sunday))")
         }
@@ -353,7 +391,26 @@ struct WidgetRenderDiffTests {
             let tuesday = brightest(atColumn: columnCentre(1), in: pixels)
             let wednesday = brightestInRestColumn(2, in: pixels)
             let thursday = brightest(atColumn: columnCentre(3), in: pixels)
+            // The same pairing as above, and for the same reason: measured, the
+            // window either side of Wednesday's centre reads **1**, which is
+            // emptiness with a pixel of halo in it rather than a line that
+            // stops. See #226.
+            let restLine = brightestAtRestLine(2, in: pixels)
+            let dots = min(
+                brightest(atColumn: columnCentre(0), in: pixels),
+                brightest(atColumn: columnCentre(1), in: pixels)
+            )
+
+            #expect(restLine > Self.lineFloor,
+                    "nothing is drawn in Wednesday's column at all (\(restLine))")
+            #expect(isUnlit(restLine, beside: dots),
+                    "Wednesday's line is lit (\(restLine), against the dots at \(dots))")
             #expect(wednesday < Self.clear, "the line crosses the rest day (\(wednesday))")
+
+            // Both pieces are there. Tuesday is a logged day in this fixture,
+            // so this column reads 255 rather than the line's 36 — it says the
+            // left of the cut was drawn, and it would go on passing if the line
+            // under the dot were lost. The right-hand floor is the line itself.
             #expect(tuesday > Self.lineFloor, "the left piece is missing (\(tuesday))")
             #expect(thursday > Self.lineFloor, "the right piece is missing (\(thursday))")
         }
@@ -538,6 +595,20 @@ struct WidgetRenderDiffTests {
             // would lift every one of these off the floor at once, which a
             // corner sample alone could miss if it were subtle at the edges.
             #expect(share > 90, "\(name): only \(Int(share))% of the frame is pure black")
+
+            // **And 100 is what a frame with nothing in it reads.** #226
+            // catalogued this bound and `noHueAnywhere` beside the two that
+            // were fixed there, as whole-frame claims a blank render would
+            // satisfy. Deliberately not closed with a content floor here: the
+            // four frames are already held, per family, by
+            // `RenderBaselineTests` — a committed 16 × 16 grid of mean
+            // brightness, this same exact-black share, and a census of the
+            // tones each family paints. Blanking `month small` was measured
+            // against both: that gate went red three ways at once (a cell
+            // moved 23 against a tolerance of 3, the share went 90.2 → 100.0
+            // against 0.5, and the level-36 tone went 680 → 0) while this test
+            // and `noHueAnywhere` stayed green. A floor here would restate a
+            // gate that is already the stricter of the two.
         }
         }
     }
@@ -602,6 +673,8 @@ struct WidgetRenderDiffTests {
             }
             // One level of slack for the encoder's own rounding between
             // channels; anything with an actual tint lands far above it.
+            // Zero on a blank frame, as `groundIsPureBlack`'s share is 100 on
+            // one — and held for the same reason and by the same gate. #226.
             #expect(worst <= 1, "\(name) carries a hue: channels spread by \(worst)")
         }
     }
