@@ -351,6 +351,46 @@ large accessibility size cannot shrink the track until a week stops looking like
 one. The weekday header's own numerals stay fixed, because they sit inside
 columns that are one slot wide and have nowhere to grow into.
 
+## What a launch does, in order
+
+Four steps, three of them in `GlowApp.init` and the last in `body`. The order is
+not arrangement — each of the first three changes what the widget should draw,
+and the reload is last so that it reloads against the settled answer.
+
+1. **`DebugToday.clearOnLaunch()`**, before the store is opened (#204). The
+   override lives in the App Group, so the widget reads it from its own process
+   and draws the simulated week; clearing it changes what a widget is showing.
+2. **The container opens**, or does not — `StoreUnavailableView` is the answer
+   when it does not, and steps 3 and 4 do not happen at all.
+3. **`DailyHabitMigration.runIfNeeded`**, on a context of that container
+   (#239). It used to run when `WeeklyGridView` appeared, which is a screen a
+   session can skip and another process cannot reach at all: the system's widget
+   configurator calls `WeeklyHabitQuery.suggestedEntities()` from outside the
+   app, reads the same file, and was offering rows the sweep had never been
+   asked to delete. Everything downstream — the reload below, the pager's reach,
+   the empty state's claim about what the store holds — then reads a swept
+   store without knowing the sweep exists.
+4. **`WidgetRefresh.invalidate()`**, unconditionally, from a `.task` on the
+   container branch of `body` (#236). Every other reload in the app is
+   write-triggered, so before this a build that changed what a widget *draws*
+   rather than what the store *holds* reached the phone with nothing to tell
+   WidgetKit to ask the provider again.
+
+Steps 3 and 4 are inert in the test host without a second check: the binding in
+`init` hands back no container under tests (#179), so there is nothing for the
+migration to open a context on, and `body`'s `isRunningTests` guard draws
+`Color.black` before the container branch is reached. A migration or a reload
+running in the test process is the process-wide leak #105, #168, #175 and #179
+closed.
+
+On the one launch where the sweep actually deletes something, step 3 invalidates
+too. `WidgetRefresh` coalesces calls made inside the same turn of the main
+actor — the turn, not the launch — so whether that costs one reload or two is
+the runtime's to decide. Measured on the simulator it was one:
+`reloadAllTimelines()` appears once in chronod's log for that launch. Nothing
+depends on the count, because a reload against already-correct data is a no-op
+render. What the order buys is that the last word belongs to step 4.
+
 ## Day rollover
 
 The open slot is defined as "today", so the screen has to notice when today

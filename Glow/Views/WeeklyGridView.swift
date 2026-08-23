@@ -237,12 +237,20 @@ struct WeeklyGridView: View {
             // calls — this handler used to call it directly.
             refreshToday()
         }
-        // The sweep is about rows a *previous* build wrote, and it is the only
-        // thing this screen still does to the store unasked — nothing seeds on
-        // appear any more (#228), so the empty state below is a real answer
-        // about what the store holds rather than a frame before the seeder
-        // fills it.
-        .task { migrateDailyHabitsOut() }
+        // **This screen writes nothing to the store unasked.** Seeding went in
+        // #228 and the per-day sweep went to `GlowApp` in #239, so the empty
+        // state below is a real answer about what the store holds rather than a
+        // frame before something fills or empties it. Both left for the same
+        // reason: the store is reached without this view being reached. The
+        // system's widget configurator is another process entirely, reading the
+        // same file with no screen of this app involved at all — and even
+        // inside the app, "This Week is the landing tab" is a default anyone
+        // can change (#238 moved the tab order around it once already), which
+        // makes it a poor thing for a one-time sweep to depend on.
+        //
+        // `refreshReach` is unconditional and has to stay that way: it is the
+        // only thing that reads `recordStart`, and the sweep that used to
+        // trigger a second call is now over before this view exists.
         .task { refreshDemoHistory() }
         .task { refreshReach() }
     }
@@ -521,22 +529,6 @@ struct WeeklyGridView: View {
             try store.addSpacer()
         } catch {
             HabitStore.report(error, operation: "addSpacer")
-        }
-    }
-
-    /// Takes out the per-day habits an earlier build seeded, once (#209).
-    ///
-    /// Here rather than in `GlowApp` for the reason first-run seeding was: this
-    /// is the screen the store is opened for, and a launch that never reaches
-    /// it never needed either. It refreshes the reach when it removes anything,
-    /// because deleting habits can move how far back the pager reaches.
-    private func migrateDailyHabitsOut() {
-        do {
-            if try DailyHabitMigration.runIfNeeded(context: context) > 0 {
-                refreshReach()
-            }
-        } catch {
-            HabitStore.report(error, operation: "migrateDailyHabitsOut")
         }
     }
 

@@ -138,6 +138,41 @@ struct WidgetRefreshTests {
         }
     }
 
+    @Test("Coalescing is scoped to a turn of the main actor, not to a launch")
+    func coalescingIsPerTurn() async throws {
+        // **#236 leans on "a launch is one gesture as far as this is
+        // concerned", and that is a claim about scheduling rather than about
+        // launches.** What `invalidate` actually promises is the turn: it
+        // schedules the flush for the next one, so a call made after that turn
+        // has run is a second reload however close together the two look. This
+        // is the boundary, stated as a test so that the promise is not read as
+        // wider than it is.
+        //
+        // A launch can invalidate twice — `DailyHabitMigration` does it from
+        // `GlowApp.init` on the one launch after an upgrade where it finds
+        // per-day rows (#239), and the unconditional reload is a `.task` on
+        // `body`. Whether those two land in one turn is the runtime's to
+        // decide, not this type's; measured on the simulator, that launch
+        // produced exactly one `reloadAllTimelines()` in chronod's log, so they
+        // did. Nothing depends on it either way: a reload against data that is
+        // already correct is a no-op render, and what the code does rely on is
+        // the *order* — the sweep deletes rows the widget draws, so the reload
+        // has to be the one that comes second, and it is.
+        let spy = Spy()
+        let previous = WidgetRefresh.sink
+        defer { WidgetRefresh.sink = previous }
+        WidgetRefresh.flush()
+        WidgetRefresh.sink = { [spy] kinds in spy.calls.append(kinds) }
+
+        WidgetRefresh.invalidate()
+        try await Task.sleep(for: .milliseconds(100))   // the flush turn passes
+        WidgetRefresh.invalidate()
+        try await Task.sleep(for: .milliseconds(100))
+
+        #expect(spy.count == 2)
+        #expect(spy.calls.allSatisfy { $0 == WidgetRefresh.allKinds })
+    }
+
     @Test("Nothing pending sends nothing")
     func emptyFlushIsSilent() throws {
         try withSpy { spy, _, _ in
