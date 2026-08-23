@@ -84,6 +84,20 @@ This costs one small allocation per row per redraw and buys three things: the
 logic is testable without a store, the logic is `Sendable`, and a view cannot
 accidentally mutate a model while drawing it.
 
+**A surface that draws a bounded stretch of time reads only that stretch**
+(#135). `Habit.snapshots(of:within:calendar:)` takes the days the surface
+actually draws — `week.dayIDs()`, `MonthGrid.dayRange(containing:)`, the year's
+first and last column — and pushes the bound into SQLite on `Completion.dayKey`.
+`habit.snapshot()` with no range still means the whole history and is what the
+export calls.
+
+The snapshot it hands back therefore holds only those days, which is the one
+thing to know before passing one on. Everything week-shaped asks only about days
+inside the week it was given, so a week's worth is all a week's row needs;
+`Tests/HistoryProjectionTests.swift` asserts that against `WeekGrid`,
+`WeekSpans`, `WeekDots`, `GoalMet`, `MonthGrid` and `YearHistory` rather than
+against a reading of them.
+
 ### Slots carry their own action
 
 `Slot.actionDay` is the day a tap would toggle, or `nil` if the slot is not
@@ -182,9 +196,16 @@ local midnight the row was written at, but it is evidence rather than identity
 and nothing compares it. `Habit.completionDayCounts` is the single place rows
 become history — `[DayID: Int]`, fetched through the context — and
 `completionCounts(in:)` / `completedDays(in:)` project it onto whichever
-calendar is drawing. Keeping the projection separate is deliberate: the
-identity half depends on nothing but the store and is therefore cacheable, and
-the calendar half must not be.
+calendar is drawing. Keeping the projection separate is deliberate: the identity
+half depends on nothing but the store, and the calendar half must not be
+remembered because the calendar can change under it.
+
+That seam was described here as the one a cache belongs behind. **Nothing is
+cached across renders and nothing should be** — the widget's intents write this
+store from their own process and never tell the app, so a cache they cannot
+invalidate is a wrong number that survives until something unrelated redraws.
+What #135 did instead was bound the read; the measurement that settled it is in
+decisions.md.
 
 The backfill for stores written before that column lives in
 `StoreMigration.stampDayIdentities`, and the migration record's `format` is now

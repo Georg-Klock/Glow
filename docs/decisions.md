@@ -2005,3 +2005,86 @@ days and the row is a completed block plus a ✕ for each of the rest. All of
 those columns are now reachable. Nothing about the mark changed: it still never
 moves on its own, and logging the day means the rep happened, late. SPEC §7 says
 so in those terms.
+
+## A surface reads the days it draws
+
+#135 was written as "stop rebuilding complete history on every calendar and
+widget render", and the obvious reading of it is *stop doing it n times* — one
+shared pass over the store instead of one fetch per habit. That reading is
+wrong, and the measurement is what says so.
+
+Twelve habits with two years each, 8,760 completions, both arms alternated in
+one process and reported as medians of eight rounds, over three runs:
+
+| what a list-shaped surface does | median |
+| --- | --- |
+| one fetch per habit, whole history | 184–194ms |
+| one shared fetch, whole history | 179–205ms |
+| one shared fetch, bounded to a week | 2.3–2.5ms |
+
+The first two rows are the same number. Grouping *n* habits' rows into one
+query saves *n − 1* round trips and spends them again faulting the habit each
+row points at, and it still materializes every row there has ever been. **The
+cost is the rows, not the queries.** Reading seven days reads seven days.
+
+So `Habit.snapshots(of:within:calendar:)` takes the days a surface actually
+draws and `Habit.dayCounts(of:within:in:)` pushes the bound into SQLite. The
+week grid passes `week.dayIDs()`, the year its first and last column, the month
+widget `MonthGrid.dayRange(containing:)`, Today's rings and the Today widget one
+day. `snapshot()` with no range still means the whole history, and the export is
+what calls it — the shared pass is not offered without a range, because it
+measured no better than the loop it would replace.
+
+**A bounded snapshot holds only those days**, which is the thing to know before
+handing one on. That is safe because everything week-shaped counts inside the
+week it is given, and `Tests/HistoryProjectionTests.swift` asserts it against
+`WeekGrid`, `WeekSpans`, `WeekDots`, `GoalMet`, `MonthGrid` and `YearHistory`
+themselves — whole history in one side, the bounded read in the other, same
+output — rather than against a reading of their source.
+
+### The predicate does not need to know whether the store is stamped
+
+#130 left this open: "once a store is fully stamped the predicate can be pushed
+into SQLite, which is #135's to take, and it needs a way to know the store is
+ready for it". It turned out not to. A legacy row's `dayKey` is empty and its
+day is inferred from the untouched instant, so the predicate fetches the range
+**and every row with no key at all**, and settles those in memory:
+
+```swift
+$0.dayKey == "" || ($0.dayKey >= low && $0.dayKey <= high)
+```
+
+On a stamped store the empty-key branch matches nothing and the range does all
+the work. On an unstamped one it degrades to the scan that was already
+happening. Both answer the same, at every point in between, with no reading of
+the migration record and so no second thing that can be wrong about it.
+
+### Nothing is cached across renders
+
+The other half of #135 as filed was a cache behind `completionDayCounts`, and
+ARCHITECTURE.md said that seam was where one belongs. It is not, and the reason
+is #145: `ToggleHabitIntent` and `TapHabitIntent` open their own container
+against the same App Group file, and nothing tells the app's context when they
+write. A cache the other process cannot invalidate is a wrong number that
+survives until something unrelated redraws — which on this app means a
+completion logged from the home screen not appearing in the grid. The pass is
+shared within one render and dropped at the end of it. That is a cost the number
+of habits no longer multiplies, and the bound is what took the rest.
+
+### What this cost elsewhere
+
+The week grid was taking two whole-history reads per redraw, not one: once
+mapped over the habits for `RestCut`, and again inside the row loop. It now
+takes one bounded read and indexes into it. Today's rings were calling
+`snapshot()` per ring to answer a question about one day. The month widget was
+projecting every weekly habit's whole history to draw one habit's month, and
+both configuration pickers were doing the same to display a list of names —
+`TodayStore.perDayNames` and `MonthStore.weeklyNames` read no completions at
+all now.
+
+Verified in the simulator, which is where geometry and state are verifiable and
+the glow is not: This Week and Today both redraw correctly through a write —
+a slot toggled to a filled dot, a two-rep ring filled to a solid circle by two
+taps, the label going grey behind it — and History draws the year with today
+lit. The widgets' own render was not put on a home screen; their providers call
+the same bounded reads the app does.

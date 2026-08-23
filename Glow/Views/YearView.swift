@@ -46,10 +46,22 @@ struct YearView: View {
     ///
     /// This used to be a dictionary of completion sets, rebuilt by the computed
     /// property on every one of the year's 365 cells. The verdict moved to
-    /// `YearHistory` (#137) and the snapshots come with it: taken once per
+    /// `YearHistory` (#137) and the snapshots came with it: taken once per
     /// redraw, and read by a dictionary lookup per habit per day rather than by
     /// building a `Set` per habit per day.
-    private var snapshots: [HabitSnapshot] { habits.map { $0.snapshot() } }
+    ///
+    /// Bounded to the year on the screen (#135). Taking it once was the first
+    /// half; the other half is that a screen showing one year was still reading
+    /// every year — and the columns already end where the range does, so a
+    /// completion outside it has nowhere to be drawn.
+    private var snapshots: [HabitSnapshot] {
+        guard let first = weeks.first, let last = weeks.last else { return [] }
+        return Habit.snapshots(
+            of: habits,
+            within: DayID.range(from: first.days[0], through: last.days[6], calendar: calendar),
+            calendar: calendar
+        )
+    }
 
     /// Spacers hold a position in the grid and nothing else.
     private var realHabits: [Habit] { habits.filter { !$0.isSpacer } }

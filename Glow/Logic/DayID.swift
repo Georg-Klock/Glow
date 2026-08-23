@@ -91,6 +91,20 @@ struct DayID: Hashable, Comparable, Sendable, CustomStringConvertible {
         (lhs.year, lhs.month, lhs.day) < (rhs.year, rhs.month, rhs.day)
     }
 
+    /// The stretch of civil days two instants span, ends included.
+    ///
+    /// What a bounded history read is asked for (#135): a surface that draws a
+    /// week, a month or a year says which days it draws, and reads only those.
+    /// Reversed inputs are put in order rather than trapping — a caller with
+    /// two dates and no opinion about which is earlier should not have to know.
+    static func range(
+        from first: Date, through last: Date, calendar: Calendar
+    ) -> ClosedRange<DayID> {
+        let a = DayID(first, calendar: calendar)
+        let b = DayID(last, calendar: calendar)
+        return a <= b ? a...b : b...a
+    }
+
     // MARK: - Reading a legacy instant
 
     /// What day a pre-`DayID` `Completion.day` was meant to name.

@@ -72,18 +72,14 @@ struct MonthProvider: AppIntentTimelineProvider {
     }
 
     private func entry(for configuration: SelectWeeklyHabitIntent) -> MonthEntry {
-        let all = MonthStore.weeklyHabits()
-        // A freshly placed, never-configured widget shows the first habit —
-        // something real rather than a "choose habit" placeholder. A chosen
-        // habit that was deleted shows the empty state instead, rather than
-        // silently becoming a different habit.
-        let shown: HabitSnapshot?
-        if let chosen = configuration.habit {
-            shown = all.first { $0.id == chosen.id }
-        } else {
-            shown = all.first
-        }
-        return MonthEntry(date: Date(), habit: shown)
+        // One habit, one month. Both halves of that used to be paid for
+        // whether or not they were drawn: every weekly habit's whole history
+        // was projected, and all but one of the results thrown away. See #135.
+        let now = Date()
+        return MonthEntry(
+            date: now,
+            habit: MonthStore.month(of: configuration.habit?.id, containing: now)
+        )
     }
 }
 
