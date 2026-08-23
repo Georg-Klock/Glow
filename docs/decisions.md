@@ -3705,11 +3705,25 @@ with only the cap normalized the sweep still fails 14 times, and with only
 `startOfWeek` fixed it fails none. Both ship because both are wrong; only one of
 them was #242.
 
-**What the issue ruled out, it ruled out correctly**, and its last hypothesis is
-unspent rather than disproven. Nothing here says a `ToolbarItem` cannot go stale
-— only that a `WeekReach` this app can hold answers the chevron's two questions
-differently without any help from SwiftUI. A report of this from a zone that
-does not change its clocks at midnight would still be unexplained.
+**What it looks like from outside, exactly — one dead press, not a dead
+button.** Run the view's own state machine over the failing case (`weekStart`
+from `today()`, the chevron's `.disabled`, `step`, and `show(week:)`'s guard)
+and the sequence is: the chevron draws **lit at the floor of the reach, where it
+should be dim**; one press assigns a `weekStart` an hour earlier; the title and
+the grid do not move, because the week did not; and the chevron then dims
+correctly. That is the reported symptom word for word — not dimmed, tapping it
+does nothing at all, the title text does not change either — and the report
+describes a press rather than a series of them. The shortest path to it is also
+the likeliest: a store only a few days old, so the floor *is* the current week,
+on one of the two days a year that zone's clock moves.
+
+**What it does not explain, and the claim is deliberately narrow.** A chevron
+that stays lit across repeated presses, or one in a zone that does not change
+its clocks at midnight. Neither of those is this bug, and #242's last hypothesis
+— a `ToolbarItem` holding a closure from an earlier render — is unspent rather
+than disproven: nothing here says that cannot happen, only that a `WeekReach`
+this app can hold answers the chevron's two questions differently without any
+help from SwiftUI. If the report comes back from Berlin, it is still open.
 
 **The `?? weekStart` and `?? latest` fallbacks are not reachable**, which is
 worth stating because a nil there would make `step` a genuine no-op with the
