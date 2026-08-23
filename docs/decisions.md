@@ -3374,7 +3374,6 @@ would go on passing if the line under the dot were lost. Fixing it means moving
 where that scan samples or changing the fixture, which is a different change
 from this one. The code says so where it samples.
 
-
 ## Tinted and Clear stay glass (#53)
 
 **2026-08-22.** Closed, accepted rather than fixed. `containerBackgroundRemovable(false)` was built, measured on device, and does not do what the issue wanted: on iOS 26 that flag governs contexts with no background at all — StandBy, the iPad Lock Screen gallery — and Tinted and Clear are a restyling of the Home Screen, not one of those, so both still substitute glass regardless of the flag. A black image drawn as ordinary content inside the container fails the same way, silently. Worse than the background: the halo does not survive Tinted or Clear either, with or without the flag, so a lit mark already reads as a bright shape rather than a glow one layer before the background question even applies.
@@ -4050,3 +4049,67 @@ So: `HabitStore.delete` deletes every row outright, spacer or habit; `HabitStore
 **The half of #129 that is not about layout survives, and is stronger for it.** A deleted habit's `id` had to stop resolving, because widget configurations and widget intents both resolve by `id` — a configured widget would otherwise start showing an unrelated habit, and a tap from a widget snapshot taken before the delete would land as history on whatever came next. That used to be arranged by giving the surviving blank row a fresh `UUID`. Deleting the row removes the `id` along with it, which is the same guarantee without the row that carried it.
 
 `Tests/SpacerIdentityTests.swift`, `Tests/SeedingTests.swift` and `Tests/PersistenceTests.swift` each carried an assertion of the old rule; all three now assert the new one and say in the test which way they were turned. Two new tests hold the parts that are easy to lose next time: that a deliberate blank row survives an add, and that a delete moves the rows below it up.
+
+## A widget's rows are its own, and the app's line narrows (#188)
+
+The week widget mirrored the app's habit order and had no way not to. #172
+measured what that costs: the app's own clustering (#123) puts a blank row
+where a medium widget's cut falls, so medium shows four habits instead of five,
+and the only way to ask for a different five was to reorder the whole app. #172
+decided against moving the seed clustering — the app's order is the app's
+order — and for letting a widget deviate from it. This is that.
+
+**The decision is `WidgetRows.rows(from:chosen:)`**, in `Glow/Logic/`, and it is
+eleven lines. Everything interesting about it is what happens when a choice
+outlives the store it was made against: an id that no longer exists is dropped
+rather than held as a gap, because a deleted habit is not a blank row; a
+repeated id appears once, because the view's `ForEach` is keyed by id and the
+rest cut is a range of indices into the same list; and the order is the
+configuration's, with the app's list consulted only for what a row *is*. A
+widget whose every chosen row has been deleted draws the empty state rather
+than silently becoming somebody else's first rows, which is the rule the month
+widget already follows for its one deleted habit.
+
+**No `mediumRowCapacity`, no `smallRowCapacity`.** #188 expected to need them
+and it does not. The premise was that medium and small "truncate by SwiftUI
+running out of frame", so a person-chosen list would need an explicit count to
+slice by — but `WeekWidgetView` has always measured `proxy.size` inside its
+`GeometryReader` and applied `WidgetMetrics.rowCapacity` to it, then done an
+explicit `prefix`. The cut is deliberate code, not clipping. Storing the two
+numbers would have been worse than not: a widget's point size differs by phone,
+so a constant derived from the 6.1" the design is authored for is right there
+and wrong everywhere else, while the measured frame is right everywhere.
+`largeRowCapacity` stays, for the one job it has always had — the *app* needs a
+number to draw its boundary at, and cannot measure a widget it is not in.
+
+What is asserted instead is the formula's answer per family, which is what the
+tests can honestly claim: eleven large, five medium, six small. And that a
+configured medium is **a choice among five, not a dial** — five rows need
+127.28pt of a 128pt content box, and the 0.72pt left over does not buy a sixth
+from anywhere. Both candidate donors are spoken for: `padVertical` already gave
+its point to buy the fifth (#57), and `rowGap` is set by how far a halo spills
+out of a row, so closing it would put each row's light into its neighbour.
+
+**The app's hairline means something narrower now.** `WeeklyGridView` reads
+`largeRowCapacity` twice — for the boundary line and for the rest cut's end —
+on the assumption that there is one widget row count the app can know. Per-widget
+configuration ends that assumption, and the answer is to narrow the claim rather
+than to draw more lines: the hairline marks where an *unconfigured* large widget
+stops. Every widget starts unconfigured and most stay that way, and somebody who
+has opened the sheet already knows what their widget shows. Several boundaries,
+one per placed widget, would be the app explaining the home screen back to
+itself in a list that scrolls.
+
+**What the system's sheet actually offers is not what this was built for, and
+that is recorded rather than resolved.** #188 named the unknown — whether
+WidgetKit presents an array-of-entity parameter as a reorderable list — and said
+to say which path this needs before writing the provider. Measured in the
+simulator: the sheet is an unordered multi-select checklist in the query's own
+suggested order, with no reordering affordance, and the stored choice arrived at
+the timeline as an **empty array** on every render while
+`WeekRowQuery.entities(for:)` was never called in the extension at all. The
+trace is in #191, with what to check on a device and what the fallback costs.
+This still ships, and the reason is the fallback rule rather than optimism:
+empty and nil both mean the app's own order, so a widget that cannot receive its
+configuration draws exactly what it drew before this change. The failure mode is
+invisible, which is the property that makes an open question safe to merge past.

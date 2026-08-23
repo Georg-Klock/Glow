@@ -425,7 +425,10 @@ it. It runs from the **top of the first habit** to the **bottom of the last one
 the surface shows**, and no further: never into the header's air, never past the
 last row. `RestCut.rows` decides which rows carry it, taking the surface's
 capacity — the widget's `rowCapacity`, the app's `largeRowCapacity`, so the app's
-line ends on the same hairline that marks where the widget ends. A blank row
+line ends on the same hairline that marks where an unconfigured large widget
+ends. On a configured widget the cut runs over the rows that widget draws, in
+the order it draws them, because `RestCut.rows` has an opinion about a list and
+none about where the list came from. A blank row
 *between* two habits is inside the cut and draws its segment; a blank row at
 either end is outside it. All three week widget families draw it, on the same
 `RestCut` numbers the app uses.
@@ -608,6 +611,27 @@ Rows are as many as fit, then a hard cut — no "+N more" row, per
 docs/vision.md: a row spent saying how much is missing is a row not showing a
 habit. The app's own grid marks the boundary, where there is room to say it.
 
+**Which rows, and in what order, is a per-widget choice.** All three families
+offer it. The picker lists every week-shaped row in the app's order —
+including the blank rows, labelled "Blank Row", which the month widget's
+picker excludes — and the widget draws the chosen ones in the chosen order.
+A widget nobody has configured keeps the app's own order exactly, which is
+what every widget already placed does after this ships. A chosen row that has
+since been deleted is dropped rather than held as a gap; a widget whose every
+chosen row is gone shows the empty state rather than silently becoming
+someone else's first rows. `WidgetRows` decides all of that and is where the
+rules are tested.
+
+The hard cut is unchanged and is not configurable: a medium widget shows five
+rows and a person configuring six gets the first five. There is no per-family
+row count stored anywhere — `WeekWidgetView` measures its own frame and
+applies `WidgetMetrics.rowCapacity` to it, because a widget's point size
+differs by phone. `largeRowCapacity` exists for the app's own use and is now
+a narrower claim: it is where an *unconfigured* large widget stops, which is
+what the grid's boundary hairline marks and where its rest-day cut ends. No
+line in a scrolling list can stand for several differently-configured widgets
+at once, and the app does not try.
+
 **The Today widget is not in this build** (#209). It was small and medium —
 one configurable habit's ring, and the first three per-day habits — and it went
 with the kind it drew. Its kind strings, `GlowTodaySmall` and `GlowTodayMedium`,
@@ -657,6 +681,14 @@ once, so "which one is this" is not a question it asks. Zero weekly habits is
 still one card, drawing the widget's own empty state — what adding it today
 would actually get you. Week-Small is left alone until #188 gives it a per-habit
 axis to vary over; without one, a second card would be the first card again.
+
+The previews are of *unconfigured* widgets, which is the same narrowing the
+grid's boundary hairline took (#188). They draw the app's own list because
+that is what a widget nobody has configured draws, and per-widget rows mean the
+page cannot know what any particular placed widget shows — `WidgetCenter`
+reports a kind and a family, never a configuration. A preview per placed widget
+would be four previews of one widget, and a wrong one is worse than a generic
+one.
 
 **Nothing on that page places a widget, because no API can.** No public call
 opens the widget gallery or adds anything to a Home Screen; `WidgetCenter`

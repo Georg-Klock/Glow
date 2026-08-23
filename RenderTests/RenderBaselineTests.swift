@@ -276,6 +276,14 @@ struct RenderBaselineTests {
                   view: AnyView(WeekWidgetView(entry: week, familyOverride: .systemMedium))),
             Frame(name: "week large", size: WidgetMetrics.size(of: .systemLarge),
                   view: AnyView(WeekWidgetView(entry: week, familyOverride: .systemLarge))),
+            // A widget somebody configured (#188), and the only committed frame
+            // with a blank row in it. Both halves were ungated until this
+            // landed: nothing rendered a spacer, and nothing rendered a row
+            // list that disagrees with the app's own order.
+            Frame(name: "week medium configured", size: WidgetMetrics.size(of: .systemMedium),
+                  view: AnyView(WeekWidgetView(
+                      entry: Fixture.configuredWeek(), familyOverride: .systemMedium
+                  ))),
             Frame(name: "month small", size: WidgetMetrics.size(of: .systemSmall),
                   view: AnyView(MonthWidgetView(entry: month))),
         ]
@@ -325,6 +333,28 @@ struct RenderBaselineTests {
                     habit(6, "Touch Grass", "leaf", .daily, done: [monday, tuesday]),
                     habit(7, "Sunset", "sunrise", .timesPerWeek(1), done: [monday]),
                 ]
+            )
+        }
+
+        /// The same week, as a widget somebody configured: four rows in an
+        /// order the app does not have, with a blank one third.
+        ///
+        /// Built through `WidgetRows` rather than by hand, so the picture this
+        /// gate commits to is the one the provider would produce. A hand-typed
+        /// array would pass forever while the selection regressed — the mirror
+        /// copy this project's test rules already forbid.
+        static func configuredWeek() -> WeekEntry {
+            let base = week()
+            let spacer = HabitSnapshot(
+                id: id(90), name: "", icon: "", frequency: .daily,
+                completedDays: [], isSpacer: true
+            )
+            let all = base.habits + [spacer]
+            let chosen = [all[5].id, all[2].id, spacer.id, all[0].id]
+            return WeekEntry(
+                date: base.date,
+                week: base.week,
+                habits: WidgetRows.rows(from: all, chosen: chosen)
             )
         }
 

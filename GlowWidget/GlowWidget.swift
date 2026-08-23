@@ -1,4 +1,4 @@
-import SwiftData
+import AppIntents
 import SwiftUI
 import UIKit
 import WidgetKit
@@ -13,11 +13,28 @@ import WidgetKit
 ///
 /// What it keeps beyond that is the part that matters daily: logging a habit
 /// without opening anything.
+///
+/// **Which rows it shows is a per-widget choice** (#188). All three families,
+/// not just the small ones: a person who wants large to show something other
+/// than the default set gets the same control as everyone else rather than
+/// being assumed never to want it. The intent, entity and query live in the
+/// shared sources (`WeekWidgetConfig.swift`) — see the note there; defined only
+/// in this target, the stored choice never reaches the provider.
+///
+/// A widget already on a home screen when this ships arrives with the intent's
+/// default — `rows` nil — which is the case that keeps the app's own order, so
+/// the change is invisible to anyone who does not open the sheet. The kind
+/// string is unchanged for the same reason: it is what an existing widget is
+/// keyed by.
 struct GlowWidget: Widget {
     let kind = WidgetKind.week.rawValue
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: WeekProvider()) { entry in
+        AppIntentConfiguration(
+            kind: kind,
+            intent: SelectWeekLayoutIntent.self,
+            provider: WeekProvider()
+        ) { entry in
             WeekWidgetView(entry: entry)
                 .padding(.leading, WidgetMetrics.padLeading)
                 .padding(.trailing, WidgetMetrics.padTrailing)
@@ -92,7 +109,7 @@ struct GlowWidget: Widget {
     }
 }
 
-struct WeekProvider: TimelineProvider {
+struct WeekProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> WeekEntry {
         let today = WeekCalendar.today()
         return WeekEntry(
@@ -102,13 +119,15 @@ struct WeekProvider: TimelineProvider {
         )
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (WeekEntry) -> Void) {
-        completion(loadEntry())
+    func snapshot(for configuration: SelectWeekLayoutIntent, in context: Context) async -> WeekEntry {
+        loadEntry(for: configuration)
     }
 
     /// One still entry and a midnight refresh — plus, after a tap, the few
     /// cross-fade frames that ride inside the reload the tap already paid for.
-    func getTimeline(in context: Context, completion: @escaping (Timeline<WeekEntry>) -> Void) {
+    func timeline(
+        for configuration: SelectWeekLayoutIntent, in context: Context
+    ) async -> Timeline<WeekEntry> {
         // One entry, and a refresh at midnight. The open slot is defined as
         // "today", so the day rolling over is the only moment the widget goes
         // stale on its own. Everything else is a write, and writes reload the
@@ -120,11 +139,18 @@ struct WeekProvider: TimelineProvider {
         // entries far finer than the minute it is usually credited with. It
         // still came out, because entries are free and reloads are not. See
         // docs/glow.md.
-        let entry = loadEntry()
+        let entry = loadEntry(for: configuration)
         let now = Date()
         let midnight = WeekCalendar.calendar.date(
             byAdding: .day, value: 1, to: WeekCalendar.day(now)
         ) ?? now.addingTimeInterval(3600)
+        // Whether the stored choice reaches the provider is exactly what the
+        // device check needs to see, and the same question about the month
+        // widget's single entity was only ever settled on hardware — see
+        // `MonthWidgetConfig`. Counts and ids only, see `WidgetTrace`.
+        WidgetTrace.record(
+            "week timeline: rows=\(configuration.rows.map { "\($0.count)" } ?? "unset")"
+        )
 
         // A tap animates. Everything else renders still.
         // Reduce Motion travels with the burst rather than being read here.
@@ -135,8 +161,7 @@ struct WeekProvider: TimelineProvider {
             let why = WidgetBurst.pending(now: now) == nil ? "none pending" : "suppressed by reduce motion"
             GlowLog.widget.notice("timeline: 1 entry, still (burst \(why, privacy: .public))")
             WidgetTrace.record("timeline: 1 entry, still (burst \(why))")
-            completion(Timeline(entries: [entry], policy: .after(midnight)))
-            return
+            return Timeline(entries: [entry], policy: .after(midnight))
         }
 
         // The cross-fade's few stills, skipping any the reload latency has
@@ -166,33 +191,27 @@ struct WeekProvider: TimelineProvider {
         let summary = "timeline: \(entries.count) entries, burst \(burst.habitID.uuidString) starting \(lag)s in"
         GlowLog.widget.notice("\(summary, privacy: .public)")
         WidgetTrace.record(summary)
-        completion(Timeline(entries: entries, policy: .after(midnight)))
+        return Timeline(entries: entries, policy: .after(midnight))
     }
 
 
-    /// Not main-actor isolated: `TimelineProvider` is called on whatever queue
-    /// WidgetKit chooses, and the context created here is local to this call,
-    /// so it never crosses a boundary.
-    private func loadEntry() -> WeekEntry {
+    /// Not main-actor isolated: a timeline provider is called on whatever queue
+    /// WidgetKit chooses, and the context `WeekWidgetStore` creates is local to
+    /// the call, so it never crosses a boundary.
+    ///
+    /// The fetch moved to `WeekWidgetStore` (#188) so the configuration picker
+    /// and this render read one descriptor. Two copies of "the week-shaped
+    /// rows, in the user's order" would be two that could drift, and the
+    /// picker offering a row the widget cannot draw is exactly the drift that
+    /// would not be noticed.
+    private func loadEntry(for configuration: SelectWeekLayoutIntent) -> WeekEntry {
         let today = WeekCalendar.today()
         let week = WeekCalendar.week(containing: today)
-
-        guard let container = GlowStore.makeReadOnlyContainer() else {
-            return WeekEntry(date: today, week: week, habits: [])
-        }
-        let context = ModelContext(container)
-        let descriptor = FetchDescriptor<Habit>(
-            predicate: Habit.weekly,
-            sortBy: [SortDescriptor(\.sortOrder)]
+        return WeekEntry(
+            date: today,
+            week: week,
+            habits: WeekWidgetStore.rows(chosen: configuration.rows?.map(\.id), in: week)
         )
-        // Bounded to the week it draws (#135). A home screen widget reloading
-        // every time a completion lands was reading every completion of every
-        // habit to fill in seven columns.
-        let habits = Habit.snapshots(
-            of: (try? context.fetch(descriptor)) ?? [], within: week.dayIDs()
-        )
-
-        return WeekEntry(date: today, week: week, habits: habits)
     }
 }
 

@@ -63,6 +63,46 @@ struct WidgetMetricsTests {
         ) == 4)
     }
 
+    @Test("The small widget holds six habits")
+    func smallHoldsSix() {
+        // The small family drops the label column entirely, so its track is
+        // the frame less the padding and its slot is much smaller — six rows
+        // in the same 128pt of content the medium family fits five in.
+        //
+        // **There is no `smallRowCapacity`, and no `mediumRowCapacity`**
+        // (#188). Configuring a widget's rows was expected to need them, and it
+        // does not: `WeekWidgetView` already measures its own frame and cuts
+        // the list with this same function, so the numbers below are what a
+        // 6.1" phone asks for rather than what the code stores. A stored
+        // per-family constant would be this phone's answer applied to every
+        // other one — a medium widget is 338 × 158 here and larger on a 6.7".
+        // `largeRowCapacity` exists for a different job: the *app* draws a
+        // boundary hairline and needs one number to draw it at.
+        let smallTrack: CGFloat = 158 - WidgetMetrics.padLeading - WidgetMetrics.padTrailing
+        #expect(WidgetMetrics.rowCapacity(
+            height: 158 - WidgetMetrics.padVertical * 2,
+            slot: SlotLayout.slotHeight(trackWidth: smallTrack),
+            hasHeader: false
+        ) == 6)
+    }
+
+    @Test("A configured medium widget is a choice among five, not a dial")
+    func mediumHasNoSixthRow() {
+        // What #188 can and cannot offer. Choosing *which* five rows a medium
+        // widget shows is free; choosing six is not, and no amount of
+        // configuration buys one. The margin is 0.72pt — five rows need 127.28
+        // of 128 — and both candidate donors are already spoken for:
+        // `padVertical` gave its point to buy the fifth row (#57), and `rowGap`
+        // is set by how far a halo spills out of a row.
+        let mediumHeight: CGFloat = 158
+        let content = mediumHeight - WidgetMetrics.padVertical * 2
+        func height(_ n: Int) -> CGFloat {
+            CGFloat(n) * largeSlot + CGFloat(n - 1) * WidgetMetrics.rowGap
+        }
+        #expect(height(5) <= content)
+        #expect(height(6) > content)
+    }
+
     @Test("The large widget's eleven survives the point")
     func largeIsUnaffectedByThePoint() {
         // `padVertical` moved for the medium family's sake, and the large one
