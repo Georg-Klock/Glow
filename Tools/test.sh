@@ -101,6 +101,33 @@ if [ "${GLOW_ERASE_SIMULATOR:-0}" = "1" ]; then
   xcrun simctl erase "$DEVICE_ID"
 fi
 
+# **There is no accessibility tree until accessibility is switched on** (#245).
+#
+# UIKit loads the accessibility bundles into an app only when the device says
+# accessibility is enabled, and a simulator nobody has ever run VoiceOver or the
+# Accessibility Inspector on does not say that. In a process without them
+# nothing vends elements at all — measured on a device this script had just
+# erased, every node in a hosted `WeeklyGridView` came back
+# `isAccessibilityElement = false`, the navigation bar included, and the root
+# reported an element count of zero.
+#
+# `EmptyStateAccessibilityTests` walks that tree, so it failed on every CI run —
+# the lane erases its phone — and passed on the machine it was written on, which
+# had accessibility left on from an earlier session. Empty, not wrong: an empty
+# tree is what an absent runtime looks like, which is why it read as a layout
+# problem.
+#
+# Here rather than in the test, because the preference is the device's and is
+# read once, as the test host launches: by the time any test runs it is far too
+# late to set it. `bootstatus -b` because a device that was just erased is shut
+# down, and `simctl spawn` needs it up.
+echo "==> Enabling accessibility on simulator $DEVICE_ID"
+xcrun simctl bootstatus "$DEVICE_ID" -b >/dev/null
+xcrun simctl spawn "$DEVICE_ID" \
+  defaults write com.apple.Accessibility AccessibilityEnabled -bool true
+xcrun simctl spawn "$DEVICE_ID" \
+  defaults write com.apple.Accessibility ApplicationAccessibilityEnabled -bool true
+
 echo "==> Testing on simulator $DEVICE_ID"
 echo "==> Evidence: $RUN"
 

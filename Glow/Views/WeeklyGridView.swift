@@ -361,67 +361,65 @@ struct WeeklyGridView: View {
         }
     }
 
-    /// The system's empty state, rather than a stack of centred labels.
+    /// Two buttons on an empty screen, and nothing else (#243).
     ///
-    /// Its icon is a real slot rendered by the real code path, so the thing the
-    /// app is about is the first thing on screen, and on an HDR display it
-    /// glows here before there is anything to track.
+    /// **It is the first-run choice** (#228). Nothing seeds by itself, so this
+    /// screen is what a fresh install opens on, and it offers the two starting
+    /// points rather than assuming one: a habit of your own, or the curated set
+    /// that used to arrive unasked. An empty store means the same thing however
+    /// it got that way — nobody has added anything yet, or everything has been
+    /// deleted — and both deserve the same offer, which is why the flag that
+    /// used to tell them apart went with the seeder.
     ///
-    /// **It is the first-run choice now** (#228). Nothing seeds by itself any
-    /// more, so this screen is what a fresh install opens on, and it offers the
-    /// two starting points rather than assuming one: a habit of your own, or
-    /// the curated set that used to arrive unasked. An empty store means the
-    /// same thing however it got that way — nobody has added anything yet, or
-    /// everything has been deleted — and both deserve the same offer, which is
-    /// why the flag that used to tell them apart went with the seeder.
+    /// **A plain stack rather than `ContentUnavailableView`** (#243). The
+    /// system's view is three slots — icon and title, description, actions —
+    /// and this screen now fills one of them; leaving the other two empty is
+    /// fighting the type rather than using it. What went with it is named in
+    /// `docs/decisions.md`: the 54×54 slot that was the first lit thing on a
+    /// fresh install, and the sentence that answered *am I stuck with these?*
+    /// where the question is asked.
+    ///
+    /// **What a screen reader hears is what the screen says, still.** The icon
+    /// carried no accessibility label to begin with — measured, it produced no
+    /// element at all — so the title and the description were the whole of this
+    /// screen's spoken content beyond the buttons, and they are gone from both
+    /// at once. Two buttons is what a sighted user sees and two buttons is what
+    /// VoiceOver reaches, so nothing here needs a label with no visible text
+    /// behind it. See `EmptyStateAccessibilityTests`, which fails if an
+    /// invisible third thing ever appears.
     private var emptyState: some View {
-        ContentUnavailableView {
-            VStack(spacing: 14) {
-                GlowImageView(size: CGSize(width: 54, height: 54))
-                Text("No Habits")
+        VStack(spacing: 16) {
+            // Drawn rather than styled: the app's root tint is pure white, and
+            // `.borderedProminent` fills with the tint and draws the label in
+            // the contrasting colour — white on white. Measured: the capsule's
+            // interior was 8077 pixels of a single colour, 255,255,255, with no
+            // label in it at all. Same treatment as `StoreUnavailableView`.
+            // See #162.
+            Button { isAddingHabit = true } label: {
+                Text("Add Your First Habit")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Capsule().fill(GlowPalette.color))
             }
-        } description: {
-            // The second sentence answers the one hesitation a pre-selected set
-            // raises — *am I stuck with these?* — where it is asked, rather
-            // than on a confirmation screen after the tap.
-            Text(
-                "Add a habit and today's slot will be waiting for you. "
-                    + "Start with the pre-selected set and you can rename, "
-                    + "retarget, reorder or delete any of them."
-            )
-        } actions: {
-            VStack(spacing: 16) {
-                // Drawn rather than styled: the app's root tint is pure
-                // white, and `.borderedProminent` fills with the tint and
-                // draws the label in the contrasting colour — white on white.
-                // Measured: the capsule's interior was 8077 pixels of a single
-                // colour, 255,255,255, with no label in it at all. Same
-                // treatment as `StoreUnavailableView`. See #162.
-                Button { isAddingHabit = true } label: {
-                    Text("Add Your First Habit")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(Capsule().fill(GlowPalette.color))
-                }
-                .buttonStyle(.plain)
+            .buttonStyle(.plain)
 
-                // Plain text, not a second capsule: #162's trap is a filled
-                // background taking the tint, and there is no fill here. The
-                // secondary action does not need the primary's weight to be
-                // legible — white type on the app's black reads as well as
-                // black type on white does.
-                Button {
-                    startWithDefaults()
-                } label: {
-                    Text("Start with a Pre-Selected Set")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(GlowPalette.color)
-                }
-                .buttonStyle(.plain)
+            // Plain text, not a second capsule: #162's trap is a filled
+            // background taking the tint, and there is no fill here. The
+            // secondary action does not need the primary's weight to be
+            // legible — white type on the app's black reads as well as black
+            // type on white does.
+            Button {
+                startWithDefaults()
+            } label: {
+                Text("Start with a Pre-Selected Set")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(GlowPalette.color)
             }
+            .buttonStyle(.plain)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     /// Which week you are on: what it is called, and under it the half the

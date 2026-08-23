@@ -3738,3 +3738,123 @@ it per zone and asserts the sweep swept something — a zone that quietly produc
 no enabled chevron would otherwise pass by asking nothing — and keeps both
 Havana dates as named cases, because a range that happens to contain a date is
 weaker evidence than the date.
+
+### What the empty state stopped saying (#243)
+
+**2026-08-23.** The screen above is two buttons now. The 54×54 slot, the "No
+Habits" title and the description sentence are deleted, and
+`ContentUnavailableView` went with them — its shape is icon-and-title,
+description, actions, and a screen that fills one of those three slots is
+fighting the type rather than using it. What is left is a `VStack` of the two
+buttons, centred, drawn exactly as #228 drew them.
+
+**Both losses are real, and neither is an oversight.** The icon was the first
+lit thing on a fresh install — the one thing the app is about, rendered by the
+real code path, glowing on a device before there was anything to track. The
+description's second sentence answered the one hesitation a pre-selected set
+raises, *am I stuck with these?*, at the moment it is raised rather than in a
+confirmation sheet after the tap. With it gone, the button's own label is the
+whole of what says what the tap does; the answer *is* still true — every habit
+the set installs is an ordinary habit — and it is now written in SPEC §2 and
+nowhere on the screen. Shortening the sentence rather than deleting it is a
+live alternative and was not what was asked for here.
+
+**The accessibility question, measured rather than reasoned about.**
+`ContentUnavailableView` was assumed to announce its three parts as one unit,
+which would have made the plain stack a real regression for VoiceOver. It does
+not. The accessibility tree, walked out of a hosted `WeeklyGridView` over an
+empty store, held four separate elements before the change:
+
+| | element | trait |
+| --- | --- | --- |
+| 1 | "No Habits" | static text |
+| 2 | "Add a habit and today's slot will be waiting for you. Start with the pre-selected set and you can rename, retarget, reorder or delete any of them." | static text |
+| 3 | "Add Your First Habit" | button |
+| 4 | "Start with a Pre-Selected Set" | button |
+
+and two after it — elements 3 and 4, both enabled buttons, in that order. **The
+icon produced no element at all**, which is the fact the decision turns on: it
+was never part of what this screen said out loud, so what a screen reader loses
+here is exactly what a sighted reader loses — the title and the sentence, gone
+from both at once. Parity holds, so **no `.accessibilityLabel` was added**.
+Adding one would have made the screen say more to VoiceOver than it shows to
+everyone else, which is a different decision — restoring the sentence for one
+audience only — wearing an accessibility fix's clothes. The screen is not
+contextless either way: the toolbar still carries "This Week" and the plus
+button, and "Add Your First Habit" only exists on a store with nothing in it.
+
+**VoiceOver itself was not run.** It does not run in the Simulator, and driving
+the host machine's screen reader was not available in this environment, so the
+tree above is what the accessibility server hands out — the same data VoiceOver
+speaks — rather than a recording of it speaking. What that measurement cannot
+answer is announcement *order* and phrasing: it is the tree, not the utterance.
+
+**And the buttons are pressed the way a screen reader presses them.**
+`EmptyStateAccessibilityTests` activates each element with
+`accessibilityActivate()`, which is what VoiceOver's double tap calls: the
+second installs `DefaultHabits.all` with no completions, the first presents the
+editor and leaves the store empty. Four tests, and the first of them fails if an
+invisible third element ever appears — so adding one stays a decision.
+
+**Read off the screenshot, not the diff.** iPhone 17 Pro simulator, fresh
+install: no icon, no title, no paragraph, two centred buttons. #162's white-on-
+white trap is still absent — the capsule's interior measures 89.1% white with
+**5,610 pure-black label pixels** in it, and the secondary's band is black with
+**7,374 white label pixels**. Both say something.
+
+### An accessibility test needs accessibility switched on (#245)
+
+**2026-08-23.** `EmptyStateAccessibilityTests` was green on the machine it was
+written on and red on every CI run, with all three hosted-view tests failing the
+same way: the accessibility tree was **empty**. Not a wrong label, not a crash —
+no elements at all.
+
+**The cause is not layout, and not the window.** The obvious suspicion was the
+harness's window: it joins the host app's scene only `if` one exists, and a
+`UIWindow` outside the accessibility hierarchy vends nothing. Instrumented on an
+erased simulator, that is not what happens. One `UIWindowScene`, foreground
+active; `window.windowScene` non-nil; the window key; `host.view.window` set;
+the view laid out at 402×874 with the navigation bar measured at its real
+frame. The hierarchy is on screen and correct.
+
+What is missing is the accessibility runtime. UIKit loads the accessibility
+bundles into an app only when the device says accessibility is enabled, and on a
+device where it never was, `_AXSApplicationAccessibilityEnabled()` is false, the
+UIKit accessibility bundle is absent from the process, and **every node reports
+`isAccessibilityElement = false`** — the buttons, the hosting view and UIKit's
+own navigation bar alike. An empty tree is what an absent runtime looks like,
+which is exactly why it read as a layout failure and is not one.
+
+**Why it split by machine.** `Tools/test.sh` erases the simulator on CI, so CI's
+phone is always a fresh one. Of the simulators on the machine the suite was
+written on, exactly one carried `ApplicationAccessibilityEnabled`, left by some
+earlier session that had turned VoiceOver on; the suite was measured and run
+there. The tests were never CI-specific — they fail on any simulator that has
+never had accessibility switched on, which is how the diagnosis was made
+locally rather than by pushing to CI.
+
+**The fix is to state the requirement rather than work around it.**
+`Tools/test.sh` now writes `AccessibilityEnabled` and
+`ApplicationAccessibilityEnabled` into the chosen simulator's
+`com.apple.Accessibility` domain before handing the device to `xcodebuild`. It
+cannot be done from inside a test: the preference is read as the test host
+launches. Proof that this and nothing else is the difference — the same built
+binary, on the same machine, in the same minute: on the erased device three
+tests fail with an empty tree; on a device differing only in those two
+preferences, all four pass and the walk finds the two `AccessibilityNode`s
+labelled "Add Your First Habit" and "Start with a Pre-Selected Set".
+
+No assertion was relaxed and nothing is retried or skipped — a poll loop around
+an empty tree would only have bought a slow red test and eventually a flaky
+green one, and `Tools/validate-test-result.py` fails a run that skips anything.
+The suite carries a comment saying what it needs, because it is the only one in
+the repository that hosts a live view and now the only one with a requirement on
+the device: a hand-typed `xcodebuild test` on a fresh simulator still fails
+these four and nothing else, and that shape of failure is the diagnosis.
+
+**What this does not change.** The measurement in the entry above stands. It was
+taken with accessibility on, which is the condition a VoiceOver user is in — the
+tree the tests walk is the tree the accessibility server hands out. That
+`ContentUnavailableView` vended four separate elements rather than one, that the
+icon vended none, and that the empty state's spoken content is exactly its two
+buttons are all unaffected.
