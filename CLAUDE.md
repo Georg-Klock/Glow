@@ -107,6 +107,15 @@ settled did not go with it.
   page. See the end of `docs/glow.md` for what was measured, including the one
   trap: a screen without headroom tone-maps the result to grey, so the page has
   to test for headroom before showing it at all.
+- **Shut down simulators nothing is testing on:** `Tools/reap-simulators.sh`
+
+  A booted runtime is not free — ten booted devices with two in use measured
+  1,770 CoreSimulator processes and a load average of 797, well past where this
+  machine kills a test host during bootstrap. Devices accumulate because
+  `GLOW_SIMULATOR_UDID` runs create their own and nothing reaps them, so the
+  escape hatch from #221's queue feeds the load that kills the next run. Spares
+  anything a live `xcodebuild` names; shuts down rather than deletes, so the
+  next run pays one boot. See #247.
 - **Read the widget's trace off a tethered phone:** `Tools/pull-widget-log.sh`
 - **Check the App Group entitlement survived signing:**
   `Tools/check-app-group.sh [path/to/Glow.app]`
