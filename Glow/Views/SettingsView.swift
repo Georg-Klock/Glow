@@ -70,6 +70,9 @@ struct SettingsView: View {
             // background, so the halo falls off into the same black the grid
             // uses and there is no seam where the row would have been.
             .background(Color.black)
+            // Everything that scrolls up to the top of the screen dissolves
+            // into black before it gets there. See `topFade`.
+            .overlay(alignment: .top) { topFade }
             .navigationTitle("Settings")
             // The bar is opaque from the start, because the preview scrolls
             // under it now. Measured on screen: a column down the left edge
@@ -86,6 +89,14 @@ struct SettingsView: View {
             // than it sounds: the system material dims the capsule to grey and
             // prints "Settings" on top of it, so the product's one lit object
             // slides under the title as a smear. Screenshotted before choosing.
+            //
+            // **It does not make the bar opaque, and the measurement above was
+            // read as saying it does.** Scrolled 200pt and screenshotted at
+            // rest, the preview capsule reads 249,249,248 through the bar with
+            // the inline title printed over it. The column that read 0,0,0 was
+            // a column with nothing bright behind it. The bar is still declared
+            // visible — it is what stops the material smear — and what actually
+            // keeps light off the top of the screen is `topFade`. See #195.
             .toolbarBackground(.visible, for: .navigationBar)
 
             .onAppear { isDemoSeeded = DemoHistory(context: context).isSeeded }
@@ -123,6 +134,27 @@ struct SettingsView: View {
                 // already a band of black, and the Form's gap on top of that
                 // reads as the first section having drifted down the screen.
                 .listSectionSpacing(0)
+
+                // Directly under the thing it explains. It used to sit three
+                // sections down, below the Glow slider and the whole "Say well
+                // done" cluster, so a dark preview was two unrelated controls
+                // away from the one line saying why it is dark.
+                //
+                // **No `.listSectionSpacing(0)` of its own, and #201 asked for
+                // one.** The modifier sets the gap *below* the section it is on,
+                // not above it: the preview's own zero already lands on whatever
+                // follows, so the banner arrives tight against the reserved band
+                // either way. Measured, glow at minimum, both builds — the
+                // banner sits at 418–470pt in both; carrying the modifier only
+                // pulls the Glow section up from 528pt to 510pt, closing the
+                // one gap #201 asked to keep.
+                if peak <= GlowSettings.range.lowerBound {
+                    Section {
+                        Label("Glow off. Today's slot still shows, unlit.", systemImage: "info.circle")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
                 // Glow leads: it is the one control here that is the product
                 // rather than a preference about it.
@@ -175,14 +207,6 @@ struct SettingsView: View {
                     Text("Say well done")
                 } footer: {
                     Text(popFooter)
-                }
-
-                if peak <= GlowSettings.range.lowerBound {
-                    Section {
-                        Label("Glow off. Today's slot still shows, unlit.", systemImage: "info.circle")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
                 }
 
                 // One subject, one section: which seven days a week is, and
@@ -334,12 +358,106 @@ struct SettingsView: View {
     /// black on black.
     private static let haloReach: CGFloat = 3
 
+    /// Black at the top of the screen, fading out below it.
+    ///
+    /// A property of the top of the screen rather than of the preview: whatever
+    /// scrolls up there dissolves rather than being cut at the list's clip
+    /// boundary. Measured at rest, scrolled 200pt: the preview capsule sat at
+    /// 100–143pt reading 249,249,248 with the inline title printed on top of it
+    /// — so the navigation bar's own background is not the opaque black
+    /// `.toolbarBackground(.visible, for:)` was read as granting, and a hard cut
+    /// is what was holding the light back. See #195.
+    ///
+    /// Opaque through the safe area, so nothing is ever lit beside the Dynamic
+    /// Island, and the falloff resolves below the bar rather than at it — the
+    /// same "reserve past the falloff, do not clip at it" the halo's own
+    /// reservation is built on.
+    ///
+    /// **`ignoresSafeArea` is load-bearing, and it is not about the status
+    /// bar.** Without it the overlay's top edge is the *form's* top edge, which
+    /// a `NavigationStack` puts below the whole navigation bar: coloured red
+    /// and green and screenshotted, the band started at 167pt — under the large
+    /// title, over the preview, nowhere near the screen's top. With it the band
+    /// starts at 0.
+    ///
+    /// It draws over the content and under the bar, which is what makes it safe
+    /// where a `Color` on `.toolbarBackground` was not: screenshotted scrolled,
+    /// the inline title renders at full white on top of the band. The system
+    /// status bar and the Dynamic Island are above it too.
+    private var topFade: some View {
+        let solid = Self.safeAreaTop
+        let height = solid + Self.topFadeFalloff
+        return LinearGradient(
+            stops: [
+                .init(color: .black, location: 0),
+                .init(color: .black, location: solid / height),
+                .init(color: .black.opacity(0), location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: height)
+        .ignoresSafeArea(edges: .top)
+        .allowsHitTesting(false)
+    }
+
+    /// How far below the safe area the fade takes to reach nothing.
+    ///
+    /// Past the navigation bar's own height (44pt), so the falloff finishes in
+    /// open content rather than at the bar's lower edge, where the handover
+    /// would read as the seam this replaced.
+    private static let topFadeFalloff: CGFloat = 64
+
+    /// Where the safe area ends, from the window rather than from a
+    /// `GeometryReader`.
+    ///
+    /// **A `GeometryReader` here reports zero.** The first build of this fade
+    /// read `proxy.safeAreaInsets.top` inside the overlay, with
+    /// `.ignoresSafeArea(edges: .top)` on it, and got 0 — so the gradient came
+    /// out 64pt tall, ended above everything it was meant to cover, and
+    /// measured pixel-for-pixel identical to the screen without it. Colouring
+    /// the two stops red and green showed the band starting at y=0 and ending
+    /// at 57pt: the overlay is already full-screen, so there is no inset left
+    /// for a proxy to report. The window still knows.
+    ///
+    /// The fallback is the largest inset a current iPhone has, because
+    /// over-reserving here costs black on black and under-reserving is the bug.
+    private static var safeAreaTop: CGFloat {
+        let window = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }
+        return window?.safeAreaInsets.top ?? 62
+    }
+
     /// How much the Dynamic Island says.
     ///
     /// A binding rather than `@AppStorage`, because the default is **goals**
     /// and `@AppStorage` hands back `0` for a key nobody has written — a plain
     /// stored default reads as whatever `0` maps to until it is changed twice.
     /// `PopPreferences` keeps the sentinel; this reflects it.
+    ///
+    /// **A plain synchronous write, and #203 asked for `withAnimation`.** The
+    /// footer under this picker is one sentence, two, or a longer two-clause
+    /// one, so it resizes and every section below it moves — and that move
+    /// snaps. Wrapping the write does not change it: built with a three-second
+    /// linear `withAnimation` around the write, and again with a linear
+    /// `animation` modifier keyed to `popLevel` on the `Form` as well, a burst
+    /// of screenshots 0.2s apart caught the Week section moving 373pt → 405pt
+    /// between two consecutive frames, with no intermediate position in either
+    /// build.
+    ///
+    /// The transaction is not being lost. A control in the same build — the
+    /// preview's opacity, driven by the same `popLevel` write — ramped
+    /// 254 → 168 across thirteen frames of that same three-second curve while
+    /// the sections below still jumped in one. A `Form` section's reflow is
+    /// simply not what that animation reaches, so an animated write here would
+    /// be a claim the screen does not support. See #203 and #215.
+    ///
+    /// **The API names are spelled without their parentheses on purpose.**
+    /// `ReduceMotionTests` scans source text for the two call shapes and asks
+    /// every file that contains one to read the setting; prose naming an API is
+    /// indistinguishable from calling it, and this file animates nothing.
     private var popBinding: Binding<PopPreferences.Level> {
         Binding(get: { popLevel }, set: { popLevel = $0; PopPreferences.level = $0 })
     }
@@ -412,14 +530,34 @@ struct SettingsView: View {
             + "phone only when you send it somewhere — nothing is uploaded."
     }
 
-    /// The section's three paragraphs, in row order, as one string.
+    /// The section's paragraphs, in row order, as one string.
     ///
-    /// They stay three properties because each explains a different control and
-    /// is worth reading on its own; they arrive as one `Text` because that is
-    /// the only way a section footer shows more than its first line. See the
+    /// They stay separate properties because each explains a different control
+    /// and is worth reading on its own; they arrive as one `Text` because that
+    /// is the only way a section footer shows more than its first line. See the
     /// note at the call site.
     private var dataFooter: String {
-        [exportFooter, demoFooter, resetFooter].joined(separator: "\n\n")
+        [exportFooter, demoFooter, resetFooter, versionFooter].joined(separator: "\n\n")
+    }
+
+    /// What is installed, in the shape everything else already uses.
+    ///
+    /// `SHORT (BUILD)` — `Glow 0.1 (1)` locally, `Glow 0.1 (202608211900)` from
+    /// a lane that computes the build at archive time — because that is what a
+    /// crash report prints and what `Tools/check-release-build.py` compares, so
+    /// the number in Settings is the one to paste rather than a
+    /// differently-formatted twin of it. The first runtime reader of either key
+    /// in this app; every other check reads them from outside the built product.
+    ///
+    /// **Last paragraph of one `Text`, not a `Text` of its own.** #200's sketch
+    /// added a third `Text` to the footer, which is exactly the bug #193 found
+    /// there: a section footer renders its first `Text` and drops the rest, so
+    /// the version would never have appeared on screen.
+    private var versionFooter: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "Glow \(short) (\(build))"
     }
 
     /// Seeds or removes the invented past. Errors leave the toggle where the
