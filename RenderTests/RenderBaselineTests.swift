@@ -44,7 +44,8 @@ import UIKit
 /// `RenderSignature.toneExcess` — is a count of pixels, not an average, so it
 /// does not care how thin the mark is.
 ///
-/// Measured across all six families, before and after #194: the excess at the
+/// Measured across the six families that existed before #209, before and after
+/// #194: the excess at the
 /// grey's own level is **680 to 4132** pixels where the grey is painted, and
 /// **−2 to 42** at that same level where it is not. Two orders of magnitude,
 /// against three levels of slack in the grid. A one-level palette move is
@@ -236,7 +237,8 @@ struct RenderBaselineTests {
     /// The share of a committed tone's pixel count that has to survive.
     ///
     /// Generous on purpose, and it can afford to be. Measured across the six
-    /// families before and after #194: a tone that is still painted holds 680
+    /// families that existed before #209, before and after #194: a tone that is
+    /// still painted holds 680
     /// to 4132 pixels of excess, and the same level with the tone moved away
     /// holds −2 to 42 — about 1% of the number the baseline recorded. Half is
     /// far outside anything antialiasing can do and far inside the collapse.

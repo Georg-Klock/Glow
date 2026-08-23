@@ -194,7 +194,7 @@ final class Habit {
     /// if something were placed to try.
     ///
     /// The rows go out from under it because **two processes write this store**.
-    /// `ToggleHabitIntent` and `TapHabitIntent` open their own `ModelContainer`
+    /// `ToggleHabitIntent` opens its own `ModelContainer`
     /// against the same App Group file, and nothing tells the app's context to
     /// re-fetch when the widget's deletes a completion. The app tells the widget
     /// about every write it makes; the reverse path does not exist.

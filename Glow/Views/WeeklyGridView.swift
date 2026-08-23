@@ -681,8 +681,8 @@ struct WeekdayHeader: View {
     /// standing: this header is built inside `WeeklyGridView`'s
     /// `NavigationStack`, not by the struct that constructs one, so the value
     /// the toolbar's `EditButton` toggles is the value it sees. See
-    /// `HabitRowView.isEditing` for the distinction, and `TodayView` for the
-    /// case where it does not hold.
+    /// `HabitRowView.isEditing` for the distinction, and CLAUDE.md's entry on
+    /// `@Environment(\.editMode)` for the case where it does not hold.
     @Environment(\.editMode) private var editMode
     private var isEditing: Bool { editMode?.wrappedValue.isEditing ?? false }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
