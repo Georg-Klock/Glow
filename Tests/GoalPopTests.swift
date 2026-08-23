@@ -20,28 +20,18 @@ struct GoalPopTests {
         )
     }
 
-    private func met(_ h: HabitSnapshot, todayColumn: Int = 4) -> Bool {
-        GoalMet.justMet(habit: h, in: week, today: day(todayColumn), calendar: calendar)
+    private func met(_ h: HabitSnapshot) -> Bool {
+        GoalMet.justMet(habit: h, in: week)
     }
 
     // MARK: - The goal, not each repetition
-
-    @Test("A per-day habit fires on the last repetition and no other")
-    func perDayFiresOnce() {
-        // The twelfth glass, not each of the twelve.
-        for count in 0..<12 {
-            #expect(!met(habit(.timesPerDay(12), counts: [4: count])),
-                    "fired at \(count) of 12")
-        }
-        #expect(met(habit(.timesPerDay(12), counts: [4: 12])))
-    }
 
     @Test("A completion past the goal fires nothing")
     func pastTheGoalIsSilent() {
         // Exactly met, not met-or-past — which is also what removes the need to
         // know what the count was before the write.
-        #expect(!met(habit(.timesPerDay(3), counts: [4: 4])))
         #expect(!met(habit(.timesPerWeek(2), counts: [0: 1, 1: 1, 2: 1])))
+        #expect(!met(habit(.timesPerWeek(1), counts: [0: 1, 3: 1])))
     }
 
     @Test("A weekly habit fires when the week's goal is met")
@@ -65,7 +55,7 @@ struct GoalPopTests {
             frequency: .timesPerWeek(2),
             completionCounts: [TestCalendar.date(2026, 8, 10): 1, day(0): 1]
         )
-        #expect(!GoalMet.justMet(habit: habit, in: week, today: day(4), calendar: calendar))
+        #expect(!GoalMet.justMet(habit: habit, in: week))
     }
 
     @Test("A blank row has no goal to meet")
@@ -74,14 +64,13 @@ struct GoalPopTests {
             id: UUID(), name: "", icon: "", frequency: .daily,
             completionCounts: [:], isSpacer: true
         )
-        #expect(!GoalMet.justMet(habit: spacer, in: week, today: day(4), calendar: calendar))
+        #expect(!GoalMet.justMet(habit: spacer, in: week))
     }
 
     @Test("Every cadence has a goal, and it is the number the habit asks for")
     func targets() {
         #expect(GoalMet.target(of: .daily) == Frequency.daysInWeek)
         #expect(GoalMet.target(of: .timesPerWeek(4)) == 4)
-        #expect(GoalMet.target(of: .timesPerDay(12)) == 12)
     }
 
     // MARK: - The line

@@ -127,23 +127,10 @@ struct DemoHistoryTests {
         #expect(try snapshot() == first)
     }
 
-    @Test("A per-day habit's demo never overshoots its target")
-    func perDayStaysWithinTarget() throws {
-        let defaults = makeDefaults()
-        let context = try seededContext(defaults)
-        let store = HabitStore(context: context, calendar: calendar)
-        let habit = try store.addHabit(
-            name: "Water", icon: "drop", frequency: Frequency(timesPerDay: 3), now: today
-        )
-
-        try demo(context, defaults).seed(now: today)
-
-        for (day, count) in habit.completionCounts {
-            #expect(count <= 3, "\(day) holds \(count) of 3")
-            #expect(day != today)
-        }
-        #expect(!habit.completionCounts.isEmpty)
-    }
+    // The per-day habit's demo used to be asserted here: that a day never
+    // held more repetitions than the habit asked for. It is on
+    // `feature/daily-habits-2.0` with the branch of `SeededHistory` that drew
+    // it (#209).
 
     @Test("What the demo added is known to the store, not to the defaults")
     func provenanceOutlivesTheDefaults() throws {

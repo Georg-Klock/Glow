@@ -42,7 +42,7 @@ enum GoalPopCentre {
         today: Date,
         calendar: Calendar = WeekCalendar.calendar
     ) {
-        let met = GoalMet.justMet(habit: habit, in: week, today: today, calendar: calendar)
+        let met = GoalMet.justMet(habit: habit, in: week)
         // The routine line, and then the goal's — the tap that meets the goal
         // has two things to say (#119). They share the two seconds rather than
         // getting one each: a compact Island state has room for one short

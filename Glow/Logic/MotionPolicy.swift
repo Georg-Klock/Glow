@@ -2,18 +2,18 @@ import CoreGraphics
 
 /// Whether a change moves, decided in one place for every surface.
 ///
-/// The app has exactly one animation — a completion arriving — drawn four
-/// ways: the ring closing (`SlotView`), the bar closing (`SpanView`), the
-/// label dimming beside it (`HabitRowView`), and the line sweeping round the
-/// day (`DayRingView`). Reduce Motion was honoured in one of those four, plus
-/// the widget's burst, which records the setting at the tap and leaves a
-/// timeline with one still entry in it (`WidgetBurst`, #107). SPEC §3's "Reduce
-/// Motion snaps" was written about the ring and read as if it covered the
-/// grid; it did not (#137).
+/// The app has exactly one animation — a completion arriving — drawn three
+/// ways: the ring closing (`SlotView`), the bar closing (`SpanView`), and the
+/// label dimming beside it (`HabitRowView`). It was four while the Today ring's
+/// sweep shipped (#209). Reduce Motion was honoured in one of those, plus the
+/// widget's burst, which records the setting at the tap and leaves a timeline
+/// with one still entry in it (`WidgetBurst`, #107). SPEC §3's "Reduce Motion
+/// snaps" was written about the ring and read as if it covered the grid; it did
+/// not (#137).
 ///
 /// The rules are here rather than in each view for the reason `WeekGrid`'s
-/// are: a predicate in a view is a predicate no test can reach, and four
-/// copies of "and not while Reduce Motion is on" is four chances to keep three.
+/// are: a predicate in a view is a predicate no test can reach, and three
+/// copies of "and not while Reduce Motion is on" is three chances to keep two.
 ///
 /// **The reduced path is a snap, not a shorter animation.** A quicker sweep is
 /// still a sweep; what the setting asks for is the final state, arrived at with
@@ -34,15 +34,6 @@ enum MotionPolicy {
         reduceMotion: Bool
     ) -> Bool {
         previous == .open && next == .filled && !reduceMotion
-    }
-
-    /// Whether the Today ring sweeps a repetition into place.
-    ///
-    /// One more, and only one more. A reset, a day rolling over, an edit, a tap
-    /// arriving from the widget — none of those is a gesture anybody made on
-    /// this ring, and none of them animates.
-    static func sweepsRing(from previous: Int, to next: Int, reduceMotion: Bool) -> Bool {
-        next == previous + 1 && !reduceMotion
     }
 
     /// How far a press pushes a mark past its resting size.

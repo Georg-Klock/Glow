@@ -19,20 +19,18 @@ enum DefaultHabits {
         let frequency: Frequency
     }
 
-    /// One list, two screens.
+    /// One list, one screen.
     ///
-    /// `Frequency` has two kinds that never share a surface, and each screen
-    /// asks its own question of the store: This Week queries
-    /// `Habit.countedPerWeek` and Today queries `Habit.countedPerDay`. So the
-    /// seed is written as one array in one order, and the split happens on the
-    /// way out rather than here — eight weekly-cadence habits for the grid,
-    /// five per-day habits for the ring.
+    /// It was one list and two: five per-day habits rode along at the end for
+    /// the Today ring, and the split happened on the way out. Both are gone with
+    /// the kind they served (#209) — Sunlight, Protein Meal, Move, Breathe and
+    /// Hydration are on `feature/daily-habits-2.0`, and an install that already
+    /// has them is swept by `DailyHabitMigration`.
     ///
-    /// **Blank rows are the grid's own device** and only ever land there:
-    /// `countedPerWeek` is `timesPerDay == 0`, which a spacer satisfies and a
-    /// per-day habit never does. Two of them, because three clusters need two
-    /// dividers — not because a target row count wanted filling. Eight habits
-    /// and two blank rows is ten, inside the large widget's eleven.
+    /// **Blank rows are the grid's own device.** Two of them, because three
+    /// clusters need two dividers — not because a target row count wanted
+    /// filling. Eight habits and two blank rows is ten, inside the large
+    /// widget's eleven.
     ///
     /// Names are short on purpose. The label column is a fixed fraction of the
     /// width, and a long name truncates on a small phone, which is a poor first
@@ -42,7 +40,7 @@ enum DefaultHabits {
     /// `.timesPerWeek(7)`: `Frequency.init(timesPerWeek:)` folds seven into
     /// `.daily` at runtime, so the literal may as well say what it means.
     static let all: [Template] = [
-        // The weekly eight, in three clusters by time of day. Morning:
+        // Eight, in three clusters by time of day. Morning:
         Template(name: "Gratitude", icon: "pencil", frequency: .daily),
         Template(name: "Stretch", icon: "figure.yoga", frequency: .timesPerWeek(4)),
         Template(name: "Read Book", icon: "book", frequency: .timesPerWeek(4)),
@@ -58,23 +56,6 @@ enum DefaultHabits {
 
         // Evening:
         Template(name: "Watch Sunset", icon: "sunset", frequency: .timesPerWeek(3)),
-        Template(name: "Early night", icon: "bed.double", frequency: .daily),
-
-        // The per-day five, which never reach the grid — they are Today's
-        // rings. Counts rather than checkmarks, because that is the cadence
-        // each of these actually has: water is drunk across a day, not logged
-        // once at the end of it.
-        Template(name: "Sunlight", icon: "sun.max", frequency: .timesPerDay(2)),
-        Template(name: "Protein Meal", icon: "fork.knife", frequency: .timesPerDay(3)),
-        Template(name: "Move", icon: "figure.walk", frequency: .timesPerDay(4)),
-        Template(name: "Breathe", icon: "wind", frequency: .timesPerDay(3)),
-        Template(name: "Hydration", icon: "drop", frequency: .timesPerDay(8))
+        Template(name: "Early night", icon: "bed.double", frequency: .daily)
     ]
-
-    /// The rows This Week and the week widget see: the weekly cadences and the
-    /// blank rows between them, in order.
-    static var weekly: [Template] { all.filter { !$0.frequency.isCountedPerDay } }
-
-    /// The rows Today sees. Blank rows are the grid's, so none are here.
-    static var perDay: [Template] { all.filter(\.frequency.isCountedPerDay) }
 }

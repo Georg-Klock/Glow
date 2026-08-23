@@ -406,9 +406,6 @@ struct WidgetRenderDiffTests {
     /// Every family, at the sizes a 6.1" phone gives them.
     private func families() -> [(String, AnyView, CGSize)] {
         let week = entry()
-        let today = TodayEntry(date: week.date, habits: [
-            DayRingSnapshot(id: UUID(), name: "Water", icon: "drop", target: 6, done: 2),
-        ])
         return [
             ("week small", AnyView(WeekWidgetView(entry: week, familyOverride: .systemSmall)),
              CGSize(width: 158, height: 158)),
@@ -416,10 +413,6 @@ struct WidgetRenderDiffTests {
              CGSize(width: 338, height: 158)),
             ("week large", AnyView(WeekWidgetView(entry: week, familyOverride: .systemLarge)),
              CGSize(width: 338, height: 354)),
-            ("today small", AnyView(TodaySmallView(entry: today)),
-             CGSize(width: 158, height: 158)),
-            ("today medium", AnyView(TodayMediumView(entry: today)),
-             CGSize(width: 338, height: 158)),
             // The densest family, and the one most likely to lose the ground
             // claim without anyone noticing: six rows of seven cells, where a
             // lifted floor reads as "the marks are dim" rather than as "the
@@ -448,11 +441,13 @@ struct WidgetRenderDiffTests {
     ///
     /// The background cannot be measured with the halo on. A lit mark spreads
     /// white onto the ground on purpose — that is the product, not a leak — and
-    /// on the small Today family the ring's halo reaches
-    /// `96 * ringHaloRadius * maxHaloScale` = 46.6pt, which covers a 158pt
-    /// frame corner to corner. Its corners read 1,1,1 with the glow up, and
-    /// **0,0,0 with it down**, which is what proves the one level is the halo
-    /// and not the ground.
+    /// on a small family it reaches the corners: the measurement that
+    /// established this was the Today ring's halo at
+    /// `96 * ringHaloRadius * maxHaloScale` = 46.6pt across a 158pt frame,
+    /// whose corners read 1,1,1 with the glow up and **0,0,0 with it down**.
+    /// That family is gone (#209) and the claim is not — `haloIsWhatLiftsIt`
+    /// makes it against a family that still ships, and fails rather than
+    /// passing vacuously if no halo reaches that far.
     private func withoutHalo<T>(_ body: () throws -> T) rethrows -> T {
         let previous = GlowSettings.store.object(forKey: GlowSettings.key)
         defer { GlowSettings.store.set(previous, forKey: GlowSettings.key) }
@@ -489,7 +484,8 @@ struct WidgetRenderDiffTests {
             }
             let share = Double(exact) * 100 / Double(w * h)
             print("bg-audit: \(name) exact-black \(String(format: "%.1f", share))%")
-            // 95-98% measured across the five. A gradient, a tint or a material
+            // 95-98% measured across the six families this had before #209
+            // took two of them out. A gradient, a tint or a material
             // would lift every one of these off the floor at once, which a
             // corner sample alone could miss if it were subtle at the edges.
             #expect(share > 90, "\(name): only \(Int(share))% of the frame is pure black")
@@ -500,20 +496,46 @@ struct WidgetRenderDiffTests {
     @Test("With the glow up, the only thing lifting the ground is the halo")
     func haloIsWhatLiftsIt() throws {
         // The other half of the same claim, and the reason the test above turns
-        // the glow down rather than loosening its tolerance. On the small Today
-        // family the ring's halo covers the whole frame — corner to corner —
-        // so there is nowhere in it that "no mark is near".
-        let (_, view, size) = families()[3]
-        let lit = try rgba(of: try renderFamily(view, size: size))
-        let dark = try withoutHalo { try rgba(of: try renderFamily(view, size: size)) }
+        // the glow down rather than loosening its tolerance.
+        //
+        // It used to read one corner of the small Today family, whose ring halo
+        // reached `96 * ringHaloRadius * maxHaloScale` = 46.6pt and so covered a
+        // 158pt frame corner to corner: there was nowhere in that frame where
+        // "no mark is near". **That family is gone** (#209), and measured on the
+        // four that remain, no corner is lifted at all — the corner was a
+        // property of the ring, not of the halo.
+        //
+        // So the sample is the difference itself rather than a place. Every
+        // pixel that is exactly 0,0,0 with the glow down and is not with it up
+        // is a pixel the halo lifted, wherever it falls, and the claim is about
+        // all of them: there are some, and every one is neutral.
+        var lifted = 0
+        var worstSpread = 0
+        for (name, view, size) in families() {
+            // Explicitly, both times. `withoutHalo` empties the cache on the way
+            // in and not on the way out, so a lit render following a dark one
+            // would otherwise draw the previous family's unlit tiles.
+            GlowImageCache.shared.removeAll()
+            let lit = try rgba(of: try renderFamily(view, size: size))
+            let dark = try withoutHalo { try rgba(of: try renderFamily(view, size: size)) }
+            #expect(lit.count == dark.count, "\(name) rendered two different sizes")
 
-        func corner(_ p: [UInt8]) -> Int { Int(p[(1 * Int(size.width * Self.scale) + 1) * 4]) }
-        #expect(corner(dark) == 0, "the ground itself is not black")
-        #expect(corner(lit) > 0, "the halo does not reach the corner after all")
-        // And it is still neutral where it lands, which is the claim that
-        // survives the halo.
-        let i = (1 * Int(size.width * Self.scale) + 1) * 4
-        #expect(lit[i] == lit[i + 1] && lit[i + 1] == lit[i + 2])
+            for i in stride(from: 0, to: min(lit.count, dark.count), by: 4)
+            where dark[i] == 0 && dark[i + 1] == 0 && dark[i + 2] == 0 {
+                let high = Int(max(lit[i], lit[i + 1], lit[i + 2]))
+                guard high > 0 else { continue }
+                lifted += 1
+                worstSpread = max(
+                    worstSpread, high - Int(min(lit[i], lit[i + 1], lit[i + 2]))
+                )
+            }
+        }
+        GlowImageCache.shared.removeAll()
+
+        #expect(lifted > 0, "the glow lifts no pixel off the ground at all")
+        // Neutral where it lands, which is the claim that survives the halo.
+        // One level of slack for the encoder's own rounding between channels.
+        #expect(worstSpread <= 1, "the halo carries a hue: channels spread by \(worstSpread)")
     }
 
     @Test("No pixel the widget renders carries a hue")

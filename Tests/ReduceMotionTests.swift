@@ -4,12 +4,15 @@ import Testing
 
 /// #137: Reduce Motion was honoured on one animated surface out of four.
 ///
-/// SPEC §3 says "Reduce Motion snaps" in the `DayRing` section, and it was true
-/// there and in the widget's burst, which records the setting at the tap
+/// SPEC §3 said "Reduce Motion snaps" in the Today ring's section, and it was
+/// true there and in the widget's burst, which records the setting at the tap
 /// (`WidgetBurst`, #107). The week grid — the screen the app *is* — read the
 /// setting nowhere: a completion closed on a spring, the row's label dimmed on
 /// the same spring, and a press grew 32% and sprang back, whatever the person
 /// had asked for.
+///
+/// The ring is gone with the per-day kind (#209) and `sweepsRing` with it, so
+/// the surfaces are three and every one of them is asserted here.
 @Suite("Reduce Motion")
 struct MotionPolicyTests {
     @Test("A completion closes only when it was just made")
@@ -30,18 +33,6 @@ struct MotionPolicyTests {
                 #expect(!MotionPolicy.closesCompletion(from: from, to: to, reduceMotion: true))
             }
         }
-    }
-
-    @Test("The ring sweeps one repetition, and only by hand")
-    func ringSweepsOnce() {
-        #expect(MotionPolicy.sweepsRing(from: 0, to: 1, reduceMotion: false))
-        #expect(MotionPolicy.sweepsRing(from: 4, to: 5, reduceMotion: false))
-        // A reset, an edit, a day rolling over, a tap arriving from the widget:
-        // none of those is a gesture anybody made on this ring.
-        #expect(!MotionPolicy.sweepsRing(from: 3, to: 0, reduceMotion: false))
-        #expect(!MotionPolicy.sweepsRing(from: 1, to: 3, reduceMotion: false))
-        #expect(!MotionPolicy.sweepsRing(from: 1, to: 1, reduceMotion: false))
-        #expect(!MotionPolicy.sweepsRing(from: 0, to: 1, reduceMotion: true))
     }
 
     // `@MainActor` because `SlotView.pressScale` is: `View` carries the

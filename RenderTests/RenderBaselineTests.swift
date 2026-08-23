@@ -244,12 +244,14 @@ struct RenderBaselineTests {
 
     /// Pixels of excess below which a level is not a tone this frame paints.
     ///
-    /// The two Today families sit under it at level 36 and that is correct
-    /// rather than a gap in the fixture: their only unlit surface is a habit
-    /// name in the handled state, and the pinned fixture's one habit is open,
-    /// so those frames contain no `greyOpaque` pixel at all. The baseline
-    /// records that as a number near zero, and the *other* branch above holds
-    /// it there.
+    /// It had a second job while the two Today families rendered: they sat
+    /// under it at level 36 — their only unlit surface was a habit name in the
+    /// handled state, and the pinned fixture's one habit was open, so those
+    /// frames held no `greyOpaque` pixel at all — and the *other* branch above
+    /// was what held them there. Those families are gone (#209), and with them
+    /// #213's claim; every frame left paints both levels well above this. The
+    /// floor still separates a tone from a rounding artefact, which is the job
+    /// it was written for.
     static let toneFloor = 200
 
     // MARK: - The scene
@@ -264,7 +266,6 @@ struct RenderBaselineTests {
 
     static var frames: [Frame] {
         let week = Fixture.week()
-        let today = Fixture.today()
         let month = Fixture.month()
         return [
             Frame(name: "week small", size: CGSize(width: 158, height: 158),
@@ -273,10 +274,6 @@ struct RenderBaselineTests {
                   view: AnyView(WeekWidgetView(entry: week, familyOverride: .systemMedium))),
             Frame(name: "week large", size: CGSize(width: 338, height: 354),
                   view: AnyView(WeekWidgetView(entry: week, familyOverride: .systemLarge))),
-            Frame(name: "today small", size: CGSize(width: 158, height: 158),
-                  view: AnyView(TodaySmallView(entry: today))),
-            Frame(name: "today medium", size: CGSize(width: 338, height: 158),
-                  view: AnyView(TodayMediumView(entry: today))),
             Frame(name: "month small", size: CGSize(width: 158, height: 158),
                   view: AnyView(MonthWidgetView(entry: month))),
         ]
@@ -327,12 +324,6 @@ struct RenderBaselineTests {
                     habit(7, "Sunset", "sunrise", .timesPerWeek(1), done: [monday]),
                 ]
             )
-        }
-
-        static func today() -> TodayEntry {
-            TodayEntry(date: WeekCalendar.day(anchor), habits: [
-                DayRingSnapshot(id: id(1), name: "Water", icon: "drop", target: 6, done: 2),
-            ])
         }
 
         static func month() -> MonthEntry {

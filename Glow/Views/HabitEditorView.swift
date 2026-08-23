@@ -6,14 +6,6 @@ import WidgetKit
 struct HabitEditorView: View {
     let habit: Habit?
 
-    /// Which kind a *new* habit starts as.
-    ///
-    /// Each screen opens the editor on its own kind, so adding from a screen
-    /// produces a habit that appears on it: Today makes rings, This Week makes
-    /// week rows. Editing an existing habit ignores this and loads the kind
-    /// the habit already has.
-    var newHabitKind: Kind = .week
-
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
 
@@ -23,17 +15,6 @@ struct HabitEditorView: View {
     /// to `.daily`, so the two cadences are one number rather than a switch and
     /// a number that have to agree.
     @State private var timesPerWeek = Frequency.daysInWeek
-    /// The per-day count, kept separately from the weekly one so switching
-    /// kinds back and forth loses neither number.
-    @State private var timesPerDay = 3
-
-    /// A habit is counted across a week or within a day, never both. This is
-    /// the one place that either/or is chosen.
-    enum Kind: Hashable {
-        case week, day
-    }
-
-    @State private var kind: Kind = .week
 
     @FocusState private var isNameFocused: Bool
     @State private var isConfirmingDelete = false
@@ -78,29 +59,17 @@ struct HabitEditorView: View {
     private var isEditing: Bool { habit != nil }
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
-    private var frequency: Frequency {
-        switch kind {
-        case .week: Frequency(timesPerWeek: timesPerWeek)
-        case .day: Frequency(timesPerDay: timesPerDay)
-        }
-    }
+    private var frequency: Frequency { Frequency(timesPerWeek: timesPerWeek) }
 
-    /// The number the stepper is editing, and the bounds it steps inside —
-    /// one control either way, reading and writing whichever count the chosen
-    /// kind owns.
-    private var count: Binding<Int> {
-        switch kind {
-        case .week: $timesPerWeek
-        case .day: $timesPerDay
-        }
-    }
+    /// The number the stepper is editing, and the bounds it steps inside.
+    ///
+    /// A `Binding` and a computed range for what is now one number in one
+    /// range, because the row below is written against a control that had two
+    /// of each while the per-day kind shipped (#209). Collapsing them into
+    /// `$timesPerWeek` and a literal is a rewrite of that row for no behaviour.
+    private var count: Binding<Int> { $timesPerWeek }
 
-    private var countRange: ClosedRange<Int> {
-        switch kind {
-        case .week: Frequency.selectableCounts
-        case .day: Frequency.selectableDailyCounts
-        }
-    }
+    private var countRange: ClosedRange<Int> { Frequency.selectableCounts }
 
     var body: some View {
         NavigationStack {
@@ -141,18 +110,15 @@ struct HabitEditorView: View {
                             .background(platter)
                     }
 
-                    // One platter, not two. The kind and the count are a
-                    // single decision read top to bottom — what this habit is
-                    // counted against, then how many — and the page showing
-                    // through between two platters made them read as two
-                    // unrelated settings that happened to sit near each other.
-                    VStack(spacing: 0) {
-                        kindRow
-                            .frame(height: Self.rowHeight)
-                        frequencyRow
-                            .frame(height: Self.rowHeight)
-                    }
-                    .background(platter)
+                    // One platter, and now one row on it. It held two while a
+                    // habit could be counted within a day as well as across a
+                    // week (#209): the kind and the count read top to bottom as
+                    // a single decision. There is one kind left, so the row
+                    // that chose between them is gone and the count is the
+                    // whole decision.
+                    frequencyRow
+                        .frame(height: Self.rowHeight)
+                        .background(platter)
 
                     if isEditing {
                         // No platter and no explanation. The confirmation
@@ -213,28 +179,6 @@ struct HabitEditorView: View {
             .fill(Color(.secondarySystemGroupedBackground))
     }
 
-    /// Which kind of habit this is: counted across the week, or within a day.
-    ///
-    /// A segmented control rather than anything cleverer, because this is a
-    /// genuine either/or — the model has no habit that is both — and two
-    /// segments is the honest drawing of that.
-    /// **Two senses of "daily" meet here, and they are not the same thing.**
-    /// The segment labelled `Daily` means *counted within a day* — `Kind.day`,
-    /// `Frequency.timesPerDay`, the habit that draws a ring on Today. The
-    /// model's own `Frequency.daily` means something else: a seven-times-a-week
-    /// cadence, which is a *weekly* habit here and lives under `Weekly`. The
-    /// label is what the person reads and it wins on screen; renaming the model
-    /// to match would collide with `Habit.countedPerDay` / `countedPerWeek` and
-    /// every caller of both, so it is deliberately not renamed.
-    private var kindRow: some View {
-        Picker("Counted", selection: $kind) {
-            Text("Daily").tag(Kind.day)
-            Text("Weekly").tag(Kind.week)
-        }
-        .pickerStyle(.segmented)
-        .padding(.horizontal, 10)
-    }
-
     /// Minus, the reading, plus — in that order across the row.
     ///
     /// Hand-rolled rather than a `Stepper`, which always puts its label on one
@@ -258,7 +202,7 @@ struct HabitEditorView: View {
                 Text("\(count.wrappedValue)x")
                     .monospacedDigit()
                     .glowing(halo: GlowPalette.labelHalo)
-                Text(kind == .day ? " per day" : " per week")
+                Text(" per week")
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
@@ -271,7 +215,7 @@ struct HabitEditorView: View {
         // as part of the container rather than as things inside it.
         .padding(.horizontal, 10)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(kind == .day ? "Times per day" : "Times per week")
+        .accessibilityLabel("Times per week")
         .accessibilityValue("\(count.wrappedValue)")
         .accessibilityAdjustableAction { direction in
             switch direction {
@@ -333,18 +277,13 @@ struct HabitEditorView: View {
             // icon. The icon is a starting point rather than a suggestion —
             // something is always better than a placeholder tick, and it is one
             // tap from being changed.
-            kind = newHabitKind
             icon = HabitSymbol.random()
             isNameFocused = true
             return
         }
         name = habit.name
         icon = habit.icon
-        if let daily = habit.frequency.dailyTarget {
-            kind = .day
-            timesPerDay = daily
-        } else if let weekly = habit.frequency.slotCount {
-            kind = .week
+        if let weekly = habit.frequency.slotCount {
             timesPerWeek = weekly
         }
     }

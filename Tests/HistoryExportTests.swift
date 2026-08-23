@@ -25,14 +25,18 @@ struct HistoryExportTests {
         let csv = HistoryExport.csv(
             habits: [
                 habit("Read", .daily, [17: 1, 19: 1]),
-                habit("Water", .timesPerDay(3), [17: 2]),
+                // Two completions on one civil day. The per-day kind is what
+                // made that ordinary and it is gone (#209); a store written
+                // before day identities can still hold one (#130), and the
+                // count is what the file says either way.
+                habit("Water", .timesPerWeek(3), [17: 2]),
             ],
             calendar: calendar
         )
         #expect(csv == """
         date,habit,cadence,target,completions
         2026-08-17,Read,daily,1,1
-        2026-08-17,Water,times-per-day,3,2
+        2026-08-17,Water,times-per-week,3,2
         2026-08-19,Read,daily,1,1
 
         """)
@@ -104,7 +108,7 @@ struct HistoryExportTests {
     @Test("The JSON carries the day, the count and when it was exported")
     func jsonShape() throws {
         let json = try HistoryExport.json(
-            habits: [habit("Water", .timesPerDay(3), [17: 2, 18: 3])],
+            habits: [habit("Water", .timesPerWeek(3), [17: 2, 18: 3])],
             exportedAt: day(20), calendar: calendar
         )
         #expect(json.contains("\"exportedAt\""))
@@ -123,10 +127,8 @@ struct HistoryExportTests {
         // must not silently change a file somebody is already parsing.
         #expect(HistoryExport.cadence(of: .daily) == "daily")
         #expect(HistoryExport.cadence(of: .timesPerWeek(3)) == "times-per-week")
-        #expect(HistoryExport.cadence(of: .timesPerDay(3)) == "times-per-day")
         #expect(HistoryExport.target(of: .daily) == 1)
         #expect(HistoryExport.target(of: .timesPerWeek(4)) == 4)
-        #expect(HistoryExport.target(of: .timesPerDay(12)) == 12)
     }
 
     @Test("The filename carries the day, so two exports do not collide")

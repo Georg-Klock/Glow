@@ -18,7 +18,7 @@ import SwiftUI
 /// a nested stack would swallow the push animation and the back button.
 struct YearView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @Query(filter: Habit.countedPerWeek, sort: [SortDescriptor(\Habit.sortOrder)])
+    @Query(filter: Habit.weekly, sort: [SortDescriptor(\Habit.sortOrder)])
     private var habits: [Habit]
 
     @State private var today = WeekCalendar.day(Date())

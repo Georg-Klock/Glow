@@ -67,7 +67,7 @@ struct MonthProvider: AppIntentTimelineProvider {
         // reload the timelines explicitly, same as the other widgets.
         return Timeline(
             entries: [entry(for: configuration)],
-            policy: .after(TodayStore.midnight(after: now))
+            policy: .after(MonthStore.midnight(after: now))
         )
     }
 

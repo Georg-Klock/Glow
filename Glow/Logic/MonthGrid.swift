@@ -88,7 +88,7 @@ enum MonthGrid {
         restDay: Int?,
         calendar: Calendar = WeekCalendar.calendar
     ) -> [MonthCell] {
-        guard !habit.isSpacer, !habit.frequency.isCountedPerDay else { return [] }
+        guard !habit.isSpacer else { return [] }
         let todayStart = WeekCalendar.day(today, calendar: calendar)
         guard let month = calendar.dateInterval(of: .month, for: todayStart) else { return [] }
 

@@ -7,18 +7,21 @@ import Testing
 struct DeepLinkTests {
     @Test("Each widget's own URL lands on its screen")
     func widgetURLs() {
-        #expect(DeepLink.destination(for: DeepLink.today) == .today)
         #expect(DeepLink.destination(for: DeepLink.week) == .week)
     }
 
     @Test("Case does not matter; a URL is not a spelling test")
     func caseInsensitive() {
-        #expect(DeepLink.destination(for: URL(string: "GLOW://Today")!) == .today)
         #expect(DeepLink.destination(for: URL(string: "Glow://WEEK")!) == .week)
+        #expect(DeepLink.destination(for: URL(string: "GLOW://Week")!) == .week)
     }
 
     @Test("Anything unrecognised changes nothing rather than guessing a tab", arguments: [
         "glow://year",
+        // The per-day screen's own link, and it now means nothing rather than
+        // landing somebody on This Week uninvited (#209).
+        "glow://today",
+        "GLOW://Today",
         "glow://",
         "glowup://today",
         "https://today",

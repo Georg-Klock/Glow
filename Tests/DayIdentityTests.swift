@@ -200,12 +200,17 @@ struct DayIdentityTests {
     }
 
     @MainActor
-    @Test("A per-day habit's repetitions land on one day, not on two")
+    @Test("Two writes for one civil day land on one day, not on two")
     func repetitionsStayOnOneDay() throws {
+        // Written for the per-day kind, where a day holding several rows was
+        // the ordinary case. That kind is gone (#209) and the claim is not: a
+        // day is a day whichever zone wrote it, and `addCompletion` is still
+        // the primitive that can put two rows on one — see the pre-#130
+        // duplicate below, which is the case this now protects.
         let context = try makeContext()
         let there = HabitStore(context: context, calendar: losAngeles)
         let habit = try there.addHabit(
-            name: "Water", icon: "drop", frequency: Frequency(timesPerDay: 3),
+            name: "Water", icon: "drop", frequency: .timesPerWeek(3),
             now: midday(2026, 8, 19, in: losAngeles)
         )
         #expect(try there.addCompletion(for: habit, on: midday(2026, 8, 19, in: losAngeles)) == 1)

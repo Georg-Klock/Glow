@@ -174,7 +174,7 @@ struct WeekProvider: TimelineProvider {
         }
         let context = ModelContext(container)
         let descriptor = FetchDescriptor<Habit>(
-            predicate: Habit.countedPerWeek,
+            predicate: Habit.weekly,
             sortBy: [SortDescriptor(\.sortOrder)]
         )
         // Bounded to the week it draws (#135). A home screen widget reloading
@@ -192,8 +192,6 @@ struct WeekProvider: TimelineProvider {
 struct GlowWidgetBundle: WidgetBundle {
     var body: some Widget {
         GlowWidget()
-        TodaySmallWidget()
-        TodayMediumWidget()
         MonthWidget()
         // Not a home screen widget: the Dynamic Island's two seconds when a
         // goal is met. A Live Activity is declared in the same bundle. See #58.

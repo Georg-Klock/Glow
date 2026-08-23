@@ -10,7 +10,7 @@ import WidgetKit
 struct WeeklyGridView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
-    @Query(filter: Habit.countedPerWeek, sort: [SortDescriptor(\Habit.sortOrder)])
+    @Query(filter: Habit.weekly, sort: [SortDescriptor(\Habit.sortOrder)])
     private var habits: [Habit]
 
     @State private var today = WeekCalendar.day(Date())
@@ -224,6 +224,10 @@ struct WeeklyGridView: View {
             // them back out, and both move how far back this screen can go.
             refreshReach()
         }
+        // Before seeding, not after: the sweep is about rows a *previous*
+        // build wrote, and running it first means the seeder's "does this
+        // store hold anything" guard is asked of the store this build has.
+        .task { migrateDailyHabitsOut() }
         .task { seedIfNeeded() }
         .task { refreshDemoHistory() }
         .task { refreshReach() }
@@ -474,6 +478,22 @@ struct WeeklyGridView: View {
             try store.addSpacer()
         } catch {
             HabitStore.report(error, operation: "addSpacer")
+        }
+    }
+
+    /// Takes out the per-day habits an earlier build seeded, once (#209).
+    ///
+    /// Here rather than in `GlowApp` for the reason seeding is: this is the
+    /// screen the store is opened for, and a launch that never reaches it never
+    /// needed either. It runs before the reach is refreshed for the same reason
+    /// seeding does — deleting habits can move how far back the pager reaches.
+    private func migrateDailyHabitsOut() {
+        do {
+            if try DailyHabitMigration.runIfNeeded(context: context) > 0 {
+                refreshReach()
+            }
+        } catch {
+            HabitStore.report(error, operation: "migrateDailyHabitsOut")
         }
     }
 

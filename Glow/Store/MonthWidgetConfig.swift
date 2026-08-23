@@ -2,20 +2,19 @@ import AppIntents
 import Foundation
 import SwiftData
 
-/// The month widget's configuration: which weekly-cadence habit it shows.
+/// The month widget's configuration: which habit it shows.
 ///
-/// In the shared sources for the same load-bearing reason as
-/// `TodayWidgetConfig`: the system consolidates AppIntents metadata under the
-/// app, and an intent defined only in the extension configures but never
-/// resolves — the stored choice arrives unresolved on every render. Compiled
-/// into both targets, the choice round-trips.
+/// In the shared sources, and that is load-bearing: the system consolidates
+/// AppIntents metadata under the app, and an intent defined only in the
+/// extension configures but never resolves — the stored choice arrives
+/// unresolved on every render. Compiled into both targets, the choice
+/// round-trips.
 ///
-/// A separate entity from `HabitEntity`, not a shared one: the entity type is
-/// what binds the picker to its query, and this picker offers the weekly
-/// cadences where that one offers the per-day kind. Per-day habits are not
-/// selectable here on purpose — their day is a count, not a yes, and a dot
-/// meaning "some of the water" would be a third mark state that exists
-/// nowhere else.
+/// The entity is named `Weekly` because it once shared this app with a per-day
+/// kind and a picker that offered it (#209). What it offers now is every habit
+/// there is, minus the rows that kind left behind — see `Habit.weekly`. Renaming
+/// it is an AppIntents identifier change, which is a stored-configuration
+/// migration rather than a rename, so it keeps the name it registered under.
 struct WeeklyHabitEntity: AppEntity, Identifiable {
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Habit"
     static let defaultQuery = WeeklyHabitQuery()
@@ -39,9 +38,9 @@ struct WeeklyHabitQuery: EntityQuery {
         MonthStore.weeklyNames().map { WeeklyHabitEntity(id: $0.id, name: $0.name) }
     }
 
-    // No `defaultResult()`, same as the Today widget: a freshly placed widget
-    // is seeded by the provider, so it shows something real without the query
-    // guessing on the system's behalf.
+    // No `defaultResult()`: a freshly placed widget is seeded by the provider,
+    // so it shows something real without the query guessing on the system's
+    // behalf.
 }
 
 struct SelectWeeklyHabitIntent: WidgetConfigurationIntent {
@@ -89,9 +88,21 @@ enum MonthStore {
         return Habit.snapshots(of: [shown], within: days, calendar: calendar).first
     }
 
+    /// One entry, and a refresh at midnight — the open dot is defined as
+    /// "today", so the day rolling over is the only moment a month goes stale
+    /// on its own. Every write reloads the timelines explicitly.
+    ///
+    /// It lived on `TodayStore` and moved here when that went with the per-day
+    /// kind (#209). Its one caller is the month provider.
+    static func midnight(after now: Date) -> Date {
+        WeekCalendar.calendar.date(
+            byAdding: .day, value: 1, to: WeekCalendar.day(now)
+        ) ?? now.addingTimeInterval(3600)
+    }
+
     private static func offered(in context: ModelContext) -> [Habit] {
         let descriptor = FetchDescriptor<Habit>(
-            predicate: Habit.countedPerWeek,
+            predicate: Habit.weekly,
             sortBy: [SortDescriptor(\Habit.sortOrder)]
         )
         return ((try? context.fetch(descriptor)) ?? []).filter { !$0.isSpacer }

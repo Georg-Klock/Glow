@@ -32,7 +32,7 @@ enum WeekDots {
         restDay: Int?,
         calendar: Calendar = WeekCalendar.calendar
     ) -> [Int] {
-        guard !habit.isSpacer, !habit.frequency.isCountedPerDay else { return [] }
+        guard !habit.isSpacer else { return [] }
         return week.days.indices.filter { index in
             let day = week.days[index]
             return habit.completedDays.contains(day)
