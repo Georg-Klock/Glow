@@ -436,6 +436,28 @@ struct SettingsView: View {
     /// and `@AppStorage` hands back `0` for a key nobody has written — a plain
     /// stored default reads as whatever `0` maps to until it is changed twice.
     /// `PopPreferences` keeps the sentinel; this reflects it.
+    ///
+    /// **A plain synchronous write, and #203 asked for `withAnimation`.** The
+    /// footer under this picker is one sentence, two, or a longer two-clause
+    /// one, so it resizes and every section below it moves — and that move
+    /// snaps. Wrapping the write does not change it: built with a three-second
+    /// linear `withAnimation` around the write, and again with a linear
+    /// `animation` modifier keyed to `popLevel` on the `Form` as well, a burst
+    /// of screenshots 0.2s apart caught the Week section moving 373pt → 405pt
+    /// between two consecutive frames, with no intermediate position in either
+    /// build.
+    ///
+    /// The transaction is not being lost. A control in the same build — the
+    /// preview's opacity, driven by the same `popLevel` write — ramped
+    /// 254 → 168 across thirteen frames of that same three-second curve while
+    /// the sections below still jumped in one. A `Form` section's reflow is
+    /// simply not what that animation reaches, so an animated write here would
+    /// be a claim the screen does not support. See #203 and #215.
+    ///
+    /// **The API names are spelled without their parentheses on purpose.**
+    /// `ReduceMotionTests` scans source text for the two call shapes and asks
+    /// every file that contains one to read the setting; prose naming an API is
+    /// indistinguishable from calling it, and this file animates nothing.
     private var popBinding: Binding<PopPreferences.Level> {
         Binding(get: { popLevel }, set: { popLevel = $0; PopPreferences.level = $0 })
     }

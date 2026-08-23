@@ -3011,3 +3011,36 @@ modifier changes only what is below it, pulling the Glow section's panel from
 own acceptance criterion asks to keep ("the normal Form spacing should resume
 between the banner and the Glow slider section below it"). The two halves of
 the issue disagreed; the screen settles it.
+
+## A `Form` section footer's reflow does not animate (#203, #215)
+
+**Question.** Switching "Say well done" changes the footer's length and every
+section below it jumps. #203 asks for `withAnimation` around `popBinding`'s
+write, "matching how this app already treats a state-driven layout change".
+
+**Decision.** Not implemented, and the write stays synchronous. Measured on an
+iPhone 17 Pro simulator with a burst of screenshots 0.17–0.33s apart:
+
+- With `withAnimation(.linear(duration: 3))`, the Week section's panel reads
+  518pt in thirteen consecutive frames and 486pt in every frame after, changing
+  between two frames 0.33s apart. No intermediate position.
+- Adding `.animation(.linear(duration: 3), value: popLevel)` to the `Form` as
+  well: 373pt → 405pt, again between two consecutive frames.
+
+**The transaction is not being lost, which is the part worth keeping.** The
+preview capsule given `.opacity(popLevel == .off ? 0.3 : 1.0)` — driven by the
+same write, inside the same `withAnimation` — ramped 254 → 168 across thirteen
+frames of that three-second curve while the sections below it still jumped in
+one. Animations run; the write animates everything it drives except the list's
+own layout.
+
+That is the false positive #203 warns about, one level down. It says to check
+that the *footer* animates rather than the picker's knob — and the knob
+animates, and so does anything else the write reaches. The section reflow is
+the exception.
+
+Shipping the wrap anyway would have been a change that reads as a fix, passes
+review, and does nothing. What ships instead is the measurement, as a comment
+on `popBinding`, so the next reader does not re-derive it. #215 carries the
+open design question: accept the snap, or move the explanation out of the
+section footer and into a row, where ordinary layout animates ordinarily.
