@@ -276,6 +276,30 @@ struct WidgetRenderDiffTests {
         )
     }
 
+    /// The rest day's own line, sampled down the centre of its column — the
+    /// flat `GlowPalette.grey` rule `RestCut` draws there, which composites to
+    /// 36 on black.
+    ///
+    /// The counterpart to `brightestInRestColumn`, which steps around it, and
+    /// the quantity that says the rest day's column was *drawn* rather than
+    /// merely left dark. A claim that the column holds no light is satisfied
+    /// perfectly by a column with nothing in it — see #219.
+    private func brightestAtRestLine(_ index: Int, in pixels: [UInt8]) -> Int {
+        brightest(atColumn: columnCentre(index), in: pixels)
+    }
+
+    /// Whether a tone is unlit, judged against the lit marks in the same frame
+    /// rather than against a level.
+    ///
+    /// The palette has two colours and nothing between them (#111): the grey
+    /// composites to 36 on black and a lit mark to 255. A quarter of the
+    /// frame's own lit level sits far above the first and far below the second,
+    /// so this says "grey, not white" without naming either number — and it
+    /// goes on saying it the next time the palette moves, which the fixed band
+    /// it replaces did not. #194 moved the grey thirteen levels underneath a
+    /// bound of 60 and nothing noticed.
+    private func isUnlit(_ value: Int, beside lit: Int) -> Bool { value * 4 < lit }
+
     /// One habit, so the first row's band is unambiguous.
     private func oneHabit(_ frequency: Frequency, done: [Int], todayColumn: Int) -> WeekEntry {
         let week = WeekCalendar.week(containing: WeekCalendar.day(Date()))
@@ -374,12 +398,37 @@ struct WidgetRenderDiffTests {
             #expect(open.firstDay < 2 && open.lastDay > 2, "the fixture does not straddle Wednesday")
 
             let pixels = try rgba(of: try render(entry))
-            let wednesday = brightestInRestColumn(2, in: pixels)
             let before = brightest(atColumn: columnCentre(open.firstDay), in: pixels)
             let after = brightest(atColumn: columnCentre(3), in: pixels)
-            #expect(wednesday < 60, "the open span crosses the rest day (\(wednesday))")
+            // Four quantities out of one frame, and every claim below is a
+            // relationship between them rather than a level: the two arcs, the
+            // rest day's own line down the middle of its column, and the window
+            // the span is supposed to have lost either side of that line.
+            let restLine = brightestAtRestLine(2, in: pixels)
+            let window = brightestInRestColumn(2, in: pixels)
+            let arcs = min(before, after)
+
             #expect(before > 150, "the left arc is missing (\(before))")
             #expect(after > 150, "the right arc is missing (\(after))")
+
+            // **The rest day's column was drawn.** This is the half #219 was
+            // filed for. The claim here is that the open span crosses the rest
+            // day rather than lighting it, and it used to be evidenced by
+            // `wednesday < 60` alone — an upper bound, which a column with
+            // nothing painted in it at all satisfies perfectly. Measured on
+            // this frame, the window either side of the line reads exactly 0,
+            // so that bound was already passing on emptiness rather than on the
+            // subtraction it was gating. Same shape as the near-miss in #199.
+            #expect(restLine > Self.lineFloor,
+                    "the rest day's line is missing from its own column (\(restLine))")
+            // And it is structure rather than a mark, next to the arcs beside
+            // it in the same frame.
+            #expect(isUnlit(restLine, beside: arcs),
+                    "the rest day's line is lit (\(restLine), against arcs at \(arcs))")
+            // Only now does "no light here" mean anything: there is something
+            // in this column, and what is in it is not the span.
+            #expect(isUnlit(window, beside: arcs),
+                    "the open span crosses the rest day (\(window), against arcs at \(arcs))")
         }
     }
 

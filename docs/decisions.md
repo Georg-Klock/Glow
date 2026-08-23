@@ -3246,3 +3246,49 @@ while it is on is logged for real.
 caller is still padding when the banner is absent, which would put a 10pt gap
 above every screen whenever the override is off. The change has to be inert with
 the override off, and the render baseline is the evidence: no frame moved.
+
+## An upper bound needs something under it (#219)
+
+`WidgetRenderDiffTests.openSpanKeepsBothArcs` claimed that an open span
+*crosses* the rest day rather than lighting it, and offered `wednesday < 60` as
+the evidence. Sixty was derived from nothing, and — the part that matters — a
+column with nothing painted in it satisfies it perfectly. The same shape as the
+near-miss #199 was filed for from the other end, where a band of `20...26` went
+empty when the palette moved to 36.
+
+**It was already passing on emptiness.** The issue supposed the bound was
+holding because the rest day's mark composites to 36. Measured, that column
+reads **0** at the two places this test samples: `brightestInRestColumn` steps a
+quarter-slot either side of the centre to avoid the rest cut, and the window
+`RestWindow` subtracts from the span means there is nothing else there. So the
+assertion was gating on an empty region rather than on the subtraction it was
+written for, and had been since #71 put the cut in the middle of the column.
+
+**The fix is a relationship, not a level.** Four quantities out of one frame —
+the two lit arcs, the rest day's own line down the centre of its column, and the
+window either side of that line — and three claims between them: the line is
+there (`> lineFloor`), the line is unlit beside the arcs, and the window holds
+no more light than the line does. `isUnlit(_:beside:)` is a quarter of the
+frame's *own* lit level, which sits far above 36 and far below 255 without
+naming either, so it survives the next palette move. #194 moved the grey
+thirteen levels underneath a bound of 60 and nothing noticed.
+
+**Proved in both arms**, by perturbing the widget and re-running the one test.
+The old bound and the new claims were evaluated side by side in the same run:
+
+| perturbation | old `wednesday < 60` | new claims |
+| --- | --- | --- |
+| rest cut filled `.clear` — the mark is not drawn | **passes** (window 0) | fails: line missing (0) |
+| rest cut filled white — the mark is lit | **passes** (window 0) | fails: line lit (255 beside arcs at 255) |
+| `restWindow` forced to nil — the span crosses | fails (window 255) | fails, on both the line and the window |
+
+The third arm is the regression the test was written for, and the new form still
+catches it; the first two are what the old form could not see. Reverted, the
+suite is green and no frame in the render baseline moved — this changed what the
+test demands, not what the widget draws.
+
+**The rest of the file was left alone, deliberately.** `metGoalStopsBeforeSunday`
+and `metGoalIsCutInTheMiddle` bound the rest column with `< clear` and have the
+same one-sided shape, and `groundIsPureBlack` and `noHueAnywhere` would both
+pass on a blank frame. Catalogued rather than fixed here, the way #199
+catalogued the bands: one reviewable change at a time.
