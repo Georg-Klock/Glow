@@ -25,6 +25,14 @@ import SwiftData
 /// them a second time, because there is no way left to make a row it would
 /// match.
 ///
+/// **Run from `GlowApp.init`, on every launch that opens a store** (#239). It
+/// hung off `WeeklyGridView` appearing until then, on the reasoning that the
+/// store is opened for that screen — but the widget configurator is a separate
+/// process reading the same file with no screen involved at all, and it was
+/// offering rows this had never been asked to delete. A sweep that runs unasked
+/// cannot be scheduled by a view; the only thing every store-opening launch has
+/// in common is the launch.
+///
 /// The flag is written **after** the save, the shape first-run seeding's flag
 /// established in #140: a failure anywhere leaves the store exactly as it was
 /// and the next launch tries again. This is the last flag of that shape in the

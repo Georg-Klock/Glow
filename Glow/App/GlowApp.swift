@@ -34,6 +34,31 @@ struct GlowApp: App {
         let attempt = GlowSettings.isRunningTests
             ? (container: ModelContainer?.none, failure: String?.none)
             : Self.open()
+
+        // Second, and only when a real store was opened: the sweep that takes
+        // the per-day habits out (#239). It used to hang off `WeeklyGridView`
+        // appearing, which is a screen the store can outlive being shown —
+        // the system's widget configurator is a *separate process* reading the
+        // same file, and it never opens that screen at all, so rows the app
+        // believes it has deleted were still on disk when "Choose Habit" read
+        // them.
+        //
+        // Here rather than in a `.task` on `body` for the ordering: everything
+        // downstream — the reload below, `WeeklyGridView`'s own reach, the
+        // empty state's claim about what the store holds — is then reading a
+        // store that has already been swept, without any of them having to
+        // know the sweep exists. Two `.task` bodies have no such order between
+        // them.
+        //
+        // Inert in the test host by construction, not by a second check: the
+        // binding above hands back no container under tests, so there is
+        // nothing for this to open a context on. A migration running in the
+        // test process is the process-wide store leak #105, #168, #175 and
+        // #179 closed.
+        if let container = attempt.container {
+            Self.migrateDailyHabitsOut(in: container)
+        }
+
         _container = State(initialValue: attempt.container)
         _failure = State(initialValue: attempt.failure)
 
@@ -50,6 +75,28 @@ struct GlowApp: App {
             return (try GlowStore.makeContainer(), nil)
         } catch {
             return (nil, error.localizedDescription)
+        }
+    }
+
+    /// Takes the per-day habits out of the store, once per install (#209).
+    ///
+    /// The decision about *what* to delete is `DailyHabitMigration`'s and stays
+    /// there; what moved in #239 is only when it is asked. A failure is logged
+    /// and swallowed: the migration leaves the store exactly as it was and
+    /// writes no flag, so the next launch tries again — which is the whole
+    /// reason it must not be allowed to take a launch down with it.
+    ///
+    /// `refreshReach()` does not move with it. `reach` is `WeeklyGridView`'s
+    /// own `@State`, and that view already calls `refreshReach()`
+    /// unconditionally from its own `.task`; the extra call the migration used
+    /// to make existed because the sweep could land *after* that task had run.
+    /// From here it cannot — this is over before any view is built — so the
+    /// unconditional call is the whole of it.
+    private static func migrateDailyHabitsOut(in container: ModelContainer) {
+        do {
+            try DailyHabitMigration.runIfNeeded(context: ModelContext(container))
+        } catch {
+            HabitStore.report(error, operation: "migrateDailyHabitsOut")
         }
     }
 
@@ -103,6 +150,39 @@ struct GlowApp: App {
                     .tint(GlowPalette.color)
                     .preferredColorScheme(.dark)
                     .modelContainer(container)
+                    // **Every other reload in this app is write-triggered**
+                    // (#236). `HabitStore.commit()` invalidates on every save,
+                    // `DailyHabitMigration` after it sweeps, the intents after
+                    // a tap — so until something writes, nothing tells
+                    // WidgetKit to ask the provider again. A TestFlight update
+                    // that changes what the widget *draws* rather than what the
+                    // store *holds* lands in exactly that gap: the new code is
+                    // installed, no write happens, and the placed widget goes
+                    // on rendering what the old build left there.
+                    //
+                    // Unconditional, because there is nothing to compute: an
+                    // argument-less `invalidate()` reloads every kind, and a
+                    // reload against unchanged data is a no-op render.
+                    //
+                    // **Here, and not in `init`, because `init` is also the
+                    // test host's.** The container branch is the one the host
+                    // never reaches — `GlowSettings.isRunningTests` is checked
+                    // first and draws `Color.black` instead, and under tests
+                    // `container` is `nil` anyway because `init` opens none. A
+                    // reload fired from `init` would fire in the test process
+                    // too, which is the class of leak #179 closed.
+                    //
+                    // **Last of the three things a launch does, and the order
+                    // is load-bearing.** `init` clears a stale `DebugToday`
+                    // override (#204) and sweeps the per-day habits out
+                    // (#239), and both change what the widget should draw —
+                    // the override lives in the App Group where the widget
+                    // reads it, and the sweep deletes rows the widget renders.
+                    // A reload placed ahead of either would ask the provider
+                    // for a redraw of data about to be discarded, and then
+                    // nothing would ask again. `init` runs before any of
+                    // `body`, so a `.task` here is strictly after both.
+                    .task { WidgetRefresh.invalidate() }
             } else {
                 StoreUnavailableView(message: failure ?? "") {
                     let attempt = Self.open()
