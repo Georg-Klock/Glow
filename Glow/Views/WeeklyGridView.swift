@@ -30,6 +30,21 @@ struct WeeklyGridView: View {
     @State private var isDemoSeeded = false
     @State private var editingHabit: Habit?
     @State private var isAddingHabit = false
+    /// Edit mode, owned rather than left to the `NavigationStack` (#207).
+    ///
+    /// The list's editing controls are offered on the current week and nowhere
+    /// else, so paging away has to *end* edit mode rather than merely hide the
+    /// button that leaves it — a mode with no exit control is a trap, and this
+    /// screen would otherwise set one every time you paged back out of Edit.
+    /// Ending it needs a binding this view can write, which the stack's own is
+    /// not.
+    ///
+    /// Injected below the stack, on the view the toolbar hangs off, so
+    /// `EditButton` and the `List` both see this binding rather than the one
+    /// the stack provides. **This is not the trap in CLAUDE.md** — that is
+    /// about *reading* `@Environment(\.editMode)` from outside the stack, which
+    /// is always inactive, and `EditModeTests` scans for it.
+    @State private var editMode: EditMode = .inactive
     @State private var isShowingLowPowerNotice = false
     @State private var lowPower = LowPowerMonitor()
     /// Survives relaunches, so the notice appears once per time Low Power Mode
@@ -52,8 +67,8 @@ struct WeeklyGridView: View {
     private var store: HabitStore { HabitStore(context: context) }
 
     /// Which weeks there are to visit. Derived from the record, so a fresh
-    /// install has only this one: the swipe clamps against its own ends and
-    /// the pill has nowhere to send you, so neither does anything (#190).
+    /// install has only this one: back is disabled against it, forward is not
+    /// drawn at all, and the toolbar never leaves its current-week shape.
     private var reach: WeekReach {
         WeekReach.from(recordStart: recordStart, today: today)
     }
@@ -103,59 +118,66 @@ struct WeeklyGridView: View {
                     grid
                 }
             }
-            // The title is drawn rather than set (#190): two lines, the week's
-            // dates over how far back it is, which `navigationTitle` has no
-            // shape for. The large title goes with it — the system's
-            // collapse-on-scroll belongs to `navigationTitle` alone and a
-            // principal view does not inherit it. That is the trade the issue
-            // accepts: a fixed-size header that says which week, in exchange
-            // for a large one that said which month.
+            // The title is drawn rather than set (#190): two lines, what the
+            // week is called over the half that name leaves out, which
+            // `navigationTitle` has no shape for. The large title goes with it
+            // — the system's collapse-on-scroll belongs to `navigationTitle`
+            // alone and a principal view does not inherit it. That is the trade
+            // the issue accepts: a fixed-size header that says which week, in
+            // exchange for a large one that said which month.
             //
             // The title is still set, and still says the same thing. Nothing
             // draws it — the principal item takes the centre — but it is what
             // a `NavigationLink` pushed from here would name its back button,
             // and what the system reads when the toolbar is not on screen.
-            .navigationTitle(weekRangeTitle)
+            .navigationTitle(weekTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // The chevrons are back, and deliberately temporary. #190
-                // replaced them with a header swipe, and that swipe **could not
-                // be verified**: no drag of any kind recognises under this
-                // simulator's synthetic input — the app's own shipped row
-                // `swipeActions` do not open either, which is the control that
-                // makes the negative meaningless. See #205.
-                //
-                // Without a working gesture the pill is unreachable, because it
-                // only appears once you have already paged away. That would
-                // make #117's reach-back — which shipped working — unreachable
-                // in the next build. A toolbar item is a cheap insurance
-                // premium against that; delete this block the moment a device
-                // confirms the swipe. See #211.
                 ToolbarItem(placement: .topBarLeading) {
                     weekPager
                 }
                 ToolbarItem(placement: .principal) {
                     weekReadout
                 }
+                // **The two ends are one decision, not two** (#207). What the
+                // trailing group holds depends on which week is on screen, so
+                // the pager opposite it cannot be drawn symmetrically and
+                // independently: on the current week the only way out is back,
+                // and in the past the way home is on both sides.
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    if !habits.isEmpty {
-                        EditButton()
-                    }
-                    // A menu rather than a second button: adding a blank row
-                    // is rare next to adding a habit, and two icons in a toolbar
-                    // to distinguish "new thing" from "new gap" is a puzzle.
-                    Menu {
-                        Button("New Habit", systemImage: "plus") {
-                            isAddingHabit = true
+                    if isOnCurrentWeek {
+                        if !habits.isEmpty {
+                            EditButton()
                         }
-                        Button("Blank Row", systemImage: "rectangle.dashed") {
-                            addSpacer()
+                        // A menu rather than a second button: adding a blank row
+                        // is rare next to adding a habit, and two icons in a toolbar
+                        // to distinguish "new thing" from "new gap" is a puzzle.
+                        Menu {
+                            Button("New Habit", systemImage: "plus") {
+                                isAddingHabit = true
+                            }
+                            Button("Blank Row", systemImage: "rectangle.dashed") {
+                                addSpacer()
+                            }
+                        } label: {
+                            Label("Add", systemImage: "plus")
                         }
-                    } label: {
-                        Label("Add", systemImage: "plus")
+                    } else {
+                        // **Not new editing scope** (#207). Every day of the
+                        // week on screen is still a tap target — #116 and #117
+                        // are untouched. What is gone from a past week is the
+                        // *list*: reordering, deleting and adding are
+                        // properties of the list itself, and doing them while
+                        // looking at three weeks ago means nothing they do not
+                        // already mean today. In their place, the one action a
+                        // past week has: getting back.
+                        todayButton
                     }
                 }
             }
+            // Below the stack, so `EditButton` above toggles this binding and
+            // the `List` reads the same one. See `editMode`.
+            .environment(\.editMode, $editMode)
         }
         .sheet(isPresented: $isAddingHabit) {
             HabitEditorView(habit: nil)
@@ -234,19 +256,6 @@ struct WeeklyGridView: View {
             let cut = RestCut.rows(snapshots, capacity: WidgetMetrics.largeRowCapacity)
             List {
                 Section {
-                    // Between the header and the first row, inside the list
-                    // rather than above it: it belongs to the week on screen,
-                    // so it scrolls with the week's rows and leaves the
-                    // toolbar alone. Outside the `ForEach`, so reordering and
-                    // deletion still index the habits and nothing else.
-                    if !isOnCurrentWeek {
-                        thisWeekPill
-                            .listRowInsets(EdgeInsets(
-                                top: 0, leading: geometry.horizontalPadding,
-                                bottom: 10, trailing: geometry.horizontalPadding
-                            ))
-                            .listRowSeparator(.hidden)
-                    }
                     ForEach(Array(habits.enumerated()), id: \.element.id) { index, habit in
                         HabitRowView(
                             snapshot: snapshots[index],
@@ -311,9 +320,7 @@ struct WeeklyGridView: View {
                     .onMove(perform: move)
                     .onDelete(perform: deleteAt)
                 } header: {
-                    WeekdayHeader(
-                        geometry: geometry, week: week, today: today, onPage: step
-                    )
+                    WeekdayHeader(geometry: geometry, week: week, today: today)
                         .listRowInsets(EdgeInsets(
                             top: 0, leading: geometry.horizontalPadding,
                             // The widget's header stands further from the first
@@ -360,35 +367,36 @@ struct WeeklyGridView: View {
         }
     }
 
-    /// Which week you are on: its dates, and under them how far back it is.
+    /// Which week you are on: what it is called, and under it the half the
+    /// name leaves out.
     ///
-    /// The chevrons that used to sit opposite Edit and Add are gone (#190) —
-    /// the swipe on `WeekdayHeader` pages, and the pill below returns. What
-    /// replaces them here is a readout rather than a control, so nothing new
-    /// competes for the toolbar's leading slot and nothing sits over the marks.
+    /// A readout rather than a control, so nothing competes with the pager for
+    /// the toolbar's leading slot and nothing sits over the marks.
     ///
-    /// **The one control VoiceOver is left is this.** The chevrons were also
-    /// the only paging a rotor could reach, and a drag on a header that is
-    /// `accessibilityHidden` reaches nobody — so the readout is adjustable:
-    /// swipe up for a later week, down for an earlier one, the same direction
-    /// the gesture goes. That is one element saying one thing, which is not
-    /// what #137 declined to speak; the seven letters over seven numbers are
-    /// still a table read aloud and still hidden.
+    /// **The one paging VoiceOver can reach is this.** The header is
+    /// `accessibilityHidden` — seven letters over seven numbers is a table read
+    /// aloud, which is what #137 declined to speak — and a chevron is a small
+    /// target to hunt for, so the readout is adjustable: swipe up for a later
+    /// week, down for an earlier one. It reaches *both* directions whatever
+    /// shape the pager has taken, which matters more now that the pager is
+    /// asymmetric and the forward chevron is absent from the current week
+    /// (#207). Each step clamps, so the adjustment stops where the buttons do.
     private var weekReadout: some View {
         // The two lines are left-aligned to each other, which is the part this
-        // view owns. *Where the pair sits* is the system's, and it is not one
-        // place: measured on the simulator, the item is centred while it is one
-        // line, leading once the second line arrives, and centred again in edit
-        // mode. So the readout does shift left as you leave this week — at the
-        // same moment the pill appears and the subtitle does, which is a state
-        // change and not a wobble. A `frame(maxWidth:alignment:)` around it
-        // changes none of the three; the toolbar sizes the item to fit and
-        // places it itself.
+        // view owns. *Where the pair sits* is the system's, and #190 measured
+        // it shifting left when the second line arrived. It no longer does:
+        // with #207's toolbar the title's own centre is 602–604px of a 1206px
+        // screen in all four states — current week, one week back, three weeks
+        // back, and at the floor — so the readout stays put and only its
+        // contents change. The trailing group is narrower now (one Today
+        // button, or Edit and Add, rather than Edit and Add beside a wider
+        // pager), which is the likeliest reason the item stopped being
+        // squeezed.
         VStack(alignment: .leading, spacing: 0) {
-            Text(weekRangeTitle)
+            Text(weekTitle)
                 .font(.headline)
-            if let weeksBackTitle {
-                Text(weeksBackTitle)
+            if let weekSubtitle {
+                Text(weekSubtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -404,40 +412,58 @@ struct WeeklyGridView: View {
         }
     }
 
-    /// Back to this week in one step, drawn only when you are not on it.
+    /// Back to this week in one step, in the slot Edit and Add vacate.
     ///
-    /// Drawn rather than styled, for the reason the empty state's button gives
-    /// and `StoreUnavailableView`'s repeats: the app's root tint is pure white,
-    /// and a `.borderedProminent` capsule under it fills white and writes its
-    /// label in white. See #162.
+    /// One jump rather than a walk back through the weeks between: this is the
+    /// way out of a place you paged into, and repeating a tap eleven times is
+    /// not a way out. It was a pill over the grid in #190 and is a toolbar
+    /// button in #207 — one fewer thing scrolling under the header, and it sits
+    /// where the eye already goes for the screen's other actions.
     ///
-    /// One step rather than a walk back through the weeks between: the pill is
-    /// the way out of a place you paged into, and repeating a tap eleven times
-    /// is not a way out.
-    private var thisWeekPill: some View {
-        Button {
-            weekStart = reach.latest
-        } label: {
-            HStack(spacing: 6) {
-                Text("This Week")
-                Image(systemName: "arrow.forward")
-            }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.black)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Capsule().fill(GlowPalette.color))
+    /// Plain, not prominent: the app's root tint is pure white and a
+    /// `.borderedProminent` capsule under it fills white and writes its label
+    /// in white (#162). A toolbar button needs no fill to be found — it is the
+    /// only thing on that side of the bar.
+    private var todayButton: some View {
+        Button("Today") { show(week: reach.latest) }
+    }
+
+    /// What the week on screen is called: how long ago it was, until that stops
+    /// being an answer, and then the days it covers (#207).
+    ///
+    /// **A relative phrase is what you actually asked**, for the three weeks
+    /// anybody names that way. Beyond them "five weeks ago" is arithmetic
+    /// nobody does in their head from a date, and a date is what identifies the
+    /// week — so the ladder hands over to `weekRangeTitle`, which #190 built,
+    /// and the distance moves to the line underneath.
+    private var weekTitle: String {
+        switch weeksBack {
+        case 0: return "This Week"
+        case 1: return "Last Week"
+        case 2: return "Two Weeks Ago"
+        default: return weekRangeTitle
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("This Week")
+    }
+
+    /// The half `weekTitle` leaves out: the dates when the title is a phrase,
+    /// the distance when the title is the dates.
+    ///
+    /// Nothing on the current week — "This Week" over the lit column is the
+    /// whole answer, and the dates are already under the weekday letters.
+    private var weekSubtitle: String? {
+        switch weeksBack {
+        case 0: return nil
+        case 1, 2: return weekRangeTitle
+        default: return WeekCalendar.weeksBackTitle(for: weekStart, latest: reach.latest)
+        }
+    }
+
+    private var weeksBack: Int {
+        WeekCalendar.weeksBack(from: weekStart, latest: reach.latest)
     }
 
     private var weekRangeTitle: String {
         WeekCalendar.weekRangeTitle(for: week, today: today)
-    }
-
-    private var weeksBackTitle: String? {
-        WeekCalendar.weeksBackTitle(for: weekStart, latest: reach.latest)
     }
 
     /// First launch starts with habits rather than an empty state. Nothing is
@@ -499,17 +525,23 @@ struct WeeklyGridView: View {
     private func refreshReach() {
         let start = store.earliestRecordedDay()
         if start != recordStart { recordStart = start }
-        let clamped = WeekReach.from(recordStart: start, today: today).clamped(weekStart)
-        if clamped != weekStart { weekStart = clamped }
+        show(week: WeekReach.from(recordStart: start, today: today).clamped(weekStart))
     }
 
-    /// Moves the week on screen, clamped into the reach.
-    /// Two chevrons: back through the weeks the record reaches, forward to
-    /// this one. **Temporary, and only here because #190's swipe is
-    /// unverified** — see the note on the toolbar and #211.
+    /// **Asymmetric** (#207): back is always there, forward only exists once
+    /// there is something to come forward from.
     ///
-    /// Kept exactly as #117 shipped it rather than rewritten, so removing it is
-    /// a clean deletion rather than an untangling.
+    /// A forward chevron on the current week is a control that can never do
+    /// anything — the reach stops here — and #117 drew it disabled, which is a
+    /// permanently dim button explaining a boundary nobody was pushing at. Back
+    /// keeps its disabled state, because that one *is* pushing at a boundary:
+    /// a fresh install has no record to page into, and a chevron that vanished
+    /// instead would leave the leading slot empty and the reach unmentioned.
+    ///
+    /// Sharing a shape with the trailing group is the point rather than a
+    /// coincidence: on the current week the bar is `<` … Edit Add, and in the
+    /// past it is `< >` … Today. The way home is on both sides exactly when
+    /// there is a way home.
     private var weekPager: some View {
         HStack(spacing: 8) {
             Button {
@@ -519,20 +551,37 @@ struct WeeklyGridView: View {
             }
             .disabled(weekStart <= reach.earliest)
 
-            Button {
-                step(1)
-            } label: {
-                Label("Next Week", systemImage: "chevron.right")
+            if !isOnCurrentWeek {
+                Button {
+                    step(1)
+                } label: {
+                    Label("Next Week", systemImage: "chevron.right")
+                }
             }
-            .disabled(isOnCurrentWeek)
         }
         .labelStyle(.iconOnly)
     }
 
     private func step(_ weeks: Int) {
-        let next = reach.step(weekStart, by: weeks)
-        guard next != weekStart else { return }
-        weekStart = next
+        show(week: reach.step(weekStart, by: weeks))
+    }
+
+    /// Puts a week on screen, and ends edit mode on the way out of this one.
+    ///
+    /// Every path that moves `weekStart` goes through here, because every one
+    /// of them can strand: `EditButton` is only in the toolbar on the current
+    /// week (#207), so paging back while editing would otherwise leave the list
+    /// in a mode with nothing on screen to leave it by — rows fanned open, the
+    /// week track faded (#164), and no Done. Ending the mode is the honest
+    /// resolution rather than keeping a button the week does not otherwise
+    /// have: what edit mode edits is the list, and the list is a current-week
+    /// affordance.
+    private func show(week newStart: Date) {
+        guard newStart != weekStart else { return }
+        weekStart = newStart
+        if newStart < reach.latest, editMode.isEditing {
+            editMode = .inactive
+        }
     }
 
     /// Re-reads whether the invented past is in. Compared before assigning, so
@@ -607,10 +656,6 @@ struct WeekdayHeader: View {
     let geometry: RowGeometry
     let week: Week
     let today: Date
-    /// Paging, in weeks: −1 back, +1 forward. The header owns the gesture and
-    /// nothing else about the pager — where it may go is `WeekReach`'s answer,
-    /// given by the screen.
-    let onPage: (Int) -> Void
 
     /// The same read the rows make, for the same reason and with the same
     /// standing: this header is built inside `WeeklyGridView`'s
@@ -675,40 +720,13 @@ struct WeekdayHeader: View {
         // change from the one being made.
         .opacity(isEditing ? 0 : 1)
         .animation(reduceMotion ? nil : HabitRowView.editFade, value: isEditing)
-        // The pager's gesture, and the only place in the grid that carries one
-        // (#190): the rows' own `swipeActions` own a horizontal drag that
-        // starts on a row, and this does not touch them.
-        //
-        // Discrete rather than interactive — past the threshold it jumps a
-        // week, exactly as a chevron tap did. Nothing tracks the finger, so
-        // there is no half-dragged week to abandon.
-        //
-        // Vertical drags belong to the list. `minimumDistance` keeps a tap on
-        // nothing from paging, and the comparison below hands anything more
-        // vertical than horizontal back — the List's own scroll recognizer
-        // reads that one, and a gesture that ended more up than sideways was
-        // never a page.
-        //
-        // **`simultaneousGesture` rather than `gesture`, and unverified either
-        // way.** The competing recognizer is a scroll view's pan, which claims
-        // the touch stream first; simultaneous recognition does not ask it to
-        // give the stream up. Which of the two the simulator would have shown
-        // is unknown, because *no* drag can be exercised there: the same
-        // synthetic swipes that page Calendar.app leave this app's own shipped
-        // row `swipeActions` unopened, so a header gesture that does not fire
-        // under automation is evidence about the harness and not about the
-        // code. See #205 and docs/decisions.md.
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 24)
-                .onEnded { value in
-                    // A header faded out is a header nobody can aim at, so
-                    // while edit mode has it the gesture rests with it.
-                    guard !isEditing else { return }
-                    guard abs(value.translation.width) > abs(value.translation.height)
-                    else { return }
-                    onPage(value.translation.width < 0 ? 1 : -1)
-                }
-        )
+        // No gesture. #190 put a discrete horizontal drag here and #207 took it
+        // back out in favour of the toolbar's buttons, so this header is once
+        // again seven letters over seven numbers and nothing else. What the
+        // drag would have been worth was never measured: no drag of any kind
+        // recognises under the simulator's synthetic input — this app's own
+        // shipped row `swipeActions` do not open under it either — so it would
+        // have shipped on an assumption. See docs/decisions.md and #205.
     }
 }
 

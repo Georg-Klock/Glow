@@ -2872,3 +2872,75 @@ covered one:
 - **Not covered:** the glow itself. The simulator has no EDR headroom, so every
   frame in the baseline is the SDR render. `GlowRendererTests` holds the
   headroom claim and a device holds the rest.
+## The pager becomes asymmetric, and the swipe and the pill come back out (#207)
+
+**What this overturns.** *The week pager becomes a swipe*, two entries above and
+an hour old: #190's header swipe and its "This Week" pill are both gone, and the
+date-range title is demoted from *the* title to the last rung of a ladder. The twelve-week cap and #116/#117's
+rule that every day of the visible week is tappable are not reopened and did
+not move. The old entry stays as written; this one says what replaced it.
+
+**The two ends of the toolbar are one decision.** What the trailing group holds
+depends on which week is on screen — Edit and Add on the current week, a single
+**Today** in the past — so the pager opposite it cannot be decided
+independently. Hence asymmetry: `<` alone on the current week, `< >` off it. A
+forward chevron on the newest week there is can never do anything, and #117 drew
+it permanently disabled, which is a dim button explaining a boundary nobody was
+pushing at. Back keeps its disabled state, because that one *is* a boundary
+somebody pushes at: a fresh install has no record to page into, and a chevron
+that vanished instead would leave the leading slot empty and say nothing.
+
+**List editing is a current-week affordance.** Reordering, deleting and adding
+are properties of the list, not of the week on screen; doing them while looking
+at three weeks ago means nothing they do not already mean today. This is not new
+editing scope — every slot of every reachable week is still a plain button.
+
+**So edit mode had to end when the week does.** Removing `EditButton` from a
+past week leaves a hole the issue did not name: enter edit mode, page back, and
+the list is fanned open with the week track faded (#164) and no Done anywhere on
+screen. A mode with no exit control is a trap. The resolution is to end the mode
+rather than to keep a button the week does not otherwise have, which means this
+view owns `\.editMode` as `@State` and injects it below the `NavigationStack` —
+**not** the trap in CLAUDE.md, which is about *reading* the environment value
+from outside the stack, and which `EditModeTests` scans for. Verified on the
+simulator: with edit mode on, one tap on `<` lands on a screen that differs from
+the same week reached normally only in the clock in the status bar.
+
+**"Today", not "This Week", and in the toolbar rather than over the grid.** The
+jump is the same one #190 specified — straight to `reach.latest`, not a repeated
+step — but it sits where the screen's other actions are instead of scrolling
+with the rows, so there is no second element to keep in sync with the pager. It
+is a plain toolbar button rather than a drawn capsule: the root-tint trap (#162)
+is why #190's pill had to be drawn, and a toolbar button needs no fill to be
+found when it is the only thing on that side of the bar.
+
+**The title says how long ago before it says which days.** "This Week", "Last
+Week", "Two Weeks Ago" — the three weeks anybody names that way — and then the
+range #190 built. Past the third rung a relative phrase is arithmetic nobody
+does in their head, and a date is what identifies a week. The line underneath
+carries whichever half the title left out: the dates while the title is a
+phrase, "5 weeks ago" once the title is the dates. On the current week the title
+stands alone.
+
+**The count stays days-divided-by-seven.** #207 proposed
+`dateComponents([.weekOfYear], ...)`, on the correct observation that a *read*
+between two normalized midnights carries none of the DST hazard `WeekReach.step`
+avoids. The hazard it does carry is a different one, and a test written for #190
+already fails on it: `weekOfYear` restarts on 1 January, so twelve weeks back
+from mid-January reads as −39. `WeekCalendar.weeksBack` is the number the ladder
+switches on, and `weeksBackTitle` now asks it rather than counting again.
+
+**The readout does not shift after all.** #190 measured the principal item
+moving from centred to leading when its second line arrived, and recorded it as
+a state change rather than a wobble. With this toolbar it does not move: the
+title's own centre is 602–604px of a 1206px screen on the current week, one week
+back, three weeks back and at the floor. The trailing group is narrower now,
+which is the likeliest reason. The measurement is repeated here rather than the
+old one being deleted — it was true of the toolbar it was made on.
+
+**The gesture goes unmeasured.** #190's swipe could never be exercised: no drag
+of any kind recognises under this simulator's synthetic input, and the control
+that makes that negative meaningless is that the app's own shipped row
+`swipeActions` do not open under it either. It ships nothing now, so #205's four
+device swipes no longer settle anything about this screen. The finding about the
+harness is worth keeping; the gesture is not, because #207 asked for buttons.
