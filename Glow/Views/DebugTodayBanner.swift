@@ -9,6 +9,10 @@ import SwiftUI
 /// as it is set, in the same persistent shape `LowPowerBanner` uses for the
 /// other condition that changes what the app is showing.
 ///
+/// Two screens read it: This Week and History. Settings needs no banner,
+/// because the row that set it is on the screen. #204 named three, the third
+/// being Today, which came out with the per-day kind (#209).
+///
 /// **One tap clears it**, rather than sending you back to Settings. Leaving the
 /// override on should never be more convenient than turning it off.
 ///
@@ -17,7 +21,7 @@ import SwiftUI
 /// appear here without this screen being redrawn for any other reason. The
 /// screens it sits on watch the same signal for their own `today`.
 struct DebugTodayBanner: View {
-    /// The screen's own margin, because the three it sits on do not share one.
+    /// The screen's own margin, because the screens it sits on do not share one.
     ///
     /// **Applied inside the `if`, not by the caller.** Padding applied to this
     /// view from outside would still be padding when there is no banner, and a

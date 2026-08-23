@@ -72,6 +72,14 @@ Every function takes its `Calendar` and its `today` as parameters. Nothing here
 reads the clock, which is what lets the tests assert against a fixed Tuesday in
 August rather than against whenever they happen to run.
 
+**`WeekCalendar.today()` is the one exception, and it is not in this directory**
+(#204). It answers "what day is it" for every surface, and to answer it has to
+read both the clock and the App Group — so it is declared in
+`Glow/Store/DebugToday.swift`, at the boundary, and only the spelling lives on
+`WeekCalendar`. `TestIsolationTests` scans `Glow/Logic/` for `Date()`,
+`DebugToday` and `WeekCalendar.today`, because the extension is in the same
+module and a call to it from in here would otherwise compile.
+
 **The rest day arrives the same way** (#181). `WeekPreferences` is where the
 stored value lives; nothing else in here reads it. `WeekGrid`, `WeekSpans`,
 `WeekDots`, `MonthGrid`, `SeededHistory`, `YearHistory` and `SlotEditing` all
@@ -301,11 +309,44 @@ columns that are one slot wide and have nowhere to grow into.
 ## Day rollover
 
 The open slot is defined as "today", so the screen has to notice when today
-changes. Two paths, and both are needed:
+changes. Three paths, and all are needed:
 
 - `NSCalendarDayChanged` covers the app being open across midnight.
 - `scenePhase == .active` covers it being resumed the next morning without ever
   having been killed.
+- `UserDefaults.didChangeNotification` covers the debug override moving (#204).
+  It is set from Settings, which is a sibling tab, so the screens that draw the
+  week stay alive and unredrawn while it moves — the same signal, and the same
+  reason, as demo history.
+
+## Which day the app thinks it is
+
+`WeekCalendar.today()` is where "today" is established, and every surface that
+needs one calls it and hands the answer down as a parameter. Nothing
+downstream — `WeekGrid`, `WeekSpans`, `SlotEditing`'s future-write guard, the
+widgets' timeline providers — knows there is anything to know.
+
+`DebugToday` is what it consults first: a day of the current week, stored in the
+App Group, that the app treats as today on every screen and in every widget
+(#204). It is a simulation rather than a preview — a tap while it is on writes a
+real completion dated to the simulated day — so it is fenced three ways, and
+each fence exists because the failure it prevents is a write:
+
+1. **Scoped to the real current week.** `override(calendar:)` compares the
+   stored day against the seven midnights the real week is made of and clears
+   the key when it is not one of them, so a stored day cannot outlive the week
+   it meant something in. A midnight from another time zone matches none of
+   them either, which fails in the safe direction.
+2. **Cleared at launch**, first thing in `GlowApp.init`, before the store is
+   opened. The longest a stray override can affect anything is one app session.
+3. **Said out loud.** `DebugTodayBanner` sits on This Week and on History for as
+   long as one is set, and one tap on it clears the override — leaving it on
+   must never be more convenient than turning it off.
+
+It ships in every build, TestFlight included, and deliberately not behind
+`#if DEBUG`: a Release archive is the build that gets installed on the phone
+this app is tested on, and compiling the tool out of it would remove it from
+the only place it is wanted.
 
 ## Testing
 
