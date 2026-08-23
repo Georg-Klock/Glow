@@ -2991,3 +2991,23 @@ The bar keeps `.toolbarBackground(.visible, for: .navigationBar)` — still
 without a `Color`, which still removes the title — because that is what stops
 the system material dimming the capsule to grey. It is simply not what was
 holding the light back.
+
+## `listSectionSpacing` sets the gap below, and #201 read it as above
+
+**Question.** The "Glow off" banner moves from three sections down to directly
+under the preview it explains. #201 says `.listSectionSpacing(0)` has to travel
+with it, or the gap the preview's own zero removes "reappears one section
+later".
+
+**Decision.** It moves; the modifier stays behind. `.listSectionSpacing(0)` on
+a `Section` sets the spacing **after** that section, not before it — so the
+preview's own zero already lands on whatever follows, and the banner arrives
+tight against the reserved halo band with nothing of its own.
+
+Measured on an iPhone 17 Pro simulator with the slider dragged to its minimum,
+built both ways: the banner panel occupies **418–470pt in both**. Carrying the
+modifier changes only what is below it, pulling the Glow section's panel from
+528pt up to 510pt and its header text with it — which closes the one gap #201's
+own acceptance criterion asks to keep ("the normal Form spacing should resume
+between the banner and the Glow slider section below it"). The two halves of
+the issue disagreed; the screen settles it.
