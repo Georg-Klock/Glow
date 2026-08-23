@@ -3293,3 +3293,67 @@ same one-sided shape — measured, they read 0 and 1 beside a rest cut at 36, so
 they are vacuous today too — and `groundIsPureBlack` and `noHueAnywhere` would
 both pass on a blank frame. Catalogued in #226 rather than fixed here, the way
 #199 catalogued the bands: one reviewable change at a time.
+
+## The other four one-sided bounds (#226)
+
+The follow-up #219 filed rather than fixed. Four assertions in
+`WidgetRenderDiffTests` with the same shape — an upper bound, or a whole-frame
+claim, with nothing under it — and they are not equally urgent, so they were not
+treated equally.
+
+**Two were measurably vacuous and are fixed.** `metGoalStopsBeforeSunday` says
+the met-goal line stops at Saturday and offers `sunday < clear` as the evidence;
+`metGoalIsCutInTheMiddle` says the line is cut in two and offers
+`wednesday < clear`. Rendered and printed, those regions read **0** and **1**
+beside a rest cut that reads **36** down the centre of the same column.
+`brightestInRestColumn` steps a quarter-slot around the cut on purpose and the
+span has been subtracted there, so both bounds were being satisfied by emptiness
+— delete the rest day's mark and both still pass. The floor each has on the
+*neighbouring* column does not notice, because it is in another column.
+
+The fix is the pairing `restCutStartsAndStopsOnAHabit` already uses, and the two
+helpers #219 added: the rest day's own line is there (`> lineFloor`), and it is
+unlit beside this frame's own lit dots (`isUnlit(_:beside:)`). A claim about
+absence is worth something only next to a claim that the same column was drawn.
+
+**`clear` stays a level, deliberately.** The two helpers are not
+interchangeable. `isUnlit` asks whether a tone is grey rather than white and
+admits everything up to a quarter of the frame's lit level; what these two scans
+rule out is a *grey line* running where it should not, which sits well inside
+that. Swapping `< clear` for `isUnlit` would have widened the hole rather than
+closed it. `clear` is a level against the ground rather than against the
+palette, so it does not move when the palette does.
+
+**Proved in both arms**, by perturbing the widget and re-rendering, with the old
+bound and the new claims read out of the same frame:
+
+| perturbation | old form | new claims |
+| --- | --- | --- |
+| rest cut filled `.clear` — the mark is not drawn | **passes** (0 and 1) | fails: line missing (0) |
+| rest cut filled white — the mark is lit | **passes** (0 and 1) | fails: line lit (255 beside dots at 255) |
+| `restWindow` forced to nil — the line crosses | fails (36 and 37) | fails, on the same bound |
+
+The third arm is the regression both tests were written for, and the new form
+still catches it, because the bound that catches it was kept.
+
+**The other two are left alone, and that is the decision.**
+`groundIsPureBlack` (`share > 90` is 100 on a blank frame) and `noHueAnywhere`
+(`worst <= 1` is 0 on one) are whole-frame claims stated as if they stood alone.
+They do not stand alone: `RenderBaselineTests` holds all four families
+individually, against a committed 16 × 16 grid of mean brightness, the same
+exact-black share, and a census of the tones each family paints. Measured rather
+than assumed — `month small` was blanked and the two suites run together. That
+gate went red three ways at once for that family (a cell moved 23 against a
+tolerance of 3; the black share went 90.2% → 100.0% against a tolerance of 0.5;
+the level-36 tone went 680 pixels → 0) while `groundIsPureBlack`,
+`noHueAnywhere` and `haloIsWhatLiftsIt` all stayed green. A content floor here
+would restate, more weakly, a gate that already exists. Both tests now name it,
+so the next reader does not file this a third time.
+
+**Found while in the file and not acted on.** `metGoalIsCutInTheMiddle`'s "the
+left piece is missing" floor samples Tuesday, which is a *logged* day in that
+fixture: the column reads 255, the lit dot, not the line's 36. It is not vacuous
+— a blank column fails it — but it is not measuring the line either, and it
+would go on passing if the line under the dot were lost. Fixing it means moving
+where that scan samples or changing the fixture, which is a different change
+from this one. The code says so where it samples.
