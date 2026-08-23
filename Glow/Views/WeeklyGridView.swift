@@ -118,6 +118,22 @@ struct WeeklyGridView: View {
             .navigationTitle(weekRangeTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // The chevrons are back, and deliberately temporary. #190
+                // replaced them with a header swipe, and that swipe **could not
+                // be verified**: no drag of any kind recognises under this
+                // simulator's synthetic input — the app's own shipped row
+                // `swipeActions` do not open either, which is the control that
+                // makes the negative meaningless. See #205.
+                //
+                // Without a working gesture the pill is unreachable, because it
+                // only appears once you have already paged away. That would
+                // make #117's reach-back — which shipped working — unreachable
+                // in the next build. A toolbar item is a cheap insurance
+                // premium against that; delete this block the moment a device
+                // confirms the swipe. See #211.
+                ToolbarItem(placement: .topBarLeading) {
+                    weekPager
+                }
                 ToolbarItem(placement: .principal) {
                     weekReadout
                 }
@@ -488,6 +504,31 @@ struct WeeklyGridView: View {
     }
 
     /// Moves the week on screen, clamped into the reach.
+    /// Two chevrons: back through the weeks the record reaches, forward to
+    /// this one. **Temporary, and only here because #190's swipe is
+    /// unverified** — see the note on the toolbar and #211.
+    ///
+    /// Kept exactly as #117 shipped it rather than rewritten, so removing it is
+    /// a clean deletion rather than an untangling.
+    private var weekPager: some View {
+        HStack(spacing: 8) {
+            Button {
+                step(-1)
+            } label: {
+                Label("Previous Week", systemImage: "chevron.left")
+            }
+            .disabled(weekStart <= reach.earliest)
+
+            Button {
+                step(1)
+            } label: {
+                Label("Next Week", systemImage: "chevron.right")
+            }
+            .disabled(isOnCurrentWeek)
+        }
+        .labelStyle(.iconOnly)
+    }
+
     private func step(_ weeks: Int) {
         let next = reach.step(weekStart, by: weeks)
         guard next != weekStart else { return }
