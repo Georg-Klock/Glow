@@ -2163,3 +2163,60 @@ error at the call site — and runtime behaviour on 18 remains something only a
 device answers. The lane that did land is an unsigned Release build against the
 device SDK, which is the configuration and the SDK that ship and which the
 simulator test lane never compiles.
+
+## Edit mode gives the week's width back (#164)
+
+**Question.** `List`'s edit mode draws a delete circle at the leading edge and a
+reorder handle at the trailing one, and they landed beside a row that had not
+changed at all — icon, name and seven columns of week still holding the width
+they hold when the week can be tapped. What should the row show while it is
+being reordered?
+
+**Decision.** Everything weekday-shaped leaves, and the name takes the middle of
+what is left: the track, the rest-day cut, and the header's letters all fade on
+one 0.15s `easeOut`, and the label recentres between the system's two controls.
+
+The three fade together because none of them labels anything once the others are
+gone. The cut is positioned from the same geometry as the track and marks a
+weekday exactly as the track does; the letters stand over columns that are no
+longer there. The track is *removed* rather than dimmed, which is also what
+keeps #137's rule — what is not drawn is not spoken — without a second
+declaration: no slots in the hierarchy, no dates for VoiceOver to read out of an
+empty row.
+
+**The label hugs its content rather than keeping its column.** A label still
+filling a label-shaped frame would have centred that frame, and the name inside
+it would have stayed at the frame's leading edge — centred by measurement and
+visibly not centred. Measured on the simulator at 3x: the delete circle ends at
+x=116 and the handle begins at x=1054, midpoint 585; the label's box spans
+444–724, centre 584. The ink looks a few points right of that because the icon
+column is 24pt wide and a pencil is not.
+
+**Reading `\.editMode` from the environment is correct here, and it was checked
+before anything was built on it.** CLAUDE.md carries the opposite case as a paid-for
+trap, and the difference is which side of the `NavigationStack` the view is on:
+`TodayView`'s own `body` builds the stack, so the value it reads is its parent's
+and never the one the toolbar's `EditButton` toggles — it owns `@State` and
+injects it. `HabitRowView` and `WeekdayHeader` are plain descendants of the stack
+`WeeklyGridView` builds, so they read the live value. Verified on the simulator
+with a temporary on-screen indicator in both types before the fade existed: every
+row and the header flipped on the tap. `EditModeTests` keeps the distinction from
+drifting — no view that builds a stack may read the environment's copy.
+
+**Leaving edit mode does not fade; entering does.** Measured off a 60fps capture
+of the toggle, on the luma of one row's track: entering ramps from 26.9 to 16.9
+over 0.13s, which is the animation asked for. Leaving jumps in a single frame
+while `List`'s own chrome is still sliding out — the row's content is rebuilt as
+the list drops out of editing, so the inserted track has no state to animate
+from. It reads as the marks being back rather than as a jump, and the fix would
+be to hold the whole track in the hierarchy at zero width and zero opacity,
+which buys one direction of one transition with an invisible, still-hit-testable
+week. Not taken; recorded here so the asymmetry is a decision rather than a
+surprise.
+
+**Timing: 0.15s `easeOut`, roughly half of `SlotView.close`.** A completion is a
+change worth noticing and settles on a spring; this is a surface getting out of
+the way, and it leaves. The number lives on `HabitRowView.editFade` and the
+header borrows it, so the two cannot drift apart. Reduce Motion snaps it, as it
+snaps everything else the grid does — the label changes width and position here,
+and a shorter version of that is still a version of it.

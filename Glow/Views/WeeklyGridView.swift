@@ -510,6 +510,16 @@ struct WeekdayHeader: View {
     let week: Week
     let today: Date
 
+    /// The same read the rows make, for the same reason and with the same
+    /// standing: this header is built inside `WeeklyGridView`'s
+    /// `NavigationStack`, not by the struct that constructs one, so the value
+    /// the toolbar's `EditButton` toggles is the value it sees. See
+    /// `HabitRowView.isEditing` for the distinction, and `TodayView` for the
+    /// case where it does not hold.
+    @Environment(\.editMode) private var editMode
+    private var isEditing: Bool { editMode?.wrappedValue.isEditing ?? false }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private var initials: [String] { WeekCalendar.weekdayInitials() }
     private var numbers: [String] { WeekCalendar.dayNumbers(in: week) }
 
@@ -553,6 +563,16 @@ struct WeekdayHeader: View {
             .frame(width: geometry.trackWidth, alignment: .leading)
         }
         .accessibilityHidden(true)
+        // Nothing left to label. The letters stand over the columns, and in
+        // edit mode there are no columns — so they go with them, on the rows'
+        // own timing so the whole week leaves as one thing rather than as a
+        // header and eleven rows that happen to agree.
+        //
+        // Opacity rather than removal: the header carries the section's height,
+        // and a list whose first row jumps up under the title is a different
+        // change from the one being made.
+        .opacity(isEditing ? 0 : 1)
+        .animation(reduceMotion ? nil : HabitRowView.editFade, value: isEditing)
     }
 }
 
