@@ -270,13 +270,13 @@ struct RenderBaselineTests {
         let week = Fixture.week()
         let month = Fixture.month()
         return [
-            Frame(name: "week small", size: CGSize(width: 158, height: 158),
+            Frame(name: "week small", size: WidgetMetrics.size(of: .systemSmall),
                   view: AnyView(WeekWidgetView(entry: week, familyOverride: .systemSmall))),
-            Frame(name: "week medium", size: CGSize(width: 338, height: 158),
+            Frame(name: "week medium", size: WidgetMetrics.size(of: .systemMedium),
                   view: AnyView(WeekWidgetView(entry: week, familyOverride: .systemMedium))),
-            Frame(name: "week large", size: CGSize(width: 338, height: 354),
+            Frame(name: "week large", size: WidgetMetrics.size(of: .systemLarge),
                   view: AnyView(WeekWidgetView(entry: week, familyOverride: .systemLarge))),
-            Frame(name: "month small", size: CGSize(width: 158, height: 158),
+            Frame(name: "month small", size: WidgetMetrics.size(of: .systemSmall),
                   view: AnyView(MonthWidgetView(entry: month))),
         ]
     }

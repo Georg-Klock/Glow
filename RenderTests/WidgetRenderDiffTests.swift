@@ -408,17 +408,17 @@ struct WidgetRenderDiffTests {
         let week = entry()
         return [
             ("week small", AnyView(WeekWidgetView(entry: week, familyOverride: .systemSmall)),
-             CGSize(width: 158, height: 158)),
+             WidgetMetrics.size(of: .systemSmall)),
             ("week medium", AnyView(WeekWidgetView(entry: week, familyOverride: .systemMedium)),
-             CGSize(width: 338, height: 158)),
+             WidgetMetrics.size(of: .systemMedium)),
             ("week large", AnyView(WeekWidgetView(entry: week, familyOverride: .systemLarge)),
-             CGSize(width: 338, height: 354)),
+             WidgetMetrics.size(of: .systemLarge)),
             // The densest family, and the one most likely to lose the ground
             // claim without anyone noticing: six rows of seven cells, where a
             // lifted floor reads as "the marks are dim" rather than as "the
             // background is wrong".
             ("month small", AnyView(MonthWidgetView(entry: monthEntry())),
-             CGSize(width: 158, height: 158)),
+             WidgetMetrics.size(of: .systemSmall)),
         ]
     }
 

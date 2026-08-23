@@ -105,6 +105,18 @@ enum MonthStore {
             predicate: Habit.weekly,
             sortBy: [SortDescriptor(\Habit.sortOrder)]
         )
-        return ((try? context.fetch(descriptor)) ?? []).filter { !$0.isSpacer }
+        return offered(among: (try? context.fetch(descriptor)) ?? [])
+    }
+
+    /// The same rule, over habits somebody has already fetched.
+    ///
+    /// The Widgets tab previews the month widget from its own `@Query` rather
+    /// than opening a second container to ask (#210), and "which habit does an
+    /// unconfigured month widget show" has to be one answer — a preview showing
+    /// a different habit than the widget it is a preview of is worse than no
+    /// preview. Expects the weekly-cadence habits in the user's order, which is
+    /// what the descriptor above and the tab's query both produce.
+    static func offered(among habits: [Habit]) -> [Habit] {
+        habits.filter { !$0.isSpacer }
     }
 }
