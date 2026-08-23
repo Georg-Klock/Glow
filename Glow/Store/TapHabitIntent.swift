@@ -64,9 +64,13 @@ struct TapHabitIntent: LiveActivityIntent {
         // path has the same rule for free, because `.uncompleted` never calls
         // this at all.
         if count > 0 {
+            // The week, not the history: `GoalMet` counts inside the week it
+            // is given, so a ring tap no longer reads every repetition ever
+            // logged to decide whether this one met the goal (#135).
+            let week = WeekCalendar.week(containing: Date())
             GoalPopCentre.popIfMet(
-                habit: habit.snapshot(),
-                in: WeekCalendar.week(containing: Date()),
+                habit: habit.snapshot(within: week.dayIDs()),
+                in: week,
                 today: Date()
             )
         }

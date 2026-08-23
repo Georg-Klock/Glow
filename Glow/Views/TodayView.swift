@@ -34,6 +34,7 @@ struct TodayView: View {
 
     private var store: HabitStore { HabitStore(context: context) }
     private var isEditing: Bool { editMode.isEditing }
+    private var calendar: Calendar { WeekCalendar.calendar }
 
     /// Three rings to a row, like the medium widget. Sized so a full row sits
     /// inside an iPhone's width with the margins the widget would have.
@@ -118,11 +119,23 @@ struct TodayView: View {
     /// stack rather than a grid so a final row of one or two rings centres the
     /// way the widget would centre them, instead of hugging the leading edge.
     private var rings: some View {
-        ScrollView {
+        // One day, read once. Each ring used to call `snapshot()`, which reads
+        // every completion the habit has ever had and projects all of them onto
+        // a calendar, to answer a question about one day — and did it per ring
+        // per redraw. A per-day habit is the one with the most rows of anything
+        // here, so it was also the worst case. See #135.
+        let counts = Habit.dayCounts(
+            of: habits, within: DayID.range(from: today, through: today, calendar: calendar),
+            in: context
+        )
+        let dayID = DayID(today, calendar: calendar)
+        return ScrollView {
             VStack(spacing: Self.rowSpacing) {
                 ForEach(rows, id: \.first?.id) { row in
                     HStack(alignment: .top, spacing: Self.columnSpacing) {
-                        ForEach(row) { habit in cell(habit) }
+                        ForEach(row) { habit in
+                            cell(habit, done: counts[habit.id]?[dayID] ?? 0)
+                        }
                     }
                 }
             }
@@ -138,9 +151,8 @@ struct TodayView: View {
         }
     }
 
-    private func cell(_ habit: Habit) -> some View {
+    private func cell(_ habit: Habit, done: Int) -> some View {
         let target = habit.timesPerDay
-        let done = habit.snapshot().count(on: today)
         let isOpen = done < target
 
         // Editing changes what the ring is for rather than adding a second

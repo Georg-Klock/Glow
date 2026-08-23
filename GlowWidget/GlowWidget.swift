@@ -177,7 +177,12 @@ struct WeekProvider: TimelineProvider {
             predicate: Habit.countedPerWeek,
             sortBy: [SortDescriptor(\.sortOrder)]
         )
-        let habits = (try? context.fetch(descriptor))?.map { $0.snapshot() } ?? []
+        // Bounded to the week it draws (#135). A home screen widget reloading
+        // every time a completion lands was reading every completion of every
+        // habit to fill in seven columns.
+        let habits = Habit.snapshots(
+            of: (try? context.fetch(descriptor)) ?? [], within: week.dayIDs()
+        )
 
         return WeekEntry(date: today, week: week, habits: habits)
     }

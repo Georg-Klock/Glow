@@ -130,6 +130,20 @@ final class Habit {
         }
     }
 
+    /// The same counts, over a bounded stretch of days.
+    ///
+    /// One habit's half of `Habit.dayCounts(of:within:in:)`, for the surfaces
+    /// that hold a habit rather than a list of them — a widget tap deciding
+    /// whether it met a weekly goal, which is a question about one week (#135).
+    /// A habit with no context filters the rows it carries, so a fixture
+    /// answers the same as a stored row.
+    func completionDayCounts(within days: ClosedRange<DayID>) -> [DayID: Int] {
+        guard let modelContext else {
+            return completionDayCounts.filter { days.contains($0.key) }
+        }
+        return Habit.dayCounts(of: [self], within: days, in: modelContext)[id] ?? [:]
+    }
+
     /// The same counts, placed on the timeline `calendar` describes.
     ///
     /// Everything week-shaped compares days by equality against the midnights
@@ -186,13 +200,147 @@ final class Habit {
     }
 
     func snapshot(calendar: Calendar = WeekCalendar.calendar) -> HabitSnapshot {
+        snapshot(dayCounts: completionDayCounts, calendar: calendar)
+    }
+
+    /// A snapshot holding only the days `days` covers, and nothing before or
+    /// after them. See `Habit.snapshots(of:within:calendar:)` for what may be
+    /// handed one.
+    func snapshot(
+        within days: ClosedRange<DayID>, calendar: Calendar = WeekCalendar.calendar
+    ) -> HabitSnapshot {
+        snapshot(dayCounts: completionDayCounts(within: days), calendar: calendar)
+    }
+
+    /// A snapshot from counts somebody else already took.
+    ///
+    /// The projection, separated from the read that feeds it (#135), so a
+    /// caller that has already read a bounded stretch of history does not read
+    /// it again per habit. The calendar stays on this side, where it belongs:
+    /// the counts are zone-free and only the projection is not.
+    func snapshot(dayCounts: [DayID: Int], calendar: Calendar) -> HabitSnapshot {
         HabitSnapshot(
             id: id,
             name: name,
             icon: icon,
             frequency: frequency,
-            completionCounts: completionCounts(in: calendar),
+            completionCounts: dayCounts.reduce(into: [:]) { counts, entry in
+                counts[entry.key.date(in: calendar)] = entry.value
+            },
             isSpacer: isSpacer
         )
+    }
+
+    /// How many completions each of these habits has on each civil day of
+    /// `days`, in one pass over the store.
+    ///
+    /// **The saving is the range, not the single fetch**, and that is a
+    /// measurement rather than a guess. Twelve habits with two years each —
+    /// 8,760 completions, alternated arms in one process, medians of eight
+    /// rounds, over three runs: one fetch per habit over the whole history
+    /// 188–194ms, one shared fetch over the whole history 183–205ms, one
+    /// shared fetch bounded to a week 2.4–2.5ms. The first two are the same
+    /// number. Grouping *n* habits' rows into one query saves *n − 1* round
+    /// trips and spends them again faulting the habit each row points at, and
+    /// it still materializes every row there has ever been. Reading seven days
+    /// materializes seven days. See `Tests/HistoryProjectionTests.swift`.
+    ///
+    /// So a caller that draws a bounded stretch of time should pass it. A
+    /// caller that genuinely needs the whole history — the export — should not
+    /// bother, and `snapshots(of:within:calendar:)` says so by mapping
+    /// `snapshot()` when there is no range.
+    ///
+    /// Habits outside `habits` are dropped rather than returned, so a caller
+    /// that fetched the weekly cadences does not also get the per-day ones.
+    ///
+    /// **This is not a cache and nothing here is remembered** — see
+    /// `snapshots(of:within:calendar:)` for why not.
+    static func dayCounts(
+        of habits: [Habit], within days: ClosedRange<DayID>? = nil, in context: ModelContext
+    ) -> [UUID: [DayID: Int]] {
+        let wanted = Set(habits.map(\.id))
+        guard !wanted.isEmpty else { return [:] }
+        var descriptor = FetchDescriptor<Completion>(predicate: rowsFalling(in: days))
+        // Fault the habit each row points at in the same pass. Without this
+        // the group below asks for it row by row, which trades n fetches of
+        // completions for rather more fetches of habits.
+        descriptor.relationshipKeyPathsForPrefetching = [\.habit]
+        guard let rows = try? context.fetch(descriptor) else { return [:] }
+
+        var counts: [UUID: [DayID: Int]] = [:]
+        for row in rows {
+            guard let habitID = row.habit?.id, wanted.contains(habitID) else { continue }
+            let dayID = row.dayID
+            if let days, !days.contains(dayID) { continue }
+            counts[habitID, default: [:]][dayID, default: 0] += 1
+        }
+        return counts
+    }
+
+    /// The rows that could fall inside `days`, as something SQLite can answer.
+    ///
+    /// **A legacy row is always fetched, whatever the range** (#130, #135). Its
+    /// `dayKey` is empty and its day is *inferred* from the untouched instant,
+    /// so a predicate on the key alone would silently skip exactly the rows the
+    /// day-identity work is about — and it would skip them differently
+    /// depending on how far through the backfill a store happened to be. Empty
+    /// keys come back and `dayID` settles them in memory, which is why this
+    /// needs no way to ask whether a store is fully stamped: on a stamped store
+    /// the empty-key branch matches nothing and the range is doing all the
+    /// work, on an unstamped one it degrades to the scan that already happens
+    /// today, and both answer the same.
+    ///
+    /// The comparison is on the text because the text is what sorts like the
+    /// dates do — that is the whole reason `DayID.text` is zero-padded.
+    private static func rowsFalling(in days: ClosedRange<DayID>?) -> Predicate<Completion>? {
+        guard let days else { return nil }
+        let low = days.lowerBound.text
+        let high = days.upperBound.text
+        return #Predicate<Completion> {
+            $0.dayKey == "" || ($0.dayKey >= low && $0.dayKey <= high)
+        }
+    }
+
+    /// Snapshots of a whole list, reading only the days `within` covers.
+    ///
+    /// What every list-shaped surface that draws a bounded stretch of time
+    /// should call instead of mapping `snapshot()`: the week grid draws seven
+    /// days, the year draws one year, the month widget draws one month, and
+    /// each of them was reading every completion of every habit, once per
+    /// habit, on every redraw.
+    ///
+    /// **A snapshot made this way holds only those days**, which is the one
+    /// thing to know before passing one somewhere else. Everything week-shaped
+    /// — `WeekGrid`, `WeekSpans`, `WeekDots`, `GoalMet`, `RestCut` — asks only
+    /// about days inside the week it is given, so a week's worth is all a week
+    /// needs; `HistoryExport` and the CSV are the callers that genuinely mean
+    /// *all of it*, and they pass no range.
+    ///
+    /// **Per render, not across renders, and that is deliberate** (#135, #145).
+    /// The tempting version of this is a cache on the habit, taken once and
+    /// invalidated when the app writes. It cannot be made honest here: the
+    /// widget's intents open their own container against the same App Group
+    /// file, the app is never told when they write, and a cache the other
+    /// process cannot invalidate is a wrong number that survives until
+    /// something unrelated redraws. So the pass is shared within one render and
+    /// dropped at the end of it, which is a cost the *number of habits* no
+    /// longer multiplies.
+    ///
+    /// Maps `snapshot()` in two cases: when there is no range, where the shared
+    /// pass measured no better than a fetch per habit and so is not worth the
+    /// second code path, and when no habit here has a context — fixtures, which
+    /// carry their rows in the cached array and have nothing to fetch from.
+    static func snapshots(
+        of habits: [Habit],
+        within days: ClosedRange<DayID>? = nil,
+        calendar: Calendar = WeekCalendar.calendar
+    ) -> [HabitSnapshot] {
+        guard let days, let context = habits.lazy.compactMap(\.modelContext).first else {
+            return habits.map { $0.snapshot(calendar: calendar) }
+        }
+        let counts = dayCounts(of: habits, within: days, in: context)
+        return habits.map { habit in
+            habit.snapshot(dayCounts: counts[habit.id] ?? [:], calendar: calendar)
+        }
     }
 }

@@ -54,6 +54,31 @@ struct MonthCell: Identifiable, Equatable, Sendable {
 ///   an X on a day you can still act on would be a prediction, which is the one
 ///   thing this mark must never be.
 enum MonthGrid {
+    /// The civil days this grid draws for the month `day` falls in — whole
+    /// weeks, so the ends run into the neighbouring months exactly as the
+    /// cells do.
+    ///
+    /// What a bounded history read is asked for (#135), and it is derived from
+    /// the same loop `cells` walks rather than restated: a range that stopped
+    /// at the month's own edges would be short by up to twelve days, and the
+    /// marks in them would silently go missing.
+    static func dayRange(
+        containing day: Date, calendar: Calendar = WeekCalendar.calendar
+    ) -> ClosedRange<DayID>? {
+        let start = WeekCalendar.day(day, calendar: calendar)
+        guard let month = calendar.dateInterval(of: .month, for: start) else { return nil }
+        var weekStart = WeekCalendar.startOfWeek(containing: month.start, calendar: calendar)
+        let first = weekStart
+        var last = WeekCalendar.week(containing: weekStart, calendar: calendar).days[6]
+        while weekStart < month.end {
+            let week = WeekCalendar.week(containing: weekStart, calendar: calendar)
+            last = week.days[6]
+            guard let next = calendar.date(byAdding: .day, value: 7, to: weekStart) else { break }
+            weekStart = next
+        }
+        return DayID.range(from: first, through: last, calendar: calendar)
+    }
+
     static func cells(
         for habit: HabitSnapshot,
         today: Date,

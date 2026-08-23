@@ -11,6 +11,13 @@ struct Week: Equatable, Sendable {
     func contains(_ day: Date) -> Bool { days.contains(day) }
 
     func index(of day: Date) -> Int? { days.firstIndex(of: day) }
+
+    /// The seven civil days this week is, for a bounded history read (#135).
+    /// Everything week-shaped reads only these, so this is all a week's row has
+    /// to fetch.
+    func dayIDs(in calendar: Calendar = WeekCalendar.calendar) -> ClosedRange<DayID> {
+        DayID.range(from: days[0], through: days[6], calendar: calendar)
+    }
 }
 
 /// Every date question in the app goes through here, so "what day is it" is

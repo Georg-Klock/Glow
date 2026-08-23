@@ -76,9 +76,13 @@ struct ToggleHabitIntent: LiveActivityIntent {
             // render an activity while its own app is in front, so a completion
             // logged in the app fires one nobody looks at, and one logged from
             // the home screen fires one they are already looking at.
+            // The week, not the history: `GoalMet` counts inside the week it
+            // is given and asks nothing about any day outside it, so a tap no
+            // longer reads a year to decide whether it was the seventh (#135).
+            let week = WeekCalendar.week(containing: Date())
             GoalPopCentre.popIfMet(
-                habit: habit.snapshot(),
-                in: WeekCalendar.week(containing: Date()),
+                habit: habit.snapshot(within: week.dayIDs()),
+                in: week,
                 today: Date()
             )
         }

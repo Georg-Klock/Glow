@@ -181,22 +181,32 @@ struct WeeklyGridView: View {
         .task { refreshReach() }
     }
 
+    /// Every row's week, read once per redraw and only for the week shown.
+    ///
+    /// This used to be two whole-history reads per redraw — `snapshot()` mapped
+    /// over the habits for the cut, and `snapshot()` again inside the loop for
+    /// each row — so a screen of seven days cost every completion of every
+    /// habit, twice, on every keystroke that redrew it. Nothing here asks about
+    /// a day outside `week`: `WeekGrid`, `WeekSpans`, `WeekDots` and `GoalMet`
+    /// all count inside the week they are given. See #135.
+    private var snapshots: [HabitSnapshot] {
+        Habit.snapshots(of: habits, within: week.dayIDs())
+    }
+
     private var grid: some View {
         GeometryReader { proxy in
             let geometry = RowGeometry(totalWidth: proxy.size.width)
+            let snapshots = self.snapshots
             // The rest day's line ends on a habit, and it ends where the widget
             // ends: the same `largeRowCapacity` that decides the boundary
             // hairline below, so the cut stops on that line rather than running
             // down a list that scrolls.
-            let cut = RestCut.rows(
-                habits.map { $0.snapshot() },
-                capacity: WidgetMetrics.largeRowCapacity
-            )
+            let cut = RestCut.rows(snapshots, capacity: WidgetMetrics.largeRowCapacity)
             List {
                 Section {
                     ForEach(Array(habits.enumerated()), id: \.element.id) { index, habit in
                         HabitRowView(
-                            snapshot: habit.snapshot(),
+                            snapshot: snapshots[index],
                             week: week,
                             today: today,
                             geometry: geometry,
