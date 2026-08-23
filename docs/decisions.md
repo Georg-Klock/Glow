@@ -3357,3 +3357,14 @@ fixture: the column reads 255, the lit dot, not the line's 36. It is not vacuous
 would go on passing if the line under the dot were lost. Fixing it means moving
 where that scan samples or changing the fixture, which is a different change
 from this one. The code says so where it samples.
+
+
+## Tinted and Clear stay glass (#53)
+
+**2026-08-22.** Closed, accepted rather than fixed. `containerBackgroundRemovable(false)` was built, measured on device, and does not do what the issue wanted: on iOS 26 that flag governs contexts with no background at all — StandBy, the iPad Lock Screen gallery — and Tinted and Clear are a restyling of the Home Screen, not one of those, so both still substitute glass regardless of the flag. A black image drawn as ordinary content inside the container fails the same way, silently. Worse than the background: the halo does not survive Tinted or Clear either, with or without the flag, so a lit mark already reads as a bright shape rather than a glow one layer before the background question even applies.
+
+No mechanism was found. The design argument for pitch black in every appearance is unchanged and not wrong; there is simply nothing in the current API surface that grants it. Georg's call: stop paying a real cost (StandBy, the iPad Lock Screen gallery, foreground tinting) for a change that would not have worked anyway, and accept the platform default for Tinted and Clear.
+
+**What this does not reopen.** #111's grey-as-`ShapeStyle` resolution does not depend on this — it was built to survive accented rendering regardless of whether the background is ever forced to black, and the measured hierarchy (Default 255/23, Tinted 255/149, Clear 255/162) holds under the platform default exactly as it would have under a forced one. Nothing about closing this changes that.
+
+**If this is ever reopened**, it needs a new mechanism to have appeared — a future `containerBackgroundRemovable`-shaped API that actually distinguishes Tinted/Clear from StandBy, or a way to keep the halo under accented rendering — not a second attempt at the same flag.
