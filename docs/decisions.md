@@ -2944,3 +2944,50 @@ that makes that negative meaningless is that the app's own shipped row
 `swipeActions` do not open under it either. It ships nothing now, so #205's four
 device swipes no longer settle anything about this screen. The finding about the
 harness is worth keeping; the gesture is not, because #207 asked for buttons.
+
+## The top of the screen fades; the toolbar was never opaque (#195)
+
+**Question.** The preview capsule reads as visible right behind the Dynamic
+Island while Settings is being scrolled. Is something clipping wrongly, or is
+it just an unlucky scroll position?
+
+**Neither, and the premise was one step off.** It is not a during-the-gesture
+effect and it does not need a device to see. Swiped 200pt and screenshotted at
+rest on an iPhone 17 Pro simulator, a column through the capsule reads
+**249,249,248 at 140pt from the top of the screen**, with the inline "Settings"
+title printed over it. The navigation bar's declared-visible background is not
+opaque black. #109's measurement — "a column down the left edge reads 0,0,0
+straight through the bar" — is real and was read as saying more than it says: a
+column with nothing bright behind it reads black whatever the bar is doing.
+
+**Decision.** A fixed gradient pinned to the top of the screen, opaque through
+the safe area and falling off 64pt below it, over the content and under the
+bar. It belongs to the top of the screen rather than to the preview, so
+whatever ends up scrolling through there dissolves the same way.
+
+Two things had to be measured rather than assumed, and both were wrong on the
+first build:
+
+- **`.ignoresSafeArea(edges: .top)` is what pins it to the screen.** Without it
+  the overlay's top edge is the *form's* top edge, which a `NavigationStack`
+  puts below the whole navigation bar. Coloured red and green and
+  screenshotted, the band started at 167pt — under the large title, across the
+  preview, nowhere near the top of the screen.
+- **A `GeometryReader` inside that overlay reports `safeAreaInsets.top` as 0.**
+  Once the safe area is ignored there is no inset left for a proxy to report,
+  so a height derived from it came out 64pt and the screen measured
+  pixel-for-pixel identical to the screen with no fade at all. The inset is read
+  from the key window instead: 62pt on this phone, and the fade is 126pt.
+
+**Verified on screen**, same simulator, same scroll position, black rather than
+coloured: 104pt from the top the capsule's edge went 137 → 90, 96pt went 31 →
+17, and everything above 100pt reads under 5 where it read up to 57 before.
+Scrolled far enough that the capsule passes 56–96pt — the position the report
+is about — nothing above 92pt exceeds 41 and the capsule is gone into black
+rather than cut off in it. At rest the preview is untouched at 255,255,254: the
+fade ends at 126pt and the capsule starts at 275pt.
+
+The bar keeps `.toolbarBackground(.visible, for: .navigationBar)` — still
+without a `Color`, which still removes the title — because that is what stops
+the system material dimming the capsule to grey. It is simply not what was
+holding the light back.
