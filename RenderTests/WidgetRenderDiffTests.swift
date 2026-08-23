@@ -385,20 +385,30 @@ struct WidgetRenderDiffTests {
 
     @Test("A met goal with Wednesday resting is cut in two")
     func metGoalIsCutInTheMiddle() throws {
-        let entry = oneHabit(.timesPerWeek(2), done: [0, 1], todayColumn: 4)
+        // **Monday and today, not Monday and Tuesday** (#230). The goal is met
+        // either way — a met goal is one span across the whole week, whichever
+        // two days carried it — but where the completions fall decides what
+        // this test's own floors can see. Wednesday resting cuts that span at
+        // columns 0...1 and 3...6, and with Monday and Tuesday logged *both*
+        // columns of the left piece carried a lit dot: the floor below read 255
+        // and would have gone on reading 255 with the line deleted underneath
+        // it. Logging today instead leaves Tuesday carrying the line and
+        // nothing else, so the floor measures the piece it names.
+        let entry = oneHabit(.timesPerWeek(2), done: [0, 4], todayColumn: 4)
         try withRestColumn(2, of: entry.week) {
             let pixels = try rgba(of: try render(entry))
             let tuesday = brightest(atColumn: columnCentre(1), in: pixels)
             let wednesday = brightestInRestColumn(2, in: pixels)
             let thursday = brightest(atColumn: columnCentre(3), in: pixels)
             // The same pairing as above, and for the same reason: measured, the
-            // window either side of Wednesday's centre reads **1**, which is
-            // emptiness with a pixel of halo in it rather than a line that
-            // stops. See #226.
+            // window either side of Wednesday's centre reads **0**, which is
+            // emptiness rather than a line that stops. See #226.
             let restLine = brightestAtRestLine(2, in: pixels)
+            // The two logged days, a column outside each piece's sample point,
+            // as the lit level to judge the unlit ones against.
             let dots = min(
                 brightest(atColumn: columnCentre(0), in: pixels),
-                brightest(atColumn: columnCentre(1), in: pixels)
+                brightest(atColumn: columnCentre(4), in: pixels)
             )
 
             #expect(restLine > Self.lineFloor,
@@ -407,12 +417,18 @@ struct WidgetRenderDiffTests {
                     "Wednesday's line is lit (\(restLine), against the dots at \(dots))")
             #expect(wednesday < Self.clear, "the line crosses the rest day (\(wednesday))")
 
-            // Both pieces are there. Tuesday is a logged day in this fixture,
-            // so this column reads 255 rather than the line's 36 — it says the
-            // left of the cut was drawn, and it would go on passing if the line
-            // under the dot were lost. The right-hand floor is the line itself.
+            // **Both pieces are there, and both are the line.** A floor alone
+            // says a column is not empty, and a column is not empty for lots of
+            // reasons — a completion dot in it being the one that cost #230.
+            // Each piece is sampled where this fixture puts no dot, so both read
+            // the grey line at 36 against dots at 255, and both go to nothing
+            // when the piece they name is not drawn.
             #expect(tuesday > Self.lineFloor, "the left piece is missing (\(tuesday))")
+            #expect(isUnlit(tuesday, beside: dots),
+                    "the left piece is a mark, not a line (\(tuesday), against the dots at \(dots))")
             #expect(thursday > Self.lineFloor, "the right piece is missing (\(thursday))")
+            #expect(isUnlit(thursday, beside: dots),
+                    "the right piece is a mark, not a line (\(thursday), against the dots at \(dots))")
         }
     }
 
