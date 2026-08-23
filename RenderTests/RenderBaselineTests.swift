@@ -45,11 +45,17 @@ import UIKit
 /// does not care how thin the mark is.
 ///
 /// Measured across all six families, before and after #194: the excess at the
-/// grey's own level is **680 to 4132** pixels where the grey is painted, and
+/// grey's own level is **365 to 4132** pixels where the grey is painted, and
 /// **−2 to 42** at that same level where it is not. Two orders of magnitude,
 /// against three levels of slack in the grid. A one-level palette move is
 /// enough to collapse it, because the spike lands on the neighbouring level
 /// instead.
+///
+/// A statistic is only as good as there being something in the frame to count,
+/// and for two frames there was not: the Today fixture's single habit was open,
+/// so both Today families measured zero and the census gated nothing on them
+/// (#213). The fixture now finishes its first habit, which is the one surface
+/// either family paints unlit. See `Fixture.today`.
 ///
 /// ## The determinism contract
 ///
@@ -236,7 +242,7 @@ struct RenderBaselineTests {
     /// The share of a committed tone's pixel count that has to survive.
     ///
     /// Generous on purpose, and it can afford to be. Measured across the six
-    /// families before and after #194: a tone that is still painted holds 680
+    /// families before and after #194: a tone that is still painted holds 365
     /// to 4132 pixels of excess, and the same level with the tone moved away
     /// holds −2 to 42 — about 1% of the number the baseline recorded. Half is
     /// far outside anything antialiasing can do and far inside the collapse.
@@ -244,12 +250,12 @@ struct RenderBaselineTests {
 
     /// Pixels of excess below which a level is not a tone this frame paints.
     ///
-    /// The two Today families sit under it at level 36 and that is correct
-    /// rather than a gap in the fixture: their only unlit surface is a habit
-    /// name in the handled state, and the pinned fixture's one habit is open,
-    /// so those frames contain no `greyOpaque` pixel at all. The baseline
-    /// records that as a number near zero, and the *other* branch above holds
-    /// it there.
+    /// Every family is over it at level 36, which is what #213 changed: the two
+    /// Today families used to sit at 8 and −2, because their only unlit surface
+    /// is a habit name in the handled state and the fixture's one habit was
+    /// open. A frame with no unlit mark in it makes both branches above true
+    /// and neither of them a check. The fixture now finishes a habit, and they
+    /// measure 415 and 365.
     static let toneFloor = 200
 
     // MARK: - The scene
@@ -329,9 +335,29 @@ struct RenderBaselineTests {
             )
         }
 
+        /// A mixed day, and the first habit is the finished one on purpose.
+        ///
+        /// The Today families paint exactly one unlit surface: a habit name in
+        /// the handled state, `GlowPalette.grey` per `RingCell`. The ring is
+        /// never it — both of its layers are lit and shape is what separates
+        /// open from done (#75) — so a fixture whose habits are all open
+        /// contains no `greyOpaque` pixel anywhere, which is what the two
+        /// Today frames were: a tone census over a frame with nothing in it to
+        /// census (#213).
+        ///
+        /// `TodaySmallView` draws `habits.first` and nothing else, so the
+        /// resting label can only reach the small frame by that habit being
+        /// the finished one. Medium then shows what the widget usually shows —
+        /// three rings, one of each state: closed, part-way, untouched.
         static func today() -> TodayEntry {
             TodayEntry(date: WeekCalendar.day(anchor), habits: [
-                DayRingSnapshot(id: id(1), name: "Water", icon: "drop", target: 6, done: 2),
+                DayRingSnapshot(
+                    id: id(1), name: "Water the plants", icon: "drop", target: 6, done: 6
+                ),
+                DayRingSnapshot(
+                    id: id(2), name: "Stretch", icon: "figure.flexibility", target: 3, done: 1
+                ),
+                DayRingSnapshot(id: id(3), name: "Study", icon: "book", target: 1, done: 0),
             ])
         }
 
