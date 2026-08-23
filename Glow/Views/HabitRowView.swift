@@ -128,18 +128,20 @@ struct HabitRowView: View {
 
     /// Whether the list is being edited, read straight from the environment.
     ///
-    /// **This is the read `TodayView` cannot make, and the difference is which
-    /// side of the `NavigationStack` the view sits on.** `TodayView` is the
-    /// struct whose own `body` builds the stack, so the `editMode` it reads is
-    /// its parent's and never the one the toolbar's `EditButton` toggles; it
-    /// owns `@State` and injects it instead. This row is a plain descendant —
-    /// `WeeklyGridView` builds the stack, the list and the `ForEach` above
-    /// it — so it is inside the environment the button writes to, and reading
-    /// it here sees the live value. Measured on the simulator before the fade
-    /// was built on top of it: every row and the header flipped on the tap.
+    /// **A view that *builds* the `NavigationStack` cannot make this read, and
+    /// the difference is which side of the stack the view sits on.** For a
+    /// struct whose own `body` builds the stack, the `editMode` it reads is its
+    /// parent's and never the one the toolbar's `EditButton` toggles, so it has
+    /// to own `@State` and inject it instead. The Today screen was the app's
+    /// worked example until #209 removed it; the trap it paid for is in
+    /// CLAUDE.md. This row is a plain descendant — `WeeklyGridView` builds the
+    /// stack, the list and the `ForEach` above it — so it is inside the
+    /// environment the button writes to, and reading it here sees the live
+    /// value. Measured on the simulator before the fade was built on top of it:
+    /// every row and the header flipped on the tap.
     ///
     /// `Binding<EditMode>?`, not `EditMode`, which is why this reads less
-    /// directly than `TodayView`'s owned copy.
+    /// directly than an owned copy would.
     @Environment(\.editMode) private var editMode
     private var isEditing: Bool { editMode?.wrappedValue.isEditing ?? false }
 
