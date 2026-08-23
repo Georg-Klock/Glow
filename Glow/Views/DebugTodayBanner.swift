@@ -30,10 +30,23 @@ struct DebugTodayBanner: View {
     var horizontalPadding: CGFloat = 16
 
     @Environment(\.scenePhase) private var scenePhase
-    @State private var override: Date?
+
+    /// Read at construction, not only in `task` (#204). A screen *pushed* while
+    /// the override is already on — History is reached from Settings, which is
+    /// where it gets set — was rendering nothing: with no banner to draw, this
+    /// view's body was an `EmptyView`, and an `EmptyView` receives no lifecycle
+    /// events at all, so neither `task` nor `onReceive` ever ran to discover
+    /// there was something to say. Screenshotted on the year grid, whose open
+    /// day had correctly moved to the overridden Wednesday with nothing on
+    /// screen admitting it. The initial value closes that; the container below
+    /// is what keeps the updates arriving.
+    @State private var override: Date? = DebugToday.override()
 
     var body: some View {
-        Group {
+        // A `VStack`, not a `Group`: a `Group` holding a false condition *is*
+        // an `EmptyView` and drops every modifier attached to it. An empty
+        // `VStack` is still a view, takes no space, and keeps receiving.
+        VStack(spacing: 0) {
             if let override {
                 Button {
                     DebugToday.set(nil)
