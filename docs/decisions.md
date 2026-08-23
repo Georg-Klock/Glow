@@ -2578,3 +2578,99 @@ that band is empty, and the test would have failed with "nothing unlit in the
 render" on a render that was fine. It is 33...39 now. The band is a literal
 rather than a value read from `GlowPalette`, deliberately: a band computed from
 the number it is checking agrees with every number.
+
+## Reset to Default Habits: typed, not tapped (#193)
+
+**Question.** First-run seeding refuses a store that holds anything, on purpose
+— a seed set that changed would otherwise rewrite a list somebody had arranged.
+So an install seeded three days ago can never see the current defaults again.
+What is the escape hatch, and how is it guarded?
+
+**Decision.** A row in Settings → Data that empties the store and installs
+`DefaultHabits.all`, behind a confirmation the person has to **type**.
+
+The seeding guard is not touched and not weakened. What is added is the opt-in
+opposite of it: an explicit request for the shipped list, made by someone who
+knows it throws away what they have. Not a merge, and no attempt to reconcile
+old habits with new ones by name — "Workout" appearing in both lists is a
+coincidence, not a match worth preserving history over.
+
+**Why typed.** Everything else destructive in this app is either recoverable or
+small: a deleted habit is one habit, and an unchecked day is one day. This is
+all of it, at once, with no undo, sitting one row below a demo toggle that is
+flipped casually and often. A confirm button that one tap dismisses is a bad
+evening for somebody who reached for the wrong row. So the destructive button
+stays disabled until `RESET` is in the field — the cost is four seconds for the
+person who meant it, and the whole action for the person who did not.
+
+**The alert really does enforce it, and that was checked rather than assumed.**
+SwiftUI alert buttons are widely reported to ignore modifiers, and `.disabled`
+on one re-evaluating live against a `TextField` in the same alert is exactly the
+kind of thing that compiles and does nothing. Screenshotted on an iPhone Air
+simulator at each step: empty field, Reset dimmed; four characters typed, still
+dimmed; the fifth typed, Reset enabled **and red**. Red because an alert is one
+of the few contexts that ignores the app's root white tint — the same exception
+the grid's swipe action already documents. The Settings row itself does not get
+that exception and is drawn red by hand, like Delete Habit.
+
+**The match is case-insensitive and trimmed**, which is looser than the issue's
+`text != "RESET"` and looser in the only dimension that carries no intent.
+Typing `reset` is exactly as deliberate an act as typing `RESET`; a confirm
+button that stays dead over a shift key, with nothing on screen saying why, is a
+worse outcome than the one the strictness was guarding against. The field asks
+for capitals with `.textInputAutocapitalization(.characters)`, so most people
+never meet the difference. Nothing else is forgiven: no prefix, no substring, no
+empty field, and it still has to be typed rather than tapped. The rule is
+`ResetConfirmation` in `Logic/` rather than an expression inside the
+`.disabled(…)` — it stands in front of the one action that deletes everything at
+once, and every other rule that decides whether a write may happen is a pure
+function with a test on it.
+
+**One thing found on the way, and fixed here because shipping around it would
+have meant shipping text nobody can read.** A `Section` footer built from
+several `Text`s renders the first and drops the rest. The Data section held two
+and has been showing only the export sentence — the demo-history paragraph has
+never appeared on screen, which is visible at the bottom of the scroll where it
+is absent rather than cut off. The Week section next door has always written its
+footer as one string with a blank line in it, which is why both of *its*
+paragraphs arrive. The Data footer now does the same, and all three paragraphs
+render; screenshotted before and after.
+
+**What the reset clears, and what it deliberately does not.**
+
+- **Every habit and every completion**, in one `commit()`. One transaction is
+  the point: a failure leaves the store exactly as it was, which is #140's
+  property applied where the half-finished state would be a deletion. The
+  completions are deleted explicitly rather than left to `.cascade`, because a
+  cascade cannot reach a completion whose habit is nil, and "nothing survives"
+  with an exception in it is a different promise.
+- **`DemoHistory`'s pre-provenance key.** The issue asked for this as a
+  correctness fix and it is not one any more, which is worth writing down rather
+  than quietly doing: since #140 the demo's provenance is `demoSessionID` on the
+  row, so a reset that deleted every completion already reads as no demo. The
+  key is dropped because it would otherwise name fifty completions that no
+  longer exist — tidiness, in a call whose claim is that nothing is left over.
+  The Settings screen re-reads `isSeeded` from the store afterwards rather than
+  assuming, which is what actually keeps the toggle honest.
+- **Not `HabitSeeder.seededKey`.** It means "this install has at some point
+  ended up in a seeded state", and a store holding exactly `DefaultHabits.all`
+  is that state. Clearing it would arm a seeder that then refuses the store
+  anyway, and on the one path where it would not refuse, it would add a second
+  copy of the list the reset just installed. A test asserts both halves.
+- **Not the widget reload at the call site.** The issue's sketch called
+  `WidgetCenter.shared.reloadAllTimelines()` directly; that is the habit #134
+  removed. Going through `commit()` means the reset coalesces like every other
+  write — asserted as exactly one reload for the whole thing.
+
+**Numbered from zero.** The sketch reused `addAll`, whose `nextSortOrder()`
+would have been answering from rows already staged for deletion, leaving the
+same list at `sortOrder` 3…17. Invisible on screen and harmless today, and a
+difference between "reset" and "fresh install" that nothing would ever
+reconcile. `addAll` and the reset now share a private `insert(_:from:now:)`.
+
+**Verified on screen**, on an iPhone Air simulator: a store with the demo in,
+a hand-typed habit, two completions logged by hand and a rest day set — 15
+habits and 1,728 completions read out of the App Group's SQLite — reset to 15
+rows matching `DefaultHabits.all` at `sortOrder` 0…14 and **0** completions, the
+demo toggle reading off, and This Week redrawing to the first-launch screen.
+The rest day survived, as a preference should.

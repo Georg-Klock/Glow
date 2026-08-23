@@ -49,6 +49,11 @@ struct SettingsView: View {
     /// the toggle animates the flip it caused instead of waiting on a re-read.
     @State private var isDemoSeeded = false
 
+    /// Whether the reset confirmation is up, and what has been typed into it.
+    /// See `resetRow`.
+    @State private var isConfirmingReset = false
+    @State private var typedConfirmation = ""
+
     @AppStorage(WeekPreferences.firstWeekdayKey, store: GlowSettings.store)
     private var firstWeekday: Int = WeekPreferences.defaultFirstWeekday
 
@@ -227,11 +232,20 @@ struct SettingsView: View {
 
                     Toggle("Demo history", isOn: demoBinding)
                         .tint(GlowPalette.controlTint)
+
+                    resetRow
                 } header: {
                     Text("Data")
                 } footer: {
-                    Text(exportFooter)
-                    Text(demoFooter)
+                    // **One `Text`, paragraphs separated by blank lines.** A
+                    // section footer built from several `Text`s renders the
+                    // first one and drops the rest: this footer held two and
+                    // has been showing only the export sentence — screenshotted
+                    // at the bottom of the scroll, where the demo paragraph is
+                    // absent rather than cut off. The Week section next door
+                    // has always done it this way, which is why its two
+                    // paragraphs both arrive.
+                    Text(dataFooter)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -253,6 +267,19 @@ struct SettingsView: View {
             // them as two is how one of them gets missed.
             .sheet(item: $exportFile, onDismiss: { discardExport() }) { file in
                 ShareSheet(url: file.url)
+            }
+            .alert("Reset to Default Habits?", isPresented: $isConfirmingReset) {
+                TextField("Type \(ResetConfirmation.word) to confirm", text: $typedConfirmation)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                Button("Cancel", role: .cancel) { typedConfirmation = "" }
+                Button("Reset", role: .destructive) { performReset() }
+                    .disabled(!ResetConfirmation.isConfirmed(typedConfirmation))
+            } message: {
+                Text(
+                    "Deletes every habit and every completion, then installs "
+                        + "the current defaults. This cannot be undone."
+                )
             }
     }
 
@@ -385,6 +412,16 @@ struct SettingsView: View {
             + "phone only when you send it somewhere — nothing is uploaded."
     }
 
+    /// The section's three paragraphs, in row order, as one string.
+    ///
+    /// They stay three properties because each explains a different control and
+    /// is worth reading on its own; they arrive as one `Text` because that is
+    /// the only way a section footer shows more than its first line. See the
+    /// note at the call site.
+    private var dataFooter: String {
+        [exportFooter, demoFooter, resetFooter].joined(separator: "\n\n")
+    }
+
     /// Seeds or removes the invented past. Errors leave the toggle where the
     /// truth is: the state is re-read from the record rather than assumed.
     private var demoBinding: Binding<Bool> {
@@ -407,6 +444,69 @@ struct SettingsView: View {
                 WidgetRefresh.invalidate()
             }
         )
+    }
+
+    // MARK: - Reset
+
+    /// The row that opens the confirmation.
+    ///
+    /// **Red by hand.** `role: .destructive` would colour it for free
+    /// everywhere except here: the app sets a pure white tint at the root and
+    /// that wins, so a styled destructive control comes back white — the trap
+    /// the editor's Delete Habit button and the grid's swipe action both say
+    /// out loud, and the one #162 measured at 8077 pixels of a single colour
+    /// with no label in it.
+    ///
+    /// **No "Resetting…" state, and that is not an omission.** #193 allows one
+    /// for a slow store, but the reset is a single synchronous `commit()` on
+    /// the main actor: nothing can be drawn between the flag going up and
+    /// coming down, because the run loop never gets a turn in between. A
+    /// spinner that cannot render is a claim about what the app does that is
+    /// never true. Measured on a store holding 1,728 completions — it returns
+    /// while the alert is still dismissing.
+    private var resetRow: some View {
+        Button {
+            typedConfirmation = ""
+            isConfirmingReset = true
+        } label: {
+            Label("Reset to Default Habits", systemImage: "arrow.counterclockwise")
+        }
+        .foregroundStyle(.red)
+    }
+
+    /// Empties the store and puts the shipped defaults back.
+    ///
+    /// Synchronously, and #193 says why: this is a rare, explicitly confirmed
+    /// action, and a background-context path for something that happens once in
+    /// an install's life is machinery nobody would ever get to exercise.
+    ///
+    /// The order matters at the end. `isDemoSeeded` is state mirroring the
+    /// store, and the reset has just deleted every completion the demo
+    /// invented — so the toggle is re-read from the record rather than assumed
+    /// off, exactly as the toggle's own binding does.
+    private func performReset() {
+        typedConfirmation = ""
+        let demo = DemoHistory(context: context)
+        do {
+            try HabitStore(context: context).resetToDefaults()
+            // The rows the pre-provenance record named are gone with
+            // everything else. Dropping the key is tidying, not correctness —
+            // see `DemoHistory.discardLegacyRecord`.
+            demo.discardLegacyRecord()
+        } catch {
+            HabitStore.report(error, operation: "resetToDefaults")
+        }
+        // Whether the reset threw or not: the toggle shows what the store
+        // holds, and after a failure that is whatever it held before.
+        isDemoSeeded = demo.isSeeded
+    }
+
+    /// Names the control it explains, because the section holds four rows and
+    /// only one of them throws anything away.
+    private var resetFooter: String {
+        "Reset to Default Habits deletes every habit and every day you logged, "
+            + "then puts the habits a new install starts with back. There is no "
+            + "undo, so it asks you to type \(ResetConfirmation.word) first."
     }
 
     /// The toggle turns the sentinel into a real day and back, defaulting to

@@ -54,6 +54,11 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
   full, partial, empty or still to come. It is the year grid's own rule, out of
   the view so that the sentence `HistoryVoice` speaks counts what the grid
   draws rather than counting it a second way.
+- `ResetConfirmation` is the gate in front of Reset to Default Habits: the word
+  that has to be typed, and what counts as having typed it. Four lines, out of
+  the view for the same reason `MotionPolicy` is — it stands in front of the
+  one action that deletes everything at once, and a rule living inside a
+  `.disabled(…)` is a rule nothing can assert.
 - `MotionPolicy` decides whether a change moves. One completion is drawn four
   ways — a ring closing, a bar closing, a label dimming, a line sweeping — and
   Reduce Motion has to reach all four; a predicate left in a view is one no
@@ -185,6 +190,20 @@ timelines. A save that throws rolls back, so a failed write leaves the store as
 it was rather than leaving its changes pending for the next unrelated save to
 commit (#140). `addAll(_:now:)` is the batch door — a whole list inserted and
 saved once, which is how the default seed arrives.
+
+`resetToDefaults(now:)` is the destructive door (#193): every completion and
+every habit deleted, then `DefaultHabits.all` inserted, all inside one
+`commit()`. One transaction, so a failure leaves the person's habits where they
+were rather than half-way through a deletion — the property `addAll` established
+for seeding, applied where it matters more. The inserts are numbered from zero
+rather than from `nextSortOrder()`, which would be answering from rows already
+staged for deletion; `addAll` and the reset share a private `insert(_:from:now:)`
+so the list is built the same way in both. Completions go explicitly rather than
+by `.cascade`, because a cascade cannot reach a completion whose habit is nil and
+the claim here is that nothing survives. `HabitSeeder.seededKey` is untouched:
+it records that this install has ended up seeded, which is exactly what the store
+now is. The Settings row that calls it is behind a typed confirmation, not a
+tap-through alert — see decisions.md.
 
 `HabitSeeder` inserts through it and writes `didSeedDefaultHabits` *after* the
 save returns, so an interrupted first launch is retried rather than half-recorded

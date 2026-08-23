@@ -183,6 +183,24 @@ struct DemoHistory {
         defaults.removeObject(forKey: Self.legacyIDsKey)
     }
 
+    /// Drops the pre-provenance record without adopting it.
+    ///
+    /// **Only correct where the rows it names are known to be gone**, which is
+    /// one place: after `HabitStore.resetToDefaults` has emptied the store
+    /// (#193). Everywhere else the key has to be *read* first — that is what
+    /// `adoptLegacyRecord` is for, and dropping it unread is exactly the bug
+    /// that method exists to avoid.
+    ///
+    /// Not load-bearing for the toggle, and worth saying which way round that
+    /// is. "Is the demo in" is answered by `demoSessionID` on the rows now, not
+    /// by this key, so a reset that deleted every completion already reads as
+    /// no demo whether this runs or not. What it removes is a dead key naming
+    /// fifty completions that no longer exist — untidy rather than wrong, and
+    /// one line, in a call whose whole claim is that nothing is left over.
+    func discardLegacyRecord() {
+        defaults.removeObject(forKey: Self.legacyIDsKey)
+    }
+
     /// Saves, or leaves the store exactly as it was.
     ///
     /// The rollback is the point. A `ModelContext` holds its pending changes
