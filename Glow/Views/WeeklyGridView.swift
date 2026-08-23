@@ -189,6 +189,10 @@ struct WeeklyGridView: View {
     /// habit, twice, on every keystroke that redrew it. Nothing here asks about
     /// a day outside `week`: `WeekGrid`, `WeekSpans`, `WeekDots` and `GoalMet`
     /// all count inside the week they are given. See #135.
+    ///
+    /// `week` follows `weekStart`, so paging back (#117) reads that week and
+    /// costs what this one does. A pager over whole histories would have made
+    /// every step back the most expensive thing the screen does.
     private var snapshots: [HabitSnapshot] {
         Habit.snapshots(of: habits, within: week.dayIDs())
     }
