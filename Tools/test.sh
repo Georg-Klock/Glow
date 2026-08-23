@@ -46,7 +46,13 @@ RESULT="$RUN/Glow.xcresult"
 echo "==> Generating Glow.xcodeproj"
 Tools/generate.sh
 
-DEVICE_ID=$(
+# A caller that knows it is one of several concurrent runs pins its own phone
+# with GLOW_SIMULATOR_UDID. Without it the selection below is deterministic, so
+# every concurrent run picks the *same* device and they install competing
+# bundles onto it — see #221 and the lock further down.
+DEVICE_ID="${GLOW_SIMULATOR_UDID:-}"
+
+[ -n "$DEVICE_ID" ] || DEVICE_ID=$(
   xcrun simctl list devices available --json |
     /usr/bin/python3 -c '
 import json, re, sys
@@ -75,6 +81,19 @@ if [ -z "$DEVICE_ID" ]; then
   echo "error: no available iPhone simulator found. Install an iOS runtime in Xcode." >&2
   exit 1
 fi
+
+# Two runs on one device tear each other apart, and not in ways that read as a
+# device conflict: the host dies during bootstrap, or a bundle reports fewer
+# tests than its floor, or a failure names a file that is clean in this
+# checkout. The third can just as easily produce a green run that is partly
+# another checkout's. So a run holds the device for its duration and a second
+# run waits rather than interleaving. See #221.
+LOCK="${TMPDIR:-/tmp}/glow-simulator-$DEVICE_ID.lock"
+exec 9>"$LOCK"
+if ! /usr/bin/python3 -c 'import fcntl,sys; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null; then
+  echo "==> Simulator $DEVICE_ID is busy with another run; waiting for it"
+fi
+/usr/bin/python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'
 
 if [ "${GLOW_ERASE_SIMULATOR:-0}" = "1" ]; then
   echo "==> Erasing simulator $DEVICE_ID"
@@ -155,8 +174,12 @@ if [ "$STATUS" -ne 0 ]; then
     echo
     echo "  load average now: $(uptime | sed 's/.*load averages*: //')"
     echo
-    echo "This machine has been seen killing the host above roughly 70. If the"
-    echo "load is high, re-run before reading anything into which test failed."
+    echo "Two causes, and the load average tells them apart badly. This machine"
+    echo "has been seen killing the host above roughly 70 — but a second run on"
+    echo "the same simulator does this too, at any load, and drives the load up"
+    echo "while it does it (#221). The lock above should prevent that; if this"
+    echo "line is printing anyway, check for another xcodebuild before reading"
+    echo "anything into which test failed."
     if [ -n "$ASSERTIONS" ]; then
       echo
       echo "Assertions also present, which may or may not be related:"
