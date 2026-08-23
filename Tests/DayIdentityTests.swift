@@ -374,7 +374,12 @@ struct DayIdentityTests {
 
     /// A store on a real file holding `count` completions with no `dayKey`,
     /// one per day counting back from 19 August 2026 in `zone`.
+    ///
+    /// `@discardableResult` because two of the three callers plant the rows and
+    /// then read them back through the app's own types rather than through the
+    /// dates returned here — the return value is a convenience, not the point.
     @MainActor
+    @discardableResult
     private func legacyStore(at url: URL, days: Int, zone: Calendar) throws -> [Date] {
         let context = try TestStore.writable(at: url)
         let habit = Habit(
