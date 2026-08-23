@@ -3133,3 +3133,57 @@ a floor, and there was no need to.
 **The Today tab's slot is left empty rather than collapsed.** #210 puts the
 Widgets tab in the same position. Reflowing the tab bar twice in two builds is a
 worse thing to ship than two tabs for one build.
+
+## A span is identified by its division, not by its index (#196)
+
+`SlotSpan.id` was `index`, and `Slot.id` still is. The difference is that a
+daily row's seven slots are the seven weekdays forever — index N is weekday N,
+and logging a day changes neither the count nor the meaning — while
+`WeekSpans.divided()` recomputes the number of spans *and their day ranges* from
+`done`, `repsLeft`, `lost` and `live`, which is to say from exactly the numbers
+a tap moves. The span at index 2 before a tap and the one at index 2 after it
+can be different widths over different days.
+
+`ForEach` believed the index and kept `SpanView`'s `@State` across that. The
+state it kept is `closing`, the mid-flight size of the completion animation, so
+a span whose range changed under a running animation drew a mark measured for a
+different span — and since the `Button`'s hit area is that mark, the row went
+dead to taps at the same moment it started looking wrong.
+
+**Measured, with the hold window widened to make the race catchable.** The
+`Task` that clears `closing` sleeps `SlotView.closeDuration`, 600 ms, which is
+too short to drive by hand; a scratch build raised it to 30 s and changed
+nothing else. Week starting Friday so that today, Sunday, sits in column 2; a
+3×/week row, nothing logged, drawn as `open:0-2 inactive:3-4 inactive:5-6`. Tap
+today, then tap Friday inside the same span, which #116 allows and #117 allows
+in any week on the pager: the row redivides to `filled:0-1 filled:2-2
+inactive:3-6`, and the first span keeps its state while its range narrows. On
+the pre-fix build that span rendered **246 px wide inside a 124 px frame**,
+centred on 591 — the closing size of the three-column span it used to be,
+overflowing the two-column frame it now is. With the identity fixed it rendered
+530–653, pixel-for-pixel the resting geometry of that row.
+
+**The range, and not the state.** #196 proposed hashing `firstDay`, `lastDay`
+*and* `state`, and the state is the half that cannot be there. A completion
+arriving is precisely a span holding its range while its state goes
+`.open → .filled`, and `SpanView` starts the close from
+`.onChange(of: span.state)`. Put the state in the identity and that span is a
+new view rather than a changed one, `onChange` never runs, and there is no
+animation left to inherit because there is no animation. Recorded and stepped
+frame by frame on a 2×/week row: with the range identity the mark goes
+300 × 68 px → 296 × 64 → 288 × 56 → 279 × 46 → 270 × 36 → 260 × 28 → 253 × 20 →
+246 × 13 → 242 × 9 and then holds; with the state in the identity it goes
+300 × 68 → the settled line in **one frame**, with nothing in between. That is
+the reduced-motion path arriving for everybody, which is not a fix.
+
+So the identity is `SlotSpan.Division`, the two column bounds. Spans partition
+the seven columns without overlapping, so no two spans in a row can share one —
+asserted across every target, every weekday and six completion sets rather than
+argued.
+
+**One thing seen on the way and not chased here.** In the frame capture the
+mark vanishes entirely for three frames between the close finishing and the
+held bar — the rest of the screen is unchanged in those frames, so it is that
+one view. It is not this change: for the transition being recorded the identity
+is the same before and after the fix — index 0, columns 0-2 — so both builds run
+the same code path. Worth a look when something else touches `GlowImageView`.

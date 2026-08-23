@@ -6,6 +6,8 @@ import Foundation
 /// as seven columns — it is drawn as N shapes that stretch across the week. A
 /// span is one of those: which columns it covers, and what state it is in.
 struct SlotSpan: Identifiable, Equatable, Sendable {
+    /// Which span this is in reading order. Kept for the arithmetic below and
+    /// for the record of order; it is **not** what identifies a span. See `id`.
     let index: Int
     /// Inclusive column range, 0 through 6.
     let firstDay: Int
@@ -14,7 +16,44 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
     /// The day a tap would toggle, or nil when the span is not tappable.
     let actionDay: Date?
 
-    var id: Int { index }
+    /// **A span is identified by the division it is, not by where it sits**
+    /// (#196).
+    ///
+    /// `Slot` can be identified by its index and is: a daily row always has
+    /// seven slots, index N is weekday N forever, and completing one changes
+    /// neither how many there are nor what any of them means. A span has none
+    /// of that. `divided()` recomputes the number of spans *and their day
+    /// ranges* from `done`, `repsLeft`, `lost` and `live` — precisely the
+    /// numbers a completion or an undo moves — so the span at index 2 before a
+    /// tap and the one at index 2 after it can be different widths covering
+    /// different days.
+    ///
+    /// `ForEach` believed the index, so `SpanView` kept its `@State` across
+    /// that. The state it kept is `closing`, the mid-flight size of a
+    /// completion animation: a span whose range changed under a running
+    /// animation inherited a size measured for a different span and drew a mark
+    /// at it, in a frame it no longer fits — and since the `Button`'s hit area
+    /// is the mark, the row went dead to taps along with looking wrong. Two
+    /// fast taps on a weekly row is all it takes; #116 and #117 widen that to
+    /// any tap on a past day, in any week on the pager.
+    ///
+    /// **The range, and only the range.** #196 proposed hashing the state in
+    /// too, and that would take the animation with it: a completion arriving is
+    /// exactly a span holding its range while its state goes `.open → .filled`,
+    /// and `SpanView` starts the close from `.onChange(of: span.state)`. Put
+    /// state in the identity and that span is a *new* view instead of a changed
+    /// one, `onChange` never fires, and the bar stops closing at all — measured
+    /// frame by frame before this was written. Range is the identity that keeps
+    /// the animation the app has and drops the one it never asked for.
+    var id: Division { Division(firstDay: firstDay, lastDay: lastDay) }
+
+    /// The columns a span covers — what makes two spans the same span across a
+    /// re-render.
+    struct Division: Hashable, Sendable {
+        let firstDay: Int
+        let lastDay: Int
+    }
+
     var dayCount: Int { lastDay - firstDay + 1 }
     var isTappable: Bool { actionDay != nil }
 
