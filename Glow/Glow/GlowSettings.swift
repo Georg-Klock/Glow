@@ -56,6 +56,19 @@ enum GlowSettings {
         return UserDefaults(suiteName: StoreLocation.appGroupID) ?? .standard
     }
 
+    /// Whether this process is hosting a test bundle.
+    ///
+    /// Named once and read twice: it decides that tests get a private defaults
+    /// suite (#168), and that the test host does not build the app's interface
+    /// (#179). Both are the same idea — a test process should not be running
+    /// the app.
+    static let isRunningTests: Bool = {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["XCTestConfigurationFilePath"] != nil
+            || environment["XCTestBundlePath"] != nil
+            || environment["XCTestSessionIdentifier"] != nil
+    }()
+
     /// A private, per-process defaults suite when running under a test bundle.
     ///
     /// `nil` in the app and in the widget, so neither pays for this.
@@ -64,11 +77,7 @@ enum GlowSettings {
     /// `UserDefaults` is itself thread-safe. The same reasoning `store` above
     /// relies on every time it hands one out.
     private nonisolated(unsafe) static let testStore: UserDefaults? = {
-        let environment = ProcessInfo.processInfo.environment
-        guard environment["XCTestConfigurationFilePath"] != nil
-            || environment["XCTestBundlePath"] != nil
-            || environment["XCTestSessionIdentifier"] != nil
-        else { return nil }
+        guard isRunningTests else { return nil }
 
         let suite = "\(StoreLocation.appGroupID).tests.\(ProcessInfo.processInfo.processIdentifier)"
         guard let defaults = UserDefaults(suiteName: suite) else { return nil }

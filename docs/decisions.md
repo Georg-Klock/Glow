@@ -2296,3 +2296,53 @@ minute-resolution UTC stamp with a monotonic allocator, because two uploads in
 one minute collide. That is a real problem and a separate one: it changes what
 goes to App Store Connect, and it cannot be tested without uploading. The
 mismatch this entry is about is fixed and verified; the allocator is still open.
+
+## A test process should not be running the app
+
+**2026-08-22.** CI failed twice on a commit containing no Swift — a Python
+validator, `project.yml` version keys and shell — with
+`Swift/FlatMap.swift:49: Fatal error: Unexpectedly found nil`, failing a
+different test each time, preceded by a background-thread publish storm the
+xcresult attributed to `TestPreferences.withWeek` (#179).
+
+**The mechanism, read off the code rather than guessed.** The test host is
+`Glow.app`, and it builds the real interface. Those views observe preferences
+through `@AppStorage` — `WeeklyGridView` the week's first day, every
+`HabitRowView` the rest day, `GlowImageCache` the glow level. `TestPreferences`
+writes exactly those keys, and Swift Testing runs tests off the main thread. So
+every `withWeek` published into a live SwiftUI hierarchy from a background
+thread, which is undefined behaviour — and the way it fails is somebody else's
+`nil`, in a test that had nothing to do with it.
+
+The seed set landing at eight habits (#123) made it worse: the rest day is
+observed once per row.
+
+**Measured, through the result bundle's own runtime-warning count** — which
+exists because #138 started recording it a few hours earlier:
+
+| | runtime warnings |
+| --- | --- |
+| `GlowTests`, before | **106** |
+| `GlowTests`, after | **0** (twice repeated) |
+| `GlowRenderTests`, either way | 0 — it hosts no interface |
+
+**The fix is that the test host opens nothing and draws nothing.** Under a test
+bundle `GlowApp` skips the container and presents a plain black view.
+`GlowSettings.isRunningTests` is now named once and read twice: it decides that
+tests get a private defaults suite (#168) and that the host stays inert. Both
+are the same idea.
+
+It also removes a second failure this repository had already seen: a test host
+that opens the real store races the tests that open their own, and #138's work
+watched it die when the migration suite left a deliberately malformed file
+where the host looked.
+
+**This is the fourth time the same root has surfaced**, and it is worth saying
+plainly. #105 said suites cannot overlap because they are serialised. #168
+found a preference outliving the process. #175 found the host dying under load.
+Each was true and each was treated as the whole answer. The common cause is
+that **decision logic reads a process-wide store**, and every fix so far has
+made that harmless in one more situation rather than removing it. The real
+answer is still what #105 named: the rest day should arrive as a parameter, the
+way `calendar:` already does. This entry is not that fix either — but the count
+of interims is now four, and that is the argument for doing it.

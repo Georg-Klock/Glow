@@ -17,7 +17,10 @@ struct GlowApp: App {
     @State private var failure: String?
 
     init() {
-        let attempt = Self.open()
+        // A test host opens nothing and draws nothing. See `body`.
+        let attempt = GlowSettings.isRunningTests
+            ? (container: ModelContainer?.none, failure: String?.none)
+            : Self.open()
         _container = State(initialValue: attempt.container)
         _failure = State(initialValue: attempt.failure)
 
@@ -65,7 +68,24 @@ struct GlowApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if let container {
+            if GlowSettings.isRunningTests {
+                // **The test host runs no interface** (#179). The app's own
+                // views observe preferences through `@AppStorage` —
+                // `WeeklyGridView` the week's first day, every `HabitRowView`
+                // the rest day, `GlowImageCache` the glow level — and the
+                // tests write exactly those keys. Swift Testing runs off the
+                // main thread, so each write published into a live SwiftUI
+                // hierarchy from a background thread, which is undefined
+                // behaviour and showed up as the host dying on an unwrap in
+                // somebody else's code, failing a different innocent test each
+                // time.
+                //
+                // Measured: 106 runtime warnings in one `GlowTests` run before
+                // this, against 0 in `GlowRenderTests`, which hosts no
+                // interface. A test bundle needs a process to live in, not an
+                // app to race.
+                Color.black.ignoresSafeArea()
+            } else if let container {
                 RootTabView()
                     .tint(GlowPalette.color)
                     .preferredColorScheme(.dark)
