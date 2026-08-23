@@ -86,7 +86,7 @@ struct GlowWidget: Widget {
 
 struct WeekProvider: TimelineProvider {
     func placeholder(in context: Context) -> WeekEntry {
-        let today = WeekCalendar.day(Date())
+        let today = WeekCalendar.today()
         return WeekEntry(
             date: today,
             week: WeekCalendar.week(containing: today),
@@ -166,7 +166,7 @@ struct WeekProvider: TimelineProvider {
     /// WidgetKit chooses, and the context created here is local to this call,
     /// so it never crosses a boundary.
     private func loadEntry() -> WeekEntry {
-        let today = WeekCalendar.day(Date())
+        let today = WeekCalendar.today()
         let week = WeekCalendar.week(containing: today)
 
         guard let container = GlowStore.makeReadOnlyContainer() else {

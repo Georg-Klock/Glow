@@ -49,6 +49,12 @@ struct SettingsView: View {
     /// the toggle animates the flip it caused instead of waiting on a re-read.
     @State private var isDemoSeeded = false
 
+    /// Mirrors `DebugToday.override()`, for the same reason `isDemoSeeded`
+    /// mirrors the record: a `Date?` in the App Group is not something
+    /// `@AppStorage` can bind to, so the control is driven from state and the
+    /// store is written behind it. Nil is off.
+    @State private var overrideDay: Date?
+
     /// Whether the reset confirmation is up, and what has been typed into it.
     /// See `resetRow`.
     @State private var isConfirmingReset = false
@@ -99,7 +105,18 @@ struct SettingsView: View {
             // keeps light off the top of the screen is `topFade`. See #195.
             .toolbarBackground(.visible, for: .navigationBar)
 
-            .onAppear { isDemoSeeded = DemoHistory(context: context).isSeeded }
+            .onAppear {
+                isDemoSeeded = DemoHistory(context: context).isSeeded
+                // Re-read rather than assumed: the banner on another screen
+                // can have cleared it, and the week can have rolled over and
+                // expired it, since this view was last built.
+                overrideDay = DebugToday.override()
+            }
+            // Cleared from a banner on another tab, this row has to follow.
+            .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+                let current = DebugToday.override()
+                if current != overrideDay { overrideDay = current }
+            }
             // Covers the toggle and the day picker both: the widget draws the
             // same week and withholds the same taps, and it is not told when
             // the setting moves.
@@ -256,6 +273,22 @@ struct SettingsView: View {
 
                     Toggle("Demo history", isOn: demoBinding)
                         .tint(GlowPalette.controlTint)
+
+                    // The same tier as demo history, and in the same section:
+                    // both write real rows into the real store, and this one
+                    // decides what day they are dated to. Not `#if DEBUG` —
+                    // see `DebugToday` for why a build that compiles it out is
+                    // a build where it is missing from the only place it is
+                    // needed.
+                    Toggle("Debug: Override Today", isOn: overrideBinding)
+                        .tint(GlowPalette.controlTint)
+                    if overrideDay != nil {
+                        Picker("Day", selection: dayBinding) {
+                            ForEach(DebugToday.choices(), id: \.self) { day in
+                                Text(DebugToday.dayName(day)).tag(day)
+                            }
+                        }
+                    }
 
                     resetRow
                 } header: {
@@ -537,7 +570,17 @@ struct SettingsView: View {
     /// is the only way a section footer shows more than its first line. See the
     /// note at the call site.
     private var dataFooter: String {
-        [exportFooter, demoFooter, resetFooter, versionFooter].joined(separator: "\n\n")
+        [exportFooter, demoFooter, overrideFooter, resetFooter, versionFooter]
+            .joined(separator: "\n\n")
+    }
+
+    /// What the override actually does, said plainly, because what it does is
+    /// not what a debug switch usually does.
+    private var overrideFooter: String {
+        "Treats another day of this week as today, everywhere — including the "
+            + "widgets. Anything you log while it is on is logged to that day "
+            + "for real. It turns itself off when the app is relaunched, and "
+            + "when the week ends."
     }
 
     /// What is installed, in the shape everything else already uses.
@@ -569,7 +612,10 @@ struct SettingsView: View {
                 let demo = DemoHistory(context: context)
                 do {
                     if wantsDemo {
-                        try demo.seed()
+                        // The day the app currently believes it is, so a demo
+                        // seeded under a debug override leaves *that* day's
+                        // slot open rather than the real one (#204).
+                        try demo.seed(now: WeekCalendar.today())
                     } else {
                         try demo.remove()
                     }
@@ -579,6 +625,40 @@ struct SettingsView: View {
                 isDemoSeeded = demo.isSeeded
                 // Demo history writes through `DemoHistory` rather than
                 // `HabitStore`, so it says so itself. See `WidgetRefresh`.
+                WidgetRefresh.invalidate()
+            }
+        )
+    }
+
+    // MARK: - Debug: override today
+
+    /// On means "some day of this week", and the day it starts on is the real
+    /// today — the one position that changes nothing until the picker moves.
+    ///
+    /// Off clears the stored key outright rather than remembering the last day,
+    /// because a remembered override is the thing this feature is fenced
+    /// against: nothing may survive being switched off.
+    private var overrideBinding: Binding<Bool> {
+        Binding(
+            get: { overrideDay != nil },
+            set: { wantsOverride in
+                let day = wantsOverride ? WeekCalendar.realToday() : nil
+                DebugToday.set(day)
+                overrideDay = DebugToday.override()
+                // Every surface follows the override, the widget included, and
+                // the widget is a second process that is not told when a
+                // default moves.
+                WidgetRefresh.invalidate()
+            }
+        )
+    }
+
+    private var dayBinding: Binding<Date> {
+        Binding(
+            get: { overrideDay ?? WeekCalendar.realToday() },
+            set: { day in
+                DebugToday.set(day)
+                overrideDay = DebugToday.override()
                 WidgetRefresh.invalidate()
             }
         )

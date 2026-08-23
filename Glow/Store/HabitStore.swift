@@ -409,7 +409,7 @@ struct HabitStore {
         // Guarded here as well as in the grid, for the reason the rest day is:
         // a surface can outlive the setting it was built under, and this is the
         // path every surface shares.
-        guard allowingFuture || day <= WeekCalendar.day(Date(), calendar: calendar) else {
+        guard allowingFuture || day <= WeekCalendar.today(calendar: calendar) else {
             return .refused
         }
 

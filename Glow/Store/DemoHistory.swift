@@ -84,7 +84,14 @@ struct DemoHistory {
     /// needs on screen — and the rest cycle down to patchy so a missed day is
     /// on screen too. Each habit's days are derived from its own id, so
     /// switching the demo off and on rebuilds the same past. Today is never
-    /// touched: the open slot is the one thing the app is for.
+    /// touched: the open slot is the one thing the app is for — and *today* is
+    /// whatever the app currently believes it is, so a demo seeded under a
+    /// debug override leaves the overridden day open rather than the real one
+    /// (#204). That arrives as `now` from Settings rather than as this
+    /// default: `now` is an *instant*, normalized by this type's own calendar,
+    /// and a default of `WeekCalendar.today()` would hand a midnight taken in
+    /// one calendar to a store built on another — which is a day out wherever
+    /// the two disagree, and the suites here inject a UTC calendar.
     ///
     /// One save at the end, and nothing outside the store to keep in step with
     /// it: the whole seeding either lands or none of it does.

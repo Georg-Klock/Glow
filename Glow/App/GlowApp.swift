@@ -17,6 +17,19 @@ struct GlowApp: App {
     @State private var failure: String?
 
     init() {
+        // **An overridden "today" does not survive a launch** (#204). The
+        // override is a full simulation with real write powers: a tap while it
+        // is on logs a genuine completion dated to the simulated day, and once
+        // that row is in the store nothing distinguishes it from a real one.
+        // The week-boundary check in `DebugToday` bounds it to days; this
+        // bounds it to one app session, which is the difference between a
+        // debug tool somebody forgot to turn off and one that quietly rewrites
+        // what "today" means until somebody happens to notice.
+        //
+        // First, before the store is opened or a view can read it, so no
+        // surface is ever built from a stale override.
+        DebugToday.clearOnLaunch()
+
         // A test host opens nothing and draws nothing. See `body`.
         let attempt = GlowSettings.isRunningTests
             ? (container: ModelContainer?.none, failure: String?.none)

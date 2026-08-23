@@ -75,7 +75,14 @@ struct MonthProvider: AppIntentTimelineProvider {
         // One habit, one month. Both halves of that used to be paid for
         // whether or not they were drawn: every weekly habit's whole history
         // was projected, and all but one of the results thrown away. See #135.
-        let now = Date()
+        //
+        // `today()` rather than `Date()` (#204): `MonthWidgetView` reads
+        // `entry.date` as today — which month to draw, and which dot is the
+        // open one — so this is a place "today" is established, not a
+        // timestamp. The timeline's refresh policy above still runs off the
+        // real clock, because when to reload is not a thing the override has
+        // an opinion about.
+        let now = WeekCalendar.today()
         return MonthEntry(
             date: now,
             habit: MonthStore.month(of: configuration.habit?.id, containing: now)
