@@ -651,8 +651,8 @@ struct SettingsView: View {
     /// only one of them throws anything away.
     private var resetFooter: String {
         "Reset to Default Habits deletes every habit and every day you logged, "
-            + "then puts the habits a new install starts with back. There is no "
-            + "undo, so it asks you to type \(ResetConfirmation.word) first."
+            + "then puts the pre-selected set back. There is no undo, so it "
+            + "asks you to type \(ResetConfirmation.word) first."
     }
 
     /// The toggle turns the sentinel into a real day and back, defaulting to

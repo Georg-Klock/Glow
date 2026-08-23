@@ -17,9 +17,10 @@
             preferences, the pop switch, the tap burst and the widget trace.
             Read and written only within this app group.
 
-    CA92.1  The app's own defaults. HabitSeeder records whether the first-run
-            habits have been seeded in UserDefaults.standard, and GlowSettings
-            falls back to .standard if the group container is ever unavailable.
+    CA92.1  The app's own defaults. DailyHabitMigration records whether this
+            install has been swept of per-day habits in UserDefaults.standard,
+            and GlowSettings falls back to .standard if the group container is
+            ever unavailable.
             Read and written only by this app.
 
   NSPrivacyCollectedDataTypes is empty, and that is a statement about the

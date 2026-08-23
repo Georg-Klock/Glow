@@ -26,11 +26,14 @@ struct DemoHistoryTests {
         return defaults
     }
 
-    /// A store with the default habits and nothing logged.
-    private func seededContext(_ defaults: UserDefaults) throws -> ModelContext {
+    /// A store with the default habits and nothing logged. Filled the way the
+    /// app fills it — `resetToDefaults`, the one call that installs
+    /// `DefaultHabits.all` (#228) — rather than through a first-run seeder that
+    /// no longer exists.
+    private func seededContext() throws -> ModelContext {
         let context = try makeContext()
-        try HabitSeeder(context: context, defaults: defaults, calendar: calendar)
-            .seedIfNeeded(now: today)
+        try HabitStore(context: context, calendar: calendar, restDay: nil)
+            .resetToDefaults(now: today)
         return context
     }
 
@@ -46,7 +49,7 @@ struct DemoHistoryTests {
     @Test("Seeding fills a past for every real habit, and today is never part of it")
     func seedsEveryHabitButNotToday() throws {
         let defaults = makeDefaults()
-        let context = try seededContext(defaults)
+        let context = try seededContext()
         let demo = demo(context, defaults)
 
         #expect(!demo.isSeeded)
@@ -62,7 +65,7 @@ struct DemoHistoryTests {
     @Test("Removal takes out exactly what seeding added")
     func removalIsExact() throws {
         let defaults = makeDefaults()
-        let context = try seededContext(defaults)
+        let context = try seededContext()
         let demo = demo(context, defaults)
         try demo.seed(now: today)
 
@@ -74,7 +77,7 @@ struct DemoHistoryTests {
     @Test("A completion the user logged survives the demo coming out")
     func userDataSurvives() throws {
         let defaults = makeDefaults()
-        let context = try seededContext(defaults)
+        let context = try seededContext()
         let store = HabitStore(context: context, calendar: calendar)
         let demo = demo(context, defaults)
         try demo.seed(now: today)
@@ -97,7 +100,7 @@ struct DemoHistoryTests {
     @Test("Seeding twice is one demo, not two stacked")
     func seedIsIdempotent() throws {
         let defaults = makeDefaults()
-        let context = try seededContext(defaults)
+        let context = try seededContext()
         let demo = demo(context, defaults)
 
         try demo.seed(now: today)
@@ -109,7 +112,7 @@ struct DemoHistoryTests {
     @Test("Off and on again rebuilds the same past")
     func reseedIsDeterministic() throws {
         let defaults = makeDefaults()
-        let context = try seededContext(defaults)
+        let context = try seededContext()
         let demo = demo(context, defaults)
 
         func snapshot() throws -> [String: [Date: Int]] {
@@ -140,7 +143,7 @@ struct DemoHistoryTests {
         // the toggle reads off, and ten weeks of fiction are on the grid for
         // good.
         let defaults = makeDefaults()
-        let context = try seededContext(defaults)
+        let context = try seededContext()
         let store = HabitStore(context: context, calendar: calendar)
         try demo(context, defaults).seed(now: today)
 
@@ -165,7 +168,7 @@ struct DemoHistoryTests {
         // mark the rest would have carried. Removal is by that mark, so there
         // is no such thing as a row it wrote and cannot take back.
         let defaults = makeDefaults()
-        let context = try seededContext(defaults)
+        let context = try seededContext()
         let habit = try #require(
             try context.fetch(FetchDescriptor<Habit>()).first { !$0.isSpacer }
         )
@@ -190,8 +193,8 @@ struct DemoHistoryTests {
         let defaults = makeDefaults()
 
         let setUp = try TestStore.writable(at: url)
-        try HabitSeeder(context: setUp, defaults: defaults, calendar: calendar)
-            .seedIfNeeded(now: today)
+        try HabitStore(context: setUp, calendar: calendar, restDay: nil)
+            .resetToDefaults(now: today)
 
         // The same file, opened so that the save cannot land.
         let blocked = try TestStore.readOnly(at: url)
@@ -215,7 +218,7 @@ struct DemoHistoryTests {
         // record has its ids in the defaults and nothing on the rows, so
         // dropping that key unread would hand exactly these people the bug.
         let defaults = makeDefaults()
-        let context = try seededContext(defaults)
+        let context = try seededContext()
         let store = HabitStore(context: context, calendar: calendar)
         let habit = try #require(
             try context.fetch(FetchDescriptor<Habit>()).first { !$0.isSpacer }
@@ -253,7 +256,7 @@ struct DemoHistoryTests {
         #expect(SeededHistory.form(at: 0) == .perfect)
 
         let defaults = makeDefaults()
-        let context = try seededContext(defaults)
+        let context = try seededContext()
         try demo(context, defaults).seed(now: today)
 
         let first = try #require(

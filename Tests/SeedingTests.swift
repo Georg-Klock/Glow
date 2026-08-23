@@ -3,6 +3,9 @@ import SwiftData
 import Testing
 @testable import Glow
 
+/// The curated set, and what putting it in means. It arrives on a tap now
+/// rather than on first launch (#228), so every test here starts from the
+/// empty store the choice is offered on.
 @Suite("Default habits")
 @MainActor
 struct SeedingTests {
@@ -17,28 +20,21 @@ struct SeedingTests {
         return ModelContext(container)
     }
 
-    /// A throwaway defaults domain per test, so one test's "already seeded"
-    /// flag cannot decide another's outcome, and so a run never touches the
-    /// real one.
-    private func makeDefaults() -> UserDefaults {
-        let suite = "seeding-tests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite) ?? .standard
-        defaults.removePersistentDomain(forName: suite)
-        return defaults
+    private func store(_ context: ModelContext) -> HabitStore {
+        HabitStore(context: context, calendar: calendar, restDay: nil)
     }
 
-    private func seeder(_ context: ModelContext, _ defaults: UserDefaults) -> HabitSeeder {
-        HabitSeeder(context: context, defaults: defaults, calendar: calendar)
-    }
-
-    @Test("A fresh install starts with the default habits and an empty grid")
-    func seedsOnFirstLaunch() throws {
+    @Test("The curated set goes in on the tap, with an empty grid")
+    func theCuratedSetGoesInEmpty() throws {
         // Habits only, in every configuration: a tracker that opens showing a
         // streak you did not earn is lying on the first screen. The invented
         // past is DemoHistory's, behind the Settings toggle, and has its own
         // suite.
+        //
+        // This is what the empty state's second button does: `resetToDefaults`
+        // on a store holding nothing.
         let context = try makeContext()
-        let added = try seeder(context, makeDefaults()).seedIfNeeded(now: today)
+        let added = try store(context).resetToDefaults(now: today)
 
         #expect(added == DefaultHabits.all.count)
         let habits = try context.fetch(FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder)]))
@@ -47,10 +43,10 @@ struct SeedingTests {
         #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
     }
 
-    @Test("Every seeded row is open today")
-    func seededHabitsAreOpenToday() throws {
+    @Test("Every row of the curated set is open today")
+    func curatedHabitsAreOpenToday() throws {
         let context = try makeContext()
-        try seeder(context, makeDefaults()).seedIfNeeded(now: today)
+        try store(context).resetToDefaults(now: today)
 
         let week = WeekCalendar.week(containing: today, calendar: calendar)
         let rows = try context.fetch(FetchDescriptor<Habit>(predicate: Habit.weekly))
@@ -109,26 +105,17 @@ struct SeedingTests {
         }
     }
 
-    @Test("Seeding runs once, not on every launch")
-    func seedsOnlyOnce() throws {
+    @Test("Deleting every habit empties the store, and only a tap fills it again")
+    func anEmptiedStoreStaysEmpty() throws {
+        // What the first-run flag used to protect, protected now by there being
+        // nothing to protect against: no launch path inserts anything, so an
+        // emptied store stays empty until somebody asks for the set. The flag
+        // told "never seeded" from "deleted everything" apart, and with nothing
+        // seeding by itself those are one state with one answer.
         let context = try makeContext()
-        let defaults = makeDefaults()
+        let store = store(context)
+        try store.resetToDefaults(now: today)
 
-        #expect(try seeder(context, defaults).seedIfNeeded(now: today) == DefaultHabits.all.count)
-        #expect(try seeder(context, defaults).seedIfNeeded(now: today) == 0)
-        #expect(try context.fetchCount(FetchDescriptor<Habit>()) == DefaultHabits.all.count)
-    }
-
-    @Test("Deleting every habit does not bring them back")
-    func doesNotReseedAfterDeletion() throws {
-        // "Is the store empty" and "has this install been seeded" are different
-        // questions, and answering the second with the first makes the app
-        // impossible to empty.
-        let context = try makeContext()
-        let defaults = makeDefaults()
-        try seeder(context, defaults).seedIfNeeded(now: today)
-
-        let store = HabitStore(context: context, calendar: calendar)
         // Twice: the first pass turns every habit into a blank row, the second
         // removes the rows. Emptying the list is two steps now, which is the
         // point — a deleted habit leaves its position behind.
@@ -137,19 +124,23 @@ struct SeedingTests {
                 try store.delete(habit)
             }
         }
-
-        #expect(try seeder(context, defaults).seedIfNeeded(now: today) == 0)
         #expect(try context.fetchCount(FetchDescriptor<Habit>()) == 0)
+
+        // And the way back is the same tap on the same empty store: the curated
+        // set once, not doubled by anything that went before it.
+        #expect(try store.resetToDefaults(now: today) == DefaultHabits.all.count)
+        #expect(try context.fetchCount(FetchDescriptor<Habit>()) == DefaultHabits.all.count)
     }
 
-    @Test("A seed that could not save leaves nothing, and the next launch tries again")
-    func aFailedSeedIsRetried() throws {
-        // The partial-seed failure, which used to be permanent: the flag went
-        // in before the inserts, so an interruption anywhere in them left four
-        // habits of eleven and nothing that would ever repair them.
+    @Test("A curated set that could not save leaves nothing, and the tap can be repeated")
+    func aFailedStartLeavesTheStoreEmpty() throws {
+        // The transaction is what makes the empty state's button safe to press
+        // again: a save that cannot land leaves the store exactly as it was —
+        // empty — so the screen still shows the choice and the second tap is
+        // the first tap. Nothing is recorded about having tried, which is the
+        // property the retried first launch used to need a flag to get.
         let url = TestStore.url()
         defer { TestStore.discard(url) }
-        let defaults = makeDefaults()
 
         // An empty store, made first: a read-only container cannot open a file
         // that is not there yet, which is a fresh install's other problem.
@@ -158,33 +149,14 @@ struct SeedingTests {
 
         let blocked = try TestStore.readOnly(at: url)
         #expect(throws: (any Error).self) {
-            try seeder(blocked, defaults).seedIfNeeded(now: today)
+            try HabitStore(context: blocked, calendar: calendar, restDay: nil)
+                .resetToDefaults(now: today)
         }
-        #expect(!defaults.bool(forKey: HabitSeeder.seededKey))
 
         let after = try TestStore.writable(at: url)
         #expect(try after.fetchCount(FetchDescriptor<Habit>()) == 0)
-        #expect(try seeder(after, defaults).seedIfNeeded(now: today) == DefaultHabits.all.count)
+        #expect(try store(after).resetToDefaults(now: today) == DefaultHabits.all.count)
         #expect(try after.fetchCount(FetchDescriptor<Habit>()) == DefaultHabits.all.count)
-    }
-
-    @Test("A flag that never landed does not seed the list twice")
-    func aLostFlagConvergesRatherThanDuplicating() throws {
-        // The one step that cannot be part of the transaction is the flag,
-        // because it lives in another store. So it converges: a launch that
-        // finds habits it has no record of putting there records that, rather
-        // than adding eleven more rows to a list somebody is already using.
-        let context = try makeContext()
-        let forgetful = try #require(ForgetfulDefaults(suiteName: "seeding-lost-flag-\(UUID().uuidString)"))
-        #expect(try seeder(context, forgetful).seedIfNeeded(now: today) == DefaultHabits.all.count)
-        #expect(!forgetful.bool(forKey: HabitSeeder.seededKey))
-
-        // Relaunch, with a defaults that keeps what it is given this time.
-        let defaults = makeDefaults()
-        #expect(try seeder(context, defaults).seedIfNeeded(now: today) == 0)
-        #expect(try context.fetchCount(FetchDescriptor<Habit>()) == DefaultHabits.all.count)
-        #expect(defaults.bool(forKey: HabitSeeder.seededKey))
-        #expect(try seeder(context, defaults).seedIfNeeded(now: today) == 0)
     }
 
     @Test("A list goes in as it was written, blank rows in their places")
@@ -211,17 +183,6 @@ struct SeedingTests {
         #expect(rows.map(\.isSpacer) == [false, false, true, false])
         #expect(rows.map(\.sortOrder) == [0, 1, 2, 3])
         #expect(rows[3].frequency == .timesPerWeek(2))
-    }
-
-    @Test("An install that already has habits is left alone")
-    func doesNotSeedOverExistingHabits() throws {
-        let context = try makeContext()
-        let store = HabitStore(context: context, calendar: calendar)
-        try store.addHabit(name: "Mine", icon: "star", frequency: .daily)
-
-        #expect(try seeder(context, makeDefaults()).seedIfNeeded(now: today) == 0)
-        let habits = try context.fetch(FetchDescriptor<Habit>())
-        #expect(habits.map(\.name) == ["Mine"])
     }
 
     @Test("Every default habit uses a symbol the picker can draw")
@@ -546,8 +507,8 @@ struct ResetToDefaultsTests {
     func resetLeavesNoDemoBehind() throws {
         let defaults = makeDefaults()
         let context = try makeContext()
-        try HabitSeeder(context: context, defaults: defaults, calendar: calendar)
-            .seedIfNeeded(now: today)
+        try HabitStore(context: context, calendar: calendar, restDay: nil)
+            .resetToDefaults(now: today)
         let demo = DemoHistory(
             context: context, defaults: defaults, calendar: calendar, restDay: nil
         )
@@ -575,27 +536,6 @@ struct ResetToDefaultsTests {
         demo.discardLegacyRecord()
 
         #expect(defaults.stringArray(forKey: DemoHistory.legacyIDsKey) == nil)
-    }
-
-    @Test("A reset does not re-arm first-run seeding")
-    func resetLeavesTheSeededFlagAlone() throws {
-        // `seededKey` means "this install has at some point ended up seeded",
-        // and a store holding exactly the defaults is that state. Clearing it
-        // would arm a seeder that then refuses the store anyway — and on the
-        // one path where it would not refuse, it would be adding a second copy
-        // of the list this call just installed.
-        let defaults = makeDefaults()
-        let context = try makeContext()
-        let seeder = HabitSeeder(context: context, defaults: defaults, calendar: calendar)
-        try seeder.seedIfNeeded(now: today)
-        #expect(defaults.bool(forKey: HabitSeeder.seededKey))
-
-        try HabitStore(context: context, calendar: calendar, restDay: nil)
-            .resetToDefaults(now: today)
-
-        #expect(defaults.bool(forKey: HabitSeeder.seededKey))
-        #expect(try seeder.seedIfNeeded(now: today) == 0)
-        #expect(try context.fetchCount(FetchDescriptor<Habit>()) == DefaultHabits.all.count)
     }
 
     @Test("Resetting twice is resetting once")

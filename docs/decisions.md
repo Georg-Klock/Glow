@@ -967,7 +967,10 @@ two genuinely different ways, so both reasons are declared and both are true:
   trace.
 - `CA92.1` — the app's own defaults. `HabitSeeder` records the first-run seeding
   in `UserDefaults.standard`, and `GlowSettings` falls back to it if the group
-  container is ever unavailable.
+  container is ever unavailable. The seeder is gone (#228) and the reason is
+  not: `DailyHabitMigration` records its sweep there, the Low Power notice
+  records that it has been shown, and the fallback is unchanged. Both manifests
+  name the writers they actually have.
 
 A manifest that over-declares is as wrong as one that under-declares, so the
 test asserts the family count as well as its contents.
@@ -1840,6 +1843,11 @@ does not really have.
 under #140: a version that bumped would push a new list onto people who had
 already arranged the old one.
 
+**Superseded by #228, below.** The set is not pushed at all now — it is offered
+on the empty state and arrives on a tap. The question the flag answered stopped
+having consequences, so the flag went with the seeder; what replaced it is that
+this list only ever reaches a store somebody asked to fill.
+
 ## A completion belongs to a day, not to a midnight
 
 **2026-08-22.** `Completion.day` stored local midnight and every lookup compared
@@ -2657,6 +2665,10 @@ render; screenshotted before and after.
   is that state. Clearing it would arm a seeder that then refuses the store
   anyway, and on the one path where it would not refuse, it would add a second
   copy of the list the reset just installed. A test asserts both halves.
+
+  **Both the flag and the seeder are gone** (#228, below). There is no first-run
+  insert left for a reset to re-arm, and `resetToDefaults` is now the only way
+  the defaults ever go in — from Settings, and from the empty state.
 - **Not the widget reload at the call site.** The issue's sketch called
   `WidgetCenter.shared.reloadAllTimelines()` directly; that is the habit #134
   removed. Going through `commit()` means the reset coalesces like every other
@@ -3433,3 +3445,81 @@ left piece and on the right, against the frame's own dots — a floor says a
 column is not empty, and a column is not empty for lots of reasons. Naming the
 tone is what stops the next fixture edit putting a dot back on a sample point
 without anything noticing.
+
+
+## A fresh install chooses its starting point (#228)
+
+**2026-08-23.** `HabitSeeder` is deleted. A fresh install used to open with
+`DefaultHabits.all` already in the store; it opens on the empty state now, which
+offers two buttons — **Add Your First Habit**, and **Start with a Pre-Selected
+Set** which installs the same eight habits on a tap.
+
+**What is being traded, stated plainly.** #123's seeder existed so that a first
+launch showed what the grid is *for* rather than an empty screen and a plus
+button, and that reasoning was good: an empty tracker teaches nothing about
+itself. What replaces it is not an empty screen — it is the same demonstration
+turned into an offer. The screen still says what the app is about (the empty
+state's icon is a real slot rendered by the real code path, and on a device it
+glows there before there is anything to track), and the list is one tap away
+instead of already decided. The cost is one tap on the way in. What is bought is
+that nobody arrives at a list of eight habits they did not choose and has to
+delete them to disagree.
+
+**The flag goes with it, and that is the part worth checking.**
+`didSeedDefaultHabits` existed to answer "has this install ever been seeded",
+which is a different question from "is the store empty" — and #140 recorded, at
+some length, that answering the second with the first makes a tracker impossible
+to empty: delete every habit at night and find them all back in the morning.
+That failure needs an automatic insert to happen at all. With nothing seeding by
+itself, an empty store is one state, however it got there — nobody has added
+anything, or everything has been deleted — and both want the same two buttons.
+
+**Verified rather than reasoned**, on an iPhone 17 Pro simulator: the curated
+set installed from the empty state, then every habit deleted (each habit leaves a
+blank row, so emptying the grid is two passes — #143), leaving the two-button
+empty state; then home, terminate, relaunch — and the empty state again, with an
+empty store. The one regression this change could plausibly have introduced is
+the one that used to need a flag, and it is not there because there is no longer
+anything that could cause it.
+
+**`resetToDefaults` rather than a revived seeder.** #193 split `insert` out of
+`addAll` precisely so the reset and the seed shared one definition of "the
+defaults go in", and the empty state's button calls the reset directly. Its name
+describes a reset because #193 built it for a store with something in it; on an
+empty store, resetting and seeding are the same act, so no special case is
+needed. It is also why the button needs no confirmation: destructive is a claim
+about what the store held, and this caller is only ever on screen when it held
+nothing.
+
+**"You can edit them anytime" is on the screen, not behind it.** The one
+hesitation a pre-selected set raises is *am I stuck with these?*, and the answer
+belongs where the question is asked — a second sentence in the empty state's
+description — rather than in a confirmation sheet after the tap. Every habit it
+installs is an ordinary habit: rename, retarget, reorder, delete.
+
+**Both buttons are drawn, not styled.** The primary is a `Text` over a filled
+`Capsule` for #162's reason — the root tint is pure white and `.borderedProminent`
+fills with it, which measured 8077 interior pixels of one colour with no label in
+them. The secondary is plain text on the app's black, which is the same trap's
+opposite: the trap needs a filled background to take the tint, and there is no
+fill here. Measured on the fresh-install screenshot rather than assumed: the
+capsule's interior is 84.2% white with **5,021 pure-black pixels of label** in
+it, and the secondary's band is black with **6,413 white pixels of label**. Both
+say something.
+
+**What this does not touch.** `DemoHistory` — a separate concept, invented
+*completions* on top of whatever habits exist, still behind its Settings toggle,
+and still the only thing in the app that fabricates history; the curated set goes
+in with an empty grid. And #193's Reset to Default Habits, which is the same call
+from a different place: a typed, destructive confirmation over a store somebody
+has used, versus a first-run choice on a store that holds nothing.
+
+**What the tests did.** The suite kept the claims that still have a subject and
+retargeted them at `resetToDefaults`: the curated set goes in with no
+completions, every row of it is open today, a set that could not save leaves the
+store empty and the tap can be repeated. Four went, because what they asserted
+does not exist any more — seeding runs once per install, a lost flag converges
+rather than duplicating, an install with habits is left alone, and a reset does
+not re-arm first-run seeding. `ForgetfulDefaults`, the test double that took a
+write and did not keep it, went with the flag it was built to lose. `GlowTests`
+runs 469 against a floor of 398, so no floor moved.

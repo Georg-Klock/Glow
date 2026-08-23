@@ -237,11 +237,12 @@ struct WeeklyGridView: View {
             // calls — this handler used to call it directly.
             refreshToday()
         }
-        // Before seeding, not after: the sweep is about rows a *previous*
-        // build wrote, and running it first means the seeder's "does this
-        // store hold anything" guard is asked of the store this build has.
+        // The sweep is about rows a *previous* build wrote, and it is the only
+        // thing this screen still does to the store unasked — nothing seeds on
+        // appear any more (#228), so the empty state below is a real answer
+        // about what the store holds rather than a frame before the seeder
+        // fills it.
         .task { migrateDailyHabitsOut() }
-        .task { seedIfNeeded() }
         .task { refreshDemoHistory() }
         .task { refreshReach() }
     }
@@ -357,6 +358,14 @@ struct WeeklyGridView: View {
     /// Its icon is a real slot rendered by the real code path, so the thing the
     /// app is about is the first thing on screen, and on an HDR display it
     /// glows here before there is anything to track.
+    ///
+    /// **It is the first-run choice now** (#228). Nothing seeds by itself any
+    /// more, so this screen is what a fresh install opens on, and it offers the
+    /// two starting points rather than assuming one: a habit of your own, or
+    /// the curated set that used to arrive unasked. An empty store means the
+    /// same thing however it got that way — nobody has added anything yet, or
+    /// everything has been deleted — and both deserve the same offer, which is
+    /// why the flag that used to tell them apart went with the seeder.
     private var emptyState: some View {
         ContentUnavailableView {
             VStack(spacing: 14) {
@@ -364,23 +373,46 @@ struct WeeklyGridView: View {
                 Text("No Habits")
             }
         } description: {
-            Text("Add a habit and today's slot will be waiting for you.")
+            // The second sentence answers the one hesitation a pre-selected set
+            // raises — *am I stuck with these?* — where it is asked, rather
+            // than on a confirmation screen after the tap.
+            Text(
+                "Add a habit and today's slot will be waiting for you. "
+                    + "Start with the pre-selected set and you can rename, "
+                    + "retarget, reorder or delete any of them."
+            )
         } actions: {
-            // Drawn rather than styled: the app's root tint is pure
-            // white, and `.borderedProminent` fills with the tint and
-            // draws the label in the contrasting colour — white on white.
-            // Measured: the capsule's interior was 8077 pixels of a single
-            // colour, 255,255,255, with no label in it at all. Same
-            // treatment as `StoreUnavailableView`. See #162.
-            Button { isAddingHabit = true } label: {
-                Text("Add Habit")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(Capsule().fill(GlowPalette.color))
+            VStack(spacing: 16) {
+                // Drawn rather than styled: the app's root tint is pure
+                // white, and `.borderedProminent` fills with the tint and
+                // draws the label in the contrasting colour — white on white.
+                // Measured: the capsule's interior was 8077 pixels of a single
+                // colour, 255,255,255, with no label in it at all. Same
+                // treatment as `StoreUnavailableView`. See #162.
+                Button { isAddingHabit = true } label: {
+                    Text("Add Your First Habit")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(Capsule().fill(GlowPalette.color))
+                }
+                .buttonStyle(.plain)
+
+                // Plain text, not a second capsule: #162's trap is a filled
+                // background taking the tint, and there is no fill here. The
+                // secondary action does not need the primary's weight to be
+                // legible — white type on the app's black reads as well as
+                // black type on white does.
+                Button {
+                    startWithDefaults()
+                } label: {
+                    Text("Start with a Pre-Selected Set")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(GlowPalette.color)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -483,8 +515,6 @@ struct WeeklyGridView: View {
         WeekCalendar.weekRangeTitle(for: week, today: today)
     }
 
-    /// First launch starts with habits rather than an empty state. Nothing is
-    /// pre-completed: see DefaultHabits.
     /// A blank row, appended at the end and dragged into place from there.
     private func addSpacer() {
         do {
@@ -496,10 +526,10 @@ struct WeeklyGridView: View {
 
     /// Takes out the per-day habits an earlier build seeded, once (#209).
     ///
-    /// Here rather than in `GlowApp` for the reason seeding is: this is the
-    /// screen the store is opened for, and a launch that never reaches it never
-    /// needed either. It runs before the reach is refreshed for the same reason
-    /// seeding does — deleting habits can move how far back the pager reaches.
+    /// Here rather than in `GlowApp` for the reason first-run seeding was: this
+    /// is the screen the store is opened for, and a launch that never reaches
+    /// it never needed either. It refreshes the reach when it removes anything,
+    /// because deleting habits can move how far back the pager reaches.
     private func migrateDailyHabitsOut() {
         do {
             if try DailyHabitMigration.runIfNeeded(context: context) > 0 {
@@ -510,19 +540,28 @@ struct WeeklyGridView: View {
         }
     }
 
-    private func seedIfNeeded() {
+    /// The empty state's second choice: the curated set, on a tap (#228).
+    ///
+    /// `resetToDefaults` rather than a revived seeder, because it is the same
+    /// insert — #193 split `addAll` out so this path and Settings' reset share
+    /// one definition, and duplicating it here to spell the call "seed" would
+    /// give the app two ways to install one list. The name describes a reset
+    /// because that is what it does to a store with something in it; this
+    /// button is only ever offered when the store is empty, where resetting and
+    /// seeding are the same act.
+    ///
+    /// No confirmation: nothing is being thrown away. The typed gate in
+    /// Settings guards a store that holds a person's habits, and this one
+    /// cannot be reached while it does.
+    private func startWithDefaults() {
         do {
-            let added = try HabitSeeder(context: context).seedIfNeeded()
-            // Seeding writes through its own path rather than `HabitStore`,
-            // so it says so itself. See `WidgetRefresh`.
-            if added > 0 {
-                WidgetRefresh.invalidate()
-                // The record starts where the first habit does, so a store that
-                // was empty a moment ago now has one.
-                refreshReach()
-            }
+            try store.resetToDefaults()
+            // The record starts where the first habit does, so a store that was
+            // empty a moment ago now has one. The widget hears about it from
+            // `HabitStore`'s own commit.
+            refreshReach()
         } catch {
-            HabitStore.report(error, operation: "seedDefaults")
+            HabitStore.report(error, operation: "startWithDefaults")
         }
     }
 

@@ -19,15 +19,17 @@ import SwiftData
 /// is the price of pulling the feature rather than shipping it half-drawn. The
 /// feature itself is preserved whole on `feature/daily-habits-2.0`.
 ///
-/// **Once per install**, on the flag `HabitSeeder.seededKey` already establishes
-/// the shape of: a store with nothing left to migrate still runs the fetch once
-/// and then never again, and — more to the point — a person who later creates
-/// nothing of the kind cannot have this run against them a second time, because
-/// there is no way left to make a row it would match.
+/// **Once per install**, on its own flag: a store with nothing left to migrate
+/// still runs the fetch once and then never again, and — more to the point — a
+/// person who later creates nothing of the kind cannot have this run against
+/// them a second time, because there is no way left to make a row it would
+/// match.
 ///
-/// The flag is written **after** the save, for the reason the seeder's is: a
-/// failure anywhere leaves the store exactly as it was and the next launch tries
-/// again.
+/// The flag is written **after** the save, the shape first-run seeding's flag
+/// established in #140: a failure anywhere leaves the store exactly as it was
+/// and the next launch tries again. This is the last flag of that shape in the
+/// app — seeding's went with the seeder in #228, because a sweep runs unasked
+/// and needs to remember, while a tap does not.
 @MainActor
 enum DailyHabitMigration {
     /// Set once this install has been swept.

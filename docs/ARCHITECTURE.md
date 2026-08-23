@@ -198,25 +198,34 @@ Every write ends in a private `commit()`: save, and then invalidate the widget
 timelines. A save that throws rolls back, so a failed write leaves the store as
 it was rather than leaving its changes pending for the next unrelated save to
 commit (#140). `addAll(_:now:)` is the batch door — a whole list inserted and
-saved once, which is how the default seed arrives.
+saved once, which is how the curated set arrives.
 
-`resetToDefaults(now:)` is the destructive door (#193): every completion and
-every habit deleted, then `DefaultHabits.all` inserted, all inside one
-`commit()`. One transaction, so a failure leaves the person's habits where they
-were rather than half-way through a deletion — the property `addAll` established
-for seeding, applied where it matters more. The inserts are numbered from zero
-rather than from `nextSortOrder()`, which would be answering from rows already
-staged for deletion; `addAll` and the reset share a private `insert(_:from:now:)`
-so the list is built the same way in both. Completions go explicitly rather than
-by `.cascade`, because a cascade cannot reach a completion whose habit is nil and
-the claim here is that nothing survives. `HabitSeeder.seededKey` is untouched:
-it records that this install has ended up seeded, which is exactly what the store
-now is. The Settings row that calls it is behind a typed confirmation, not a
-tap-through alert — see decisions.md.
+`resetToDefaults(now:)` is the destructive door (#193), and since #228 it is
+the **only** door the defaults come through: every completion and every habit
+deleted, then `DefaultHabits.all` inserted, all inside one `commit()`. One
+transaction, so a failure leaves the person's habits where they were rather than
+half-way through a deletion — the property `addAll` established for the first-run
+seed, applied where it matters more. The inserts are numbered from zero rather
+than from `nextSortOrder()`, which would be answering from rows already staged
+for deletion; `addAll` and the reset share a private `insert(_:from:now:)` so the
+list is built the same way in both. Completions go explicitly rather than by
+`.cascade`, because a cascade cannot reach a completion whose habit is nil and
+the claim here is that nothing survives.
 
-`HabitSeeder` inserts through it and writes `didSeedDefaultHabits` *after* the
-save returns, so an interrupted first launch is retried rather than half-recorded
-forever. `DemoHistory` writes its own transaction, and the demo's provenance is
+Two callers, and what separates them is what the store held. Settings' Reset to
+Default Habits is behind a typed confirmation because it is destroying a list
+somebody arranged — see decisions.md. `WeeklyGridView`'s empty state calls it
+unguarded, because it is only offered on a store that holds nothing and there is
+nothing there to destroy.
+
+**Nothing seeds by itself** (#228). `HabitSeeder` and its `didSeedDefaultHabits`
+flag are gone: the flag existed to tell "never seeded" from "deleted everything"
+apart so an emptied store would not refill overnight, and with no automatic
+insert left, an empty store means one thing and gets one answer — the empty
+state's two buttons. `DailyHabitMigration` still runs unasked, still on a flag
+written after its save, and is now the only thing on that pattern.
+
+`DemoHistory` writes its own transaction, and the demo's provenance is
 a column on `Completion` rather than a list of ids beside the store: one write,
 so "what did the demo add" cannot disagree with what is there. Both are in
 decisions.md.
@@ -232,10 +241,10 @@ migration rather than a configuration change.
 enum, so the column stays queryable and a schema change does not hinge on an
 enum's `Codable` representation. `timesPerDay` is still a column and is always
 zero in a shipped build (#209): dropping it is a schema change, and it is what
-`DailyHabitMigration` finds the leftover rows *by*. #123 seeded five per-day
-habits, so an install updating from a build that carried them holds habits
-nothing can now draw; the migration deletes them and their completions once, at
-launch, before seeding. **It destroys history** — repetitions logged during the
+`DailyHabitMigration` finds the leftover rows *by*. #123's set shipped five
+per-day habits, so an install updating from a build that carried them holds
+habits nothing can now draw; the migration deletes them and their completions
+once, at launch. **It destroys history** — repetitions logged during the
 window the feature shipped in are gone — and the release notes for the build
 carrying it have to say so.
 
@@ -271,7 +280,7 @@ during and after — which is what makes the riskiest migration in the app one
 that can be abandoned at any point. See decisions.md.
 
 `Completion.demoSessionID` is provenance: `nil` for a completion a person
-logged, and the seeding's id for one the demo invented. It is what the demo
+logged, and the demo session's id for one the demo invented. It is what the demo
 toggle reads and what its removal fetches on, so a demo is identifiable from the
 store alone. Optional with a `nil` default, which makes it a lightweight
 migration for a store written before it existed — verified against one.
