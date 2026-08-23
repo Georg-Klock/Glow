@@ -317,7 +317,8 @@ Otherwise no slot is open: everything filled stays filled, unfilled pills stay
 inactive.
 
 **A rest day stops the week.** One optional weekday, set in Settings
-(`WeekPreferences.restDay`), is true rest: its slot is never open, never
+(`WeekPreferences.restDay`) and handed to the grids as a parameter rather than
+looked up by them (#181), is true rest: its slot is never open, never
 missed, and never writable. Nothing can be logged on it and nothing un-logged
 — `HabitStore.toggleCompletion` refuses the write, which holds in the widget's
 process too, where a stale surface can still offer a button — and the week is
