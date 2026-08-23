@@ -80,40 +80,101 @@ enum WeekCalendar {
         }
     }
 
-    /// What to call the week on screen, now that it is not always this one
-    /// (#117).
+    /// What to call the week on screen: the days it covers (#190).
     ///
-    /// **The month you are looking at is the month of the day you are looking
-    /// at**, and on a week with no today in it that is where the week begins.
-    /// One rule, and it leaves the current week saying exactly what it said
-    /// before: a week straddling the end of August still reads "September" on
-    /// the 2nd.
+    /// **A week is named by both its ends**, "Aug 17 – 23", because that is the
+    /// question a pager leaves you with. This replaces the month name #117 put
+    /// in the title, which answered a coarser question — a month holds four or
+    /// five of these and every one of them read the same.
     ///
-    /// The year appears only when it is not this one, which paging back a
-    /// quarter from January reaches. A year on every title would be chrome
-    /// answering a question nobody has eleven months of the time.
+    /// The month is said once when both ends fall in it and twice when they do
+    /// not, which is `Date.IntervalFormatStyle`'s own doing rather than this
+    /// function's: the collapse, the separator and the order of day and month
+    /// are the locale's, so "Aug 31 – Sep 6" is "31. Aug. – 6. Sept." where
+    /// that is how a date is written.
+    ///
+    /// **The year appears only when it is not today's**, which is `monthTitle`'s
+    /// rule kept: a week reachable from here is at most a quarter back, so
+    /// eleven months of the year a year would be chrome answering a question
+    /// nobody has. That rule is not one the interval style can express — asked
+    /// for a year it prints both — so a week that needs one is composed from
+    /// its two ends instead, and the year is dropped from the first end when
+    /// both ends share it: "Dec 29, 2025 – Jan 4", "Oct 20 – Oct 26, 2025".
     ///
     /// Formatted through the calendar's own locale *and time zone*, not the
     /// process's: a midnight formatted in the wrong zone is the previous day,
     /// and one day in twelve that is the previous month.
-    static func monthTitle(
+    /// What joins the two ends when this function has to compose them.
+    ///
+    /// An en dash between two thin spaces, which is what
+    /// `Date.IntervalFormatStyle` itself produces — measured, not guessed — so
+    /// the composed branch and the formatted one do not read as two different
+    /// punctuations of the same idea.
+    static let rangeSeparator = "\u{2009}\u{2013}\u{2009}"
+
+    static func weekRangeTitle(
         for week: Week,
         today: Date,
         calendar: Calendar = WeekCalendar.calendar
     ) -> String {
-        let today = day(today, calendar: calendar)
-        let anchor = week.contains(today) ? today : week.start
-        var style = Date.FormatStyle(
-            date: .omitted,
-            time: .omitted,
-            locale: calendar.locale ?? .current,
-            calendar: calendar,
-            timeZone: calendar.timeZone
-        ).month(.wide)
-        if calendar.component(.year, from: anchor) != calendar.component(.year, from: today) {
-            style = style.year()
+        let thisYear = calendar.component(.year, from: day(today, calendar: calendar))
+        let startYear = calendar.component(.year, from: week.days[0])
+        let endYear = calendar.component(.year, from: week.days[6])
+
+        if startYear == thisYear, endYear == thisYear {
+            let style = Date.IntervalFormatStyle(
+                date: .omitted,
+                time: .omitted,
+                locale: calendar.locale ?? .current,
+                calendar: calendar,
+                timeZone: calendar.timeZone
+            ).month(.abbreviated).day()
+            return (week.days[0]..<week.days[6]).formatted(style)
         }
-        return anchor.formatted(style)
+
+        func end(_ date: Date, year: Bool) -> String {
+            var style = Date.FormatStyle(
+                date: .omitted,
+                time: .omitted,
+                locale: calendar.locale ?? .current,
+                calendar: calendar,
+                timeZone: calendar.timeZone
+            ).month(.abbreviated).day()
+            if year { style = style.year() }
+            return date.formatted(style)
+        }
+        // Each end says its own year when that year is not today's, and a year
+        // both ends share is said once, at the end: "Oct 20 – Oct 26, 2025"
+        // rather than the same four digits twice.
+        return end(week.days[0], year: startYear != thisYear && startYear != endYear)
+            + Self.rangeSeparator
+            + end(week.days[6], year: endYear != thisYear)
+    }
+
+    /// How far back the week on screen is, as a phrase — or nothing at all on
+    /// the newest week there is.
+    ///
+    /// The range title says *which* week; this says *how far*, which is the
+    /// half a date range cannot carry on its own. Nil rather than an empty
+    /// string, so the caller draws nothing rather than an empty line: on the
+    /// current week the title stands alone.
+    ///
+    /// Counted in whole days and divided, rather than in `weekOfYear`, for the
+    /// reason `WeekReach.step` gives: `weekOfYear` restarts at a year end, and
+    /// twelve weeks back from mid-January crosses one.
+    static func weeksBackTitle(
+        for weekStart: Date,
+        latest: Date,
+        calendar: Calendar = WeekCalendar.calendar
+    ) -> String? {
+        let days = calendar.dateComponents(
+            [.day],
+            from: day(weekStart, calendar: calendar),
+            to: day(latest, calendar: calendar)
+        ).day ?? 0
+        let weeks = days / 7
+        guard weeks > 0 else { return nil }
+        return weeks == 1 ? "1 week ago" : "\(weeks) weeks ago"
     }
 
     /// Single-letter column headers in the user's locale, in the calendar's own

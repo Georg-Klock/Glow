@@ -485,9 +485,13 @@ job — light says what happened, and shape says what is still open. The cost is
 accepted: a stray tap changes a day, and nothing distinguishes a correction from
 an original. That is what editing the past means.
 
-**The week view pages back through earlier weeks** (#117). Two chevrons in the
-toolbar, opposite Edit and Add — buttons rather than a swipe, because every row
-already carries swipe actions for edit and delete. An earlier week is edited
+**The week view pages back through earlier weeks** (#117, #190). A horizontal
+swipe on the weekday header, and nowhere else: the rows keep their own swipe
+actions for edit and delete, so a drag that starts on a row is still theirs. The
+swipe is discrete — past the threshold it jumps a week, rather than dragging the
+grid along with the finger. Left goes forward, right goes back, which is the
+direction Calendar.app pages in. Off the current week, a **This Week** pill
+appears between the header and the first row and returns in one step. An earlier week is edited
 exactly as this one is: the surface has not changed, and all seven of its
 columns are past, so all seven are tap targets. Nothing is open in it, because
 nothing is open anywhere but today (R1).
@@ -503,11 +507,12 @@ written before the column existed. Forward stops at the current week; further
 back than a quarter, the surface is History, which is a year of days and does
 not respond to touch on purpose.
 
-**The title names the week you are looking at.** The month of today when today
-is in the visible week, and of the week's first day otherwise — so a week
-straddling a month end still reads as the month you are in. The year appears
-only when it is not this one. The dates under the weekday letters say the rest,
-and on a week with no today in it no column is lit.
+**The title names the week you are looking at, as the days it covers** (#190).
+"17 – 23 Aug" on a week inside one month, "31 Aug – 6 Sep" across a month end.
+The year appears only when it is not today's, and a year both ends share is said
+once: "29 Dec 2025 – 4 Jan", "20 Oct – 26 Oct 2025". Under it, on any week but
+this one, how far back it is — "3 weeks ago". The dates under the weekday
+letters say the rest, and on a week with no today in it no column is lit.
 
 A span row resolves the tap to **the column under the finger** rather than to
 the span's nominal day, so a habit due N times a week records the weekday it
