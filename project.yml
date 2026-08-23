@@ -67,6 +67,13 @@ targets:
         # because Glow/Info.plist is generated from this file and untracked —
         # see #37 / #42.
         NSSupportsLiveActivities: true
+        # The host's version, from the same two settings the widget reads.
+        # Omitting them does not leave the keys out: xcodegen writes its own
+        # defaults, so the host shipped a literal 1.0 / 1 while the widget
+        # carried $(MARKETING_VERSION) / $(CURRENT_PROJECT_VERSION) and the two
+        # bundles disagreed in every build. See #133.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
     dependencies:
       - target: GlowWidget
         embed: true
