@@ -3523,3 +3523,118 @@ rather than duplicating, an install with habits is left alone, and a reset does
 not re-arm first-run seeding. `ForgetfulDefaults`, the test double that took a
 write and did not keep it, went with the flag it was built to lose. `GlowTests`
 runs 469 against a floor of 398, so no floor moved.
+
+## The unlit grey moves again, to #2B2B2B, and stops there (#240)
+
+**2026-08-23.** `GlowPalette.greyOpaque` goes from `#242424` (36,36,36) to
+`#2B2B2B` (43,43,43). Same one declaration, same everything-moves-with-it as
+#194: the resting habit name, the weekday letter that is not today, the ✕ on an
+unlogged day, the rest cut, the socket on a day still to come, the year's empty
+day.
+
+**Why 43 and not 44, computed rather than trusted.** `increasedContrastIsTheOldGrey`
+holds the shipping grey under **1.5:1** on black, and the comment beside that
+bound named 44/255 — `#2C2C2C` — as the value that ratio stands for. It is not.
+Through the same WCAG formula the test itself uses:
+
+| level | contrast on black |
+| --- | --- |
+| 36 (`#242424`) | 1.3528:1 |
+| 42 | 1.4631:1 |
+| **43 (`#2B2B2B`)** | **1.4832:1** |
+| 44 (`#2C2C2C`) | 1.5037:1 |
+
+44 is *over* the bound rather than on it, so the value the old comment offered as
+headroom would have failed the test that was written to allow it. 43 is the last
+level that clears `< 1.5`, and the comment is corrected in place rather than left
+to be repeated. #197's closing line carries the same 44/255 claim and is
+corrected there too.
+
+**So this move spends the guardrail rather than working inside it.** The
+brightest grey a nudge can reach is now what ships. If the report comes back a
+third time that the unlit marks are too dark, the thing being asked for is a
+*higher bound*, which is a design decision about whether "unmistakably not lit"
+still means what #111 and #194 meant by it — to be argued in the open, not
+backed into by picking a fourth number that happens to clear a test nobody meant
+to move.
+
+### The tone census caught it, by name, on every family that paints grey
+
+This is the first real exercise of #199's second statistic, and of the three
+rewrites (#219, #226, #230) that moved assertions off levels and onto
+relationships. Reported here either way, since the point of a gate is what it
+does on a change nobody wrote it for.
+
+**`RenderSignature.toneExcess` fired on all four families, and named the move.**
+Rendered with the palette at 43 while `flatTones` still said 36:
+
+| family | excess at 36, baseline | excess at 36, after the move |
+| --- | --- | --- |
+| week small | 1068 | 12 |
+| week medium | 2068 | 37 |
+| week large | 4132 | 40 |
+| month small | 680 | 2 |
+
+`flatTonesAreReal` went red beside it — "no family paints anything flat at level
+36 — the most any of them has is 40, in week large" — which is the check that
+stops a palette move from being re-approved into a gate comparing zero with
+zero. Moving `flatTones` to 43 then fired the *other* branch on all four
+families ("now paints 4015 pixels flat at level 43, where the baseline recorded
+0"), which is the same event seen from the other side.
+
+**The cell grid stayed green again**, exactly as #199 said it would: worst cell
++2 against a tolerance of 3, on a seven-level move. #194's thirteen levels
+arrived as +3. The geometry gate is not a colour gate and this is the second
+change to demonstrate it rather than argue it.
+
+| frame | cells moved | worst | exactly-black | tone census |
+| --- | --- | --- | --- | --- |
+| week small | 17/256 | +2 | 70.2% → 70.2% | 36: 1068 → 43: 1062 |
+| week medium | 20/256 | +2 | 73.6% → 73.6% | 36: 2068 → 43: 2007 |
+| week large | 24/256 | +1 | 84.1% → 84.1% | 36: 4132 → 43: 4015 |
+| month small | 18/256 | +2 | 90.2% → 90.1% | 36: 680 → 43: 682 |
+
+Every moved cell moved **up**, none down, and the count of pure-white pixels is
+identical in all four frames (564, 2303, 2394, 39) — the evidence that this is
+the same picture at a different level rather than a different picture. The
+baseline was re-approved from the run that produced it.
+
+**The relationship assertions survived untouched**, which is what #219 and #226
+were for. `isUnlit(_:beside:)` compares a tone against the lit marks in its own
+frame (43 × 4 = 172 against 255) and never saw the move; `lineFloor` (15) and
+`clear` (10) are levels against the *ground* rather than against the palette,
+and neither moved. Nothing in `WidgetRenderDiffTests` needed a new number except
+the one literal that is documented as tracking the palette.
+
+### The one place the rewrite did not reach, and what it measured
+
+`renderIsReal` counts pixels inside a narrow band around the grey as evidence
+that something unlit was drawn — 33...39 for `#242424`. Its comment says the
+band is a function of the palette and moves with it, which is true and is what
+this change did: it is 40...46 now.
+
+**But it did not go red first, and that is the finding.** Run with the palette at
+43 and the band still at 33...39, the test passed. Measured on the render it
+writes out, 676 × 708: **5,315 pixels** fall in 33...39 with nothing painted
+there, against a floor of 500 — halo gradient, not marks. The band it was
+checking was empty of *tones* and full of *ramp*. For comparison, the same frame
+holds 8,042 pixels in 40...46, of which **5,824 sit at exactly 43** against ~420
+at each neighbouring level: the spike the census reads.
+
+So the "narrow band" argument the comment makes — that a band reaching to 141
+would pass on halo bleed alone — turns out to apply at seven levels wide too, at
+least in the large frame, where there is a great deal of halo. The band has been
+moved because that is what its comment requires, but what it now demonstrates is
+that a *count inside a band* is weak evidence in a frame with gradients, and that
+the census next door is the check actually doing this job. Left as a finding
+rather than a rewrite: changing what `renderIsReal` asks is a separate decision,
+and this change had no business making it while moving a colour.
+
+### What is not verified here
+
+The simulator has no EDR headroom, so every halo in every frame above is drawn at
+SDR strength. Whether 43 reads as unlit **beside a real halo**, and whether it
+reads as findable at all on a phone, is the question #197 asks and it is still
+open — its subject is now `#2B2B2B` rather than `#242424`, which is noted on the
+issue. This entry records geometry, level and gate behaviour, all of which the
+simulator settles; it does not record what the change was made for.
