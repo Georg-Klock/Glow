@@ -201,12 +201,30 @@ if [ "$STATUS" -ne 0 ]; then
     echo
     echo "  load average now: $(uptime | sed 's/.*load averages*: //')"
     echo
-    echo "Two causes, and the load average tells them apart badly. This machine"
+    # Intersected, not counted separately: `ps` names devices that are not
+    # booted at all, so a bare count of each says "3 booted, 3 busy" while two
+    # of them sit idle — the exact reading this line exists to prevent.
+    BOOTED_IDS=$(xcrun simctl list devices booted -j 2>/dev/null |
+      /usr/bin/python3 -c 'import json,sys
+data=json.load(sys.stdin)["devices"]
+print("\n".join(d["udid"] for v in data.values() for d in v if d.get("state")=="Booted"))' || true)
+    BOOTED_N=$(printf "%s" "$BOOTED_IDS" | grep -c . || true)
+    BUSY_N=$(ps -Ao args | grep -o "id=[0-9A-Fa-f-]\{36\}" | sed "s/^id=//" | sort -u |
+      grep -Fxf <(printf "%s" "$BOOTED_IDS") 2>/dev/null | grep -c . || true)
+    echo "  simulators booted: ${BOOTED_N:-?}, of them being tested on: ${BUSY_N:-?}"
+    echo
+    echo "Three causes, and the load average tells them apart badly. This machine"
     echo "has been seen killing the host above roughly 70 — but a second run on"
     echo "the same simulator does this too, at any load, and drives the load up"
     echo "while it does it (#221). The lock above should prevent that; if this"
     echo "line is printing anyway, check for another xcodebuild before reading"
     echo "anything into which test failed."
+    echo
+    echo "The third is idle simulators (#247). A booted runtime carries dozens of"
+    echo "daemons whether or not anything runs on it, so devices left behind by"
+    echo "runs that already finished can push the machine past the threshold on"
+    echo "their own. If the two numbers above are far apart, that is this:"
+    echo "  Tools/reap-simulators.sh --dry-run"
     if [ -n "$ASSERTIONS" ]; then
       echo
       echo "Assertions also present, which may or may not be related:"
