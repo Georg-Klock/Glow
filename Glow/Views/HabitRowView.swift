@@ -119,6 +119,33 @@ struct HabitRowView: View {
     /// jump. See `MotionPolicy` and #137.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Whether the list is being edited, read straight from the environment.
+    ///
+    /// **This is the read `TodayView` cannot make, and the difference is which
+    /// side of the `NavigationStack` the view sits on.** `TodayView` is the
+    /// struct whose own `body` builds the stack, so the `editMode` it reads is
+    /// its parent's and never the one the toolbar's `EditButton` toggles; it
+    /// owns `@State` and injects it instead. This row is a plain descendant —
+    /// `WeeklyGridView` builds the stack, the list and the `ForEach` above
+    /// it — so it is inside the environment the button writes to, and reading
+    /// it here sees the live value. Measured on the simulator before the fade
+    /// was built on top of it: every row and the header flipped on the tap.
+    ///
+    /// `Binding<EditMode>?`, not `EditMode`, which is why this reads less
+    /// directly than `TodayView`'s owned copy.
+    @Environment(\.editMode) private var editMode
+    private var isEditing: Bool { editMode?.wrappedValue.isEditing ?? false }
+
+    /// How the week leaves when edit mode opens.
+    ///
+    /// Quick enough to read as getting out of the way rather than as a
+    /// transition worth watching — roughly half of `SlotView.close`, which is
+    /// this app's number for a change worth noticing. `easeOut` rather than a
+    /// spring: nothing here is settling into a resting shape the way a
+    /// completion does, it is leaving. The header borrows this timing rather
+    /// than keeping its own, so the track and the letters over it go together.
+    static let editFade = Animation.easeOut(duration: 0.15)
+
     private var slots: [Slot] {
         WeekGrid.slots(for: snapshot, in: week, today: today, editing: editing)
     }
@@ -155,13 +182,32 @@ struct HabitRowView: View {
                 // draggable and its place to be visible as a gap.
                 Color.clear
             } else {
+                // Editing gives the week's width back. `List` draws a delete
+                // circle at the leading edge and a reorder handle at the
+                // trailing one, and the row they land beside has no business
+                // still holding seven columns of a week nobody can tap: the
+                // marks go, and the name takes the middle of what is left.
+                //
+                // Two spacers rather than a centred frame, so the label sits
+                // between the system's own controls — the room being freed is
+                // the room they are standing in, not just the track's.
+                if isEditing { Spacer(minLength: 0) }
                 label
-                track
-                    .frame(width: geometry.trackWidth, alignment: .leading)
+                if isEditing {
+                    Spacer(minLength: 0)
+                } else {
+                    track
+                        .frame(width: geometry.trackWidth, alignment: .leading)
+                }
             }
         }
         .frame(height: max(slotHeight, GridMetrics.minimumRowHeight))
         .background(alignment: .leading) { restDayCut }
+        // Outside the background, so the cut leaves on the same timing the
+        // track does. Reduce Motion takes the snap, as everywhere else the grid
+        // moves — the label is also changing width and position here, and a
+        // shorter version of that is still a version of it. See `MotionPolicy`.
+        .animation(reduceMotion ? nil : Self.editFade, value: isEditing)
         .onAppear { lit = isDue ? 1 : 0 }
         .onChange(of: isDue) { _, due in
             withAnimation(reduceMotion ? nil : SlotView.close) { lit = due ? 1 : 0 }
@@ -181,11 +227,16 @@ struct HabitRowView: View {
     /// record, and the line marks the day, not the record.
     @ViewBuilder
     private var restDayCut: some View {
+        // Not while the list is being edited: the line is positioned from the
+        // same geometry as the track and marks a weekday exactly as the track
+        // does, so drawn beside a week that has gone it would point at nothing.
+        //
         // `restDayStorage`, not `WeekPreferences.restDay`: the raw value is
         // what this view observes, and reading it here is what makes every
         // row — including one whose slots are unchanged — redraw the line on
         // the new day the moment Settings moves it.
-        if restDayStorage != 0,
+        if !isEditing,
+           restDayStorage != 0,
            let cut, cut.contains(index),
            let restIndex = week.days.firstIndex(where: { WeekPreferences.isRestDay($0) }) {
             let width = GlowShape.barThickness
@@ -354,7 +405,11 @@ struct HabitRowView: View {
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
                 .frame(maxWidth: geometry.nameMaxWidth, alignment: .leading)
-            Spacer(minLength: 0)
+            // The spacer and the column width below are what hold the name at
+            // the leading edge, so editing drops both: a label still filling a
+            // label-shaped column would centre that column rather than the
+            // name in it, which is not the thing being centred.
+            if !isEditing { Spacer(minLength: 0) }
         }
         .font(.system(size: geometry.textSize))
 
@@ -369,7 +424,7 @@ struct HabitRowView: View {
             text.foregroundStyle(GlowPalette.grey)
             text.glowing(halo: GlowPalette.labelHalo).opacity(lit)
         }
-        .frame(width: geometry.labelWidth, alignment: .leading)
+        .frame(width: isEditing ? nil : geometry.labelWidth, alignment: .leading)
         // No clipping: the overflow is the point. The frame reserves the
         // column so the track still starts where the geometry says it does.
         .fixedSize(horizontal: true, vertical: false)

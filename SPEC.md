@@ -502,6 +502,15 @@ really happened on — the same day the month grid and the row's own dots alread
 draw it on. Touching the rest day's column inside a span does nothing: the
 column is drawn as a hole, and pressing a hole is pressing nothing.
 
+**Edit mode gives the week's width back** (#164). `List` draws a delete circle
+at the leading edge of every row and a reorder handle at the trailing one, and
+while it does, everything weekday-shaped leaves: each row's track, the rest-day
+cut positioned from the same geometry, and the header's letters, all on one
+0.15s fade. The icon and name recentre between the system's two controls — not
+in the vacated track, which would leave them a third of the way across. A blank
+row has nothing to fade and nothing to centre; it shows the two controls and the
+gap it stands for. Reduce Motion snaps the change rather than shortening it.
+
 **Edit changes what a ring's tap means** rather than adding a second control
 beside it: out of edit mode a tap counts, in edit mode it opens that habit in
 the editor, where renaming, re-targeting and deleting already live. Today is a
