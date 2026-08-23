@@ -129,12 +129,11 @@ enum TestStore {
     }
 }
 
-/// Defaults that take a write and do not keep it — the flag that never landed,
-/// which is one half of every "the store and the record disagree" failure.
-final class ForgetfulDefaults: UserDefaults, @unchecked Sendable {
-    override func set(_ value: Any?, forKey defaultName: String) {}
-    override func set(_ value: Bool, forKey defaultName: String) {}
-}
+// `ForgetfulDefaults` — defaults that take a write and do not keep it — went
+// with the only failure it could stage (#228). It existed for the first-run
+// seeding flag: a flag that never landed, and a next launch that had to
+// converge rather than insert the list twice. There is no flag and no automatic
+// insert left for it to lose.
 
 extension HabitSnapshot {
     static func fixture(

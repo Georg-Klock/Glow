@@ -1,15 +1,19 @@
 import Foundation
 
-/// The habits a fresh install starts with.
+/// The curated set — the habits a fresh install can choose to start with.
+///
+/// **Offered, not installed** (#228). This list used to arrive on first launch
+/// unasked, and it arrives on the empty state's second button now; the list is
+/// unchanged, the tap in front of it is new. `HabitStore.resetToDefaults` is
+/// the one call that puts it in, from there and from Settings' reset.
 ///
 /// Habits and nothing else: a tracker opening with a streak you did not earn
-/// is lying to you on the first screen, so every install begins with an empty
-/// grid. The invented past that shows the design off is `DemoHistory`, behind
-/// a toggle in Settings — asked for, never assumed.
+/// is lying to you on the first screen, so the set arrives with an empty grid.
+/// The invented past that shows the design off is `DemoHistory`, behind a
+/// toggle in Settings — asked for, never assumed.
 ///
-/// They are ordinary habits, editable and deletable like any other. The point
-/// is that the first launch shows what the grid is for, rather than an empty
-/// state and a plus button.
+/// They are ordinary habits, editable and deletable like any other, which is
+/// what the empty state says before the tap rather than after it.
 enum DefaultHabits {
     struct Template {
         /// A blank row rather than a habit. Everything else is ignored.

@@ -31,6 +31,19 @@ sentence with an exception is two sentences.
 - One weekly-grid screen is enough to see every habit's status for the current
   week. No drilling into detail screens for the core loop.
 - Logging a habit is one tap from the weekly grid.
+- **A fresh install chooses its starting point** (#228). An empty grid offers
+  two buttons: **Add Your First Habit**, which opens the ordinary editor, and
+  **Start with a Pre-Selected Set**, which installs `DefaultHabits.all` — the
+  eight curated habits in three clusters, with no completions — immediately, no
+  confirmation step. The list used to go in by itself on first launch; it is
+  offered now. Every habit it puts in is an ordinary one afterwards: rename,
+  retarget, reorder, delete, exactly like anything typed by hand, and the
+  description on the empty state says so before the tap.
+
+  **An empty store means one thing.** Nothing seeds automatically, so a store
+  nobody has added to and a store emptied by deleting every habit are the same
+  state and get the same offer. The flag that used to tell them apart —
+  `didSeedDefaultHabits` — is gone with the seeder that wrote it.
 - The glow renders on EDR-capable devices and degrades to plain colour where it
   cannot, with no broken state either way.
 - ~~Two kinds of habit, never mixed: counted across a week (daily, or
@@ -63,16 +76,16 @@ sentence with an exception is two sentences.
   asserted.
 - **No undo — and one action that therefore has to ask twice.** Settings → Data
   → **Reset to Default Habits** deletes every habit and every completion and
-  installs `DefaultHabits.all` fresh, which is the only way back to the shipped
-  list once a store holds anything: first-run seeding refuses a non-empty store
-  on purpose, so that a changed seed set never rewrites a list somebody
-  arranged. Because nothing here is recoverable, the confirmation is **typed
-  rather than tapped**: the destructive button stays disabled until the word
-  `RESET` is in the field — `ResetConfirmation` is the rule, and it forgives
-  case and surrounding whitespace and nothing else. The reset is one transaction
-  — either the defaults are in or the store is untouched — and it leaves
-  `didSeedDefaultHabits` alone, because a store holding exactly the defaults
-  *is* the seeded state.
+  installs `DefaultHabits.all` fresh, which is the way back to the shipped list
+  once a store holds something — the empty state's own offer of that list is
+  gone as soon as there is a habit on screen. Because nothing here is
+  recoverable, the confirmation is **typed rather than tapped**: the destructive
+  button stays disabled until the word `RESET` is in the field —
+  `ResetConfirmation` is the rule, and it forgives case and surrounding
+  whitespace and nothing else. The reset is one transaction — either the
+  defaults are in or the store is untouched. The empty state's second button
+  makes the same call without a confirmation, because a store with nothing in it
+  has nothing to lose.
 - ~~**The home screen widget does not glow.**~~ **It does.** This was written as
   a non-goal on the reasoning that WidgetKit renders in a separate process and
   archives the result, so HDR could not survive. That was never measured, and it
@@ -545,6 +558,10 @@ where the crossfade already was.
 - [x] At most one slot per habit is open at a time.
 - [x] Without EDR the glow renders as flat colour, no crash, no artifact.
 - [x] Restarting preserves all habits and completions.
+- [x] A fresh install shows both starting points; the primary opens the habit
+      editor, the secondary installs the eight curated habits with nothing
+      logged. Deleting every habit returns to the same two buttons, and a
+      relaunch leaves the store empty rather than refilling it.
 
 Each was verified in the simulator and is held by a test.
 

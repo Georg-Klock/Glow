@@ -146,12 +146,17 @@ struct HabitStore {
     /// Throws away everything the store holds and puts the current defaults in.
     /// Returns how many habits were added.
     ///
-    /// The opt-in escape hatch from `HabitSeeder`'s guard (#193). Seeding
-    /// refuses to touch a store that holds anything, deliberately — a seed set
-    /// that changed would otherwise rewrite lists people had arranged — so an
-    /// install that wants the shipped defaults after its first launch has no
-    /// way to ask. This is that way, and it is destructive on purpose: not a
-    /// merge, not a reconciliation by name, a return to zero.
+    /// **The only way the defaults ever go in**, from either of two taps: the
+    /// typed, destructive Reset to Default Habits in Settings (#193), and the
+    /// empty state's "Start with a Pre-Selected Set" on a store that holds
+    /// nothing (#228). It was the escape hatch from first-run seeding's guard
+    /// before that seeding existed; now there is no other door, and it is
+    /// destructive on purpose: not a merge, not a reconciliation by name, a
+    /// return to zero.
+    ///
+    /// Which is why the empty state can call it unguarded. Destructive is a
+    /// claim about what the store held, and that caller is only ever offered
+    /// when it held nothing.
     ///
     /// **One transaction.** Every delete and every insert is staged and then
     /// committed once, so a failure anywhere leaves the store exactly as it
@@ -166,11 +171,10 @@ struct HabitStore {
     /// reference is nil would survive a cascade. Saying it outright costs one
     /// fetch and removes the word "should" from the promise.
     ///
-    /// `HabitSeeder.seededKey` is deliberately untouched: it records that this
-    /// install has at some point ended up in a seeded state, and a store
-    /// holding exactly `DefaultHabits.all` is that state. Clearing it would
-    /// only arm first-run seeding against a store it would then refuse to
-    /// touch anyway.
+    /// There is no first-run flag left to keep in step (#228). One used to
+    /// record whether this install had ever been seeded, and this call
+    /// deliberately left it alone; with nothing seeding by itself, an empty
+    /// store means one thing and the flag had nothing left to say.
     @discardableResult
     func resetToDefaults(now: Date = Date()) throws -> Int {
         for completion in try context.fetch(FetchDescriptor<Completion>()) {
