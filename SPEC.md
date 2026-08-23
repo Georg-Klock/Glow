@@ -37,8 +37,15 @@ sentence with an exception is two sentences.
   eight curated habits in three clusters, with no completions — immediately, no
   confirmation step. The list used to go in by itself on first launch; it is
   offered now. Every habit it puts in is an ordinary one afterwards: rename,
-  retarget, reorder, delete, exactly like anything typed by hand, and the
-  description on the empty state says so before the tap.
+  retarget, reorder, delete, exactly like anything typed by hand.
+
+  **The screen is those two buttons and nothing else** (#243). No icon, no
+  title, no description: an empty grid, centred on the choice it is asking for.
+  The sentence that used to say the curated set is editable went with them —
+  what it answered is still true and is stated here, but it is not on the
+  screen. What a screen reader reaches is the same two buttons, for the same
+  reason: the icon carried no label, so the title and the description were the
+  whole of the spoken difference and they left both at once.
 
   **An empty store means one thing.** Nothing seeds automatically, so a store
   nobody has added to and a store emptied by deleting every habit are the same
