@@ -45,8 +45,8 @@
     "listed fails, for the same reason an undeclared test bundle does. See #133."
   ],
   "bundles": {
-    "GlowTests": { "minimum": 398 },
-    "GlowRenderTests": { "minimum": 12 }
+    "GlowTests": { "minimum": 469 },
+    "GlowRenderTests": { "minimum": 13 }
   },
   "release": {
     "appGroup": "group.com.georgklock.glow",
