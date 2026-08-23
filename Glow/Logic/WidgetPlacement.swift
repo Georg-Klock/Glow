@@ -28,6 +28,16 @@ struct WidgetPlacement: Hashable, Identifiable, Sendable {
 
     /// What to call this one placement — "This Week, Medium".
     var title: String { "\(kind.displayName), \(familyName)" }
+
+    /// Whether a preview of this placement is a statement about *which* habit,
+    /// and therefore worth drawing more than once (#237).
+    ///
+    /// A property of the kind, not of the family: what makes the month worth
+    /// previewing several times is `SelectWeeklyHabitIntent`, which is asked
+    /// however the widget is sized. The month is small-only today, so this is
+    /// exactly the Month-Small card — but the rule is the one that stays true
+    /// if that changes.
+    var previewsOneHabit: Bool { kind.isPerHabit }
 }
 
 /// A widget somebody has actually placed, as `WidgetCenter` reports it.
@@ -52,11 +62,52 @@ struct PlacedWidget: Hashable, Sendable {
     }
 }
 
-/// One row of the Widgets tab: a widget this app ships, and whether it is on
-/// the Home Screen.
+/// One preview on the Widgets tab: a widget this app ships, whether it is on
+/// the Home Screen, and — where the widget shows one habit somebody picks —
+/// which habit this particular preview draws.
 struct WidgetCard: Hashable, Identifiable, Sendable {
     let placement: WidgetPlacement
     let isPlaced: Bool
+
+    /// The habit this preview draws, on a placement that `previewsOneHabit`.
+    ///
+    /// `nil` everywhere else, and also on a per-habit placement with nothing
+    /// to draw yet — somebody with no weekly habits still gets one card, so
+    /// the widget's own empty state is what they see rather than a heading
+    /// with nothing under it (#237).
+    let habitID: UUID?
+
+    init(placement: WidgetPlacement, isPlaced: Bool, habitID: UUID? = nil) {
+        self.placement = placement
+        self.isPlaced = isPlaced
+        self.habitID = habitID
+    }
+
+    /// What the card *is*, not what it currently says. `isPlaced` is
+    /// deliberately outside the identity: it flips whenever somebody places a
+    /// widget and comes back to the app, and a row whose identity flips with
+    /// it is a row SwiftUI tears down and rebuilds instead of updating.
+    struct ID: Hashable, Sendable {
+        let placement: WidgetPlacement
+        let habitID: UUID?
+    }
+
+    var id: ID { ID(placement: placement, habitID: habitID) }
+}
+
+/// One placeable widget as the page presents it: the row of text naming it,
+/// and every preview under that row.
+///
+/// A group rather than a flat list, because "Small" and "Added" are facts
+/// about the **placement** — one month widget, on the Home Screen or not —
+/// while the previews beneath are several habits that one widget could be
+/// showing. Printed once per card, "Added" would claim three widgets are
+/// placed when one is (#237); printed once per group, it says what
+/// `WidgetCenter` actually reported.
+struct WidgetCardGroup: Hashable, Identifiable, Sendable {
+    let placement: WidgetPlacement
+    let isPlaced: Bool
+    let cards: [WidgetCard]
 
     var id: WidgetPlacement { placement }
 }
@@ -96,13 +147,53 @@ enum WidgetCatalog {
         })
     }
 
-    /// The page, top to bottom. Everything we ship, each carrying whether it is
-    /// already on the Home Screen — placed widgets are shown with a checkmark
-    /// rather than dropped, because seeing what is already there belongs on the
-    /// same page as seeing what is not.
-    static func cards(placed reported: [PlacedWidget]) -> [WidgetCard] {
+    /// How many habits one per-habit widget is previewed against (#237).
+    ///
+    /// **The bound is three, and the reason is that the card demonstrates a
+    /// choice rather than enumerating a list.** Three is the smallest count
+    /// that reads as a series — one is an example, two is a pair and invites
+    /// "why those two", three is plainly "one of yours, you pick". Above that
+    /// the cost is real and the argument stops improving: each preview is a
+    /// production `MonthWidgetView` laid out at the family's true 158pt and
+    /// then scaled, so the section grows about 170pt per habit. Three keeps
+    /// This Month near a screen; the eight habits a fresh install seeds would
+    /// make it about 1,400pt — the same widget, longer than the rest of the
+    /// page put together, which teaches nothing the third card did not.
+    static let habitPreviewLimit = 3
+
+    /// The page, top to bottom: everything we ship, grouped by placement, each
+    /// group carrying whether it is already on the Home Screen — placed widgets
+    /// are shown with a checkmark rather than dropped, because seeing what is
+    /// already there belongs on the same page as seeing what is not.
+    ///
+    /// `habits` is the ordered list a per-habit widget could be showing — the
+    /// person's own, which is why it arrives as a parameter read at the view
+    /// boundary rather than being fetched here. Empty is a real answer and
+    /// yields one card with no habit, not zero cards.
+    static func groups(placed reported: [PlacedWidget], habits: [UUID] = []) -> [WidgetCardGroup] {
         let placed = placed(among: reported)
-        return all.map { WidgetCard(placement: $0, isPlaced: placed.contains($0)) }
+        // Two cards with one id is a `ForEach` drawing one row and warning
+        // about it. The ids come from a fetch and so should already be
+        // distinct; this makes "should" not load-bearing.
+        var seen = Set<UUID>()
+        let distinct = habits.filter { seen.insert($0).inserted }
+        return all.map { placement in
+            let isPlaced = placed.contains(placement)
+            let cards: [WidgetCard]
+            if placement.previewsOneHabit, !distinct.isEmpty {
+                cards = distinct.prefix(habitPreviewLimit).map {
+                    WidgetCard(placement: placement, isPlaced: isPlaced, habitID: $0)
+                }
+            } else {
+                cards = [WidgetCard(placement: placement, isPlaced: isPlaced)]
+            }
+            return WidgetCardGroup(placement: placement, isPlaced: isPlaced, cards: cards)
+        }
+    }
+
+    /// Every preview on the page, flat and in order.
+    static func cards(placed reported: [PlacedWidget], habits: [UUID] = []) -> [WidgetCard] {
+        groups(placed: reported, habits: habits).flatMap(\.cards)
     }
 }
 
