@@ -134,9 +134,35 @@ if [ "$STATUS" -ne 0 ]; then
   # simulator logs `IOSurfaceClientSetSurfaceNotify failed` on runs that pass,
   # and matching it meant a launch failure was reported as one failing
   # assertion — a graphics warning — with the actual cause discarded. See #148.
-  ASSERTIONS=$(grep -E "✘|error:|Testing failed:" "$LOG" | head -40 || true)
+  # `error:` on its own is not a signal either, for the same reason a bare
+  # `failed` was not: CoreData logs `CoreData: error:` lines on runs that pass,
+  # and the migration suite plants a malformed store on purpose, so a crashed
+  # run once reported that noise under "Failing assertions". Compiler errors
+  # carry a file and a position; those are the ones worth quoting. See #148.
+  ASSERTIONS=$(grep -E "✘|\.swift:[0-9]+:[0-9]+: error:|Testing failed:" "$LOG" | head -40 || true)
 
-  if [ -n "$ASSERTIONS" ]; then
+  # A host that dies mid-run is its own outcome, and it names an innocent test.
+  # Three separate investigations went looking for a bug in whichever test
+  # happened to be running when the process was killed. See #175 and #179.
+  CRASHED=$(grep -cE "Restarting after unexpected exit|crashed with signal|Test crashed" "$LOG" || true)
+
+  if [ "$CRASHED" -gt 0 ]; then
+    echo "FAILED because the test host died mid-run — this is probably not the"
+    echo "fault of the test it names."
+    echo
+    grep -E "Restarting after unexpected exit|crashed with signal|Test crashed|Fatal error" "$LOG" \
+      | head -6 | sed 's/^/  /'
+    echo
+    echo "  load average now: $(uptime | sed 's/.*load averages*: //')"
+    echo
+    echo "This machine has been seen killing the host above roughly 70. If the"
+    echo "load is high, re-run before reading anything into which test failed."
+    if [ -n "$ASSERTIONS" ]; then
+      echo
+      echo "Assertions also present, which may or may not be related:"
+      echo "$ASSERTIONS"
+    fi
+  elif [ -n "$ASSERTIONS" ]; then
     echo "FAILED. Failing assertions:"
     echo "$ASSERTIONS"
   elif [ "$REPORTED" -eq 0 ]; then
