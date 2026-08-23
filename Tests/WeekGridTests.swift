@@ -321,6 +321,73 @@ struct WeekGridTests {
         }
     }
 
+    // MARK: - An earlier week (#117)
+
+    /// The week beginning Monday 2026-08-03, two weeks before this one — the
+    /// branch that has no today in it at all.
+    private var pastWeek: Week {
+        WeekCalendar.week(containing: TestCalendar.date(2026, 8, 3), calendar: calendar)
+    }
+
+    private func pastSlots(_ habit: HabitSnapshot, editing: SlotEditing) -> [Slot] {
+        TestPreferences.withWeek(restDay: nil) {
+            WeekGrid.slots(
+                for: habit, in: pastWeek, today: today, editing: editing, calendar: calendar
+            )
+        }
+    }
+
+    @Test("Every history of an earlier week: the week view reaches all seven days")
+    func pastWeekTappabilityOverEveryHistory() {
+        // The same exhaustive pass, on the week the issue makes load-bearing.
+        // A week with no today in it used to be a branch nothing tapped; it is
+        // now every week but one.
+        for mask in 0..<(1 << 7) {
+            let completed = Set(pastWeek.days.enumerated().compactMap { index, day in
+                mask & (1 << index) != 0 ? day : nil
+            })
+            let habit = HabitSnapshot.fixture(completedDays: completed)
+
+            // R1 holds: nothing is open in a week that is over, on any surface.
+            for editing in [SlotEditing.todayOnly, .week(allowingFuture: false),
+                            .week(allowingFuture: true)] {
+                let row = pastSlots(habit, editing: editing)
+                #expect(row.count == 7, "mask \(mask) drew \(row.count) slots")
+                #expect(!row.contains { $0.state == .open }, "mask \(mask) opened a past day")
+                #expect(!row.contains { $0.isToday }, "mask \(mask) called a past day today")
+            }
+
+            // R2 as the difference between the surfaces, exactly as the
+            // current week asserts it.
+            #expect(pastSlots(habit, editing: .todayOnly).allSatisfy { !$0.isTappable })
+
+            for editing in [SlotEditing.week(allowingFuture: false), .week(allowingFuture: true)] {
+                let row = pastSlots(habit, editing: editing)
+                #expect(
+                    row.allSatisfy { $0.isTappable },
+                    "mask \(mask) withheld a day of \(editing)"
+                )
+                #expect(row.allSatisfy { $0.actionDay == pastWeek.days[$0.index] })
+            }
+
+            // Every day is filled or missed — there is no third thing a day
+            // that has been and gone can be.
+            let states = pastSlots(habit, editing: .week(allowingFuture: false)).map(\.state)
+            #expect(states.allSatisfy { $0 == .filled || $0 == .missed }, "mask \(mask)")
+            #expect(states.count { $0 == .filled } == completed.count, "mask \(mask)")
+        }
+    }
+
+    @Test("A completion in an earlier week draws as a past completion, never as today's")
+    func pastWeekCompletionsAreNotToday() {
+        let habit = HabitSnapshot.fixture(completedDays: [pastWeek.days[1]])
+        let row = pastSlots(habit, editing: .week(allowingFuture: false))
+
+        #expect(row[1].state == .filled)
+        #expect(row[1].mark == .donePast)
+        #expect(row[0].mark == .missed)
+    }
+
     @Test("A day outside the displayed week leaves no slot open")
     func todayOutsideTheWeek() {
         let otherWeek = WeekCalendar.week(containing: TestCalendar.date(2026, 8, 10), calendar: calendar)

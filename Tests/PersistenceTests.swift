@@ -140,6 +140,65 @@ struct PersistenceTests {
         }
     }
 
+    @Test("Correcting a day in an earlier week is not a new kind of write")
+    func earlierWeeksAreTheSameWrite() throws {
+        let context = try makeContext()
+        // Three weeks back, which is a week the pager reaches and the current
+        // week does not contain. The store's guard is *ahead of now*, and a
+        // day three weeks ago is behind it exactly as Monday is — which is why
+        // #117 added no rule here. The floor the pager stops at is a bound on
+        // navigation, not on what a record may hold.
+        let longAgo = Date().addingTimeInterval(-21 * 24 * 60 * 60)
+
+        try TestPreferences.withWeek(restDay: nil) {
+            let store = HabitStore(context: context)
+            let habit = try store.addHabit(name: "Walk", icon: "🚶", frequency: .daily)
+
+            let logged = try store.toggleCompletion(for: habit, on: longAgo)
+            #expect(logged == .completed)
+            let one = try context.fetch(FetchDescriptor<Completion>())
+            #expect(one.count == 1)
+            #expect(one.first?.day == WeekCalendar.day(longAgo))
+
+            let undone = try store.toggleCompletion(for: habit, on: longAgo)
+            #expect(undone == .uncompleted)
+        }
+    }
+
+    @Test("A blank row in an earlier week is still refused")
+    func earlierWeeksDoNotReopenABlankRow() throws {
+        let context = try makeContext()
+        let longAgo = Date().addingTimeInterval(-21 * 24 * 60 * 60)
+
+        try TestPreferences.withWeek(restDay: nil) {
+            let store = HabitStore(context: context)
+            let spacer = try store.addSpacer()
+            let refused = try store.toggleCompletion(for: spacer, on: longAgo)
+            #expect(refused == .refused)
+            #expect(try context.fetch(FetchDescriptor<Completion>()).isEmpty)
+        }
+    }
+
+    @Test("The record's start is the earlier of the first habit and the first completion")
+    func earliestRecordedDayReadsBothTables() throws {
+        let context = try makeContext()
+        let store = makeStore(context)
+
+        #expect(store.earliestRecordedDay() == nil)
+
+        let habit = try store.addHabit(
+            name: "Walk", icon: "🚶", frequency: .daily, now: today
+        )
+        #expect(store.earliestRecordedDay() == today)
+
+        // A demo invents completions weeks before the habits that carry them,
+        // so the completion table is not a detail the reach can skip.
+        let invented = TestCalendar.date(2026, 6, 15)
+        context.insert(Completion(day: invented, habit: habit))
+        try context.save()
+        #expect(store.earliestRecordedDay() == invented)
+    }
+
     @Test("Permission to write ahead is not permission to write on the rest day")
     func theRestDayOutranksTheDemo() throws {
         let context = try makeContext()

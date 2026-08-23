@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 import WidgetKit
 
-/// The whole app: every habit's status for the current week, one tap from done.
+/// The whole app: every habit's status for a week, one tap from done.
 ///
 /// Built on `List` rather than a hand-rolled `ScrollView` of rows, so that
 /// reordering, deleting, separators, scroll behaviour and edit mode are the
@@ -14,6 +14,17 @@ struct WeeklyGridView: View {
     private var habits: [Habit]
 
     @State private var today = WeekCalendar.day(Date())
+    /// The first day of the week on screen, which is not always this one
+    /// (#117).
+    ///
+    /// A date rather than an offset from today, so that midnight passing while
+    /// the screen is up moves *this* week and leaves the one being looked at
+    /// where it is. An offset would silently slide the whole view back a week
+    /// at 00:00.
+    @State private var weekStart = WeekCalendar.startOfWeek(containing: Date())
+    /// The earliest day anything is on record for, from `HabitStore`. Held
+    /// rather than recomputed per redraw — see `earliestRecordedDay`.
+    @State private var recordStart: Date?
     /// Whether the invented past is in, mirrored from `DemoHistory` the way
     /// Settings mirrors it. It is what opens the days ahead — see `editing`.
     @State private var isDemoSeeded = false
@@ -36,9 +47,17 @@ struct WeeklyGridView: View {
     private var week: Week {
         // `firstWeekday` is read, not used: reading it here is the whole point.
         _ = firstWeekday
-        return WeekCalendar.week(containing: today)
+        return WeekCalendar.week(containing: weekStart)
     }
     private var store: HabitStore { HabitStore(context: context) }
+
+    /// Which weeks there are to visit. Derived from the record, so a fresh
+    /// install has only this one and both chevrons below are disabled.
+    private var reach: WeekReach {
+        WeekReach.from(recordStart: recordStart, today: today)
+    }
+
+    private var isOnCurrentWeek: Bool { weekStart >= reach.latest }
 
     /// **This screen edits any day of the week it shows** (#116). Every slot is
     /// a plain button — no edit mode, no long press, no confirmation — and the
@@ -51,6 +70,12 @@ struct WeeklyGridView: View {
     /// and the app's one signal is a record of what did; with the demo in, the
     /// whole screen is an invented past already, and painting days ahead is the
     /// same job.
+    ///
+    /// **It does not change with the week on screen** (#117). An earlier week
+    /// is edited exactly as this one is, because the surface is the same
+    /// surface; all seven of its columns happen to be past, so all seven carry
+    /// an action and `allowingFuture` decides nothing. Widening the reach was a
+    /// change to which weeks exist — `WeekReach` — not to what a tap may do.
     private var editing: SlotEditing {
         .week(allowingFuture: isDemoSeeded)
     }
@@ -83,6 +108,9 @@ struct WeeklyGridView: View {
             .navigationTitle(monthTitle)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    weekPager
+                }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if !habits.isEmpty {
                         EditButton()
@@ -143,9 +171,14 @@ struct WeeklyGridView: View {
         // out.
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
             refreshDemoHistory()
+            // The same signal carries the pager's other end: switching the demo
+            // on puts ten weeks of past on record and switching it off takes
+            // them back out, and both move how far back this screen can go.
+            refreshReach()
         }
         .task { seedIfNeeded() }
         .task { refreshDemoHistory() }
+        .task { refreshReach() }
     }
 
     private var grid: some View {
@@ -272,8 +305,52 @@ struct WeeklyGridView: View {
         }
     }
 
+    /// Two chevrons: back through the weeks the record reaches, forward to this
+    /// one and no further.
+    ///
+    /// **Buttons rather than a swipe**, which is a departure from how #117 is
+    /// written and the reason is in the rows: every one of them already carries
+    /// `swipeActions` for edit and delete, so a horizontal drag starting on a
+    /// row is spoken for. A pager sharing that gesture works on the header and
+    /// the empty space below the last habit and nowhere in between, which is
+    /// worse than a control that is always in the same place. See
+    /// docs/decisions.md.
+    ///
+    /// Leading, opposite Edit and Add, so nothing here sits over the marks —
+    /// the grid keeps the whole width it had. What says *which* week you have
+    /// reached is the title and the dates already under the weekday letters,
+    /// not a third label.
+    ///
+    /// **Always drawn, disabled at its ends — never conditionally absent.**
+    /// This first hid itself when there was no earlier week to reach, and the
+    /// control then never appeared at all: the reach is read from the store in
+    /// a `.task`, so the *first* render of a launch always has none, the
+    /// `ToolbarItem` resolved to nothing, and it was not re-added when the
+    /// value arrived a moment later. Measured on the simulator — the pager
+    /// showed on one launch and was missing on the next with identical data.
+    /// A toolbar item that is sometimes empty is a toolbar item that is
+    /// sometimes gone.
+    private var weekPager: some View {
+        HStack(spacing: 8) {
+            Button {
+                step(-1)
+            } label: {
+                Label("Previous Week", systemImage: "chevron.left")
+            }
+            .disabled(weekStart <= reach.earliest)
+
+            Button {
+                step(1)
+            } label: {
+                Label("Next Week", systemImage: "chevron.right")
+            }
+            .disabled(isOnCurrentWeek)
+        }
+        .labelStyle(.iconOnly)
+    }
+
     private var monthTitle: String {
-        today.formatted(.dateTime.month(.wide).locale(WeekCalendar.calendar.locale ?? .current))
+        WeekCalendar.monthTitle(for: week, today: today)
     }
 
     /// First launch starts with habits rather than an empty state. Nothing is
@@ -292,7 +369,12 @@ struct WeeklyGridView: View {
             let added = try HabitSeeder(context: context).seedIfNeeded()
             // Seeding writes through its own path rather than `HabitStore`,
             // so it says so itself. See `WidgetRefresh`.
-            if added > 0 { WidgetRefresh.invalidate() }
+            if added > 0 {
+                WidgetRefresh.invalidate()
+                // The record starts where the first habit does, so a store that
+                // was empty a moment ago now has one.
+                refreshReach()
+            }
         } catch {
             HabitStore.report(error, operation: "seedDefaults")
         }
@@ -312,6 +394,33 @@ struct WeeklyGridView: View {
     private func refreshToday() {
         let current = WeekCalendar.day(Date())
         if current != today { today = current }
+        refreshReach()
+    }
+
+    /// Re-reads how far back the record goes, and pulls the week on screen back
+    /// inside it.
+    ///
+    /// Both ends move: the newest week moves at midnight, and the oldest moves
+    /// when the record does — a demo switched on ten weeks of past, a demo
+    /// switched off takes them away again. Clamping here is what stops the view
+    /// standing on a week that has stopped existing.
+    ///
+    /// Not called from `toggle`: logging a day cannot open a week the pager did
+    /// not already reach, and un-logging the earliest completion on record
+    /// while you are standing on its week would otherwise yank the screen out
+    /// from under the tap that did it.
+    private func refreshReach() {
+        let start = store.earliestRecordedDay()
+        if start != recordStart { recordStart = start }
+        let clamped = WeekReach.from(recordStart: start, today: today).clamped(weekStart)
+        if clamped != weekStart { weekStart = clamped }
+    }
+
+    /// Moves the week on screen, clamped into the reach.
+    private func step(_ weeks: Int) {
+        let next = reach.step(weekStart, by: weeks)
+        guard next != weekStart else { return }
+        weekStart = next
     }
 
     /// Re-reads whether the invented past is in. Compared before assigning, so
