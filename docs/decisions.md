@@ -2447,3 +2447,134 @@ into `WeekDots`: the scan failed, and named the file.
   passed 478/478. That is one data point against a correlation, and the load was
   CPU-only where the original was concurrent *builds*, which also bring memory
   and I/O pressure this probe did not. #175 stays open.
+
+## The unlit grey moves to #242424
+
+**2026-08-23.** #194 moves `GlowPalette.greyOpaque` — the app's one "not lit"
+colour since #111 — from `#171717` (23,23,23) to `#242424` (36,36,36). It is one
+declaration, and every unlit mark in the app moves with it: the resting habit
+name, the weekday letter that is not today, the ✕ on a day that went unlogged,
+the rest day's cut, the socket on a day still to come, the year's empty day.
+That every one of them moved from one edit is the design of #111 working, not a
+side effect of it.
+
+**Why.** 23 was too dark in use. #111 picked it because it was the value the old
+ramp's darkest step already composited to, which is what made collapsing four
+greys into one a change that invented nothing — a good argument for the collapse,
+and, it turns out, not an argument for that particular value.
+
+**"Not a new colour" stops being true here, which is the part worth recording.**
+`0.553 × 0.16 × 255 = 22.6 → 23 = 0x17` was a real derivation and is now history.
+36 is derived from nothing: it is a judgement about what reads on a black screen.
+The #111 entry above is left exactly as written — it records what was decided
+then, and editing it to say `#242424` would misreport it.
+
+**What it measures.** About **1.35:1** against black by WCAG relative contrast,
+up from about **1.17:1**. Body text asks 4.5:1, so this is still nowhere near
+legible and is not trying to be — legibility is `greyIncreasedContrast`'s job
+(`#8D8D8D`, 6.3:1), untouched by this. No target ratio was set in advance: the
+ratio is the consequence of a value chosen by eye, and it is written down so the
+next person to move it has something to move *from*.
+
+**Sampled on screen, before and after, same build path.** iPhone 17 Pro
+simulator, iOS 26.5, `xcrun simctl io … screenshot` — a true 3x, which divides
+cleanly, rather than the MCP screenshot, which does not.
+
+| sampled | before | after |
+| --- | --- | --- |
+| weekday letters that are not today | 23,23,23 (1396 px) | 36,36,36 (1388 px) |
+| the ✕ row on the first habit | 23,23,23 (500 px) | 36,36,36 (500 px) |
+| the ✕ row on the last habit | 23,23,23 (497 px) | 36,36,36 (497 px) |
+| the year's empty day | — | 36,36,36 |
+| Settings toggle ON track | 181,181,183 | 181,181,183 |
+| Settings toggle OFF track | 90,90,94 | 90,90,94 |
+
+The mark counts are the evidence that this is the same picture at a different
+level rather than a different picture: the same populations, shifted by 13.
+
+The two toggle rows are the check #124 asked for by name. `controlTint` is
+declared independently and this move must not reach it; it does not. Both
+sampled regions come back pixel-for-pixel identical, ON still twice OFF, and 36
+is still less than half of 90 — the inversion #124 warned about is not close.
+The switches will not flip under an automated tap, so the ON track was reached
+by writing `weekRestDay` into the App Group plist and relaunching.
+
+`greyAccented` is declared independently too — `white.opacity(0.553)` — and is
+not affected. Not re-measured: #111's Home Screen figures (Default 255/23,
+Tinted 255/149, Clear 255/162) were taken on a device, none of the accented ones
+depend on `greyOpaque`, and the simulator cannot settle it. What changes in that
+table is the Default column, which is now 255/36.
+
+Nothing on the simulator reads as lit at the new value, which was the risk worth
+naming: white marks stay 255 with a halo, and 36 against 0 is plainly a dark
+mark. The glow itself is unverifiable here as always — no EDR headroom.
+
+### The render baseline moved, and the gate did not ask
+
+`RenderTests/Baselines/render-signatures.json` is 16 × 16 mean-brightness cells
+per family, and its `cellTolerance` is 3. The move landed at **worst +3** — the
+tolerance is `> 3`, so all six frames passed and `Tools/test.sh` never printed
+its approve command. Cell by cell, against the previous baseline:
+
+| frame | cells moved | worst | exactly-black |
+| --- | --- | --- | --- |
+| week small | 44/256 | +3 | 70.3% → 70.2% |
+| week medium | 19/256 | +3 | 73.7% → 73.6% |
+| week large | 57/256 | +2 | 84.2% → 84.1% |
+| month small | 41/256 | +3 | 90.2% → 90.2% |
+| today small | 0/256 | 0 | 0.7% |
+| today medium | 0/256 | 0 | 53.9% |
+
+Every moved cell moved **up**, none down, and the two Today frames are bit
+identical — the Today ring has drawn no grey since #75, so there was nothing in
+them for this to move. The black share falls by a tenth of a point on three
+frames because an antialiased edge that rounded to 0 against a 23 mark rounds to
+1 against a 36 one.
+
+**It was approved anyway.** A baseline that still describes the old grey would
+hand the next unrelated change a budget this change has already spent, and the
+run after that would fire and name the wrong commit. Approving is the deliberate
+act the file is for; the re-run reproduces it with 0/256 cells moving on every
+frame.
+
+Worth saying plainly, since it is the second time a gate here has passed on
+something real: a palette move of 13 levels is within one level of invisible to
+this baseline. The tolerance is right for what it defends — a mark that moves a
+column moves cells by tens — and it is not a colour gate. `TwoColoursTests` is.
+
+### The tests, which had to be rewritten rather than patched
+
+`Tests/WidgetBackgroundTests.swift`'s `TwoColoursTests` was written to lock in
+`#171717` *and its provenance*, so updating the literals would have left the
+suite asserting a claim the code no longer makes.
+
+- **`greyIsTheOldSocket` is deleted.** It asserted `0.553 × 0.16 × 255 == 23` and
+  that the palette matched it. Its whole premise was that the grey is not a new
+  colour; it is now. There is no derivation for `#242424` to put in its place,
+  and one that reconstructed 36 from 36 would be a test that cannot fail.
+- **`theUnlitGreyClearsTheGround` replaces it**, asserting the claim that
+  survives the move: the grey stays above 15, which is `WidgetRenderDiffTests`'
+  `lineFloor` — the floor every unlit-line scan in the render bundle uses to
+  separate a span or a cut from black. That bundle cannot import this one, so
+  the coupling is asserted from this side.
+- **`increasedContrastIsTheOldGrey` was firing correctly** on exactly this
+  change: its `contrastOnBlack(23/255) < 1.2` was chosen to defend 23. The
+  replacement reads the ratio off `GlowPalette.greyOpaque` rather than off a
+  literal — so it cannot pass while the palette moves — and the ceiling is
+  **1.5:1**, which is 44/255, `#2C2C2C`. That leaves room to nudge the grey by
+  eye the way this change did, and fails on a change that starts walking it
+  toward legible body text. Legibility is the Increase Contrast path's job.
+- `greyIsOpaqueSeventeen` → `greyIsOpaqueTwentyFour`, and
+  `defaultEnvironmentResolvesToTheOpaqueGrey` now expects 36. Both are the same
+  test at the new value.
+
+One test out, one in: 478 before, 478 after, no floor in
+`Tools/test-inventory.json` touched.
+
+`RenderTests/WidgetRenderDiffTests.swift` needed one number that #194 did not
+name. `renderIsReal` demands evidence that something unlit was drawn by counting
+pixels inside a narrow band around the one grey — 20...26 for `#171717`. At 36
+that band is empty, and the test would have failed with "nothing unlit in the
+render" on a render that was fine. It is 33...39 now. The band is a literal
+rather than a value read from `GlowPalette`, deliberately: a band computed from
+the number it is checking agrees with every number.
