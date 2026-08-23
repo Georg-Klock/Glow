@@ -3638,3 +3638,89 @@ reads as findable at all on a phone, is the question #197 asks and it is still
 open — its subject is now `#2B2B2B` rather than `#242424`, which is noted on the
 issue. This entry records geometry, level and gate behaviour, all of which the
 simulator settles; it does not record what the change was made for.
+
+## An enabled chevron that does nothing is two week starts an hour apart (#242)
+
+The back chevron was reported lit and completely inert — not the habit rows, not
+even the title, which is the part that narrows it: `weekStart` itself never
+moves. #242 read the path end to end, found nothing wrong with it, and concluded
+that the next step was a device and two log lines, because the chevron's
+*enabled* state needs multi-week history and that could not be built in the
+simulator.
+
+**It did not need a device.** The chevron's enabled state and its action are two
+reads of one `WeekReach` — enabled when `weekStart > reach.earliest`, and the
+action is `reach.step(weekStart, by: -1)` — so "enabled and inert" is a rule
+over `Glow/Logic/` with no view and no store in it:
+
+> if `weekStart > reach.earliest`, then `startOfWeek(reach.step(weekStart, by:
+> -1))` is not `startOfWeek(weekStart)`.
+
+Stated on the *week* rather than on the `Date`, because `show(week:)` skips only
+when the new value equals the old one: a step that moved `weekStart` by an hour
+would still assign, and nothing on screen would move, because the title and the
+grid are both drawn from the week and not from the instant. A step that changes
+the date but not the week is a dead button with extra steps.
+
+**The rule is false, and where it is false is `WeekCalendar.startOfWeek`.** Swept
+over nine time zones, three week starts, a year of days, three times of day and
+two record lengths — 777,141 enabled-chevron checks — it fails in exactly one
+class of zone: the ones that move their clocks *at* midnight rather than at two
+or three in the morning. Havana, Chile, Brazil until 2019. `DayIdentityTests`
+already carried one of those for R4; this is the same fact arriving at a
+different surface.
+
+`startOfWeek` normalized its argument to midnight and then subtracted days to
+reach the week's first one. Day arithmetic keeps the wall-clock time, and a wall
+clock reading midnight is not always the start of its day:
+
+- **2025-03-09, Havana.** The clock goes from 23:59:59 to 01:00, so that Sunday
+  has no 00:00 at all and `startOfDay` answers 01:00. Six days back from it
+  carried the 01:00 along, so the week's Monday came out at 01:00 — while the
+  same Monday reached from any other day of that week came out at 00:00.
+- **2026-11-01, Havana.** The clock goes back from 01:00 to 00:00, so that
+  Sunday has two midnights. `startOfDay` answers with the first; day arithmetic
+  landed on the second.
+
+Either way the function answered with two instants an hour apart for the same
+week, depending on which day of it was asked about — and the pager compares one
+against the other. `reach.earliest` comes from the record, `weekStart` from
+today, `weekStart > reach.earliest` was true by that one hour, the chevron drew
+enabled, and stepping back clamped to `earliest`: a different `Date`, the same
+week, nothing on screen. Exactly the report.
+
+**The fix is one `startOfDay` after the arithmetic rather than only before it**,
+in `startOfWeek` and in the seven days `week(containing:)` hands out. `Week`
+documents those as midnights and they were not: a two-year sweep over eleven
+zones found 228 columns that were not their own day's midnight, and 168 of them
+survive fixing `startOfWeek` alone, because the week start's wall clock is
+carried into the six days after it.
+
+**`WeekReach.from`'s cap is normalized in the same change, and it is not the
+bug.** The cap is twelve weeks of *days* back from a week start, which is the
+same weekday but not reliably the same instant, and an `earliest` that is not a
+week start is compared against week starts by `contains`, `clamped` and the
+pager's own `.disabled` — 1,336 such floors in the sweep. Measured both ways:
+with only the cap normalized the sweep still fails 14 times, and with only
+`startOfWeek` fixed it fails none. Both ship because both are wrong; only one of
+them was #242.
+
+**What the issue ruled out, it ruled out correctly**, and its last hypothesis is
+unspent rather than disproven. Nothing here says a `ToolbarItem` cannot go stale
+— only that a `WeekReach` this app can hold answers the chevron's two questions
+differently without any help from SwiftUI. A report of this from a zone that
+does not change its clocks at midnight would still be unexplained.
+
+**The `?? weekStart` and `?? latest` fallbacks are not reachable**, which is
+worth stating because a nil there would make `step` a genuine no-op with the
+button enabled. `Calendar.date(byAdding: .day, ...)` on a Gregorian calendar
+returned nil in none of 280 probes at `.distantPast`, `.distantFuture` and ±10¹²
+seconds from the reference date, across five zones and all seven week starts,
+and in none of the 14.5 million steps of the exploratory sweep. They are
+defensive, and the dead chevron was never coming from them.
+
+**The invariant is now a test rather than a finding.** `WeekReachTests` sweeps
+it per zone and asserts the sweep swept something — a zone that quietly produced
+no enabled chevron would otherwise pass by asking nothing — and keeps both
+Havana dates as named cases, because a range that happens to contain a date is
+weaker evidence than the date.

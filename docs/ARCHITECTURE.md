@@ -20,7 +20,10 @@ at it. Tests reach it directly.
 Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
 
 - `WeekCalendar` answers every date question. One definition of "what day is
-  it" rather than five.
+  it" rather than five — and one *instant* per week, whichever of that week's
+  days asks. Day arithmetic keeps the wall clock, and where the clocks move at
+  midnight a wall clock reading 00:00 is not the start of its day, so both
+  `startOfWeek` and `week(containing:)` normalize again afterwards (#242).
 - `WeekGrid.slots(for:in:today:)` turns a habit plus a week into the row of
   slots to draw. This is the entire interaction model of the app, and it is one
   function.

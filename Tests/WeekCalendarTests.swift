@@ -68,6 +68,83 @@ struct WeekCalendarTests {
         }
     }
 
+    /// The zone the DST tests above cannot reach: one that moves its clocks at
+    /// midnight rather than at two or three in the morning (#242).
+    ///
+    /// Berlin's spring forward happens at 02:00, so every day of that week
+    /// still has a 00:00 and day arithmetic between midnights is unambiguous.
+    /// Havana's happens *at* midnight: 2025-03-09 has no 00:00 at all and
+    /// 2026-11-01 has two. Both of those are inside a week this app draws.
+    private static func havana(firstWeekday: Int) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Havana") ?? .gmt
+        calendar.firstWeekday = firstWeekday
+        return calendar
+    }
+
+    private static func date(_ year: Int, _ month: Int, _ day: Int, in calendar: Calendar) -> Date {
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        return calendar.startOfDay(for: calendar.date(from: components) ?? .distantPast)
+    }
+
+    @Test("A week start is one instant, whichever of the week's days names it")
+    func weekStartIsAFunctionOfTheWeek() {
+        // Sunday 2025-03-09 begins at 01:00 in Havana — the clock goes from
+        // 23:59:59 to 01:00 — and subtracting six days from that used to carry
+        // the 01:00 along, so the Monday reached from Sunday and the Monday
+        // reached from any other day were an hour apart.
+        let calendar = Self.havana(firstWeekday: 2)
+        let monday = Self.date(2025, 3, 3, in: calendar)
+        #expect(calendar.component(.hour, from: Self.date(2025, 3, 9, in: calendar)) == 1)
+
+        for offset in 0..<7 {
+            let day = calendar.date(byAdding: .day, value: offset, to: monday) ?? monday
+            let start = WeekCalendar.startOfWeek(containing: day, calendar: calendar)
+            #expect(start == monday, "day \(offset) named a different start")
+            // And it is the midnight that owns it, not an hour past one.
+            #expect(calendar.startOfDay(for: start) == start)
+        }
+    }
+
+    @Test("A day with two midnights opens its week at the first of them")
+    func weekStartWhereMidnightHappensTwice() {
+        // Havana puts the clock back from 01:00 to 00:00 on 2026-11-01, so that
+        // Sunday has two 00:00s an hour apart. `startOfDay` answers with the
+        // first; day arithmetic used to land on the second, and the two are
+        // compared against each other by the pager.
+        let calendar = Self.havana(firstWeekday: 1)
+        let sunday = Self.date(2026, 11, 1, in: calendar)
+
+        for offset in 0..<7 {
+            let day = calendar.date(byAdding: .day, value: offset, to: sunday) ?? sunday
+            #expect(WeekCalendar.startOfWeek(containing: day, calendar: calendar) == sunday)
+        }
+    }
+
+    @Test("Seven midnights, in a zone that changes its clocks at midnight")
+    func weekDaysWhereTheDayItselfMoves() {
+        // The Berlin test above asserts the same thing where the transition is
+        // at 02:00. Here the transition *is* the day boundary, so the week
+        // start's own wall clock reads 01:00 and day arithmetic carried that
+        // hour into all six days after it.
+        for firstWeekday in [1, 2] {
+            let calendar = Self.havana(firstWeekday: firstWeekday)
+            for (year, month, day) in [(2025, 3, 9), (2026, 11, 1)] {
+                let week = WeekCalendar.week(
+                    containing: Self.date(year, month, day, in: calendar), calendar: calendar
+                )
+                #expect(week.days.count == 7)
+                #expect(Set(week.days).count == 7)
+                for column in week.days {
+                    #expect(calendar.startOfDay(for: column) == column)
+                }
+            }
+        }
+    }
+
     @Test("Weekday initials are ordered Monday first")
     func weekdayInitialsOrder() {
         let initials = WeekCalendar.weekdayInitials(calendar: calendar)

@@ -56,11 +56,24 @@ enum WeekCalendar {
         calendar.startOfDay(for: date)
     }
 
+    /// The midnight that opens the week `date` falls in.
+    ///
+    /// **Normalized after the day arithmetic, not only before it** (#242). Day
+    /// arithmetic keeps the wall-clock time, and a wall clock that reads
+    /// midnight is not always the start of its day: where the DST transition
+    /// happens *at* midnight rather than at two or three in the morning — Cuba,
+    /// Chile, Brazil until 2019 — a day either has no 00:00 at all or has two
+    /// of them, and `date(byAdding:)` resolves that differently from
+    /// `startOfDay`. Without the second `startOfDay` this function answered
+    /// with two instants an hour apart for the same week, depending on which
+    /// day of it was asked about, and every surface here compares weeks by
+    /// equality. See `WeekReachTests.theBackChevronAlwaysMoves`.
     static func startOfWeek(containing date: Date, calendar: Calendar = WeekCalendar.calendar) -> Date {
         let start = calendar.startOfDay(for: date)
         let weekday = calendar.component(.weekday, from: start)
         let offset = (weekday - calendar.firstWeekday + 7) % 7
-        return calendar.date(byAdding: .day, value: -offset, to: start) ?? start
+        guard let moved = calendar.date(byAdding: .day, value: -offset, to: start) else { return start }
+        return calendar.startOfDay(for: moved)
     }
 
     static func week(containing date: Date, calendar: Calendar = WeekCalendar.calendar) -> Week {
@@ -68,8 +81,14 @@ enum WeekCalendar {
         // Day arithmetic rather than adding 86400 seconds: a DST transition
         // makes one day of the year 23 or 25 hours long, and seconds-based
         // maths lands that week's columns on 23:00 the previous day.
+        //
+        // Then `startOfDay` over the result, for the reason `startOfWeek`
+        // gives: day arithmetic carries the week start's wall clock along, and
+        // in a zone that changes its clocks at midnight that wall clock is an
+        // hour off this day's own midnight. `Week` promises seven midnights.
         let days = (0..<7).map { offset in
-            calendar.date(byAdding: .day, value: offset, to: start) ?? start
+            guard let day = calendar.date(byAdding: .day, value: offset, to: start) else { return start }
+            return calendar.startOfDay(for: day)
         }
         return Week(days: days)
     }
