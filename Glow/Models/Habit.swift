@@ -115,9 +115,15 @@ final class Habit {
     /// dictionary, which is deliberate on two counts: the identity stays
     /// zone-free right up to the moment something has to draw it, and the
     /// expensive half — a fetch and a reduce over every row a habit has — is one
-    /// value that depends on nothing but the store. That is the seam a cache
-    /// belongs behind (#135); a projection keyed by a calendar is not, because
-    /// the calendar can change under it.
+    /// value that depends on nothing but the store, where a projection keyed by
+    /// a calendar is not, because the calendar can change under it.
+    ///
+    /// This said the identity half was the seam a cache belongs behind. **It is
+    /// not cached** (#135): two processes write this store and only one of them
+    /// says so, so nothing here can know when to let go. What the expensive half
+    /// got instead is a bound — see `Habit.dayCounts(of:within:in:)`, which is
+    /// what a surface drawing a week or a month or a year calls, and which reads
+    /// those days rather than all of them.
     ///
     /// A weekly-cadence habit only ever reaches one per day. A per-day habit is
     /// the reason this is a count and not a set — and the reason a repetition is
