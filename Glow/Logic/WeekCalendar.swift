@@ -151,28 +151,50 @@ enum WeekCalendar {
             + end(week.days[6], year: endYear != thisYear)
     }
 
-    /// How far back the week on screen is, as a phrase — or nothing at all on
-    /// the newest week there is.
+    /// How many whole weeks back from `latest` the week starting at
+    /// `weekStart` is. Zero on the newest week there is, and never negative:
+    /// forward of it there is nothing to count.
     ///
-    /// The range title says *which* week; this says *how far*, which is the
-    /// half a date range cannot carry on its own. Nil rather than an empty
-    /// string, so the caller draws nothing rather than an empty line: on the
-    /// current week the title stands alone.
+    /// The number, not a phrase. #207's title ladder — *This Week*, *Last
+    /// Week*, *Two Weeks Ago*, then a date range — is a switch over this, and
+    /// so is `weeksBackTitle` below; both had been counting it themselves.
     ///
-    /// Counted in whole days and divided, rather than in `weekOfYear`, for the
-    /// reason `WeekReach.step` gives: `weekOfYear` restarts at a year end, and
-    /// twelve weeks back from mid-January crosses one.
-    static func weeksBackTitle(
-        for weekStart: Date,
+    /// **Counted in whole days and divided, rather than in `weekOfYear`.**
+    /// #207 proposed `dateComponents([.weekOfYear], ...)` on the grounds that a
+    /// *read* between two normalized midnights carries none of the DST hazard
+    /// that `WeekReach.step` avoids by adding days. The hazard it does carry is
+    /// a different one and is already covered by a test: `weekOfYear` restarts
+    /// at 1 January, so twelve weeks back from mid-January reads as −39. See
+    /// `WeekCalendarTests.theCountReachesTheFloor`.
+    static func weeksBack(
+        from weekStart: Date,
         latest: Date,
         calendar: Calendar = WeekCalendar.calendar
-    ) -> String? {
+    ) -> Int {
         let days = calendar.dateComponents(
             [.day],
             from: day(weekStart, calendar: calendar),
             to: day(latest, calendar: calendar)
         ).day ?? 0
-        let weeks = days / 7
+        return max(0, days / 7)
+    }
+
+    /// How far back the week on screen is, as a phrase — or nothing at all on
+    /// the newest week there is.
+    ///
+    /// The range title says *which* week; this says *how far*, which is the
+    /// half a date range cannot carry on its own. Nil rather than an empty
+    /// string, so the caller draws nothing rather than an empty line.
+    ///
+    /// Only reached from the fourth week back (#207): nearer than that the
+    /// title itself is the relative phrase, and a subtitle repeating it would
+    /// say the same thing twice.
+    static func weeksBackTitle(
+        for weekStart: Date,
+        latest: Date,
+        calendar: Calendar = WeekCalendar.calendar
+    ) -> String? {
+        let weeks = weeksBack(from: weekStart, latest: latest, calendar: calendar)
         guard weeks > 0 else { return nil }
         return weeks == 1 ? "1 week ago" : "\(weeks) weeks ago"
     }

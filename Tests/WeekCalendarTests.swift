@@ -153,6 +153,53 @@ struct WeekCalendarTests {
         #expect(!title(august, today: august).contains("2026"))
     }
 
+    // MARK: - How far back, as a number (#207)
+
+    // What the title ladder switches on. The ladder itself — This Week, Last
+    // Week, Two Weeks Ago, then the range — is UI text composed in
+    // `WeeklyGridView` from this number, and it is checked by looking at the
+    // screen at each step; the arithmetic under it is checked here.
+
+    private func count(_ weekOf: Date, latest: Date) -> Int {
+        WeekCalendar.weeksBack(
+            from: WeekCalendar.startOfWeek(containing: weekOf, calendar: calendar),
+            latest: WeekCalendar.startOfWeek(containing: latest, calendar: calendar),
+            calendar: calendar
+        )
+    }
+
+    @Test("The rungs of the title ladder are the first three counts")
+    func theLadderCountsWeeks() {
+        let today = TestCalendar.date(2026, 8, 19)
+        #expect(count(today, latest: today) == 0)
+        // Any day of the same week is the same week, so the whole of it is
+        // "This Week" and not the last day of it "Last Week".
+        #expect(count(TestCalendar.date(2026, 8, 23), latest: today) == 0)
+        #expect(count(TestCalendar.date(2026, 8, 12), latest: today) == 1)
+        #expect(count(TestCalendar.date(2026, 8, 5), latest: today) == 2)
+        // The first rung the ladder hands to the date range.
+        #expect(count(TestCalendar.date(2026, 7, 29), latest: today) == 3)
+    }
+
+    @Test("A week that is not behind the newest one counts as zero, not as a negative")
+    func nothingCountsForward() {
+        let today = TestCalendar.date(2026, 8, 19)
+        // The reach never puts a later week on screen, so this is a guard on
+        // the arithmetic rather than a state the pager reaches: "This Week" is
+        // the right title for it either way, and "−1 weeks ago" is not a
+        // string this app should be able to produce.
+        #expect(count(TestCalendar.date(2026, 8, 26), latest: today) == 0)
+    }
+
+    @Test("The count is whole weeks, not days divided by seven at a year end")
+    func theCountSurvivesAYearEndAsANumber() {
+        // `dateComponents([.weekOfYear], ...)` reads −39 across this boundary,
+        // which is why the read counts days. The phrase test below covers the
+        // same span; this one pins the number the ladder switches on.
+        let january = TestCalendar.date(2026, 1, 14)
+        #expect(count(TestCalendar.date(2025, 12, 31), latest: january) == 2)
+    }
+
     // MARK: - How far back (#190)
 
     private func weeksBack(_ weekOf: Date, latest: Date) -> String? {

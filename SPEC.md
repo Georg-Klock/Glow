@@ -446,7 +446,10 @@ arrives with #19.
 
 **Both screens create and edit their own habits, through one editor.** Today
 and This Week carry the same trailing pair — Edit, then add — so the two tabs
-wear one piece of chrome rather than two that resemble each other. Adding from
+wear one piece of chrome rather than two that resemble each other. On This Week
+the pair belongs to the current week only (#207): paged back, the trailing slot
+holds **Today** instead, because reordering, deleting and adding are properties
+of the list and mean nothing more three weeks ago than they mean now. Adding from
 a screen opens the editor on that screen's kind, so what you make appears
 where you made it: Today opens on **Daily**, This Week on **Weekly**. Today's
 add is a plain button rather than This Week's menu, because a blank row holds
@@ -485,13 +488,14 @@ job — light says what happened, and shape says what is still open. The cost is
 accepted: a stray tap changes a day, and nothing distinguishes a correction from
 an original. That is what editing the past means.
 
-**The week view pages back through earlier weeks** (#117, #190). A horizontal
-swipe on the weekday header, and nowhere else: the rows keep their own swipe
-actions for edit and delete, so a drag that starts on a row is still theirs. The
-swipe is discrete — past the threshold it jumps a week, rather than dragging the
-grid along with the finger. Left goes forward, right goes back, which is the
-direction Calendar.app pages in. Off the current week, a **This Week** pill
-appears between the header and the first row and returns in one step. An earlier week is edited
+**The week view pages back through earlier weeks** (#117, #190, #207). Two
+toolbar buttons, and **the pair is asymmetric**: on the current week only `<`,
+disabled when there is no record to page into; off it, `<` and `>` together. A
+forward chevron on the newest week there is would be a control that can never do
+anything. Off the current week the trailing slot holds **Today**, which jumps
+straight home rather than stepping — a way out of a place you paged into is not
+eleven taps. There is no gesture: #190's header swipe is out (#207), and the
+rows keep their own swipe actions for edit and delete. An earlier week is edited
 exactly as this one is: the surface has not changed, and all seven of its
 columns are past, so all seven are tap targets. Nothing is open in it, because
 nothing is open anywhere but today (R1).
@@ -507,12 +511,20 @@ written before the column existed. Forward stops at the current week; further
 back than a quarter, the surface is History, which is a year of days and does
 not respond to touch on purpose.
 
-**The title names the week you are looking at, as the days it covers** (#190).
-"17 – 23 Aug" on a week inside one month, "31 Aug – 6 Sep" across a month end.
-The year appears only when it is not today's, and a year both ends share is said
-once: "29 Dec 2025 – 4 Jan", "20 Oct – 26 Oct 2025". Under it, on any week but
-this one, how far back it is — "3 weeks ago". The dates under the weekday
-letters say the rest, and on a week with no today in it no column is lit.
+**The title names the week you are looking at: how long ago, then which days**
+(#190, #207). "This Week", "Last Week", "Two Weeks Ago" — and past the third
+rung a relative phrase stops being an answer, so the title becomes the days the
+week covers. "17 – 23 Aug" inside one month, "31 Aug – 6 Sep" across a month
+end; the year appears only when it is not today's, and a year both ends share is
+said once: "29 Dec 2025 – 4 Jan", "20 Oct – 26 Oct 2025". Under the title, the
+half it leaves out — the dates while the title is a phrase, "5 weeks ago" once
+the title is the dates. On the current week the title stands alone. The dates
+under the weekday letters say the rest, and on a week with no today in it no
+column is lit.
+
+**Edit mode ends when you leave this week** (#207). Its button is on the current
+week only, so paging back while editing would leave the list fanned open with no
+Done on screen. The mode goes with the week rather than the exit going missing.
 
 A span row resolves the tap to **the column under the finger** rather than to
 the span's nominal day, so a habit due N times a week records the weekday it
