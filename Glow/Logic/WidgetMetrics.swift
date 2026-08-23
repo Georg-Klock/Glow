@@ -1,4 +1,5 @@
 import CoreGraphics
+import WidgetKit
 
 /// The large widget's layout, in the design file's own numbers.
 ///
@@ -19,6 +20,34 @@ enum WidgetMetrics {
     /// authored at exactly this, at 1x.
     static let largeWidth: CGFloat = 338
     static let largeHeight: CGFloat = 354
+
+    /// A small widget's own size, on the same phone. Square, and the width the
+    /// medium and large families share is two of these plus the gap between
+    /// them.
+    static let smallSide: CGFloat = 158
+
+    /// What the system gives each family on a 6.1" iPhone.
+    ///
+    /// One list, three readers: the render harness renders every family at its
+    /// own size, the Widgets tab previews the real views at theirs (#210), and
+    /// `largeRowCapacity` above is the same numbers by another name. A preview
+    /// at a size no phone gives is a preview of a layout nobody sees — the slot
+    /// size falls out of the track width, so a widget drawn 20pt narrow is not
+    /// the same widget slightly smaller.
+    ///
+    /// Sizes do vary by device; this is the phone the design is authored
+    /// against, and the previews scale from here rather than measuring the
+    /// screen they are on.
+    static func size(of family: WidgetFamily) -> CGSize {
+        switch family {
+        case .systemMedium: CGSize(width: largeWidth, height: smallSide)
+        case .systemLarge: CGSize(width: largeWidth, height: largeHeight)
+        // Small, and anything this app does not ship — a square is the least
+        // wrong answer, and `WidgetKind.families` is what keeps the question
+        // from being asked.
+        default: CGSize(width: smallSide, height: smallSide)
+        }
+    }
 
     /// How many rows a large widget shows.
     ///

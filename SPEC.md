@@ -540,7 +540,8 @@ given room, which stays a matter of looking at it.
 ## 9. The widgets
 
 Two widgets, reading the same store through an App Group. They were three
-until #209.
+until #209. Four placeable configurations, since the week's three families are
+added independently — which is the unit the Widgets tab counts in.
 
 **The week widget**: three families. Today's slot is a button backed by an
 `AppIntent`, so a habit can be logged from the home screen without launching
@@ -571,6 +572,24 @@ until decided otherwise (#41): an N×/week habit's empty days are sockets,
 never crosses — the week grid's own rule, not a per-week verdict — and rest
 days get no month-specific treatment beyond what `WeekGrid` already says
 about them.
+
+**The Widgets tab is where they are found from inside the app** (#210). It
+shows every widget this app ships — the week at all three families, the month
+at its one — drawn by `WeekWidgetView` and `MonthWidgetView` themselves rather
+than illustrated, at the point size each family really gets, over the user's
+own habits. Each one says whether it is already on the Home Screen, and
+**"added" means that family**: the week's small, medium and large are three
+independently placeable widgets, and having one says nothing about the other
+two. `WidgetCenter` is asked fresh whenever the app becomes active, because
+placing a widget happens while the app is not frontmost.
+
+**Nothing on that page places a widget, because no API can.** No public call
+opens the widget gallery or adds anything to a Home Screen; `WidgetCenter`
+invalidates, reloads and reports, and `promptsForUserConfiguration()` — the one
+capability that reads like it might be it — is a modifier on a widget's own
+configuration that asks for its *settings* after somebody has already added it
+by hand. So the page states the long-press once, above the previews, and the
+person performs it.
 
 **The widget chooses the screen.** A widget's surface divides in two: the
 marks act in place through their intents and open nothing, and everything

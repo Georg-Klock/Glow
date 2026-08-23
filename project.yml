@@ -21,6 +21,15 @@ targets:
     platform: iOS
     sources:
       - path: Glow
+      # The widgets' own views, compiled into the app as well as into the
+      # extension, because the Widgets tab previews the real thing rather than
+      # a drawing of it (#210). The views only — never `GlowWidget.swift`,
+      # which carries the `@main` bundle, and not the providers, which are the
+      # extension's half. This is the same sharing `GlowRenderTests` does, and
+      # the reason `WeekEntry` and `MonthEntry` sit beside their views.
+      - path: GlowWidget/WeekWidgetView.swift
+      - path: GlowWidget/MonthWidgetView.swift
+      - path: GlowWidget/WeekEntry.swift
       # Explicit, and as a resource, because it has to land at the bundle root
       # of the shipped .app. See #132.
       - path: Glow/Resources/PrivacyInfo.xcprivacy
@@ -184,15 +193,18 @@ targets:
   # export (#6). Its own target rather than more of GlowTests, because
   # GlowTests reaches the *app* module and the widget's view is not in it —
   # so this target compiles the widget's own sources, the same sharing the
-  # widget target itself uses. GlowWidget.swift is excluded for its @main;
-  # WeekEntry lives in its own file for exactly this reason.
+  # widget target itself uses. The files carrying a widget's `@main` bundle or
+  # its provider are excluded, which is why each view sits in a file with its
+  # entry and nothing else: GlowWidget.swift keeps `@main`, MonthWidget.swift
+  # keeps the configuration and the provider, and `WeekEntry` and `MonthEntry`
+  # travel with the views that draw them.
   GlowRenderTests:
     type: bundle.unit-test
     platform: iOS
     sources:
       - path: RenderTests
       - path: GlowWidget/WeekWidgetView.swift
-      - path: GlowWidget/MonthWidget.swift
+      - path: GlowWidget/MonthWidgetView.swift
       - path: GlowWidget/WeekEntry.swift
       - path: Glow/Logic
       - path: Glow/Models

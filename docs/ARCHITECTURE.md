@@ -273,11 +273,47 @@ migration for a store written before it existed — verified against one.
 Mostly layout. The one piece of real behaviour is `SlotView`'s completion
 transition, which is documented in place and in [glow.md](glow.md).
 
-`RootTabView` carries two tabs, This Week and Settings. It carried three: Today
-drew the per-day habits as rings, and it is on `feature/daily-habits-2.0` with
-`DayRingView` and the geometry under it (#209). The slot is left empty rather
-than collapsed — #210 puts the Widgets tab in the same position — so the bar
-does not reflow twice in two builds.
+`RootTabView` carries three tabs: This Week, Widgets and Settings. The middle
+one was Today, which drew the per-day habits as rings and is on
+`feature/daily-habits-2.0` with `DayRingView` and the geometry under it (#209);
+the slot was left empty rather than collapsed so that #210 could fill it in the
+same position, and the bar reflowed once rather than twice.
+
+`WidgetsView` is that tab: every widget this bundle ships, previewed by the
+shipping view, with an "Added" mark on the ones already on the Home Screen.
+Three pieces make it what it is.
+
+**The previews are the production views.** `GlowWidget/WeekWidgetView.swift`,
+`GlowWidget/MonthWidgetView.swift` and the two entry types are compiled into
+the *app* target as well as into the extension — the same sharing
+`GlowRenderTests` does, and the reason each view sits in a file with its entry
+and neither a `@main` bundle nor a provider. The view is laid out at
+`WidgetMetrics.size(of:)` for its family and then scaled to fit, because slot
+size is derived from track width: drawn at a convenient width it would be a
+different layout rather than a smaller one. `WeekWidgetView.familyOverride`
+exists for the same reason the render harness needs it — `widgetFamily` is
+read-only outside WidgetKit and reports medium everywhere else.
+
+**"Added" means a family, not a kind.** `WidgetKind.families` declares which
+families each kind supports and `supportedFamilies` is set from it, so the
+page's list and the extension's are one list. `WidgetCatalog` (in `Logic/`,
+pure) diffs that list against what was reported, dropping kinds this build no
+longer serves — a Home Screen can still hold a `GlowTodaySmall` — and families
+outside `supportedFamilies`.
+
+**`WidgetPlacementQuerying` is the seam.** `WidgetCenter` answers for the
+Home Screen of the device it is running on, which a test cannot arrange, so the
+one call and its mapping live behind a protocol in `Store/`
+(`WidgetCenterPlacements`) and the diff is asserted against fixed lists.
+`currentConfigurations()` is a snapshot, not a subscription — the page asks
+again on `scenePhase == .active`, since placing a widget necessarily happens
+while the app is not frontmost.
+
+**No API places a widget**, which is why the page is instructions plus
+previews. `WidgetCenter` invalidates, reloads and reports;
+`promptsForUserConfiguration()` is a `WidgetConfiguration` modifier that
+prompts for a widget's *settings* after a manual add. Checked against the
+iOS 26.5 SDK interface, not from memory.
 
 Width flows down rather than being measured per row: `WeeklyGridView` reads the
 screen width once, builds a `RowGeometry`, and hands the same value to the
@@ -536,7 +572,10 @@ than measured by `SlotLayout`.
 The Today widget is gone with the kind it drew (#209), and its two kind
 strings — `GlowTodaySmall`, `GlowTodayMedium` — are removed rather than
 renamed, so a placed Today widget leaves the Home Screen with the extension
-that served it.
+that served it. `WidgetKind` now carries more than the strings: the families
+each kind supports, its gallery name and its one-sentence description, all read
+by the `WidgetConfiguration`s and by the Widgets tab, so the gallery and the
+app cannot describe the same widget differently.
 
 The month widget's configuration intent, its entity and its query live in the
 shared sources (`MonthWidgetConfig.swift`), not the widget target — the app

@@ -78,9 +78,12 @@ struct GlowWidget: Widget {
         // they are applied inside the container — so the padding above only
         // means what the file says once they are switched off.
         .contentMarginsDisabled()
-        .configurationDisplayName("Glow Up: This Week")
-        .description("Your habits for the week. Tap today's slot to log it.")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        // Name, sentence and families all from `WidgetKind`. The Widgets tab
+        // shows the same three families and says the same words about them, so
+        // there is one list rather than two that can disagree (#210).
+        .configurationDisplayName("Glow Up: \(WidgetKind.week.displayName)")
+        .description(WidgetKind.week.summary)
+        .supportedFamilies(WidgetKind.week.families)
     }
 }
 
