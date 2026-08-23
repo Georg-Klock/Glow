@@ -8,6 +8,11 @@ Glow/Info.plist
 Glow/Glow.entitlements
 GlowWidget/GlowWidget.entitlements
 
+# Test-run evidence: result bundles, logs, attachments and the structured
+# verdict, one directory per run. Kept because a failing run's bundle is the
+# most valuable thing it produces, and never committed.
+Artifacts/
+
 # Xcode
 build/
 DerivedData/

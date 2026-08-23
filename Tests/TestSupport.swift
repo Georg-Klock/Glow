@@ -49,6 +49,10 @@ enum TestPreferences {
     /// `restDay` is not optional-by-omission: passing nothing means *no rest
     /// day*, explicitly, rather than "leave whatever was there". A test that
     /// assumes a clean week should say so.
+    /// `@discardableResult` because the common use is to pin the week's
+    /// preferences around a body that asserts inside itself and returns
+    /// nothing worth reading.
+    @discardableResult
     static func withWeek<T>(
         firstWeekday: Int? = nil,
         restDay: Int? = nil,

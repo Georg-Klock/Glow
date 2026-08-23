@@ -25,7 +25,7 @@ struct DeepLinkTests {
         "https://example.com/glow://today",
     ])
     func unknownIsNil(raw: String) {
-        let url = try? #require(URL(string: raw))
+        let url = URL(string: raw)
         #expect(url.flatMap(DeepLink.destination(for:)) == nil)
     }
 }

@@ -44,7 +44,11 @@ struct MotionPolicyTests {
         #expect(!MotionPolicy.sweepsRing(from: 0, to: 1, reduceMotion: true))
     }
 
+    // `@MainActor` because `SlotView.pressScale` is: `View` carries the
+    // isolation, and reading it from a nonisolated test is a warning today and
+    // an error under a future language mode.
     @Test("A press does not grow when growth was declined")
+    @MainActor
     func pressDoesNotGrow() {
         #expect(MotionPolicy.pressScale(SlotView.pressScale, reduceMotion: false) == SlotView.pressScale)
         #expect(MotionPolicy.pressScale(SlotView.pressScale, reduceMotion: true) == 1)
