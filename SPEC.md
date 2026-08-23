@@ -503,6 +503,17 @@ in the vacated track, which would leave them a third of the way across. A blank
 row has nothing to fade and nothing to centre; it shows the two controls and the
 gap it stands for. Reduce Motion snaps the change rather than shortening it.
 
+**Every name reads plain white while editing** (#206). Outside edit mode a name
+is grey until its habit is due today and lit while it is — §1's rule carried
+through to type. Editing is the one moment that reading stops being the useful
+one: nobody reordering a list is asking what they are due for, and half the
+names sitting at the unlit grey is half the list hard to read at exactly the
+wrong time. So the crossfade steps aside for a flat `GlowPalette.color` — the
+header's own white, not the halo, because the halo is the same claim an open
+ring makes and wearing it on every row would say every habit is due at once. The
+due/not-due state itself is untouched: leaving edit mode returns each name to
+where the crossfade already was.
+
 ## 8. Acceptance criteria
 
 - [x] A daily habit shows exactly 7 circles for the current Monday-Sunday week.
