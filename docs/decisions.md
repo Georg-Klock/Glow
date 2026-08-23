@@ -2753,3 +2753,122 @@ it is one line, leading once the second line arrives, and centred again in edit
 mode, and a `frame(maxWidth:alignment:)` around it changes none of the three.
 So the readout shifts left as you leave this week — at the same moment the
 subtitle and the pill appear, which is a state change rather than a wobble.
+
+## The visual gate learns to see tone (#199)
+
+#194 moved `GlowPalette.greyOpaque` thirteen levels — every unlit mark in the
+app, `#171717` to `#242424` — and `RenderBaselineTests` did not fail. The worst
+cell in any family moved **+3** against a `cellTolerance` of **3**. A
+whole-palette change came one level short of invisible to the gate built to
+catch exactly that.
+
+**The arithmetic, not the tolerance, is the fault.** The baseline is a 16 × 16
+grid of *mean* brightness, and a mean dilutes a change by however much of the
+cell is unaffected. Each cell averages roughly 450 pixels; the marks that carry
+the grey are thin — hairlines, a 1pt ✕, weekday letters — so thirteen levels on
+the marks average down to two or three levels on the cell. The measured spread
+from #194: week small 44 cells moved, worst +3; week medium 19, worst +3; week
+large 57, worst +2; month small 41; both Today frames 0.
+
+### Why not simply lower the tolerance
+
+The obvious fix is `cellTolerance = 1`, and #138's own reasoning invites it: two
+simulator models produced bit-identical grids, so the observed noise floor is
+zero and 3 is buying nothing today. It was rejected because "zero on two models
+of one Xcode" is evidence that the floor is low, not proof that it stays low.
+Antialiasing and colour management are the renderer's business and have already
+been seen to move across platform versions elsewhere in this repository — it is
+why CI pins its macOS runner. A gate that goes red on all six families the
+morning after an Xcode bump is a gate people learn to re-approve without
+looking, and a baseline re-approved without looking is worse than a loose
+tolerance, because it launders a real regression through a ritual.
+
+It would also have bought less than it looks like. At tolerance 1 the #194 move
+does fail — by two levels, in four families. But the dilution factor is what it
+is: thirteen levels on the marks arrived as three on the worst cell, so a
+tolerance of 1 sees a palette move of about five levels and nothing smaller, and
+sees nothing at all in the two Today frames, which moved zero cells either way.
+A smaller number divided by the same 450 pixels is the same arithmetic.
+
+`cellTolerance` is unchanged at 3.
+
+### The second statistic
+
+The app paints exactly two colours and no ramp between them (#111). That has a
+consequence nobody had used: **an unlit mark deposits every one of its pixels at
+one exact level, while the halo around a lit mark deposits a smooth gradient.**
+In a histogram of the frame that is a spike standing on a ramp, and the height
+of the spike above the ramp is a *count of pixels* rather than an average — so
+it does not care how thin the mark is.
+
+`RenderSignature.toneExcess(in:at:)` is that height: the population at a level,
+minus the mean of its two neighbours. Measured across all six families, rendered
+before and after #194:
+
+| family | excess at 36, grey = 36 | excess at 36, grey = 23 |
+| --- | --- | --- |
+| week small | 1068 | 10 |
+| week medium | 2068 | 42 |
+| week large | 4132 | 29 |
+| month small | 680 | 0 |
+| today small | 8 | 8 |
+| today medium | −2 | −2 |
+
+Two orders of magnitude, against three levels of slack in the grid. The gate
+asks that a tone the baseline recorded still holds **half** its pixel count —
+enormous headroom, because what a move actually does is take it to about 1%. A
+*one*-level palette move collapses it just as hard, since the spike lands on the
+neighbouring level instead. The check runs in both directions: a family the
+baseline says paints a tone has to still paint it, and a family the baseline
+says does not must not start.
+
+**The two Today frames genuinely contain no unlit pixel**, which is why they
+moved zero cells in #194 and why their census reads 8 and −2. Their only unlit
+surface is a habit name in the handled state, and the pinned fixture's one habit
+is open, so it glows. The baseline records that as near-zero and the
+"must not appear" branch holds it there; the fixture was left alone rather than
+grown a second habit, which would have been a real layout change to two frames
+in a change about measurement. A tone gate cannot cover a family that paints no
+tone, and now the committed file says so in numbers.
+
+### The literal, and what keeps it honest
+
+`RenderSignature.flatTones` is `[36, 255]` — written down, not read from
+`GlowPalette`, for the same reason `WidgetRenderDiffTests`'s grey band is a
+literal: a level derived from the value under test agrees with every value.
+
+That has a failure mode. Move the palette, re-approve the baseline, and leave
+`flatTones` alone: every family then records ~0 at level 36, the census compares
+zero against zero six times, and the gate is dead without a word. So
+`flatTonesAreReal` renders the families and asserts that **something, somewhere,
+is actually painted at each level the list names**. It is the half that notices,
+in the same shape as `baselineIsComplete`.
+
+### The re-approval in this change
+
+The committed baseline was re-approved, and every pre-existing number in it is
+byte-identical: same widths, same heights, same `exactBlackPercent`, same 1,536
+grid cells. The diff is 24 added lines and nothing else — one `tones` object per
+family. Nothing about the picture moved; the file learned to record one more
+thing about it.
+
+**Proof it now catches #194.** `GlowPalette.greyOpaque` was set back to 23 and
+the suite re-run: four families fail by name — week large "has 29 pixels painted
+flat at level 36; the baseline says 4132, and this gate wants at least 2066" —
+and `flatTonesAreReal` fails alongside them. Restored to 36, green.
+
+### What the gate covers, said plainly
+
+Recorded because `Tools/test-inventory.json` read as covering both and only
+covered one:
+
+- **Geometry** — the 16 × 16 mean grid. A mark that moves a column, a row pitch
+  that shifts, a label that stops being drawn. Loud, because a mark leaving a
+  cell moves that cell by tens.
+- **Ground** — `exactBlackPercent` against `blackTolerance`. A gradient, a tint
+  or a material anywhere behind the marks.
+- **Tone** — the census. Which exact levels the app paints, and how much of the
+  frame is painted at each. This is the half that is new.
+- **Not covered:** the glow itself. The simulator has no EDR headroom, so every
+  frame in the baseline is the SDR render. `GlowRendererTests` holds the
+  headroom claim and a device holds the rest.

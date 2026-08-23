@@ -27,6 +27,30 @@ import UIKit
 /// whole reason for the coarse grid: it is deliberately blind to the noise and
 /// deliberately loud about the change.
 ///
+/// ## And a tone census, because the grid is a geometry gate (#199)
+///
+/// A mean dilutes by however much of a cell is unaffected. #194 moved
+/// `GlowPalette.greyOpaque` thirteen levels — every unlit mark in the app —
+/// and the worst cell in any family moved **+3** against a tolerance of 3. The
+/// marks that carry the grey are thin: hairlines, a 1pt ✕, weekday letters. A
+/// whole-palette move averaged down to two or three levels per cell and came
+/// one level short of being invisible here.
+///
+/// So the signature carries a second statistic that thinness cannot dilute.
+/// The app paints exactly two colours and no ramp between them (#111), which
+/// means every unlit mark deposits pixels at *one exact level* while the halo
+/// around a lit mark deposits a smooth gradient. That shows in a histogram as a
+/// spike standing on a ramp, and the height of the spike above the ramp —
+/// `RenderSignature.toneExcess` — is a count of pixels, not an average, so it
+/// does not care how thin the mark is.
+///
+/// Measured across all six families, before and after #194: the excess at the
+/// grey's own level is **680 to 4132** pixels where the grey is painted, and
+/// **−2 to 42** at that same level where it is not. Two orders of magnitude,
+/// against three levels of slack in the grid. A one-level palette move is
+/// enough to collapse it, because the spike lands on the neighbouring level
+/// instead.
+///
 /// ## The determinism contract
 ///
 /// A baseline is only as good as the scene being reproducible, so the scene is
@@ -93,9 +117,19 @@ struct RenderBaselineTests {
                 continue
             }
 
+            // One set of images per frame however many ways it disagrees:
+            // rendering the frame again for each is slow, and two attachments
+            // under one name is not evidence twice over.
+            var attached = false
+            func attachFailureOnce() {
+                guard !attached else { return }
+                attached = true
+                attachFailure(name: name, expected: expected, actual: signature)
+            }
+
             let worst = signature.worstCell(against: expected)
             if worst.delta > Self.cellTolerance {
-                attachFailure(name: name, expected: expected, actual: signature)
+                attachFailureOnce()
                 Issue.record("""
                     \(name) moved: cell (\(worst.column),\(worst.row)) is \(worst.actual), the \
                     baseline says \(worst.expected) — a delta of \(worst.delta), tolerance \
@@ -111,6 +145,58 @@ struct RenderBaselineTests {
                     A gradient, a tint or a material lifts this number off the floor.
                     """)
             }
+
+            // The half the cell grid cannot do (#199). Each declared tone is
+            // checked in both directions: one the baseline says this family
+            // paints has to still be painted, and one it says the family does
+            // not paint must not appear.
+            for tone in Self.flatTones {
+                let expectedCount = expected.tones[tone] ?? 0
+                let actualCount = signature.tones[tone] ?? 0
+
+                if expectedCount >= Self.toneFloor {
+                    let least = Int(Double(expectedCount) * Self.toneRetention)
+                    if actualCount < least {
+                        attachFailureOnce()
+                        Issue.record("""
+                            \(name) has \(actualCount) pixels painted flat at level \(tone); the \
+                            baseline says \(expectedCount), and this gate wants at least \
+                            \(least). A tone that collapses like this has moved to another \
+                            level or stopped being drawn — the cell grid dilutes both, which is \
+                            why this number exists. See #199.
+                            """)
+                    }
+                } else if actualCount >= Self.toneFloor {
+                    attachFailureOnce()
+                    Issue.record("""
+                        \(name) now paints \(actualCount) pixels flat at level \(tone), where the \
+                        baseline recorded \(expectedCount) — near enough to none. A family that \
+                        starts painting a tone it did not is a deliberate change; approve it.
+                        """)
+                }
+            }
+        }
+    }
+
+    @Test("Every flat tone the gate names is painted somewhere")
+    func flatTonesAreReal() throws {
+        // The loop-closer, and the reason `flatTones` can be a literal at all.
+        //
+        // Move the palette and re-approve the baseline without touching that
+        // list, and every family records ~0 at the old level — the check above
+        // is then comparing zero against zero in six places and gating on
+        // nothing, silently. This is what goes red instead. It renders rather
+        // than reading the committed file on purpose: the claim is about what
+        // the app draws today, not about what was approved.
+        let actual = try Self.currentSignatures()
+        for tone in Self.flatTones {
+            let best = actual.map { ($0.key, $0.value.tones[tone] ?? 0) }.max { $0.1 < $1.1 }
+            #expect((best?.1 ?? 0) >= Self.toneFloor, """
+                no family paints anything flat at level \(tone) — the most any of them has is \
+                \(best?.1 ?? 0), in \(best?.0 ?? "none"). `flatTones` names the levels this app \
+                paints; a level nothing is painted at gates nothing. If the palette moved, move \
+                this list with it. See #199.
+                """)
         }
     }
 
@@ -142,6 +228,29 @@ struct RenderBaselineTests {
     /// Percentage points of "exactly 0,0,0" the frame may move by. The claim
     /// #87 makes is that the ground is pure black; this notices it drifting.
     static let blackTolerance = 0.5
+
+    /// The levels the app paints flat. Declared on `RenderSignature`, which is
+    /// what measures them.
+    static var flatTones: [Int] { RenderSignature.flatTones }
+
+    /// The share of a committed tone's pixel count that has to survive.
+    ///
+    /// Generous on purpose, and it can afford to be. Measured across the six
+    /// families before and after #194: a tone that is still painted holds 680
+    /// to 4132 pixels of excess, and the same level with the tone moved away
+    /// holds −2 to 42 — about 1% of the number the baseline recorded. Half is
+    /// far outside anything antialiasing can do and far inside the collapse.
+    static let toneRetention = 0.5
+
+    /// Pixels of excess below which a level is not a tone this frame paints.
+    ///
+    /// The two Today families sit under it at level 36 and that is correct
+    /// rather than a gap in the fixture: their only unlit surface is a habit
+    /// name in the handled state, and the pinned fixture's one habit is open,
+    /// so those frames contain no `greyOpaque` pixel at all. The baseline
+    /// records that as a number near zero, and the *other* branch above holds
+    /// it there.
+    static let toneFloor = 200
 
     // MARK: - The scene
 
@@ -300,6 +409,13 @@ struct RenderBaselineTests {
     /// 16 × 16 approximation because that is genuinely what was approved;
     /// showing a full-resolution image nobody committed would be a nicer
     /// picture of a claim this gate does not make.
+    ///
+    /// A tone failure attaches the same three images and the diff will show no
+    /// red at all — the tone census exists precisely because that kind of
+    /// change does not move a cell mean. Read the message, and look at
+    /// `-actual.png` rather than at the diff. It is still worth attaching: a
+    /// render failure that leaves nothing to look at is what
+    /// `visualFailureAttachments` in `Tools/test-inventory.json` refuses.
     private func attachFailure(name: String, expected: RenderSignature, actual: RenderSignature) {
         let slug = name.replacingOccurrences(of: " ", with: "-")
         // Nothing here traps. This runs only on the failing path, and a crash
@@ -327,18 +443,40 @@ struct RenderBaselineTests {
 struct RenderSignature: Codable, Equatable {
     static let side = 16
 
+    /// The levels this app paints *flat* — the two colours of #111, as they
+    /// land in an sRGB byte. `GlowPalette.greyOpaque` is 36 and the lit white
+    /// is 255.
+    ///
+    /// **Literals, deliberately, and the same argument the grey band in
+    /// `WidgetRenderDiffTests` is written under.** A level read from
+    /// `GlowPalette` would agree with whatever `GlowPalette` says, which is the
+    /// one thing this must not do — the palette is what is being checked. So
+    /// these are numbers a person wrote down, and moving the palette means
+    /// moving them, in the same change, on purpose.
+    /// `RenderBaselineTests.flatTonesAreReal` is what notices if that does not
+    /// happen.
+    static let flatTones = [36, 255]
+
     var width: Int
     var height: Int
     /// Percentage of the frame that is exactly 0,0,0, to one decimal place.
     var exactBlackPercent: Double
     /// `side * side` mean brightness values, row-major, 0...255.
     var grid: [Int]
+    /// Level → how many pixels are painted flat at it, over and above the halo
+    /// gradient that passes through it. See `toneExcess`. Keyed by the levels in
+    /// `RenderBaselineTests.flatTones` and by nothing else.
+    var tones: [Int: Int]
 
-    init(width: Int, height: Int, exactBlackPercent: Double, grid: [Int]) {
+    init(
+        width: Int, height: Int, exactBlackPercent: Double, grid: [Int],
+        tones: [Int: Int] = [:]
+    ) {
         self.width = width
         self.height = height
         self.exactBlackPercent = exactBlackPercent
         self.grid = grid
+        self.tones = tones
     }
 
     // MARK: Coding
@@ -348,7 +486,7 @@ struct RenderSignature: Codable, Equatable {
     /// pull request, and one row per line means a change to one band of the
     /// widget shows up as a change to one line.
     private enum CodingKeys: String, CodingKey {
-        case width, height, exactBlackPercent, rows
+        case width, height, exactBlackPercent, tones, rows
     }
 
     init(from decoder: Decoder) throws {
@@ -356,6 +494,12 @@ struct RenderSignature: Codable, Equatable {
         width = try container.decode(Int.self, forKey: .width)
         height = try container.decode(Int.self, forKey: .height)
         exactBlackPercent = try container.decode(Double.self, forKey: .exactBlackPercent)
+        // Written with the level as the key, so the file reads as "36: 4790"
+        // rather than as a pair of positional numbers.
+        let tones = try container.decodeIfPresent([String: Int].self, forKey: .tones) ?? [:]
+        self.tones = Dictionary(uniqueKeysWithValues: tones.compactMap { key, value in
+            Int(key).map { ($0, value) }
+        })
         let rows = try container.decode([String].self, forKey: .rows)
         grid = rows.flatMap { $0.split(separator: " ").compactMap { Int($0) } }
         guard grid.count == Self.side * Self.side else {
@@ -371,6 +515,10 @@ struct RenderSignature: Codable, Equatable {
         try container.encode(width, forKey: .width)
         try container.encode(height, forKey: .height)
         try container.encode(exactBlackPercent, forKey: .exactBlackPercent)
+        try container.encode(
+            Dictionary(uniqueKeysWithValues: tones.map { (String($0.key), $0.value) }),
+            forKey: .tones
+        )
         let rows = stride(from: 0, to: grid.count, by: Self.side).map { start in
             grid[start..<min(start + Self.side, grid.count)]
                 .map { String(format: "%3d", $0) }
@@ -395,6 +543,7 @@ struct RenderSignature: Codable, Equatable {
 
         var sums = [Int](repeating: 0, count: Self.side * Self.side)
         var counts = [Int](repeating: 0, count: Self.side * Self.side)
+        var histogram = [Int](repeating: 0, count: 256)
         var black = 0
         for y in 0..<h {
             let row = y * Self.side / h
@@ -402,9 +551,11 @@ struct RenderSignature: Codable, Equatable {
                 let i = (y * w + x) * 4
                 let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2]
                 if r == 0 && g == 0 && b == 0 { black += 1 }
+                let value = Int(max(r, max(g, b)))
                 let cell = row * Self.side + (x * Self.side / w)
-                sums[cell] += Int(max(r, max(g, b)))
+                sums[cell] += value
                 counts[cell] += 1
+                histogram[value] += 1
             }
         }
 
@@ -412,6 +563,29 @@ struct RenderSignature: Codable, Equatable {
         self.height = h
         self.exactBlackPercent = (Double(black) * 1000 / Double(w * h)).rounded() / 10
         self.grid = zip(sums, counts).map { $1 == 0 ? 0 : Int((Double($0) / Double($1)).rounded()) }
+        self.tones = Dictionary(uniqueKeysWithValues: Self.flatTones.map {
+            ($0, Self.toneExcess(in: histogram, at: $0))
+        })
+    }
+
+    /// How many pixels are painted flat at `level`, over and above the smooth
+    /// gradient running through it.
+    ///
+    /// A flat-filled mark deposits every one of its interior pixels at exactly
+    /// one level; a halo deposits a ramp, one thin slice per level. So the
+    /// count at a painted level stands well above its two neighbours, and the
+    /// count at an unpainted one sits between them. Subtracting the neighbours'
+    /// mean is what separates the two — and it is a **count**, which is the
+    /// whole point. A hairline puts every one of its pixels into this number
+    /// and about a four-hundredth of a level into a cell mean. See #199.
+    ///
+    /// 255 has no upper neighbour, so its lower one stands for both. Levels 0
+    /// and 1 are not askable: the ground is 0 and would swamp them.
+    static func toneExcess(in histogram: [Int], at level: Int) -> Int {
+        guard (2...255).contains(level), histogram.count == 256 else { return 0 }
+        let below = histogram[level - 1]
+        let above = level < 255 ? histogram[level + 1] : histogram[level - 1]
+        return histogram[level] - (below + above) / 2
     }
 
     struct Worst {
