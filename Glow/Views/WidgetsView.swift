@@ -56,7 +56,14 @@ struct WidgetsView: View {
     @AppStorage(WeekPreferences.firstWeekdayKey, store: GlowSettings.store)
     private var firstWeekday: Int = WeekPreferences.defaultFirstWeekday
 
-    private var cards: [WidgetCard] { WidgetCatalog.cards(placed: placed) }
+    /// The habits a per-habit preview can be drawn against, in the person's
+    /// own order. `MonthStore`'s rule rather than a second one, so the previews
+    /// and the widget's own habit picker cannot offer different lists.
+    private var previewHabits: [Habit] { MonthStore.offered(among: habits) }
+
+    private var groups: [WidgetCardGroup] {
+        WidgetCatalog.groups(placed: placed, habits: previewHabits.map(\.id))
+    }
 
     var body: some View {
         NavigationStack {
@@ -131,36 +138,46 @@ struct WidgetsView: View {
 
     /// One kind: what it is, and each family it can be placed in.
     ///
-    /// Grouped by kind rather than one flat list of four cards, because the
-    /// sentence describing a widget is a property of the kind — three copies of
-    /// it over the week's three sizes would read as three different widgets.
+    /// Grouped by kind rather than one flat list of previews, because the name
+    /// is a property of the kind — three copies of "This Week" over the week's
+    /// three sizes would read as three different widgets.
+    ///
+    /// **The heading is all the prose there is** (#237). Under it there used to
+    /// be a sentence saying what the widget does; the widget is drawn directly
+    /// below, over the person's own habits, which says the same thing without
+    /// being read. The name and the size stay: they identify, and without the
+    /// size two Week cards would be indistinguishable at a glance. The one
+    /// paragraph left on the page is `instructions`, which describes a
+    /// long-press no preview can demonstrate.
     private func section(for kind: WidgetKind, width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(kind.displayName)
-                    .font(.headline)
-                Text(kind.summary)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(cards.filter { $0.placement.kind == kind }) { card in
-                self.card(card, width: width)
+            Text(kind.displayName)
+                .font(.headline)
+            ForEach(groups.filter { $0.placement.kind == kind }) { group in
+                self.group(group, width: width)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func card(_ card: WidgetCard, width: CGFloat) -> some View {
+    /// One placeable widget: the row naming it, and every preview of it.
+    ///
+    /// The row is drawn once for the group, not once per preview. "Added" is a
+    /// fact about the Home Screen — one small month widget is there or it is
+    /// not — and the several previews under it are several habits that same
+    /// widget could be showing, so repeating the row would count one widget
+    /// three times.
+    private func group(_ group: WidgetCardGroup, width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             // Above the preview, not below it. Under it, a caption sits
             // between two previews and belongs to neither — screenshotted,
             // "Small" read as the heading of the medium widget below it.
             HStack(spacing: 6) {
-                Text(card.placement.familyName)
+                Text(group.placement.familyName)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
-                if card.isPlaced {
+                if group.isPlaced {
                     // Placed widgets stay on the page rather than being
                     // dropped: what is already on the Home Screen belongs
                     // beside what is not.
@@ -171,10 +188,17 @@ struct WidgetsView: View {
                 }
             }
             // The size and its state are one fact about one widget, so they are
-            // one stop rather than two — and the preview below carries no
-            // label of its own.
+            // one stop rather than two — and the previews below carry no label
+            // of their own.
             .accessibilityElement(children: .combine)
-            preview(card.placement, width: width)
+            // Closer to each other than groups are to each other (16), so
+            // several previews of one widget read as one block rather than as
+            // several widgets whose captions went missing.
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(group.cards) { card in
+                    preview(card, width: width)
+                }
+            }
         }
     }
 
@@ -190,10 +214,10 @@ struct WidgetsView: View {
     /// Not interactive. The marks are `Button(intent:)`s in the real widget and
     /// still are here, so hit testing is switched off rather than left to
     /// surprise somebody: tapping a picture of a widget should not log a habit.
-    private func preview(_ placement: WidgetPlacement, width: CGFloat) -> some View {
-        let size = WidgetMetrics.size(of: placement.family)
+    private func preview(_ card: WidgetCard, width: CGFloat) -> some View {
+        let size = WidgetMetrics.size(of: card.placement.family)
         let scale = size.width > 0 ? min(1, width / size.width) : 1
-        return content(for: placement)
+        return content(for: card)
             .padding(.leading, WidgetMetrics.padLeading)
             .padding(.trailing, WidgetMetrics.padTrailing)
             .padding(.vertical, WidgetMetrics.padVertical)
@@ -228,16 +252,16 @@ struct WidgetsView: View {
     private static let corner: CGFloat = 30
 
     @ViewBuilder
-    private func content(for placement: WidgetPlacement) -> some View {
-        switch placement.kind {
+    private func content(for card: WidgetCard) -> some View {
+        switch card.placement.kind {
         case .week:
             // `familyOverride` because `widgetFamily` is read-only outside
             // WidgetKit — a `WeekWidgetView` rendered anywhere else reports
             // medium and silently drops the header. The render harness needs
             // the same door.
-            WeekWidgetView(entry: weekEntry, familyOverride: placement.family)
+            WeekWidgetView(entry: weekEntry, familyOverride: card.placement.family)
         case .month:
-            MonthWidgetView(entry: monthEntry)
+            MonthWidgetView(entry: monthEntry(for: card.habitID))
         }
     }
 
@@ -254,19 +278,28 @@ struct WidgetsView: View {
         )
     }
 
-    /// The month the month widget would draw, for the habit an unconfigured
-    /// one shows — `MonthStore` owns which habit that is, so the preview and
-    /// the widget cannot pick differently. A placed month widget can of course
-    /// be showing another habit; the preview is of the widget you would add,
-    /// which arrives unconfigured.
-    private var monthEntry: MonthEntry {
-        guard
-            let habit = MonthStore.offered(among: habits).first,
-            let days = MonthGrid.dayRange(containing: today)
+    /// The month the month widget would draw for one of the person's habits.
+    ///
+    /// **Several of these, one per habit** (#237). The month widget asks which
+    /// habit as it is placed (`SelectWeeklyHabitIntent`), so a single preview
+    /// illustrates one arbitrary answer to a question the page is trying to
+    /// show you being asked. `WidgetCatalog` decides how many and which;
+    /// `MonthStore.offered` decides what is eligible, so the previews and the
+    /// picker cannot disagree.
+    ///
+    /// `nil` means "whatever an unconfigured widget would show", which is the
+    /// first offered habit — the widget's own rule — and, when there are no
+    /// weekly habits at all, nothing. Then `MonthWidgetView` draws its own
+    /// empty state, which is the honest preview of what adding the widget
+    /// today would get you.
+    private func monthEntry(for habitID: UUID?) -> MonthEntry {
+        let offered = previewHabits
+        let chosen = habitID.map { id in offered.first { $0.id == id } } ?? offered.first
+        guard let chosen, let days = MonthGrid.dayRange(containing: today)
         else { return MonthEntry(date: today, habit: nil) }
         return MonthEntry(
             date: today,
-            habit: Habit.snapshots(of: [habit], within: days).first
+            habit: Habit.snapshots(of: [chosen], within: days).first
         )
     }
 

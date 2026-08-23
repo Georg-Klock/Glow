@@ -616,6 +616,27 @@ independently placeable widgets, and having one says nothing about the other
 two. `WidgetCenter` is asked fresh whenever the app becomes active, because
 placing a widget happens while the app is not frontmost.
 
+**The page is names, sizes and widgets** (#237). No kind carries an explaining
+sentence under its heading — the gallery does, because there a widget is an
+unfamiliar tile in a list, but here the widget itself is drawn directly below
+over the person's own habits and says the same thing without being read. What
+stays is "This Week" / "This Month", the size beside each preview, "Added", and
+the one paragraph describing the long-press, which is the only thing on the
+page no preview can demonstrate.
+
+**The month is previewed against several habits, up to three.** It is the
+widget that asks *which habit* as it is placed, so one example answers a
+question the page is trying to show being asked; three of the person's own
+habits, in their own order, show the choice instead. Three because the third
+card is what makes it read as "one of yours" rather than as an arbitrary pair,
+and because each preview is a full-size month render — a fresh install's eight
+seeded habits would make that one section longer than the rest of the page. The
+week is one preview per size at every size: it already shows every habit at
+once, so "which one is this" is not a question it asks. Zero weekly habits is
+still one card, drawing the widget's own empty state — what adding it today
+would actually get you. Week-Small is left alone until #188 gives it a per-habit
+axis to vary over; without one, a second card would be the first card again.
+
 **Nothing on that page places a widget, because no API can.** No public call
 opens the widget gallery or adds anything to a Home Screen; `WidgetCenter`
 invalidates, reloads and reports, and `promptsForUserConfiguration()` — the one

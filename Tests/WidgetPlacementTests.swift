@@ -161,11 +161,149 @@ struct WidgetPlacementTests {
         }
     }
 
+    // MARK: - One card per habit, where the widget is about a habit (#237)
+
+    private static func habitIDs(_ count: Int) -> [UUID] {
+        (0..<count).map { _ in UUID() }
+    }
+
+    private func monthGroup(_ groups: [WidgetCardGroup]) -> WidgetCardGroup {
+        groups.first { $0.placement.kind == .month }!
+    }
+
+    /// The axis exists on the month and does not exist on the week. #188 would
+    /// give the week one; until it does, a second Week-Small preview would be
+    /// the first one again.
+    @Test("The month is per-habit, the week is not")
+    func onlyTheMonthVaries() {
+        #expect(WidgetKind.month.isPerHabit)
+        #expect(!WidgetKind.week.isPerHabit)
+        #expect(WidgetPlacement(kind: .month, family: .systemSmall).previewsOneHabit)
+        for family in WidgetKind.week.families {
+            let placement = WidgetPlacement(kind: .week, family: family)
+            #expect(!placement.previewsOneHabit)
+        }
+    }
+
+    /// Zero weekly habits is the case most able to look broken: a heading with
+    /// nothing under it. The month keeps exactly one card, carrying no habit,
+    /// which is what makes `MonthWidgetView` draw its own empty state.
+    @Test("No habits still leaves one card under every heading")
+    func noHabitsKeepsOneCardEach() {
+        let groups = WidgetCatalog.groups(placed: [], habits: [])
+        let counts = groups.map(\.cards.count)
+        let habits: [UUID?] = groups.flatMap(\.cards).map(\.habitID)
+        #expect(groups.count == WidgetCatalog.all.count)
+        #expect(counts == Array(repeating: 1, count: WidgetCatalog.all.count))
+        #expect(habits == Array(repeating: nil, count: WidgetCatalog.all.count))
+    }
+
+    @Test("One habit is one card")
+    func oneHabitIsOneCard() {
+        let habits = Self.habitIDs(1)
+        let month = monthGroup(WidgetCatalog.groups(placed: [], habits: habits))
+        let previewed: [UUID?] = month.cards.map(\.habitID)
+        #expect(previewed == [habits[0]])
+    }
+
+    @Test("Several habits are several cards, one each, in the person's order")
+    func severalHabitsAreSeveralCards() {
+        let habits = Self.habitIDs(3)
+        let month = monthGroup(WidgetCatalog.groups(placed: [], habits: habits))
+        let previewed: [UUID?] = month.cards.map(\.habitID)
+        let expected: [UUID?] = habits
+        #expect(previewed == expected)
+    }
+
+    /// The bound the page states. Unbounded, a fresh install's eight seeded
+    /// habits would be eight full-size month renders in one section.
+    @Test("More habits than the bound stop at the bound, keeping the first")
+    func habitsAreBounded() {
+        let habits = Self.habitIDs(9)
+        let month = monthGroup(WidgetCatalog.groups(placed: [], habits: habits))
+        let previewed: [UUID?] = month.cards.map(\.habitID)
+        let expected: [UUID?] = Array(habits.prefix(WidgetCatalog.habitPreviewLimit))
+        #expect(WidgetCatalog.habitPreviewLimit == 3)
+        #expect(month.cards.count == WidgetCatalog.habitPreviewLimit)
+        #expect(previewed == expected)
+    }
+
+    /// The week shows every habit at once already — "which one is this?" is not
+    /// a question it asks, so having habits changes nothing about it.
+    @Test("The week is one card per size however many habits there are")
+    func theWeekIsUnaffectedByHabits() {
+        let groups = WidgetCatalog.groups(placed: [], habits: Self.habitIDs(9))
+        let week = groups.filter { $0.placement.kind == .week }
+        let counts = week.map(\.cards.count)
+        let previewed: [UUID?] = week.flatMap(\.cards).map(\.habitID)
+        #expect(week.map(\.placement.family) == WidgetKind.week.families)
+        #expect(counts == [1, 1, 1])
+        #expect(previewed == [nil, nil, nil])
+    }
+
+    /// "Added" answers for the Home Screen, and the Home Screen knows nothing
+    /// about which habit this page chose to illustrate with. One placed month
+    /// widget is one placed widget however many previews sit under the row.
+    @Test("Added stays a fact about the placement, not about a preview")
+    func addedIsPerPlacementNotPerCard() {
+        let groups = WidgetCatalog.groups(
+            placed: [PlacedWidget(kind: .month, family: .systemSmall)],
+            habits: Self.habitIDs(3)
+        )
+        let month = monthGroup(groups)
+        let weekPlacement = groups.filter { $0.placement.kind == .week }.map(\.isPlaced)
+        #expect(month.isPlaced)
+        #expect(month.cards.count == 3)
+        #expect(month.cards.map(\.isPlaced) == [true, true, true])
+        #expect(weekPlacement == [false, false, false])
+    }
+
+    /// `ForEach` draws one row per id: two cards sharing one is a preview that
+    /// silently does not appear.
+    @Test("Every card on the page has its own identity")
+    func cardIdentitiesAreDistinct() {
+        let cards = WidgetCatalog.cards(placed: [], habits: Self.habitIDs(3))
+        let ids = Set(cards.map(\.id))
+        #expect(ids.count == cards.count)
+        // Identity is the card, not its state — an "Added" that flips must not
+        // replace the row.
+        let placed = WidgetCatalog.cards(
+            placed: [PlacedWidget(kind: .month, family: .systemSmall)],
+            habits: Self.habitIDs(0)
+        )
+        let empty = WidgetCatalog.cards(placed: [], habits: Self.habitIDs(0))
+        #expect(placed.map(\.id) == empty.map(\.id))
+        #expect(placed.map(\.isPlaced) != empty.map(\.isPlaced))
+    }
+
+    @Test("A habit listed twice is previewed once")
+    func duplicateHabitsCollapse() {
+        let id = UUID()
+        let month = monthGroup(WidgetCatalog.groups(placed: [], habits: [id, id, id]))
+        let previewed: [UUID?] = month.cards.map(\.habitID)
+        #expect(previewed == [id])
+    }
+
+    /// The flat list the page used to be is still the groups, in order.
+    @Test("The flat list is the groups' cards end to end")
+    func cardsAreTheGroupsFlattened() {
+        let habits = Self.habitIDs(3)
+        let groups = WidgetCatalog.groups(placed: [], habits: habits)
+        let flat = WidgetCatalog.cards(placed: [], habits: habits)
+        #expect(flat == groups.flatMap(\.cards))
+        #expect(flat.count == WidgetCatalog.all.count - 1 + habits.count)
+    }
+
     // MARK: - The words the page and the gallery share
 
     /// The gallery's display name is built from `displayName`, and the page
     /// shows the same string. One list, so a widget cannot be called two
     /// things.
+    ///
+    /// `summary` is the gallery's alone since #237 — the Widgets tab stopped
+    /// printing it — but `GlowWidget` and `MonthWidget` still pass it to
+    /// `.description(_:)`, so an empty one is a widget with no sentence in the
+    /// gallery.
     @Test("Every kind names itself and says what it is")
     func kindsCarryTheirWords() {
         for kind in WidgetKind.allCases {

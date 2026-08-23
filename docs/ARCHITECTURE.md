@@ -298,7 +298,7 @@ same position, and the bar reflowed once rather than twice.
 
 `WidgetsView` is that tab: every widget this bundle ships, previewed by the
 shipping view, with an "Added" mark on the ones already on the Home Screen.
-Three pieces make it what it is.
+Four pieces make it what it is.
 
 **The previews are the production views.** `GlowWidget/WeekWidgetView.swift`,
 `GlowWidget/MonthWidgetView.swift` and the two entry types are compiled into
@@ -317,6 +317,22 @@ page's list and the extension's are one list. `WidgetCatalog` (in `Logic/`,
 pure) diffs that list against what was reported, dropping kinds this build no
 longer serves — a Home Screen can still hold a `GlowTodaySmall` — and families
 outside `supportedFamilies`.
+
+**A per-habit widget is previewed per habit** (#237). `WidgetKind.isPerHabit`
+declares whether a placed widget of that kind draws one habit somebody chose —
+true for the month, whose `SelectWeeklyHabitIntent` asks as it is placed; false
+for the week at every family, which is a `StaticConfiguration` over whatever the
+week holds. `WidgetCatalog.groups(placed:habits:)` turns that into the page:
+one group per placement, and under a per-habit placement one card per habit, up
+to `habitPreviewLimit` (3). The group is what carries the size caption and
+"Added", because those answer for the Home Screen — one small month widget is
+placed or it is not, however many previews of it the page draws. The habit ids
+arrive as a parameter, read from the view's own `@Query` through
+`MonthStore.offered`, so `Logic/` stays pure and the previews and the widget's
+own picker cannot offer different habits. An empty list yields one card with no
+habit, which is `MonthWidgetView`'s own empty state rather than a heading with
+nothing under it. **Week-Small is not varied**: #188 would add a per-widget
+habit order, and until that axis exists a second card would be a duplicate.
 
 **`WidgetPlacementQuerying` is the seam.** `WidgetCenter` answers for the
 Home Screen of the device it is running on, which a test cannot arrange, so the

@@ -56,12 +56,40 @@ enum WidgetKind: String, CaseIterable, Sendable {
         }
     }
 
-    /// The gallery's own sentence about the widget, and the Widgets tab's.
-    /// Same words in both places, because they are answering the same question.
+    /// The gallery's own sentence about the widget — `configurationDisplayName`'s
+    /// companion, read by `GlowWidget` and `MonthWidget` as `.description(_:)`.
+    ///
+    /// **It used to be the Widgets tab's sentence too, and is not any more**
+    /// (#237). In the gallery it is the only thing there is: a scrolling list
+    /// of unfamiliar tiles, where a sentence is what tells them apart. On the
+    /// Widgets tab the widget itself is drawn directly above it, over the
+    /// person's own habits, which is the same sentence said better — so the
+    /// page prints the name and the size and lets the preview do the rest.
+    /// The property stays because the gallery still needs it.
     var summary: String {
         switch self {
         case .week: "Your habits for the week. Tap today's slot to log it."
         case .month: "One habit's month. Tap today's dot to log it."
+        }
+    }
+
+    /// Whether a placed widget of this kind draws **one habit somebody chose**.
+    ///
+    /// `.month` does: `SelectWeeklyHabitIntent` asks which habit as the widget
+    /// is placed, so "which one" is the real variable in it. That is what makes
+    /// several Month previews several *different* previews rather than one
+    /// picture repeated, and it is the axis the Widgets tab varies over (#237).
+    ///
+    /// `.week` does not, at any family. It is a `StaticConfiguration` over
+    /// whatever habits the week holds; small drops the labels, not the habits,
+    /// so there is no per-habit choice in it to preview. #188 would add one — a
+    /// habit order held per widget — and until that lands, a second Week-Small
+    /// card would be the same rendering twice. This stays `false` rather than
+    /// inventing an axis to fill the space.
+    var isPerHabit: Bool {
+        switch self {
+        case .week: false
+        case .month: true
         }
     }
 }
