@@ -82,6 +82,14 @@ settled did not go with it.
   one is the reviewable event**, and it belongs in the same change as the
   deletion that caused it.
 
+  It holds a lock on the simulator it chose, so two checkouts testing at once
+  queue instead of installing competing bundles onto one device. That collision
+  does not read as a device conflict — it reads as a dead host, a bundle under
+  its floor, or a failure naming a file that is clean in your checkout, and it
+  can produce a green run that is partly someone else's. Set
+  `GLOW_SIMULATOR_UDID` to give a run its own phone instead of waiting. See
+  #221.
+
   When the render baseline moves, the script prints the one command that
   approves it. Approving is a decision: say in the pull request what moved.
 
