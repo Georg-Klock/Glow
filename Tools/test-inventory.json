@@ -18,11 +18,32 @@
     "",
     "requiredAttachments / visualFailureAttachments: evidence the run has to",
     "leave behind. The render baseline records what it rendered on every run,",
-    "and a visual failure has to leave images a person can look at. See #138."
+    "and a visual failure has to leave images a person can look at. See #138.",
+    "",
+    "release: what a built product has to contain to be shippable. Read by",
+    "Tools/check-release-build.py, which CI runs on the unsigned Release build",
+    "and Tools/ship-testflight.sh runs on the archive and on the exported .ipa.",
+    "The bundle identifiers and the App Group are declared here rather than",
+    "argued for at each call site, so the gate and the release path cannot",
+    "disagree about what they are checking. An appex that ships and is not",
+    "listed fails, for the same reason an undeclared test bundle does. See #133."
   ],
   "bundles": {
     "GlowTests": { "minimum": 398 },
     "GlowRenderTests": { "minimum": 12 }
+  },
+  "release": {
+    "appGroup": "group.com.georgklock.glow",
+    "host": {
+      "bundleIdentifier": "com.georgklock.glow",
+      "requiredResources": ["PrivacyInfo.xcprivacy"]
+    },
+    "extensions": {
+      "GlowWidget.appex": {
+        "bundleIdentifier": "com.georgklock.glow.widget",
+        "requiredResources": ["PrivacyInfo.xcprivacy"]
+      }
+    }
   },
   "requiredAttachments": ["render-signatures-actual.json"],
   "visualFailureAttachments": {

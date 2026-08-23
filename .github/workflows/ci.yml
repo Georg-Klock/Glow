@@ -25,6 +25,13 @@ jobs:
       - name: The validator rejects what it claims to reject
         run: python3 Tools/validate-test-result.py --self-test
 
+      # The same argument for the release gate: it fabricates bundles on disk
+      # and runs them past the same code the macOS steps call. Its signing
+      # checks are exercised as facts rather than as artifacts, because this
+      # runner has no codesign — which is the whole reason they are separable.
+      - name: The release validator rejects what it claims to reject
+        run: python3 Tools/check-release-build.py --self-test
+
   build-and-test:
     name: Build and test
     # Pinned rather than macos-latest: the test suite reads gain-map metadata,
@@ -81,14 +88,10 @@ jobs:
       # Unsigned on purpose: signing needs a team and profiles that are
       # machine-local by design, and compiling is the part CI can own.
       #
-      # #133 hooks in here. The archive-time checks it wants — the widget's
-      # CFBundleShortVersionString and CFBundleVersion matching the host app's,
-      # before anything is uploaded — belong in a script this step calls, in
-      # the shape of Tools/check-project.py: a checked-in validator that reads
-      # the built product and exits non-zero with the two values in the
-      # message. Add the step after this one and call the same script from
-      # Tools/ship-testflight.sh, so the gate and the release path cannot
-      # disagree about what "matching" means.
+      # The derived data path is explicit so the next step can name the product
+      # it validates. A validator that goes looking for whichever app the
+      # filesystem lists first is a validator that can pass on something nobody
+      # shipped.
       - name: Build Release for the device SDK
         run: |
           xcodebuild build \
@@ -96,7 +99,20 @@ jobs:
             -scheme Glow \
             -sdk iphoneos \
             -configuration Release \
+            -derivedDataPath build/release-ci \
             CODE_SIGNING_ALLOWED=NO
+
+      # #133: the host app and the widget it embeds must agree on both version
+      # keys, and the appex has to be there at all. Neither is a build failure —
+      # the answer used to arrive from App Store Connect after the upload.
+      # Tools/ship-testflight.sh calls this same script on the archive and on
+      # the exported .ipa, so the gate and the release path cannot disagree
+      # about what "matching" means. Signing is not checked here: this build is
+      # unsigned on purpose, and the release path passes --require-signing.
+      - name: Validate the Release build
+        run: |
+          python3 Tools/check-release-build.py \
+            build/release-ci/Build/Products/Release-iphoneos/Glow.app
 
       # Runs the suite into a unique result bundle under Artifacts/, then
       # validates that bundle: every declared test bundle present, every
