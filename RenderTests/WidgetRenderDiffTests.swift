@@ -49,17 +49,22 @@ struct WidgetRenderDiffTests {
         // band that still reached to 141 would pass on halo bleed alone and
         // stop being evidence that anything unlit was drawn.
         //
-        // It tracked `#171717` as 20...26 until #194 moved the grey to
-        // `#242424`; it is 33...39 now. The band is a function of the palette,
-        // so it moves whenever the palette does — and it is written as a
-        // literal rather than derived from `GlowPalette` because a band
-        // computed from the value it is checking would agree with any value.
+        // It tracked `#171717` as 20...26, `#242424` as 33...39 after #194,
+        // and is 40...46 since #240 moved the grey to `#2B2B2B`. The band is a
+        // function of the palette, so it moves whenever the palette does — and
+        // it is written as a literal rather than derived from `GlowPalette`
+        // because a band computed from the value it is checking would agree
+        // with any value. That is the trade: this line is the one assertion in
+        // this file a palette move still has to touch, and it is deliberate.
+        // Everything else here asks about a *relationship* measured in the same
+        // frame — see `isUnlit(_:beside:)` — and #240 moved the grey seven
+        // levels without any of it moving.
         let pixels = try rgba(of: image)
         var lit = 0, grey = 0
         for i in stride(from: 0, to: pixels.count, by: 4) {
             let value = max(pixels[i], pixels[i + 1], pixels[i + 2])
             if value > 200 { lit += 1 }
-            else if (33...39).contains(value) { grey += 1 }
+            else if (40...46).contains(value) { grey += 1 }
         }
         #expect(lit > 500, "no lit marks in the render")
         #expect(grey > 500, "nothing unlit in the render: \(grey) pixels at the grey")
@@ -180,7 +185,8 @@ struct WidgetRenderDiffTests {
         // the line from the background without catching a dot.
         //
         // The floor was 40, chosen when the cut composited to 72. With #111 the
-        // cut is the one grey — 23 then, 36 since #194 — so the floor is
+        // cut is the one grey — 23 then, 36 after #194, 43 since #240 — so the
+        // floor is
         // `lineFloor`: the same 15
         // every other unlit-line scan in this file uses, and the number that
         // now has to hold for all of them.
@@ -264,7 +270,7 @@ struct WidgetRenderDiffTests {
     /// either side of its centre.
     ///
     /// Not at the centre, because since #71 the widget draws the rest cut
-    /// there: a flat 2pt rule in `GlowPalette.grey`, which composites to 36
+    /// there: a flat 2pt rule in `GlowPalette.grey`, which composites to 43
     /// on black and would be read as a mark. The cut casts no halo, so a
     /// quarter-slot clears it, and that is still well inside the window the
     /// span is supposed to have lost.
@@ -278,7 +284,7 @@ struct WidgetRenderDiffTests {
 
     /// The rest day's own line, sampled down the centre of its column — the
     /// flat `GlowPalette.grey` rule `RestCut` draws there, which composites to
-    /// 36 on black.
+    /// 43 on black.
     ///
     /// The counterpart to `brightestInRestColumn`, which steps around it, and
     /// the quantity that says the rest day's column was *drawn* rather than
@@ -292,7 +298,7 @@ struct WidgetRenderDiffTests {
     /// rather than against a level.
     ///
     /// The palette has two colours and nothing between them (#111): the grey
-    /// composites to 36 on black and a lit mark to 255. A quarter of the
+    /// composites to 43 on black and a lit mark to 255. A quarter of the
     /// frame's own lit level sits far above the first and far below the second,
     /// so this says "grey, not white" without naming either number — and it
     /// goes on saying it the next time the palette moves, which the fixed band
@@ -327,7 +333,7 @@ struct WidgetRenderDiffTests {
 
     /// A span's own line, unlit. Since #47 an achieved span is structure rather
     /// than a mark, so "is the span there" is a question about the grey line,
-    /// not about light — `GlowPalette.grey` composites to 36 on black.
+    /// not about light — `GlowPalette.grey` composites to 43 on black.
     private static let lineFloor = 15
 
     /// Nothing drawn here at all — not "unlit", which is a different claim.
@@ -421,7 +427,7 @@ struct WidgetRenderDiffTests {
             // says a column is not empty, and a column is not empty for lots of
             // reasons — a completion dot in it being the one that cost #230.
             // Each piece is sampled where this fixture puts no dot, so both read
-            // the grey line at 36 against dots at 255, and both go to nothing
+            // the grey line at 43 against dots at 255, and both go to nothing
             // when the piece they name is not drawn.
             #expect(tuesday > Self.lineFloor, "the left piece is missing (\(tuesday))")
             #expect(isUnlit(tuesday, beside: dots),
