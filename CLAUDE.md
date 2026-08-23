@@ -217,7 +217,8 @@ actual bug. Every line here is something that already happened.
 - **The glow modifier uses `.overlay`, not `ZStack`.** The HDR tile is
   `resizable()`, and inside a `ZStack` it expands and centres — which renders as
   glowing text in the wrong place. There is a comment saying so; believe it.
-- **Two colours, both opaque: glow white and `#242424`** (#111, moved by #194).
+- **Two colours, both opaque: glow white and `#2B2B2B`** (#111, moved by #194
+  and again by #240).
   Not a grey
   ramp — the palette used to stack opacities into four steps and the grid read
   as a grey scale. `GlowPalette` is the single source, and `GlowPalette.grey` is

@@ -31,7 +31,7 @@ struct WidgetBackgroundTests {
     @Test("Every colour the widget draws is neutral")
     @MainActor
     func nothingCarriesAHue() {
-        // Two colours, and there is no third: white is anything lit, #242424 is
+        // Two colours, and there is no third: white is anything lit, #2B2B2B is
         // anything that is not. A hue anywhere would also break the widget's
         // accented rendering, where the system keeps alpha and discards colour.
         let neutral: [Color] = [
@@ -61,7 +61,8 @@ struct WidgetBackgroundTests {
 /// the grey was inherited rather than invented.
 ///
 /// **That claim is over.** #194 moved the grey to `#242424` because 23 was too
-/// dark to read on a real screen, and 36 is not derived from anything. So there
+/// dark to read on a real screen, #240 moved it on to `#2B2B2B` because 36 was
+/// still too dark, and 43 is not derived from anything. So there
 /// is no arithmetic left to assert, and the tests below assert instead what
 /// actually has to hold: the value the app draws, the two bounds it lives
 /// between — visible enough for the render suite's own unlit-line scans to find
@@ -77,13 +78,21 @@ struct TwoColoursTests {
         return (r, g, b, a)
     }
 
-    @Test("The grey the app draws is #242424, and it is opaque")
+    /// Named for what it asserts rather than for the value it asserts. This was
+    /// `greyIsOpaqueSeventeen` until #194 renamed it `greyIsOpaqueTwentyFour`,
+    /// and #240 would have had to rename it again. A name that spells out a
+    /// level goes stale the moment the level is nudged, and a stale name is
+    /// worse than a general one because it reads as a claim.
+    @Test("The grey the app draws is the level the palette declares, and it is opaque")
     @MainActor
-    func greyIsOpaqueTwentyFour() {
+    func theUnlitGreyIsOpaqueAtItsDeclaredLevel() {
+        // The literal moves with the palette, deliberately: this is the one
+        // test that says what the value *is*, so reading it from `GlowPalette`
+        // would make it a test that cannot fail. 43 is `#2B2B2B` (#240).
         let grey = components(GlowPalette.greyOpaque)
-        #expect((grey.r * 255).rounded() == 36)
-        #expect((grey.g * 255).rounded() == 36)
-        #expect((grey.b * 255).rounded() == 36)
+        #expect((grey.r * 255).rounded() == 43)
+        #expect((grey.g * 255).rounded() == 43)
+        #expect((grey.b * 255).rounded() == 43)
         #expect(grey.a == 1, "the grey carries alpha: \(grey.a)")
 
         // And white is still white, still opaque.
@@ -94,7 +103,7 @@ struct TwoColoursTests {
     /// Replaces `greyIsTheOldSocket`, which asserted `0.553 × 0.16 × 255 == 23`
     /// and that the palette matched it. Its premise — that the grey is not a
     /// new colour — stopped being true with #194, and there is no derivation
-    /// for `#242424` to put in its place: reconstructing 36 from 36 would be a
+    /// for `#2B2B2B` to put in its place: reconstructing 43 from 43 would be a
     /// test that cannot fail. This is the claim that survives the move.
     @Test("The unlit grey clears the ground the render suite scans against")
     @MainActor
@@ -106,9 +115,10 @@ struct TwoColoursTests {
         // is asserted from this side: a grey at or below 15 stops being
         // separable from black there, and those scans would pass on nothing.
         //
-        // This is also the half of #194 that is the *reason* for the move. 23
-        // cleared 15 arithmetically and still read as almost nothing on screen;
-        // 36 is the value picked for what it reads as.
+        // This is also the half of #194 and #240 that is the *reason* for each
+        // move. 23 cleared 15 arithmetically and still read as almost nothing
+        // on a real screen, and so did 36; 43 is the value picked for what it
+        // reads as.
         let level = (components(GlowPalette.greyOpaque).r * 255).rounded()
         #expect(level > 15, "the unlit grey is at \(level); the render scans floor at 15")
     }
@@ -118,7 +128,7 @@ struct TwoColoursTests {
     func increasedContrastIsTheOldGrey() {
         // #8D8D8D: what `white.opacity(0.553)` composited to on black, and so
         // not a number invented for the setting. It clears 4.5:1 on black,
-        // which the shipping grey at about 1.35:1 does not.
+        // which the shipping grey at about 1.48:1 does not.
         let lifted = components(GlowPalette.greyIncreasedContrast)
         #expect((lifted.r * 255).rounded() == 141)
         #expect(lifted.a == 1)
@@ -129,12 +139,20 @@ struct TwoColoursTests {
         // than from a literal, so it cannot pass while the palette moves.
         //
         // The bound was `< 1.2`, chosen to defend `#171717` at 1.17:1, and #194
-        // fired it on purpose. `< 1.5` is what replaces it: 1.35:1 is where
-        // `#242424` sits, and 1.5:1 is 44/255 — `#2C2C2C`. So the grey may be
-        // nudged by eye the way #194 nudged it, and a change that starts
-        // walking it toward legible body text fails here and has to say so.
-        // Legibility is `greyIncreasedContrast`'s job; this value's job is to
-        // stay unmistakably not-lit.
+        // fired it on purpose. `< 1.5` is what replaces it: the grey may be
+        // nudged by eye the way #194 and #240 nudged it, and a change that
+        // starts walking it toward legible body text fails here and has to say
+        // so. Legibility is `greyIncreasedContrast`'s job; this value's job is
+        // to stay unmistakably not-lit.
+        //
+        // **The bound is a ceiling that has now been reached, and the
+        // arithmetic here was wrong until #240 computed it.** This comment used
+        // to name 44/255 — `#2C2C2C` — as "1.5:1". Put through the formula
+        // below, 44/255 is 1.5037:1, which is *over* the bound rather than on
+        // it; 43/255 is 1.4832:1, and is the last value that clears it. So
+        // `#2B2B2B`, which is what ships, is the top of this guardrail: the
+        // next nudge is not a nudge but a proposal to move the bound, and has
+        // to be argued as one.
         let shipping = Self.contrastOnBlack(Double(components(GlowPalette.greyOpaque).r))
         #expect(shipping < 1.5,
                 "the unlit grey is at \(shipping):1 on black; it is supposed to stay under 1.5:1")
@@ -158,13 +176,13 @@ struct TwoColoursTests {
         }
     }
 
-    @Test("Outside accented rendering and Increase Contrast, the grey resolves to #242424")
+    @Test("Outside accented rendering and Increase Contrast, the grey resolves to #2B2B2B")
     @MainActor
     func defaultEnvironmentResolvesToTheOpaqueGrey() {
         // The default environment is what every app surface draws in: no widget
         // rendering mode, standard contrast.
         let resolved = GlowGrey().resolve(in: EnvironmentValues())
-        #expect((components(resolved).r * 255).rounded() == 36)
+        #expect((components(resolved).r * 255).rounded() == 43)
         #expect(components(resolved).a == 1)
     }
 
