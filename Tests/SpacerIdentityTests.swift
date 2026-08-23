@@ -102,57 +102,15 @@ struct SpacerIdentityTests {
 
         #expect(try store.toggleCompletion(for: spacer, on: today) == .refused)
         #expect(try store.addCompletion(for: spacer, on: today) == 0)
-        #expect(try store.recordTap(for: spacer, on: today) == 0)
         #expect(try store.clearDay(for: spacer, on: today) == 0)
         #expect(try context.fetch(FetchDescriptor<Completion>()).isEmpty)
     }
 
-    @Test("A per-day habit refuses a day toggle")
-    func cadenceMismatchIsRefused() throws {
-        // A ring is not a row of days: one tap there means "one more", not
-        // "done". A week-shaped write against it is a caller that is out of
-        // date about the cadence.
-        let context = try makeContext()
-        let store = makeStore(context)
-        let water = try store.addHabit(name: "Water", icon: "💧", frequency: .timesPerDay(6))
-
-        #expect(try store.toggleCompletion(for: water, on: today) == .refused)
-        #expect(try context.fetch(FetchDescriptor<Completion>()).isEmpty)
-        // And the ring's own write still works, because that is its surface.
-        #expect(try store.recordTap(for: water, on: today) == 1)
-    }
-
-    // MARK: - Whose layout a blank row belongs to
-
-    @Test("Adding a Today habit does not consume This Week's blank row")
-    func perDayHabitDoesNotTakeASpacer() throws {
-        // Today has no blank-row layout, so filling one would remove a gap
-        // somebody placed on a screen the new habit never appears on.
-        let context = try makeContext()
-        let store = makeStore(context)
-        try store.addSpacer()
-
-        let water = try store.addHabit(name: "Water", icon: "💧", frequency: .timesPerDay(6))
-
-        let all = try rows(context)
-        #expect(all.count == 2)
-        #expect(all.contains { $0.isSpacer }, "the blank row is still there")
-        #expect(!water.isSpacer)
-        #expect(water.sortOrder > (all.first { $0.isSpacer }?.sortOrder ?? 0))
-    }
-
-    @Test("Deleting a Today habit does not leave This Week a blank row")
-    func perDayHabitLeavesNoSpacer() throws {
-        let context = try makeContext()
-        let store = makeStore(context)
-        let water = try store.addHabit(name: "Water", icon: "💧", frequency: .timesPerDay(6))
-        try store.recordTap(for: water, on: today)
-
-        try store.delete(water)
-
-        #expect(try rows(context).isEmpty, "the row is gone, not blanked")
-        #expect(try context.fetch(FetchDescriptor<Completion>()).isEmpty)
-    }
+    // The three tests that stood here were about the per-day kind: that a ring
+    // refused a day toggle, that adding one did not consume This Week's blank
+    // row, and that deleting one left none behind. All three are on
+    // `feature/daily-habits-2.0` with the kind they described (#209). What is
+    // left below is the rule they were guarding, which was never theirs.
 
     @Test("A weekly habit still leaves and still takes a blank row")
     func weeklyBehaviourIsUnchanged() throws {

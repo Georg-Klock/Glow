@@ -7,10 +7,11 @@ import Testing
 /// The distinction is structural, not stylistic. `EditButton` toggles the
 /// binding it finds in *its* environment — the one the `NavigationStack` around
 /// it provides — so a view that reads `@Environment(\.editMode)` sees the live
-/// value exactly when it is a descendant of that stack. `TodayView` is not: its
-/// own `body` builds the stack, so the value it would read is its parent's, and
-/// it read `.inactive` forever while the button animated to Done (that is the
-/// trap in CLAUDE.md, and it cost a real bug). `HabitRowView` and
+/// value exactly when it is a descendant of that stack. A view whose own `body`
+/// builds the stack is not: the value it would read is its parent's, and it
+/// reads `.inactive` forever while the button animates to Done (that is the
+/// trap in CLAUDE.md, and it cost a real bug — on the Today screen, which is no
+/// longer here to demonstrate it, #209). `HabitRowView` and
 /// `WeekdayHeader` are descendants, so they read it directly and #164's fade
 /// rests on that.
 ///
@@ -51,9 +52,9 @@ struct EditModeTests {
 
     /// Whether this text *declares* the read, rather than talking about it.
     ///
-    /// `TodayView`'s doc comment quotes the spelling in the course of
-    /// explaining why it cannot use it, and a plain substring search called
-    /// that a violation. The scan has to see code, so it looks for the property
+    /// A doc comment can quote the spelling in the course of explaining why a
+    /// view cannot use it — one did, and a plain substring search called that a
+    /// violation. The scan has to see code, so it looks for the property
     /// wrapper at the head of a line.
     private func declaresEnvironmentRead(_ text: String) -> Bool {
         text.split(separator: "\n").contains { line in

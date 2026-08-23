@@ -172,8 +172,8 @@ struct HistoryProjectionTests {
                     )
                 )
                 #expect(
-                    GoalMet.justMet(habit: part, in: shown, today: today, calendar: calendar)
-                        == GoalMet.justMet(habit: full, in: shown, today: today, calendar: calendar)
+                    GoalMet.justMet(habit: part, in: shown)
+                        == GoalMet.justMet(habit: full, in: shown)
                 )
             }
         }

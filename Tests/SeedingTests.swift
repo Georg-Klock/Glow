@@ -47,16 +47,13 @@ struct SeedingTests {
         #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
     }
 
-    @Test("Every seeded week row is open today")
+    @Test("Every seeded row is open today")
     func seededHabitsAreOpenToday() throws {
-        // The weekly cadences only. A per-day habit has no week row at all —
-        // it is one ring on Today — so asking `WeekGrid` about it would assert
-        // against the backstop that draws nothing rather than against a habit.
         let context = try makeContext()
         try seeder(context, makeDefaults()).seedIfNeeded(now: today)
 
         let week = WeekCalendar.week(containing: today, calendar: calendar)
-        let rows = try context.fetch(FetchDescriptor<Habit>(predicate: Habit.countedPerWeek))
+        let rows = try context.fetch(FetchDescriptor<Habit>(predicate: Habit.weekly))
         for habit in rows where !habit.isSpacer {
             let slots = WeekGrid.slots(
                 for: habit.snapshot(calendar: calendar), in: week, today: today,
@@ -66,24 +63,9 @@ struct SeedingTests {
         }
     }
 
-    @Test("Every seeded ring has its whole day still to do")
-    func seededRingsAreOpenToday() throws {
-        // Today's half of the same claim: a fresh install's rings are empty,
-        // with every repetition open, because nothing has been logged yet.
-        let context = try makeContext()
-        try seeder(context, makeDefaults()).seedIfNeeded(now: today)
-
-        let rings = try context.fetch(FetchDescriptor<Habit>(predicate: Habit.countedPerDay))
-        #expect(rings.count == DefaultHabits.perDay.count)
-        for habit in rings {
-            #expect(!habit.isSpacer, "\(habit.name) is a blank row on Today")
-            let target = try #require(habit.frequency.dailyTarget)
-            let arcs = DayRing.arcs(target: target, done: 0)
-            let open = arcs.filter(\.isOpen).count
-            #expect(arcs.count == target, "\(habit.name)")
-            #expect(open == target, "\(habit.name)")
-        }
-    }
+    // The seeded rings' own claim — every repetition of every per-day default
+    // still open on a fresh install — went with `DayRing` and the five habits
+    // it drew (#209). See `feature/daily-habits-2.0`.
 
     @Test("A perfect habit really is perfect, and an uneven one is not")
     func formsProduceTheirRates() throws {
@@ -256,7 +238,6 @@ struct SeedingTests {
         let cadences = Set(DefaultHabits.all.map(\.frequency))
         #expect(cadences.contains(.daily))
         #expect(cadences.contains { if case .timesPerWeek = $0 { true } else { false } })
-        #expect(cadences.contains { if case .timesPerDay = $0 { true } else { false } })
     }
 
     @Test("A seven-a-week default is written as daily")
@@ -306,27 +287,25 @@ struct SpacerTests {
         #expect(spans.isEmpty)
     }
 
-    @Test("The weekly rows fit a large widget")
+    @Test("The seed set fits a large widget")
     func defaultsFitTheWidget() {
         // Eight habits and two blank rows is ten, inside the eleven a large
         // widget holds — see WidgetMetricsTests. Not a number the set was
         // built to hit: three clusters need two dividers, and ten is what that
         // comes to. What is asserted is that it fits.
-        #expect(DefaultHabits.weekly.count == 10)
-        #expect(DefaultHabits.weekly.count <= WidgetMetrics.largeRowCapacity)
-        #expect(DefaultHabits.weekly.count(where: \.isSpacer) == 2)
-        #expect(DefaultHabits.weekly.count(where: { !$0.isSpacer }) == 8)
+        #expect(DefaultHabits.all.count == 10)
+        #expect(DefaultHabits.all.count <= WidgetMetrics.largeRowCapacity)
+        #expect(DefaultHabits.all.count(where: \.isSpacer) == 2)
+        #expect(DefaultHabits.all.count(where: { !$0.isSpacer }) == 8)
     }
 
-    @Test("Blank rows are the grid's, and only the grid's")
-    func spacersAreWeeklyOnly() {
-        // `countedPerWeek` is `timesPerDay == 0`, which a blank row satisfies
-        // and a per-day habit never does — so a spacer among the per-day five
-        // would be a row Today could not draw and the grid could not see.
-        let spacersOnToday = DefaultHabits.perDay.count(where: \.isSpacer)
-        #expect(DefaultHabits.perDay.count == 5)
-        #expect(spacersOnToday == 0)
-        #expect(DefaultHabits.weekly.count + DefaultHabits.perDay.count == DefaultHabits.all.count)
+    @Test("The seed set holds nothing the app cannot draw")
+    func seedIsAllWeekly() {
+        // It held five per-day habits until #209, and the split between them
+        // and the grid's rows was what this asserted. What is left is the
+        // claim underneath it: every template seeds a row the week grid draws,
+        // which is what `Habit.weekly` then fetches back.
+        #expect(DefaultHabits.all.allSatisfy { $0.frequency.slotCount != nil })
     }
 
     @Test("The blank rows fall between clusters, never at either end")
@@ -334,7 +313,7 @@ struct SpacerTests {
         // A blank row at the top or the bottom of the grid is padding; between
         // two habits it is a divider. Three clusters, so the dividers are
         // interior and never adjacent.
-        let isSpacer = DefaultHabits.weekly.map(\.isSpacer)
+        let isSpacer = DefaultHabits.all.map(\.isSpacer)
         let adjacent = zip(isSpacer, isSpacer.dropFirst()).filter { $0 && $1 }.count
         #expect(isSpacer.first == false)
         #expect(isSpacer.last == false)
@@ -509,7 +488,7 @@ struct ResetToDefaultsTests {
         let mine = try store.addHabit(name: "Mine", icon: "star", frequency: .daily, now: today)
         try store.addSpacer(now: today)
         let counted = try store.addHabit(
-            name: "Water", icon: "drop", frequency: .timesPerDay(3), now: today
+            name: "Water", icon: "drop", frequency: .timesPerWeek(3), now: today
         )
         _ = try store.toggleCompletion(for: mine, on: today)
         _ = try store.toggleCompletion(for: mine, on: TestCalendar.date(2026, 8, 18))

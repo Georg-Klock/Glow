@@ -10,15 +10,17 @@ is absence: a missed day, a day still to come, a rep that ran out of days.
 
 That single rule decides more than it looks like it does, and the corollary is
 that **light cannot also be what separates open from done** — so shape carries
-that instead. A slot open today is a ring and a completion is a dot; a
-repetition still open on the Today ring is an outlined band and a logged one is
-a line. Both lit, different silhouettes.
+that instead. A slot open today is a ring and a completion is a dot: both lit,
+different silhouettes.
 
-This paragraph used to say the glow was "not a reward for finishing", and the
-Today ring was built to match: it painted a logged repetition grey and was the
-one surface in the app where a completion went dark. The rule it was reaching
-for is real — brightness must not mean *well done* — but grey for a completion
-overshot it into contradicting §1. See #75 and docs/decisions.md.
+The rule was settled on a surface that is no longer here. This paragraph used to
+say the glow was "not a reward for finishing", and the Today ring was built to
+match: it painted a logged repetition grey and was the one surface in the app
+where a completion went dark. The rule it was reaching for is real — brightness
+must not mean *well done* — but grey for a completion overshot it into
+contradicting §1. See #75 and docs/decisions.md. The ring itself went to
+`feature/daily-habits-2.0` with the rest of the per-day kind (#209); what it
+settled did not go with it.
 
 ## Read first
 
@@ -31,7 +33,7 @@ overshot it into contradicting §1. See #75 and docs/decisions.md.
   writeup says why.
 - **There is no design-system document, on purpose.** Colour, type, geometry and
   effects live in the code that draws them and nowhere else: `GlowPalette`,
-  `GlowShape`, `WidgetMetrics`, `SlotLayout`, `DayRing`. Read those. Two
+  `GlowShape`, `WidgetMetrics`, `SlotLayout`. Read those. Two
   documents used to publish the same numbers and both drifted — see
   `docs/decisions.md`.
 - `docs/decisions.md` — questions already settled, and why. Reopening one is a
@@ -149,6 +151,17 @@ lives has already been seen to differ between platform versions.
   and `restDay:` do, read once at the view, widget or store boundary. The rest
   day was the exception and cost four issues in one night (#105, #168, #175,
   #179) before #181 removed it; `TestIsolationTests` now scans for the read.
+
+- **Per-day habits are on `feature/daily-habits-2.0`, not in the app** (#209).
+  `Frequency.timesPerDay`, the Today screen, the Today ring and the two Today
+  widget families were built, shipped, and pulled back to 2.0 scope. The branch
+  is the snapshot; do not reconstruct them from `git log`.
+
+  **"Daily" is two different things and only one of them left.**
+  `Frequency.daily` is a *weekly* cadence due all seven days — seven columns on
+  the week grid, Gratitude and Early night in the seed set — and it is
+  untouched. Anything that reads like removing week-grid behaviour is the wrong
+  one.
 - **When behaviour changes, update the docs in the same session.** Drifted docs
   are worse than none.
 - **Machine-local values are never committed.** `Tools/local.env`,

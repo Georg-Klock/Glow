@@ -19,14 +19,18 @@ final class Habit {
     var isDaily: Bool = true
     /// Only meaningful when `isDaily` is false.
     var timesPerWeek: Int = 3
-    /// How many times a day, or **zero for a habit counted across a week**.
+    /// **Always zero in a shipped build, and kept anyway** (#209).
     ///
-    /// A sentinel rather than a third discriminator column beside `isDaily`,
-    /// because two columns that both claim to say which kind a habit is can
-    /// disagree, and then something has to decide which one wins. Zero is safe
-    /// by construction: `Frequency(timesPerDay:)` clamps into 1...12, so no real
-    /// per-day habit can store it, and every row written before this existed
-    /// reads back as exactly what it was.
+    /// This is what a per-day habit stored: how many repetitions a day it asked
+    /// for, with zero meaning "counted across a week instead". The per-day kind
+    /// is out of the app — see `Frequency` — so nothing writes anything but zero
+    /// here any more.
+    ///
+    /// The column stays for two reasons. Dropping it is a schema change, and the
+    /// stored shape is deliberately sync-ready rather than minimal. And it is
+    /// what `DailyHabitMigration` finds the leftover rows *by*: a store seeded by
+    /// a build that shipped the feature holds habits with a value in here, and
+    /// nothing else on the row says so.
     var timesPerDay: Int = 0
     /// Retained so the stored schema does not change. The app committed to a
     /// single colour, so nothing reads this; dropping the column would be a
@@ -71,42 +75,45 @@ final class Habit {
         self.frequency = frequency
     }
 
+    /// The cadence, read off the two columns that store it.
+    ///
+    /// A row left over from the per-day kind — `timesPerDay > 0` — reads back as
+    /// whatever weekly cadence its other columns hold, because those were never
+    /// cleared when it was switched to per-day. It is not drawn from a nonsense
+    /// value; it is drawn from the cadence it had before, which is the same
+    /// answer switching the kind back used to give. `DailyHabitMigration`
+    /// deletes those rows at launch, so this is what the widget sees in the
+    /// window before that runs and nowhere else.
     var frequency: Frequency {
-        get {
-            if timesPerDay > 0 { return .timesPerDay(timesPerDay) }
-            return isDaily ? .daily : Frequency(timesPerWeek: timesPerWeek)
-        }
+        get { isDaily ? .daily : Frequency(timesPerWeek: timesPerWeek) }
         set {
+            timesPerDay = 0
             switch newValue {
             case .daily:
-                timesPerDay = 0
                 isDaily = true
             case .timesPerWeek(let count):
-                timesPerDay = 0
                 isDaily = false
                 timesPerWeek = count
-            case .timesPerDay(let count):
-                // The weekly columns are left as they were on purpose: a habit
-                // switched to per-day and back should come out of it with the
-                // cadence it went in with.
-                timesPerDay = count
             }
         }
     }
 
-    /// Counted within a day rather than across a week.
-    var isCountedPerDay: Bool { timesPerDay > 0 }
-
-    /// What the week-shaped surfaces fetch: the weekly cadences, plus the blank
-    /// rows that hold their positions. One definition rather than the same
-    /// clause written into the grid, the year view and the widget separately,
-    /// where the three could drift and only two would be noticed.
-    static let countedPerWeek = #Predicate<Habit> { $0.timesPerDay == 0 }
-
-    /// What Today fetches: the several-times-a-day habits, and nothing else.
-    /// The complement of `countedPerWeek` — a spacer holds a position in the
-    /// week grid, so it belongs to that side and never appears here.
-    static let countedPerDay = #Predicate<Habit> { $0.timesPerDay > 0 }
+    /// What every habit-shaped surface fetches.
+    ///
+    /// The clause is unchanged and it is deliberately not `true` (#209). It used
+    /// to be the *kind* discriminator — the weekly cadences and the blank rows
+    /// holding their positions, as against Today's per-day habits — and with the
+    /// per-day kind gone there is nothing left for it to exclude except the rows
+    /// that kind wrote. Those rows are real: an install updating from a build
+    /// that shipped the feature holds them until `DailyHabitMigration` runs, and
+    /// **the widget's process never runs it**, so a home screen that redraws
+    /// before the app is next opened would otherwise show habits the app no
+    /// longer has a screen for.
+    ///
+    /// So this is a residue filter now, not a kind, and the name says the side
+    /// it keeps rather than the split it used to make. It can go when
+    /// `DailyHabitMigration` does, and not before.
+    static let weekly = #Predicate<Habit> { $0.timesPerDay == 0 }
 
     /// How many completions fall on each civil day that has any.
     ///
@@ -125,11 +132,16 @@ final class Habit {
     /// what a surface drawing a week or a month or a year calls, and which reads
     /// those days rather than all of them.
     ///
-    /// A weekly-cadence habit only ever reaches one per day. A per-day habit is
-    /// the reason this is a count and not a set — and the reason a repetition is
-    /// stored as its own row rather than as a number on a single row. Rows merge
-    /// when two devices sync; a counter is last-writer-wins, so two glasses of
-    /// water logged on two devices would come back as one.
+    /// A weekly-cadence habit only ever reaches one per day, so in a shipped
+    /// build every value here is one. It is a count and not a set because a day
+    /// **can** hold more than one row: the per-day kind put several there while
+    /// it shipped (#209), and a store written before this migration can still
+    /// hold a legacy double from the day-identity bug (#130). Both are seen as
+    /// the number they are rather than flattened on the way in.
+    ///
+    /// A completion is its own row rather than a number on the habit for a
+    /// reason that outlives the per-day kind: rows merge when two devices sync,
+    /// and a counter is last-writer-wins.
     var completionDayCounts: [DayID: Int] {
         liveCompletions.reduce(into: [:]) { counts, completion in
             counts[completion.dayID, default: 0] += 1
@@ -257,7 +269,7 @@ final class Habit {
     /// `snapshot()` when there is no range.
     ///
     /// Habits outside `habits` are dropped rather than returned, so a caller
-    /// that fetched the weekly cadences does not also get the per-day ones.
+    /// that fetched a filtered list gets counts for exactly that list.
     ///
     /// **This is not a cache and nothing here is remembered** — see
     /// `snapshots(of:within:calendar:)` for why not.

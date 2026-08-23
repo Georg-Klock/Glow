@@ -33,9 +33,13 @@ sentence with an exception is two sentences.
 - Logging a habit is one tap from the weekly grid.
 - The glow renders on EDR-capable devices and degrades to plain colour where it
   cannot, with no broken state either way.
-- Two kinds of habit, never mixed: counted across a week (daily, or
+- ~~Two kinds of habit, never mixed: counted across a week (daily, or
   N-times-per-week with no day pinning), or counted within a day (N times
-  today, resetting with the day). See docs/vision.md.
+  today, resetting with the day).~~ **One kind: counted across a week**
+  (#209). The per-day kind shipped, and it is 2.0 scope rather than MVP — it
+  is preserved whole on `feature/daily-habits-2.0`, along with the Today
+  screen and the two Today widget families it was drawn on. It was built; it
+  is not shipping yet. See docs/vision.md.
 
 ## 3. Non-goals (v1)
 
@@ -43,11 +47,12 @@ sentence with an exception is two sentences.
   the model is normalized now, which is why it is.
 - **No fixed-weekday schedules.** "Every Mon/Wed/Fri" is out of scope.
   Frequency habits are pure count-based; any day counts.
-- ~~**No multiple completions per day.** A habit is done or not done for a
-  day.~~ **A per-day habit holds several.** The vision added a second kind of
-  habit — done several times within one day — and each repetition is its own
-  `Completion` row. For weekly-cadence habits the old sentence still holds,
-  enforced by `toggleCompletion`.
+- **No multiple completions per day.** A habit is done or not done for a
+  day, enforced by `toggleCompletion`. This was struck through while the
+  per-day kind shipped — each repetition was its own `Completion` row — and it
+  stands again (#209). A row is still the storage shape, and a day can still
+  be found holding two: a store written before day identities can carry a
+  duplicate (#130), and `clearDay` is what puts one right.
 - **No notifications or reminders.**
 - ~~**No export.**~~ **There is one.** Settings → Data → Export History writes
   a CSV or a JSON file and hands it to the share sheet. No account, no
@@ -79,8 +84,8 @@ sentence with an exception is two sentences.
 
   **One exception, and it is bounded** (#58). Something logged from the home
   screen makes the Dynamic Island say so for two seconds. The non-goal above is
-  about the surfaces that *record state*: the grid, the rings, the widgets, all
-  of which say one thing in one register. The pop is outside all of them, it is
+  about the surfaces that *record state*: the grid and the widgets, both of
+  which say one thing in one register. The pop is outside all of them, it is
   transient, and nothing it says persists. No streak is counted, no badge is
   kept, and the grid is identical whether it fired or not.
 
@@ -99,20 +104,21 @@ sentence with an exception is two sentences.
   the same two seconds, because a compact Island state has room for one short
   phrase and not two.
 
-  **A correction says nothing.** Un-logging a day, and the tap that resets a
-  full ring to zero, both fire no pop. An acknowledgement for taking something
+  **A correction says nothing.** Un-logging a day fires no pop. An acknowledgement for taking something
   back is the app congratulating somebody for an undo.
 
   **One pop at a time, whose words change** (#102). Two goals met inside the
-  two seconds is not an edge case — the medium Today widget puts three rings
-  side by side so they can be tapped in a flurry. A second goal updates the
+  two seconds is not an edge case — the medium Today widget put three rings
+  side by side so they could be tapped in a flurry, and the week widget puts a
+  column of slots there now. A second goal updates the
   running activity rather than requesting another; the ending belongs to the
   most recent one, so nothing is cut short.
 
   **It fires from the home screen only** (#103). The Island does not render a
   Live Activity while its own app is in the foreground, so a goal met inside
   the app would spend its two seconds on nobody. `GoalPopCentre` is called from
-  `TapHabitIntent` and `ToggleHabitIntent` and from nowhere else; the app's
+  `ToggleHabitIntent` and from nowhere else — it was two intents until #209
+  took the ring's away; the app's
   acknowledgement is the one it already had, which is the ring closing and the
   row going quiet.
 
@@ -123,9 +129,9 @@ sentence with an exception is two sentences.
 ## 4. Data model
 
 ```swift
-enum Frequency { case daily, timesPerWeek(Int), timesPerDay(Int) }
+enum Frequency { case daily, timesPerWeek(Int) }
 // timesPerWeek: 1...6 selectable, 7 collapses to .daily
-// timesPerDay: 1...12, one ring arc per repetition
+// timesPerDay(Int) was a third case; see feature/daily-habits-2.0 (#209)
 
 struct Habit    { id, name, icon, frequency, accent, createdAt, sortOrder }
 struct Completion { id, habitId, dayKey, day }     // dayKey is the identity
@@ -163,9 +169,9 @@ A build that violates one of these is broken regardless of what else works.
   one** (#117): the view pages back as far as the record reaches, capped at
   twelve weeks, and a week entirely in the past is editable end to end. Forward
   stops at the current week.
-- **R3.** For a weekly-cadence habit, a day holds zero or one completion.
-  Never two. A per-day habit stores one completion row per repetition, so a
-  day holds up to its target.
+- **R3.** A day holds zero or one completion. Never two. The per-day kind was
+  the exception — one row per repetition, up to the habit's target — and it is
+  gone (#209).
 - **R4.** A completion names one civil day and keeps naming it. Changing time
   zone, crossing a DST transition or relaunching does not move it, and a
   completion the app can see is a completion the app can un-log.
@@ -367,9 +373,10 @@ ends instead of being sliced flat at them.
 
 The grid draws the cut as one vertical line down the rest day's column, in the
 missed cross's grey — absence, which does not glow.
-Per-day habits are untouched: Today's rings stay tappable, because water and a
-walk are not the thing the rest is from. This reverses "resting is permission,
-not a prohibition" — see docs/decisions.md.
+This reverses "resting is permission, not a prohibition" — see
+docs/decisions.md. The exception it carried, that Today's rings stayed tappable
+on a rest day because water and a walk are not what the rest is from, went with
+the rings (#209).
 
 **How the cut is drawn.** One line at the span bar's own weight — 2pt, absolute,
 `GlowShape.barThickness` — so it reads as part of the grid rather than as a
@@ -384,83 +391,38 @@ line ends on the same hairline that marks where the widget ends. A blank row
 either end is outside it. All three week widget families draw it, on the same
 `RestCut` numbers the app uses.
 
-**A per-day habit has no slots and no week row.** It is drawn on Today as a
-ring, one segment per repetition, consumed clockwise from the top — see
-`DayRing` and docs/vision.md.
+**The Today ring is not in this build** (#209). A per-day habit had no slots
+and no week row: it was drawn on Today as a ring, one segment per repetition,
+consumed clockwise from the top — open a lit outlined band, logged a lit line,
+consecutive logged ones merging into one unbroken run that closed into a full
+circle at the goal. A tap was one more, and a tap on a full ring reset the day
+to zero. All of it is on `feature/daily-habits-2.0`, and the paragraphs that
+described it here are in this file's history at that branch's tip rather than
+summarised badly above. What it settled that outlives it is in
+docs/decisions.md: light marks the habit at every shape, and #75's reversal of
+the ring's grey is what closed the last surface where a completion went dark.
 
-**Open is a band, done is a line, and both are lit.** A repetition still open is
-an outlined pill: the annulus between the ring's two radii, bounded by its two
-angles, corners rounded, its interior left clear and its perimeter a glowing
-hairline. A logged repetition is a thin glowing line on the band's centreline,
-and consecutive logged ones **merge into one unbroken run** — the line crosses
-the gaps between them, and the divisions only survive between repetitions still
-open. That is the week grid's rule at a different shape: a run of days there is
-one bar, not a row of dots.
+**Reduce Motion snaps every drawing of a completion.** One completion is drawn
+three ways — the ring closing in a slot, the bar closing across a span, the
+row's label dimming beside them — and the setting switches off all three, along
+with the press that grows a mark under a fingertip. It was four while the Today
+ring's sweep shipped. What the setting produces is the final state with nothing
+scheduled in between: a shorter animation is still an animation. `MotionPolicy`
+holds the rule; the widget's own completion carries it too, recorded at the tap
+and spent on a timeline of one still entry.
 
-**At the goal the line closes into a full circle**, with no break at twelve
-o'clock where the first gap was: when nothing is left there is nothing to
-divide. A target of 1 is an outlined pill too — two concentric circles with a
-black band between them — closing to that same single circle, so "finished" is
-one silhouette at every count.
+**This Week creates and edits its habits through one editor.** It carries the
+trailing pair — Edit, then add — and the pair belongs to the current week only
+(#207): paged back, the trailing slot holds **Today** instead, because
+reordering, deleting and adding are properties of the list and mean nothing
+more three weeks ago than they mean now. The editor opened on the adding
+screen's *kind* while there were two of them (#209); there is one, so it opens
+on the count and nothing else.
 
-Everything scales from the diameter (`DayRingGeometry`), so the app's 92pt ring
-and the two widget rings are one drawing at three sizes. This ring used to paint
-a logged repetition grey, which made it the one surface in the app where a
-completion went dark, against §1 (#75).
-
-**A tap sweeps.** The line grows clockwise out of the run already logged and
-the pill retreats ahead of its head — one number driving both, which is the
-grammar `SlotView` and `SpanView` already use, expressed as an angle instead of
-a diameter. It starts at the end of the existing run rather than at the new
-segment, so it crosses the gap between them on its way; that crossing *is* the
-merge. The last repetition runs a full turn and closes the circle. 0.35s,
-`.easeOut` — a sweep has nothing past its end to overshoot into, so the closing
-spring does not transfer.
-
-This is the completion transition §3 allows, not idle motion: nothing on any
-surface moves on its own, and a lit mark still holds still.
-
-**Reduce Motion snaps every drawing of it**, not only this one. One completion
-is drawn four ways — the ring closing in a slot, the bar closing across a span,
-the row's label dimming beside them, the line sweeping round this ring — and
-the setting switches off all four, along with the press that grows a mark under
-a fingertip. What it produces is the final state with nothing scheduled in
-between: a shorter animation is still an animation. `MotionPolicy` holds the
-rule; the widget's own completion already carried it, recorded at the tap and
-spent on a timeline of one still entry. **Everything other
-than a repetition being logged snaps.** The reset is instant, because animating
-a correction dresses a mistake up as an achievement. Any jump other than +1 is
-instant — a tap arriving from the widget, a day rolling over, an edit — because
-none of those is a gesture made on this ring. Reduce Motion snaps. The widget
-does not run it at all: a tap there goes through `TapHabitIntent` and WidgetKit
-renders the next entry, and all that is asked is that it lands on the settled
-drawing.
-
-**A tap on the ring is one more.** Once the ring is full, the next tap resets
-the day to zero — the reset is the whole undo, and the day's completion rows
-are genuinely deleted, not marked over. The rule is `DayRing.countAfterTap`,
-applied by `HabitStore.recordTap`, so the app and the widget cannot disagree
-about what a tap means. From the home screen the same tap goes through
-`TapHabitIntent` without opening the app; the Today widget that will use it
-arrives with #19.
-
-**Both screens create and edit their own habits, through one editor.** Today
-and This Week carry the same trailing pair — Edit, then add — so the two tabs
-wear one piece of chrome rather than two that resemble each other. On This Week
-the pair belongs to the current week only (#207): paged back, the trailing slot
-holds **Today** instead, because reordering, deleting and adding are properties
-of the list and mean nothing more three weeks ago than they mean now. Adding from
-a screen opens the editor on that screen's kind, so what you make appears
-where you made it: Today opens on **Daily**, This Week on **Weekly**. Today's
-add is a plain button rather than This Week's menu, because a blank row holds
-a position in the week grid and there is no grid here to hold one in.
-
-**A blank row belongs to This Week, and only weekly habits touch it** (#143).
-Adding a Today habit never fills one, and deleting a Today habit never leaves
-one — otherwise a screen with no blank-row layout would be silently rearranging
-a screen that has. A weekly habit still leaves its position behind when it goes
-and the next weekly habit still takes it, which is the rule that makes the grid
-something you can arrange.
+**A blank row is This Week's layout** (#143). A habit leaves its position
+behind when it goes and the next habit takes it, which is the rule that makes
+the grid something you can arrange. The clause that kept per-day habits out of
+that — they never filled a blank row and never left one — went with them.
 
 **A deleted habit does not keep its identity** (#129). The row survives; the
 `id` does not. Widget configurations and widget intents both resolve habits by
@@ -472,13 +434,13 @@ same reasoning as the rest day's refusal: the widget runs in a second process
 and its surface can outlive what it draws, so the rule lives on the write path
 both processes share.
 
-**"Daily" means two different things, and only one of them is on screen.** The
-editor's `Daily` segment means *counted within a day* — a ring on Today, N
-repetitions that reset at midnight. The model's `Frequency.daily` means a
-seven-times-a-week cadence, which is a *weekly* habit and sits under `Weekly`;
-it is why "7x per week" is the wording for the everyday case rather than a
-separate mode. The label is what the person reads; the enum keeps its name
-because `Habit.countedPerDay` and `countedPerWeek` are built on it.
+**"Daily" meant two different things, and one of them is gone** (#209). The
+editor had a `Daily` segment meaning *counted within a day* — a ring on Today,
+N repetitions resetting at midnight — beside a `Weekly` one. That segment, and
+the picker holding it, came out with the kind. `Frequency.daily` is the sense
+that remains and always was the weekly one: a seven-times-a-week cadence, which
+is why "7x per week" is the wording for the everyday case rather than a
+separate mode.
 
 **Every slot in the week view is a plain button** (#116). No edit mode, no long
 press, no confirmation: a tap on Monday marks or un-marks Monday, exactly as a
@@ -541,11 +503,6 @@ in the vacated track, which would leave them a third of the way across. A blank
 row has nothing to fade and nothing to centre; it shows the two controls and the
 gap it stands for. Reduce Motion snaps the change rather than shortening it.
 
-**Edit changes what a ring's tap means** rather than adding a second control
-beside it: out of edit mode a tap counts, in edit mode it opens that habit in
-the editor, where renaming, re-targeting and deleting already live. Today is a
-grid of rings, not a `List`, so there is nothing for edit mode to reorder.
-
 ## 8. Acceptance criteria
 
 - [x] A daily habit shows exactly 7 circles for the current Monday-Sunday week.
@@ -571,7 +528,8 @@ given room, which stays a matter of looking at it.
 
 ## 9. The widgets
 
-Two widgets, reading the same store through an App Group.
+Two widgets, reading the same store through an App Group. They were three
+until #209.
 
 **The week widget**: three families. Today's slot is a button backed by an
 `AppIntent`, so a habit can be logged from the home screen without launching
@@ -584,33 +542,32 @@ Rows are as many as fit, then a hard cut — no "+N more" row, per
 docs/vision.md: a row spent saying how much is missing is a row not showing a
 habit. The app's own grid marks the boundary, where there is room to say it.
 
-**The Today widget**: small and medium, and deliberately no large — three
-rings already say everything it could. Small is one habit's ring, and the
-person picks which habit per widget, so several small widgets can sit on one
-home screen showing different habits. Medium is the first three per-day
-habits in the user's own order, all the same size, with nothing to configure.
+**The Today widget is not in this build** (#209). It was small and medium —
+one configurable habit's ring, and the first three per-day habits — and it went
+with the kind it drew. Its kind strings, `GlowTodaySmall` and `GlowTodayMedium`,
+are removed rather than renamed, so a placed Today widget leaves the Home Screen
+with the extension that drew it. That is what pulling a feature costs, and it is
+intended.
 
 **The month widget**: small only, one weekly-cadence habit's calendar month
 as marks on weekday columns — the same marks the week draws, decided by
 `MonthGrid` asking `WeekGrid`, so the two surfaces cannot disagree about a
 day. The 1st sits under the weekday it really falls on, so the first and last
-rows are ragged. The habit is chosen per widget; per-day habits are not
-selectable, because their day is a count, not a yes. Today's dot is a button
+rows are ragged. The habit is chosen per widget. Today's dot is a button
 through `ToggleHabitIntent` — no other day is, which is R2 in a third grid —
 and everything else opens This Week. Two readings held deliberately small
 until decided otherwise (#41): an N×/week habit's empty days are sockets,
 never crosses — the week grid's own rule, not a per-week verdict — and rest
 days get no month-specific treatment beyond what `WeekGrid` already says
 about them.
-Each ring is a button backed by `TapHabitIntent`: one more repetition, or the
-reset from a full ring, without leaving the home screen.
 
 **The widget chooses the screen.** A widget's surface divides in two: the
 marks act in place through their intents and open nothing, and everything
-else opens the app on that widget's own screen — `glow://today` from the
-rings, `glow://week` from the grid, mapped by `DeepLink` in `Logic/`. There
-is no fixed landing tab; a cold launch opens This Week, since the app icon
-has no widget to ask.
+else opens the app on that widget's own screen — `glow://week`, mapped by
+`DeepLink` in `Logic/`. `glow://today` was the other one and went with the
+Today screen (#209); it now means nothing rather than landing somebody on
+This Week uninvited. Every launch opens This Week, which is what a cold
+launch already did.
 
 Nothing breathes, anywhere. The widget's pulse was built, measured working
 (WidgetKit renders sub-minute entries, contrary to its reputation), and removed:

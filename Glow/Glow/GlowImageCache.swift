@@ -72,15 +72,6 @@ enum GlowShape: Equatable {
 
     /// Stroke width of `.ring`. 3pt on a 35pt slot in the design file.
     static let ringWeight: CGFloat = 3.0 / 35.0
-    /// The Today ring's hairline: the weight of a pill's outline and of a
-    /// logged repetition's line, as a multiple of the ring's diameter.
-    ///
-    /// A fifth of `ringWeight`, and one constant for both marks — which is what
-    /// makes that ring read as one drawing rather than as two things sharing a
-    /// circle. On the app's 92pt ring it lands on 1.58, within a rounding error
-    /// of the 1.5pt hairline the week grid already uses; the fraction is the
-    /// source, not the point value. See `DayRingGeometry`.
-    static let ringHairlineWeight: CGFloat = 3.0 / 175.0
     /// Diameter of `.dot`, in points.
     ///
     /// Fixed rather than a fraction of the slot: a day is a day, and the mark

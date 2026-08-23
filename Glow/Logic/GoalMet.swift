@@ -31,30 +31,22 @@ enum GoalMet {
         switch frequency {
         case .daily: Frequency.daysInWeek
         case .timesPerWeek(let n): n
-        case .timesPerDay(let n): n
         }
     }
 
     /// True when this habit's count has just reached its goal exactly.
     ///
-    /// A per-day habit counts today; everything week-shaped counts the week —
-    /// a daily habit included, whose goal is a perfect seven.
-    static func justMet(
-        habit: HabitSnapshot,
-        in week: Week,
-        today: Date,
-        calendar: Calendar = WeekCalendar.calendar
-    ) -> Bool {
+    /// Everything counts the week — a daily habit included, whose goal is a
+    /// perfect seven. The per-day branch that counted a single day went with the
+    /// kind it served (#209), and `today` and `calendar` went with it: they were
+    /// only ever read to find *which* day to count, and the week is now the only
+    /// window there is. A parameter nothing reads is a parameter a caller can
+    /// pass wrong for years without finding out.
+    static func justMet(habit: HabitSnapshot, in week: Week) -> Bool {
         guard !habit.isSpacer else { return false }
-        let day = WeekCalendar.day(today, calendar: calendar)
         let goal = target(of: habit.frequency)
         guard goal > 0 else { return false }
 
-        switch habit.frequency {
-        case .timesPerDay:
-            return habit.count(on: day) == goal
-        case .daily, .timesPerWeek:
-            return habit.completedDays.count { week.contains($0) } == goal
-        }
+        return habit.completedDays.count { week.contains($0) } == goal
     }
 }

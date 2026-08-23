@@ -55,13 +55,13 @@ struct WidgetRefreshTests {
         // had no reload at any call site before this change.
         try withSpy { spy, store, _ in
             let habit = try store.addHabit(name: "Read", icon: "📖", frequency: .timesPerWeek(3))
-            let water = try store.addHabit(name: "Water", icon: "💧", frequency: .timesPerDay(6))
+            let walk = try store.addHabit(name: "Walk", icon: "🚶", frequency: .daily)
             let spacer = try store.addSpacer()
             try store.update(habit, name: "Read more", icon: "📖", frequency: .timesPerWeek(4))
             try store.toggleCompletion(for: habit, on: today)
-            try store.recordTap(for: water, on: today)
-            try store.clearDay(for: water, on: today)
-            try store.reorder([habit, water, spacer], from: IndexSet(integer: 0), to: 2)
+            try store.addCompletion(for: walk, on: today)
+            try store.clearDay(for: walk, on: today)
+            try store.reorder([habit, walk, spacer], from: IndexSet(integer: 0), to: 2)
             try store.delete(habit)
             try store.delete(spacer)
 
@@ -177,10 +177,14 @@ struct WidgetRefreshTests {
         // instead — each `StaticConfiguration` reads its kind from `WidgetKind`,
         // so there is no second spelling to drift from.
         #expect(WidgetKind.week.rawValue == "GlowWidget")
-        #expect(WidgetKind.todaySmall.rawValue == "GlowTodaySmall")
-        #expect(WidgetKind.todayMedium.rawValue == "GlowTodayMedium")
         #expect(WidgetKind.month.rawValue == "GlowMonthSmall")
-        #expect(WidgetKind.allCases.count == 4)
+        // Two — `GlowTodaySmall` and `GlowTodayMedium` — were removed with the
+        // per-day kind (#209). Asserted as an absence as well as a count: a
+        // kind that came back under one of those strings would be serving a
+        // widget WidgetKit still has records of.
+        #expect(!WidgetKind.allNames.contains("GlowTodaySmall"))
+        #expect(!WidgetKind.allNames.contains("GlowTodayMedium"))
+        #expect(WidgetKind.allCases.count == 2)
         #expect(WidgetRefresh.allKinds == WidgetKind.allNames)
     }
 }

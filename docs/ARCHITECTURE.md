@@ -32,9 +32,13 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
 - `SlotLayout` is the row geometry, as a single formula that a 7-circle row and
   an N-pill row both go through.
 - `Frequency` normalizes cadence at construction, so no caller can build a
-  degenerate one. A habit is counted across a week or within a day, never
-  both; `slotCount` is nil for the per-day kind, so anything week-shaped has
-  to say what it means when there is no week.
+  degenerate one. **One kind, counted across a week** — there was a second,
+  counted within a day, and it is out of the shipped app and preserved on
+  `feature/daily-habits-2.0` (#209). `slotCount` stays optional with no case
+  answering nil: it was the per-day kind's, and flattening it now would rewrite
+  every caller in the change that removed the feature and again in the one that
+  restores it. `Frequency.daily` is not that kind and never was — it is a
+  weekly cadence due all seven days.
 - `DeepLink` is the widget-to-screen mapping: each widget's inert surface
   carries one URL, and the app lands on that widget's own screen. Unknown
   URLs map to nil and change nothing.
@@ -59,16 +63,10 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
   the view for the same reason `MotionPolicy` is — it stands in front of the
   one action that deletes everything at once, and a rule living inside a
   `.disabled(…)` is a rule nothing can assert.
-- `MotionPolicy` decides whether a change moves. One completion is drawn four
-  ways — a ring closing, a bar closing, a label dimming, a line sweeping — and
-  Reduce Motion has to reach all four; a predicate left in a view is one no
-  test can reach.
-- `DayRing.arcs(target:done:gap:)` is the Today ring: one arc per repetition
-  as trim fractions of a circle, the first `done` of them quiet. The ring
-  starts full and glowing and closes clockwise from the top — the inverse of
-  the fitness rings it resembles, because here the glow is what is still open.
-  `DayRing.countAfterTap(count:target:)` is the ring's one interaction: a tap
-  is one more, and a full ring resets to zero, which is also the undo.
+- `MotionPolicy` decides whether a change moves. One completion is drawn three
+  ways — a ring closing, a bar closing, a label dimming — and Reduce Motion has
+  to reach all three; a predicate left in a view is one no test can reach. It
+  was four while the Today ring's sweep shipped (#209).
 
 Every function takes its `Calendar` and its `today` as parameters. Nothing here
 reads the clock, which is what lets the tests assert against a fixed Tuesday in
@@ -180,10 +178,13 @@ guard agree with it. Every caller builds a store per operation — the week view
 `store` is a computed property, and both intents construct one — so this is one
 read per write.
 
-`recordTap(for:on:)` is the per-day counterpart: it asks `DayRing.countAfterTap`
-what the tap means and translates the answer into rows — one more `Completion`,
-or a cleared day when a full ring resets. The rule lives in `Logic/` and the
-rows live here, so the app's ring and the widget's tap the same behaviour.
+`count(for:on:)`, `addCompletion(for:on:)` and `clearDay(for:on:)` are the
+day-level primitives `toggleCompletion` cannot express, because it stores zero
+or one row per day by construction. The per-day kind was what made a day with
+several rows ordinary, and `recordTap` — which asked `DayRing.countAfterTap`
+what a tap meant — went with it (#209). What is left for them is the case that
+outlives it: a store written before day identities can hold two rows for one
+civil day (#130), and `clearDay` has to take every one of them.
 
 Every write ends in a private `commit()`: save, and then invalidate the widget
 timelines. A save that throws rolls back, so a failed write leaves the store as
@@ -221,11 +222,21 @@ migration rather than a configuration change.
 
 `Frequency` is stored as `isDaily` plus `timesPerWeek` rather than as an encoded
 enum, so the column stays queryable and a schema change does not hinge on an
-enum's `Codable` representation. The per-day kind adds `timesPerDay`, with zero
-meaning "counted across a week" — a sentinel no real per-day habit can store,
-because the initializer clamps into 1...12. `Habit.countedPerWeek` and
-`Habit.countedPerDay` are the two fetch predicates, one definition each, so the
-week surfaces and Today cannot drift in how they split the kinds.
+enum's `Codable` representation. `timesPerDay` is still a column and is always
+zero in a shipped build (#209): dropping it is a schema change, and it is what
+`DailyHabitMigration` finds the leftover rows *by*. #123 seeded five per-day
+habits, so an install updating from a build that carried them holds habits
+nothing can now draw; the migration deletes them and their completions once, at
+launch, before seeding. **It destroys history** — repetitions logged during the
+window the feature shipped in are gone — and the release notes for the build
+carrying it have to say so.
+
+`Habit.weekly` is the one fetch predicate, and it is the old `countedPerWeek`
+clause under a name that says what it now does. It is deliberately not `true`:
+with the per-day kind gone it filters the rows that kind left behind, and the
+widget's process never runs the migration, so a home screen redrawing before
+the app is next opened would otherwise show habits the app has no screen for.
+It goes when the migration does.
 
 `Completion.dayKey` is the civil day as `yyyy-MM-dd`, and it is what the app
 groups, counts and looks up on. `Completion.day` is still there and is still the
@@ -262,12 +273,11 @@ migration for a store written before it existed — verified against one.
 Mostly layout. The one piece of real behaviour is `SlotView`'s completion
 transition, which is documented in place and in [glow.md](glow.md).
 
-`TodayView` shows the per-day habits as rings — the small and medium widget at
-app size, per docs/vision.md — and nothing week-shaped. `DayRingView` draws the
-arcs `DayRing` lays out, with the open arcs glowing as one layer: one HDR tile
-and one halo pass, rather than a dozen separately composited lights. The tile is
-shape-free and cached per intensity, so an arc is a mask like any other and
-costs the cache nothing.
+`RootTabView` carries two tabs, This Week and Settings. It carried three: Today
+drew the per-day habits as rings, and it is on `feature/daily-habits-2.0` with
+`DayRingView` and the geometry under it (#209). The slot is left empty rather
+than collapsed — #210 puts the Widgets tab in the same position — so the bar
+does not reflow twice in two builds.
 
 Width flows down rather than being measured per row: `WeeklyGridView` reads the
 screen width once, builds a `RowGeometry`, and hands the same value to the
@@ -523,14 +533,18 @@ It renders the same HDR tile as the app, via the same `GlowImageView`, with
 `fillsWidth` set because the widget's slots are distributed by an HStack rather
 than measured by `SlotLayout`.
 
-The Today widget: small (one habit, chosen per widget through a configuration
-intent) and medium (the first three per-day habits, static), drawing the same
-`DayRingView` as the app, each ring a `TapHabitIntent` button. The
-configuration intent, its entity and its query live in the shared sources
-(`TodayWidgetConfig.swift`), not the widget target — the app exports AppIntents
-metadata of its own, the system consolidates metadata under the app, and with
-the intent defined only in the extension the stored habit choice never resolved
-when the provider ran. The note on the type carries the symptom in full.
+The Today widget is gone with the kind it drew (#209), and its two kind
+strings — `GlowTodaySmall`, `GlowTodayMedium` — are removed rather than
+renamed, so a placed Today widget leaves the Home Screen with the extension
+that served it.
+
+The month widget's configuration intent, its entity and its query live in the
+shared sources (`MonthWidgetConfig.swift`), not the widget target — the app
+exports AppIntents metadata of its own, the system consolidates metadata under
+the app, and with the intent defined only in the extension the stored habit
+choice never resolved when the provider ran. That was established on the Today
+widget's own intent, which is where the note used to sit; the symptom is on the
+surviving type in full.
 
 ## What is deliberately absent
 

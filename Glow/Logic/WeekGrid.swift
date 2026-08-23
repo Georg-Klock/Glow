@@ -181,12 +181,6 @@ enum WeekGrid {
                 habit: habit, week: week, today: todayStart, target: target,
                 restDay: restDay, calendar: calendar
             )
-        case .timesPerDay:
-            // A per-day habit has no week row. It is one ring on Today, and the
-            // week-shaped screens filter it out before reaching here — this is
-            // the backstop, so a missed filter draws nothing rather than drawing
-            // a week the habit does not have.
-            return []
         }
     }
 

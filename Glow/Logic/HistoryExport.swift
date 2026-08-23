@@ -17,11 +17,14 @@ enum HistoryExport {
     /// `Frequency`'s own cases are the source; this is the wire spelling, kept
     /// separate so renaming a case cannot silently change a file somebody has
     /// already exported and is parsing.
+    ///
+    /// `times-per-day` was a third spelling and is no longer produced (#209).
+    /// Files already exported still carry it, and it means what it meant — the
+    /// separation here is what makes that safe to say.
     static func cadence(of frequency: Frequency) -> String {
         switch frequency {
         case .daily: "daily"
         case .timesPerWeek: "times-per-week"
-        case .timesPerDay: "times-per-day"
         }
     }
 
@@ -30,7 +33,6 @@ enum HistoryExport {
         switch frequency {
         case .daily: 1
         case .timesPerWeek(let n): n
-        case .timesPerDay(let n): n
         }
     }
 

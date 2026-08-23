@@ -183,11 +183,10 @@ struct MonthGridTests {
         #expect(todayCell?.isTappable == true)
     }
 
-    @Test("Per-day habits and blank rows have no month")
+    @Test("Blank rows have no month")
     func backstops() {
-        let perDay = HabitSnapshot.fixture(frequency: .timesPerDay(3))
-        #expect(MonthGrid.cells(for: perDay, today: today, restDay: nil, calendar: calendar).isEmpty)
-
+        // The per-day habit that stood beside the blank row here is gone with
+        // its kind (#209). A blank row is still a row nothing is drawn for.
         let spacer = HabitSnapshot.fixture(isSpacer: true)
         #expect(MonthGrid.cells(for: spacer, today: today, restDay: nil, calendar: calendar).isEmpty)
     }

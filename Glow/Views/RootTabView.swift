@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The app's three tabs: Today, This Week, Settings.
+/// The app's tabs: This Week and Settings.
 ///
 /// A system `TabView`, so the bar is the platform's — its height, its blur, its
 /// behaviour when a keyboard appears, its accessibility.
@@ -8,29 +8,26 @@ import SwiftUI
 /// The tabs were four, ordered as a zoom — year, week, today — and opening in
 /// the middle. That argument stopped holding once Today became the per-day
 /// screen with its own habits rather than a filtered view of the week: the
-/// tabs are no longer three depths of one thing. The year moved into Settings
+/// tabs were no longer three depths of one thing. The year moved into Settings
 /// as History, where the things that are neither today nor this week live.
 ///
-/// There is no fixed landing tab. A widget opens its own screen — the daily
-/// rings land on Today, the week grid lands on This Week — so you arrive at
-/// the bigger version of what you were just looking at. Only a cold launch
-/// has no widget to ask, and it opens This Week: the denser screen, with
-/// Today one tap away.
+/// **Today's slot is empty, not collapsed** (#209). The per-day screen came out
+/// with the kind it drew, and #210 puts the Widgets tab in the same position
+/// rather than letting the bar reflow twice in two builds. Until then there are
+/// two tabs and This Week is where every launch lands, which is what a cold
+/// launch already did.
 struct RootTabView: View {
-    /// The cold-launch screen. Deep links overwrite it before anything shows.
+    /// The landing screen. Deep links overwrite it before anything shows.
     @State private var selection: Screen = .week
 
     /// Not named `Tab`: SwiftUI has its own, and shadowing it makes the builder
     /// below construct this instead, which does not compile and does not say why.
     enum Screen: Hashable {
-        case today, week, settings
+        case week, settings
     }
 
     var body: some View {
         TabView(selection: $selection) {
-            Tab("Today", systemImage: "circle.dotted", value: Screen.today) {
-                TodayView()
-            }
             Tab("This Week", systemImage: "calendar", value: Screen.week) {
                 WeeklyGridView()
             }
@@ -44,7 +41,6 @@ struct RootTabView: View {
         .tint(GlowPalette.color)
         .onOpenURL { url in
             switch DeepLink.destination(for: url) {
-            case .today: selection = .today
             case .week: selection = .week
             case nil: break
             }

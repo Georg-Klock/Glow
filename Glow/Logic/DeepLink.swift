@@ -2,27 +2,30 @@ import Foundation
 
 /// The widget chooses the screen.
 ///
-/// There is no fixed landing tab: a daily widget opens Today, a weekly widget
-/// opens This Week — you arrive at the bigger version of the thing you were
-/// just looking at. Only a cold launch has no widget to ask, and that case is
-/// not decided here: it is the tab view's initial selection.
+/// A widget's surface divides in two, and the division is deliberate. The marks
+/// act in place — a week slot toggles, through its intent, opening nothing.
+/// Everything else carries one of these URLs and opens the app on that widget's
+/// screen.
 ///
-/// A widget's surface divides in two, and the division is deliberate. The
-/// marks act in place — a ring arc takes +1, a week slot toggles, through
-/// their intents, opening nothing. Everything else carries one of these URLs
-/// and opens the app on that widget's screen.
+/// **`glow://today` was the other one and is gone** (#209). It opened the
+/// per-day screen, which the two Today widget families carried you to and which
+/// no longer exists. It is deliberately not mapped to This Week instead: an
+/// unrecognised link changes nothing, and silently landing somebody on a screen
+/// they did not ask for is worse than doing nothing when nothing can be done.
 enum DeepLink {
     /// Where a URL lands. A separate type rather than the tab view's own
     /// `Screen`, so the mapping stays in Logic and testable without a view.
+    ///
+    /// One case, and still an enum with an optional in front of it: the
+    /// distinction that matters is "a screen was asked for" against "this URL
+    /// means nothing here", and that survives having one screen to ask for.
     enum Destination: Equatable, Sendable {
-        case today
         case week
     }
 
     static let scheme = "glow"
 
     /// The URL each widget carries on its non-acting surface.
-    static let today = URL(string: "glow://today")!
     static let week = URL(string: "glow://week")!
 
     /// The screen a URL asks for, or nil for anything unrecognised — an
@@ -30,7 +33,6 @@ enum DeepLink {
     static func destination(for url: URL) -> Destination? {
         guard url.scheme?.lowercased() == scheme else { return nil }
         switch url.host?.lowercased() {
-        case "today": return .today
         case "week": return .week
         default: return nil
         }

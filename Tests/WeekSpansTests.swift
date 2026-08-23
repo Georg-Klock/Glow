@@ -698,14 +698,10 @@ struct WeekDotsTests {
         }
     }
 
-    @Test("Daily habits and blank rows have no dots of their own")
+    @Test("Blank rows have no dots of their own")
     func onlySpanRows() {
         // A daily row is already seven day-pinned columns and already puts the
-        // light on the day; a per-day habit has no week row at all.
-        #expect(WeekDots.columns(
-            for: .fixture(frequency: .timesPerDay(3), completedDays: [day(1)]),
-            in: week, restDay: nil, calendar: calendar
-        ).isEmpty)
+        // light on the day. A blank row has nothing to put light on at all.
         #expect(WeekDots.columns(
             for: .fixture(isSpacer: true), in: week, restDay: nil, calendar: calendar
         ).isEmpty)
@@ -734,9 +730,9 @@ struct WeekDotsTests {
             for: .fixture(frequency: .timesPerWeek(3)), in: week,
             restDay: nil, calendar: calendar
         ) == nil)
-        // And the two rows that have no dots at all keep their silence.
+        // And the row that has no dots at all keeps its silence.
         #expect(WeekDots.spokenDays(
-            for: .fixture(frequency: .timesPerDay(3), completedDays: [day(1)]),
+            for: .fixture(completedDays: [day(1)], isSpacer: true),
             in: week, restDay: nil, calendar: calendar
         ) == nil)
     }
