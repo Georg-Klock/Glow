@@ -2674,3 +2674,82 @@ habits and 1,728 completions read out of the App Group's SQLite — reset to 15
 rows matching `DefaultHabits.all` at `sortOrder` 0…14 and **0** completions, the
 demo toggle reading off, and This Week redrawing to the first-launch screen.
 The rest day survived, as a preference should.
+
+## The week pager becomes a swipe, and the title becomes a date range (#190)
+
+**What this overturns.** Two of #117's decisions, both recorded above under *How
+far back the week view reaches*: **buttons rather than a swipe**, and **which
+week you are on is the title's job**, answered with a month name. The twelve-week
+cap is not reopened and did not move. The old entry stays as written — it is a
+record of what was decided then, and the reason it is being overturned is that
+one of its two premises was never tested.
+
+**The chevrons were decided by reading the code.** #117 inferred the conflict:
+every row carries `swipeActions`, so a horizontal drag starting on a row is
+spoken for, so a pager sharing that gesture would work in some places and not
+others. The inference is correct and the conclusion did not follow. The gesture
+does not have to live on the rows. It lives on `WeekdayHeader`, which owns no
+horizontal drag of its own, and the rows are untouched: **`swipeActions` did not
+change in this issue.**
+
+**Discrete, not interactive.** Past a 24pt threshold the week jumps, exactly as
+a chevron tap did; nothing tracks the finger and there is no half-dragged week
+to abandon. Left pages forward and right pages back — **confirmed against
+Calendar.app in the simulator** rather than assumed: in Day view a left swipe
+moved Sunday 31 December to Monday 1 January and a right swipe moved it back. A
+two-direction gesture with no affordance reads as broken if it is backwards, so
+this was worth ten seconds.
+
+**The simulator cannot exercise a drag at all, and that is the finding.** The
+gesture logged nothing there — as `.gesture`, as `.simultaneousGesture`, under
+`swipe` and under a twelve-point `touch_path`, with the reach confirmed open in
+the same console. The control that settles what it means: **this app's own row
+`swipeActions` do not open under the same synthetic input either**, and they
+ship. So the negative result is a property of the harness, not of the code —
+the same trap as the pixel script whose baseline was four points off. The
+assumption that remains is recorded in #205, with the four swipes on a device
+that would overturn it. `.simultaneousGesture` is what shipped, because the
+competing recognizer is a scroll view's pan and simultaneous recognition does
+not ask it to yield the touch stream.
+
+**Nothing replaces the chevrons in the toolbar, so VoiceOver needed a control.**
+The chevrons were also the only paging a rotor could reach, and a gesture on a
+header that is `accessibilityHidden` reaches nobody. The readout is therefore
+adjustable — up for a later week, down for an earlier one. That does not reopen
+#137: what stays unspoken is the seven letters over seven numbers, which is a
+table read aloud, and one element naming the week is not that.
+
+**"This Week" is drawn, not styled**, for the third time (#162, and
+`StoreUnavailableView` before it): a root tint of pure white fills a
+`.borderedProminent` capsule white and writes its label in white. A `Text` in
+black over `Capsule().fill(GlowPalette.color)`, `.buttonStyle(.plain)`. It sits
+inside the list between the header and the first row, outside the `ForEach`, so
+reordering and deletion still index the habits and nothing else — and it stays
+drawn in edit mode, where the header fades (#164). Editing is about rows; the
+pill is a way out of a week you paged into, and a control that is drawn can be
+tapped and can be spoken.
+
+**The title is a range because a month is not an answer.** A month holds four or
+five of these weeks and every one of them read the same name. `weekRangeTitle`
+says both ends; the month collapses to one name when both ends share it, and
+that collapse, the separator and the order of day and month are
+`Date.IntervalFormatStyle`'s, not this code's, so a locale that writes the day
+first gets what it writes. The year rule survives from `monthTitle` — it appears
+only when it is not today's — and it is the one thing the interval style cannot
+express, since asking it for a year prints two. A week that needs one is composed
+from its two ends instead, with the year dropped from the first when both ends
+share it.
+
+**`monthTitle` is gone rather than kept beside it.** Its only two callers were
+this view and its own tests. Keeping a formatter nothing draws, with tests
+asserting a rule nothing shows, is the code version of a drifted document.
+
+**The large title goes with it, knowingly.** Collapse-on-scroll belongs to
+`navigationTitle`, and a `.principal` toolbar view does not inherit it. The
+issue accepted that trade. `navigationTitle` is still set to the same string,
+because it is what a pushed screen would name its back button. Where the
+principal item *sits* turned out not to be ours: measured, it is centred while
+it is one line, leading once the second line arrives, and centred again in edit
+mode, and a `frame(maxWidth:alignment:)` around it changes none of the three.
+So the readout shifts left as you leave this week — at the same moment the
+subtitle and the pill appear, which is a state change rather than a wobble.
