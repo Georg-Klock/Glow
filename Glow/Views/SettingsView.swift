@@ -508,14 +508,34 @@ struct SettingsView: View {
             + "phone only when you send it somewhere — nothing is uploaded."
     }
 
-    /// The section's three paragraphs, in row order, as one string.
+    /// The section's paragraphs, in row order, as one string.
     ///
-    /// They stay three properties because each explains a different control and
-    /// is worth reading on its own; they arrive as one `Text` because that is
-    /// the only way a section footer shows more than its first line. See the
+    /// They stay separate properties because each explains a different control
+    /// and is worth reading on its own; they arrive as one `Text` because that
+    /// is the only way a section footer shows more than its first line. See the
     /// note at the call site.
     private var dataFooter: String {
-        [exportFooter, demoFooter, resetFooter].joined(separator: "\n\n")
+        [exportFooter, demoFooter, resetFooter, versionFooter].joined(separator: "\n\n")
+    }
+
+    /// What is installed, in the shape everything else already uses.
+    ///
+    /// `SHORT (BUILD)` — `Glow 0.1 (1)` locally, `Glow 0.1 (202608211900)` from
+    /// a lane that computes the build at archive time — because that is what a
+    /// crash report prints and what `Tools/check-release-build.py` compares, so
+    /// the number in Settings is the one to paste rather than a
+    /// differently-formatted twin of it. The first runtime reader of either key
+    /// in this app; every other check reads them from outside the built product.
+    ///
+    /// **Last paragraph of one `Text`, not a `Text` of its own.** #200's sketch
+    /// added a third `Text` to the footer, which is exactly the bug #193 found
+    /// there: a section footer renders its first `Text` and drops the rest, so
+    /// the version would never have appeared on screen.
+    private var versionFooter: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "Glow \(short) (\(build))"
     }
 
     /// Seeds or removes the invented past. Errors leave the toggle where the
