@@ -429,9 +429,30 @@ struct HabitRowView: View {
         // A due label is full white with a drop shadow in the design, the same
         // thing the marks are. Rendered as bright text it was the one part of
         // the screen pretending to be lit.
+        //
+        // **Editing is the third rendering, and it is plain white** (#206). The
+        // due/not-due crossfade is the light rule applied to type: a name glows
+        // because that habit is actionable now. Editing is the one moment that
+        // reading stops being the useful one — nobody reordering a list is
+        // asking what they are due for — and half the names sitting at `grey`
+        // while you try to read them is the cost. So while editing, both layers
+        // step aside for a flat `GlowPalette.color`.
+        //
+        // Flat, not `.glowing`: the halo is this app's vocabulary for lit, the
+        // same claim an open ring makes, and wearing it on every row would say
+        // every habit is due at once. This is a title's white — the same white
+        // as the week's dates above the grid — and it says legible, not lit.
+        //
+        // `lit` keeps running underneath: it is untouched here, so leaving edit
+        // mode returns each name to whatever the crossfade had already settled
+        // on rather than re-deriving it.
         return ZStack {
-            text.foregroundStyle(GlowPalette.grey)
-            text.glowing(halo: GlowPalette.labelHalo).opacity(lit)
+            if isEditing {
+                text.foregroundStyle(GlowPalette.color)
+            } else {
+                text.foregroundStyle(GlowPalette.grey)
+                text.glowing(halo: GlowPalette.labelHalo).opacity(lit)
+            }
         }
         .frame(width: isEditing ? nil : geometry.labelWidth, alignment: .leading)
         // No clipping: the overflow is the point. The frame reserves the

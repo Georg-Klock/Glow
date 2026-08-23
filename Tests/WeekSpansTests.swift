@@ -804,3 +804,123 @@ struct WeekDotsTests {
         #expect(partial.map(\.mark) == [.missed, .openToday])
     }
 }
+
+/// #196: what makes two spans the same span across a re-render.
+///
+/// `SpanView` owns the mid-flight size of a completion animation as `@State`,
+/// and `ForEach` decides whether that state carries over from one render to the
+/// next by asking `id`. A span used to answer with its index, which `divided()`
+/// reassigns freely — the span at index 2 before a tap and the one at index 2
+/// after it can cover different days — so an animation could be inherited by a
+/// span that was never part of it.
+///
+/// Both halves are asserted here, because the fix is a trade and only one half
+/// is obvious. A span whose *range* changed must be a new identity, or the
+/// stale animation carries over. A span whose *state* changed must keep its
+/// identity, or `SpanView.onChange(of: span.state)` never runs and the
+/// completion stops animating at all — which is what putting the state into the
+/// identity, as the issue proposed, would have done.
+@Suite("Span identity")
+struct SpanIdentityTests {
+    private let calendar = TestCalendar.monday
+    /// The week beginning Monday 2026-08-17.
+    private var week: Week {
+        WeekCalendar.week(containing: TestCalendar.date(2026, 8, 17), calendar: calendar)
+    }
+    private func day(_ column: Int) -> Date { week.days[column] }
+
+    /// A row on a surface that edits the whole week (#116), which is where a
+    /// redivision can be provoked by a tap on a day that is not today.
+    private func row(target: Int, done: [Int] = [], todayColumn: Int) -> [SlotSpan] {
+        WeekSpans.spans(
+            for: .fixture(
+                frequency: .timesPerWeek(target),
+                completedDays: Set(done.map { day($0) })
+            ),
+            in: week, today: day(todayColumn), target: target,
+            editing: .week(allowingFuture: false), restDay: nil, calendar: calendar
+        )
+    }
+
+    private func shape(_ spans: [SlotSpan]) -> String {
+        spans.map { "\($0.state.rawValue):\($0.firstDay)-\($0.lastDay)" }.joined(separator: " ")
+    }
+
+    @Test("A span that keeps its range keeps its identity through a completion")
+    func completionKeepsIdentity() {
+        // Wednesday, three a week, nothing logged: the open span runs Monday to
+        // today. Logging today turns exactly that span filled without moving
+        // either end of it, which is the transition `SpanView` animates.
+        let before = row(target: 3, todayColumn: 2)
+        let after = row(target: 3, done: [2], todayColumn: 2)
+        #expect(shape(before) == "open:0-2 inactive:3-4 inactive:5-6")
+        #expect(shape(after) == "filled:0-2 inactive:3-3 inactive:4-6")
+
+        #expect(before[0].state != after[0].state)
+        #expect(
+            before[0].id == after[0].id,
+            "the completing span must stay the same view, or it never animates"
+        )
+    }
+
+    @Test("A span that is redivided is a different span")
+    func redivisionChangesIdentity() {
+        // Same Wednesday, today already logged, and now Monday is logged too —
+        // a tap on a past day, which #116 allows and #117 allows in any week on
+        // the pager. The completed block narrows from three columns to two and
+        // stays `filled`, so nothing about the *state* changed: this is exactly
+        // the case an index-shaped identity called "the same span" and handed a
+        // running animation to.
+        let before = row(target: 3, done: [2], todayColumn: 2)
+        let after = row(target: 3, done: [0, 2], todayColumn: 2)
+        #expect(shape(before) == "filled:0-2 inactive:3-3 inactive:4-6")
+        #expect(shape(after) == "filled:0-1 filled:2-2 inactive:3-6")
+
+        #expect(before[0].state == after[0].state)
+        #expect(
+            before[0].id != after[0].id,
+            "a narrower span at the same index must not inherit the old one's animation"
+        )
+        // And nothing else in the new row may collide with it either — the
+        // stale state has to have nowhere to land.
+        #expect(!after.contains { $0.id == before[0].id })
+    }
+
+    @Test("No two spans in a row ever share an identity")
+    func identitiesAreUniqueWithinARow() {
+        for target in 1...7 {
+            for todayColumn in 0...6 {
+                let sets: [[Int]] = [[], [0], [0, 1], [0, 1, 2], [todayColumn], [0, todayColumn]]
+                for done in sets {
+                    let spans = row(
+                        target: target, done: Array(Set(done)).sorted(), todayColumn: todayColumn
+                    )
+                    #expect(
+                        Set(spans.map(\.id)).count == spans.count,
+                        "\(target)x, today \(todayColumn), done \(done): \(shape(spans))"
+                    )
+                }
+            }
+        }
+    }
+
+    @Test("Identity is the range and nothing else")
+    func identityIsTheRange() {
+        // A row redrawn for a reason that has nothing to do with it — the habit
+        // was renamed, the store republished — has to come back as itself, or
+        // every re-render would cancel a running animation.
+        let a = row(target: 3, done: [0], todayColumn: 4)
+        let b = row(target: 3, done: [0], todayColumn: 4)
+        #expect(a.map(\.id) == b.map(\.id))
+
+        // Two spans covering the same columns are the same division whatever
+        // else differs about them, which is the property the `@State` reuse
+        // actually needs: same shape in the same place, same view.
+        let open = SlotSpan(index: 0, firstDay: 1, lastDay: 3, state: .open, actionDay: nil)
+        let filled = SlotSpan(index: 2, firstDay: 1, lastDay: 3, state: .filled, actionDay: day(1))
+        #expect(open.id == filled.id)
+        #expect(open.id != SlotSpan(
+            index: 0, firstDay: 1, lastDay: 4, state: .open, actionDay: nil
+        ).id)
+    }
+}
