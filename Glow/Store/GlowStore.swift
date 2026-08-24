@@ -57,6 +57,11 @@ enum GlowStore {
             url: StoreLocation.url,
             allowsSave: false
         )
-        return try? ModelContainer(for: schema, configurations: configuration)
+        do {
+            return try ModelContainer(for: schema, configurations: configuration)
+        } catch {
+            WidgetTrace.record("read-only container failed: \(error)")
+            return nil
+        }
     }
 }
