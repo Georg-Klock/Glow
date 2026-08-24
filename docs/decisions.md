@@ -4066,3 +4066,19 @@ So: `HabitStore.delete` deletes every row outright, spacer or habit; `HabitStore
 - The committed render baseline (`RenderTests/Baselines/render-signatures.json`) moved and was approved, per `Tools/validate-test-result.py`'s own printed instruction — every family's picture genuinely looks different now, which is the point.
 
 **Tested at 509/509 after both fixes, not before either.** The first full run caught `flatTonesAreReal` failing on a stale literal test-writing hadn't yet reached; the second caught the render baseline needing re-approval against the corrected run rather than the one still carrying that bug. Both are recorded here rather than smoothed over, because a change this deep in the palette touching four files' worth of literals is exactly the shape of change where "it built" and "it is right" are different claims.
+
+## The pager reaches twelve weeks whether or not the record does
+
+**2026-08-24.** #186 settled that the reach is the record's and nothing else: a week before anything existed holds nothing to correct, so a fresh install could page nowhere. #259 widens that, and the entry above stays as the record of why the narrower rule existed.
+
+**The rule was right about the data and wrong about the control.** A back chevron that is present and does nothing reads as broken — it is the same complaint #242 fixed for a different cause, arrived at from the other direction. "There is nothing back there" is a thing the app can say by showing an empty week, and saying it that way is better than refusing to move.
+
+**It only became honest to say with #265.** Before that, a week earlier than a habit drew a ✕ on every column, so paging into one would have answered "nothing was logged here" with a wall of accusations. #265 makes such a week draw unlit dots, which is what an empty week should look like — so the two changes are one idea and #265 had to land first.
+
+**Twelve weeks is not a new number.** It is the cap #186 removed, turned around: it used to be the furthest the pager could reach and is now the least it always reaches. A quarter was argued then as about as much as a person still holds in mind, and that argument serves a floor as well as it served a ceiling. Reusing it also keeps the count of invented constants in this file where it was.
+
+`WeekReach.from` takes `min(recorded, floor)`, so the record still extends the reach and can never shorten it. A record starting in the future — a clock that went backwards, a sync from a device whose did — cannot pull the pager forward past the floor either, which the same `min` says without a second clause.
+
+**What moved in the tests, and it is most of the reviewable surface.** `noRecordNoReach` and `freshInstallHasNoReach` asserted the old rule directly and now assert the floor. `reachFollowsTheRecord` ran 0...11 and every one of those is now floored, so it is `shortRecordsAreFloored` and says so. `theDemoIsReachableEndToEnd` went from `==` to `>=`, which is the honest form of what it was always about: the demo must be reachable, not exactly reachable. `steppingBackStopsAtTheFloor` and `clampingBothEnds` had records shorter than the floor and now use longer ones, so the floor under test is still the record's own.
+
+The two Havana tests needed restating rather than renumbering. They are #242's property — that `earliest` is a normalized week start, so a comparison against a week start cannot disagree by an hour — and they asserted it by checking `earliest == thisWeek`, which was only true because the record was short. They now assert the property itself: that `earliest` normalizes to itself, sits on a midnight, contains the current week, and does not move when stepped back from. That is what those tests were for, and it no longer depends on where the floor happens to be.

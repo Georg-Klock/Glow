@@ -26,31 +26,48 @@ struct WeekReachTests {
         (calendar.dateComponents([.day], from: reach.earliest, to: reach.latest).day ?? 0) / 7
     }
 
-    @Test("An empty store can be paged nowhere")
-    func noRecordNoReach() {
+    /// **Reversed by #259.** These two used to assert that a store with no
+    /// record, and a store whose record starts today, could both be paged
+    /// nowhere — #186's rule that the reach is the record's and nothing else.
+    ///
+    /// That was right about the data and wrong about the control: a back
+    /// chevron that is present and does nothing reads as broken. The pager now
+    /// always reaches `WeekReach.minimumWeeks` back and says "nothing here" by
+    /// showing an empty week instead of by refusing to move — which only
+    /// became honest with #265, since before it such a week drew a ✕ on every
+    /// column.
+    @Test("An empty store still reaches the floor")
+    func noRecordReachesTheFloor() {
         let reach = reach(recordStart: nil)
 
-        #expect(reach.earliest == thisWeek)
         #expect(reach.latest == thisWeek)
-        #expect(weeksBack(reach) == 0)
+        #expect(weeksBack(reach) == WeekReach.minimumWeeks)
+        #expect(reach.earliest == calendar.date(
+            byAdding: .day, value: -7 * WeekReach.minimumWeeks, to: thisWeek
+        ))
     }
 
-    @Test("A record that starts this week can be paged nowhere either")
-    func freshInstallHasNoReach() {
-        // Every habit created today: there is no earlier week to correct.
+    @Test("A record that starts this week reaches the floor too")
+    func freshInstallReachesTheFloor() {
+        // Every habit created today. There is nothing back there to correct,
+        // and there is now somewhere to go and look.
         let reach = reach(recordStart: today)
 
-        #expect(reach.earliest == thisWeek)
-        #expect(weeksBack(reach) == 0)
+        #expect(weeksBack(reach) == WeekReach.minimumWeeks)
     }
 
-    @Test("The reach is the record's, week by week", arguments: 0...11)
-    func reachFollowsTheRecord(back: Int) {
+    /// Inside the floor the record does not shorten the reach — that is the
+    /// whole of what #259 changed. Outside it, the record still extends it,
+    /// which `longRecordReachesItsOwnStart` below holds.
+    @Test("A record shorter than the floor is floored", arguments: 0...11)
+    func shortRecordsAreFloored(back: Int) {
         let start = calendar.date(byAdding: .day, value: -7 * back, to: today)!
         let reach = reach(recordStart: start)
 
-        #expect(weeksBack(reach) == back)
-        #expect(reach.earliest == calendar.date(byAdding: .day, value: -7 * back, to: thisWeek))
+        #expect(weeksBack(reach) == WeekReach.minimumWeeks)
+        #expect(reach.earliest == calendar.date(
+            byAdding: .day, value: -7 * WeekReach.minimumWeeks, to: thisWeek
+        ))
     }
 
     /// The clause that was the cap, asserted as its absence (#186).
@@ -99,7 +116,11 @@ struct WeekReachTests {
         let seeded = calendar.date(byAdding: .day, value: -7 * SeededHistory.weeks, to: today)!
         let reach = reach(recordStart: seeded)
 
-        #expect(weeksBack(reach) == SeededHistory.weeks)
+        // Since #259 the floor reaches further back than the demo does, so the
+        // claim is containment rather than equality — which is what this test
+        // was always about. `>=` rather than `==` is the honest form: the demo
+        // must be reachable, not exactly reachable.
+        #expect(weeksBack(reach) >= SeededHistory.weeks)
         let first = calendar.date(byAdding: .day, value: -7 * SeededHistory.weeks, to: thisWeek)!
         #expect(reach.contains(first))
     }
@@ -119,16 +140,26 @@ struct WeekReachTests {
         let nextMonth = calendar.date(byAdding: .day, value: 30, to: today)!
         let reach = reach(recordStart: nextMonth)
 
-        #expect(reach.earliest == thisWeek)
+        // A record ahead of today cannot pull the pager *forward*, which is
+        // what this has always been about. Since #259 "where it is" is the
+        // floor rather than this week, because the floor does not depend on
+        // the record at all.
         #expect(reach.latest == thisWeek)
+        #expect(reach.earliest == calendar.date(
+            byAdding: .day, value: -7 * WeekReach.minimumWeeks, to: thisWeek
+        ))
+        #expect(reach.earliest < reach.latest)
     }
 
     @Test("Stepping back lands on week starts and stops at the floor")
     func steppingBackStopsAtTheFloor() {
-        let reach = reach(recordStart: calendar.date(byAdding: .day, value: -21, to: today)!)
+        // A record longer than the floor, so the floor under test is the
+        // record's own rather than `minimumWeeks`.
+        let back = WeekReach.minimumWeeks + 3
+        let reach = reach(recordStart: calendar.date(byAdding: .day, value: -7 * back, to: today)!)
 
         var cursor = thisWeek
-        for expected in 1...3 {
+        for expected in 1...back {
             cursor = reach.step(cursor, by: -1, calendar: calendar)
             #expect(cursor == calendar.date(byAdding: .day, value: -7 * expected, to: thisWeek))
         }
@@ -140,7 +171,11 @@ struct WeekReachTests {
     @Test("Clamping pulls a week that has stopped existing back into range")
     func clampingBothEnds() {
         let reach = reach(recordStart: calendar.date(byAdding: .day, value: -14, to: today)!)
-        let tooFar = calendar.date(byAdding: .day, value: -70, to: thisWeek)!
+        // Past the floor, which since #259 is twelve weeks rather than the
+        // record's two.
+        let tooFar = calendar.date(
+            byAdding: .day, value: -7 * (WeekReach.minimumWeeks + 5), to: thisWeek
+        )!
         let ahead = calendar.date(byAdding: .day, value: 7, to: thisWeek)!
 
         #expect(reach.clamped(tooFar) == reach.earliest)
@@ -368,10 +403,18 @@ struct WeekReachTests {
             today: today,
             calendar: calendar
         )
-        // One week of record, so the pager is at its floor and says so.
-        #expect(reach.earliest == weekStart)
-        #expect(!(weekStart > reach.earliest))
-        #expect(reach.step(weekStart, by: -1, calendar: calendar) == weekStart)
+        // #242's property, stated directly rather than through the record.
+        // The bug was an `earliest` an hour off a week start, which made the
+        // chevron lit and inert; since #259 the floor sits twelve weeks back
+        // rather than on this week, so "is it this week" is no longer the way
+        // to ask. Whatever week it names, it is a normalized week start and a
+        // step back from it does not move.
+        #expect(reach.earliest == WeekCalendar.startOfWeek(
+            containing: reach.earliest, calendar: calendar
+        ))
+        #expect(calendar.startOfDay(for: reach.earliest) == reach.earliest)
+        #expect(reach.contains(weekStart))
+        #expect(reach.step(reach.earliest, by: -1, calendar: calendar) == reach.earliest)
     }
 
     /// The other half of the same zone's year: Havana ends DST at 01:00 by
@@ -396,8 +439,15 @@ struct WeekReachTests {
             calendar: calendar
         )
         #expect(reach.latest == weekStart)
-        #expect(reach.earliest == weekStart)
-        #expect(!(weekStart > reach.earliest))
+        // As above: the floor is twelve weeks back since #259, so what is
+        // asserted is that it names a real week start once, on the day with
+        // two midnights.
+        #expect(reach.earliest == WeekCalendar.startOfWeek(
+            containing: reach.earliest, calendar: calendar
+        ))
+        #expect(calendar.startOfDay(for: reach.earliest) == reach.earliest)
+        #expect(reach.contains(weekStart))
+        #expect(reach.step(reach.earliest, by: -1, calendar: calendar) == reach.earliest)
     }
 
     // MARK: - The depth the cap used to hide (#186)
