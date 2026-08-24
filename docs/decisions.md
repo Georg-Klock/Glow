@@ -4034,3 +4034,19 @@ spread across two years including both of Havana's midnight clock changes —
 **Only for a new install.** `unset` is the sentinel for "this key has never been written" — nothing else reaches it. An install that turned the feature on under the old boolean scheme has an explicit `1` stored, which resolves to `.goals` directly rather than through `unset`, and that path is untouched: `storedOnStillMeansGoals` still asserts it. So "everything by default" is exactly the asymmetry #185 named rather than backed into — new installs get encouragement, installs that already chose `goals` keep it.
 
 `Tests/GoalPopTests.swift`'s `defaultIsOn` and `levelsAllowTheRightRegisters` moved with it; `storedOnStillMeansGoals` did not need to, and its lack of a diff is itself the evidence the compatibility guarantee held.
+
+## Deleting a habit collapses its row; adding one appends
+
+**2026-08-24.** #129 and #143 settled that a delete leaves a blank row where the habit was and the next habit added takes it — one pair, one idea: a row's existence is stable and only its contents change, so removing a habit never silently regroups the habits below it. #257 reverses both halves.
+
+The reasoning behind the old behaviour was real and is not being called wrong. Collapsing a row *does* pull everything below it up a line, and on a grid somebody arranged that is a change they did not ask for. The entry above this one is left exactly as it was, because it remains an accurate record of why the app behaved that way.
+
+**What it missed is what a delete means.** A row that is still there after you delete it reads as a delete that did not work — and it then has to be deleted a second time to actually go, so the cost of removing one habit is two acts and a moment of doubt in between. The regrouping the old rule was protecting against is visible and immediately undoable; the doubt is neither.
+
+The reversal has to be both halves or neither. `addHabit` filling the first blank row only made sense as the mirror of `delete` leaving one: together they conserved positions. On its own it is worse than the old behaviour rather than better, because the only blank rows left are **deliberate** ones — the grouping — and consuming one would take away a separator somebody placed on purpose. That is the same failure as leaving a row behind, from the other side.
+
+So: `HabitStore.delete` deletes every row outright, spacer or habit; `HabitStore.addHabit` always appends; `firstBlankRow()` is gone with its only caller.
+
+**The half of #129 that is not about layout survives, and is stronger for it.** A deleted habit's `id` had to stop resolving, because widget configurations and widget intents both resolve by `id` — a configured widget would otherwise start showing an unrelated habit, and a tap from a widget snapshot taken before the delete would land as history on whatever came next. That used to be arranged by giving the surviving blank row a fresh `UUID`. Deleting the row removes the `id` along with it, which is the same guarantee without the row that carried it.
+
+`Tests/SpacerIdentityTests.swift`, `Tests/SeedingTests.swift` and `Tests/PersistenceTests.swift` each carried an assertion of the old rule; all three now assert the new one and say in the test which way they were turned. Two new tests hold the parts that are easy to lose next time: that a deliberate blank row survives an add, and that a delete moves the rows below it up.

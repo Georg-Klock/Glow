@@ -80,7 +80,7 @@ struct PersistenceTests {
         #expect(completion.day == today)
     }
 
-    @Test("Deleting a habit takes its completions with it and leaves a blank row")
+    @Test("Deleting a habit takes its completions and its row with it")
     func deleteClearsTheHabitButKeepsThePosition() throws {
         let context = try makeContext()
         let store = makeStore(context)
@@ -90,12 +90,10 @@ struct PersistenceTests {
 
         try store.delete(habit)
 
-        // The habit is gone; the row it occupied is not. Collapsing the row
-        // would pull every habit below it up a line and silently regroup a
-        // layout the user arranged.
+        // The habit is gone and so is its row (#257). It used to leave a blank
+        // row behind, which read as a delete that had not worked.
         let rows = try context.fetch(FetchDescriptor<Habit>())
-        #expect(rows.count == 1)
-        #expect(rows.first?.isSpacer == true)
+        #expect(rows.isEmpty)
         #expect(try context.fetch(FetchDescriptor<Completion>()).isEmpty)
     }
 
