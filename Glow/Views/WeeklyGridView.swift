@@ -47,6 +47,12 @@ struct WeeklyGridView: View {
     @State private var editMode: EditMode = .inactive
     @State private var isShowingLowPowerNotice = false
     @State private var lowPower = LowPowerMonitor()
+    /// The pop currently on screen, or nil. See `InAppPop` and #273.
+    @State private var pop: InAppPop.PopContent?
+    /// Cancels a pop's own dismissal when a newer one replaces it, so the
+    /// first tap's timer cannot cut short the second tap's pill.
+    @State private var popTask: Task<Void, Never>?
+    @Environment(\.accessibilityReduceMotion) private var gridReduceMotion
     /// Survives relaunches, so the notice appears once per time Low Power Mode
     /// is switched on rather than once per launch.
     @AppStorage("didAnnounceLowPower") private var didAnnounceLowPower = false
@@ -135,6 +141,23 @@ struct WeeklyGridView: View {
             // draws it — the principal item takes the centre — but it is what
             // a `NavigationLink` pushed from here would name its back button,
             // and what the system reads when the toolbar is not on screen.
+            // **An overlay, not a row in the stack** (#273). Put in the
+            // `VStack` it pushed the whole grid down for its two seconds, so
+            // the row that was just tapped moved out from under the finger —
+            // which is precisely the flurry #272 says has to stay fast. It
+            // floats in the gap the day header already leaves instead, and
+            // nothing else on the screen moves at all.
+            .overlay(alignment: .top) {
+                if let pop {
+                    InAppPop(content: pop)
+                        .padding(.horizontal, GridMetrics.horizontalPadding)
+                        .transition(
+                            gridReduceMotion
+                                ? .opacity
+                                : .move(edge: .top).combined(with: .opacity)
+                        )
+                }
+            }
             .navigationTitle(weekTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -704,10 +727,12 @@ struct WeeklyGridView: View {
             ) {
             case .completed:
                 Haptics.completed()
-                // No pop here, deliberately: the Island does not render an
-                // activity while its own app is in front. The haptic above is
-                // what this screen has to say about it. See `GoalPopCentre`
-                // and #103.
+                // **#103 said no pop here and #273 reverses it.** The Island
+                // still will not render a Live Activity while its own app is in
+                // front, which is why this draws its own rather than asking for
+                // one. Same words, same order, same preferences — see
+                // `GoalPop.registers` and `InAppPop`.
+                showPop(for: habit, on: day)
             case .uncompleted:
                 Haptics.uncompleted()
             case .refused:
@@ -720,6 +745,50 @@ struct WeeklyGridView: View {
         } catch {
             HabitStore.report(error, operation: "toggleCompletion")
         }
+    }
+
+    /// Puts the completion's words on screen, and takes them off again.
+    ///
+    /// The same sequence `GoalPopCentre` runs for the Island: the routine line,
+    /// then the goal's after `GoalPop.handover` when the tap met the goal, then
+    /// gone after `GoalPop.duration`. `GoalPop.registers` decides which of
+    /// those there are and `PopPreferences` decides which are wanted, so the
+    /// two surfaces cannot disagree.
+    ///
+    /// One task, cancelled and replaced. Checking off several habits quickly is
+    /// the flurry this has to survive (#272): without the cancel, the first
+    /// tap's dismissal would fire two seconds after *its* tap and take the
+    /// second tap's pill with it.
+    private func showPop(for habit: Habit, on day: Date) {
+        let week = WeekCalendar.week(containing: day)
+        let snapshot = habit.snapshot(within: week.dayIDs())
+        let met = GoalMet.justMet(habit: snapshot, in: week)
+        let due = GoalPop.registers(justMetGoal: met).filter { PopPreferences.allows($0) }
+        guard let first = due.first else { return }
+
+        popTask?.cancel()
+        let name = habit.name
+        show(register: first, name: name, habitID: habit.id, on: day)
+
+        popTask = Task { @MainActor in
+            if due.count > 1 {
+                try? await Task.sleep(for: GoalPop.handover)
+                guard !Task.isCancelled else { return }
+                show(register: .goal, name: name, habitID: habit.id, on: day)
+            }
+            try? await Task.sleep(for: GoalPop.duration)
+            guard !Task.isCancelled else { return }
+            withAnimation(gridReduceMotion ? nil : .easeOut(duration: 0.2)) { pop = nil }
+        }
+    }
+
+    private func show(register: GoalPop.Register, name: String, habitID: UUID, on day: Date) {
+        let content = InAppPop.PopContent(
+            id: UUID(),
+            habitName: name,
+            line: GoalPop.line(habitID: habitID, on: day, register: register)
+        )
+        withAnimation(gridReduceMotion ? nil : .easeOut(duration: 0.2)) { pop = content }
     }
 
     private func move(from source: IndexSet, to destination: Int) {

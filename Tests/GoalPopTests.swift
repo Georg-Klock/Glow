@@ -232,3 +232,43 @@ struct PopWindowTests {
         #expect(PopWindow.shouldEnd(scheduled: 3, latest: 3))
     }
 }
+
+
+/// #273: the app pops too, so both surfaces decide *what* to say in one place.
+@Suite("The pop's registers")
+struct PopRegisterTests {
+    @Test("A routine log says one thing; the tap that meets the goal says two")
+    func registersFollowTheGoal() {
+        #expect(GoalPop.registers(justMetGoal: false) == [.logged])
+        #expect(GoalPop.registers(justMetGoal: true) == [.logged, .goal])
+    }
+
+    /// The order is the sequence both surfaces play: the routine line first,
+    /// then the goal's after `GoalPop.handover`. Reversing it would say "you
+    /// did it" and then take it back to "logged".
+    @Test("The goal's line comes second, never first")
+    func theGoalLineIsSecond() {
+        let both = GoalPop.registers(justMetGoal: true)
+        #expect(both.first == .logged)
+        #expect(both.last == .goal)
+    }
+
+    /// Preferences filter the list rather than changing it, which is what lets
+    /// "Goals" show the goal line alone — the second register surviving when
+    /// the first does not is the case that would break a sequence built as
+    /// "first, then maybe second".
+    @Test("Goals-only leaves the goal line and drops the routine one")
+    func goalsOnlyKeepsTheSecond() {
+        let both = GoalPop.registers(justMetGoal: true)
+        #expect(both.filter { PopPreferences.allows($0, at: .goals) } == [.goal])
+        let routine = GoalPop.registers(justMetGoal: false)
+        #expect(routine.filter { PopPreferences.allows($0, at: .goals) }.isEmpty)
+    }
+
+    @Test("Off drops both, everything keeps both")
+    func theOtherTwoLevels() {
+        let both = GoalPop.registers(justMetGoal: true)
+        #expect(both.filter { PopPreferences.allows($0, at: .off) }.isEmpty)
+        #expect(both.filter { PopPreferences.allows($0, at: .everything) } == [.logged, .goal])
+    }
+}
