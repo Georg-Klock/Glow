@@ -4082,3 +4082,19 @@ So: `HabitStore.delete` deletes every row outright, spacer or habit; `HabitStore
 **What moved in the tests, and it is most of the reviewable surface.** `noRecordNoReach` and `freshInstallHasNoReach` asserted the old rule directly and now assert the floor. `reachFollowsTheRecord` ran 0...11 and every one of those is now floored, so it is `shortRecordsAreFloored` and says so. `theDemoIsReachableEndToEnd` went from `==` to `>=`, which is the honest form of what it was always about: the demo must be reachable, not exactly reachable. `steppingBackStopsAtTheFloor` and `clampingBothEnds` had records shorter than the floor and now use longer ones, so the floor under test is still the record's own.
 
 The two Havana tests needed restating rather than renumbering. They are #242's property — that `earliest` is a normalized week start, so a comparison against a week start cannot disagree by an hour — and they asserted it by checking `earliest == thisWeek`, which was only true because the record was short. They now assert the property itself: that `earliest` normalizes to itself, sits on a midnight, contains the current week, and does not move when stepped back from. That is what those tests were for, and it no longer depends on where the floor happens to be.
+
+## The app pops too, reversing #103's silence
+
+**2026-08-24.** #103 settled that the app says nothing when a completion is logged inside it. The reasoning was sound and is unchanged: the Island does not render a Live Activity while its own app is in the foreground — measured, `Activity.request` succeeds and `chronod` subscribes a renderer with the right metrics, and the Island stays a plain pill until the app is backgrounded — so firing one from a tap in the app spent two seconds on nothing. #103's answer was to stop firing it and let the app's own acknowledgement stand: the ring closes, the label dims, the row goes quiet.
+
+**In use that reads as the app saying less the moment you are actually looking at it.** The pop is wanted every time, foreground included. So the app draws its own rather than asking the Island for one it will not show.
+
+`InAppPop` is the Live Activity's Lock Screen presentation, not a new design: the same mark, the same glowing line, the same habit name in grey, at the same `WidgetMetrics`. And `GoalPop.registers` — the rule that a routine log says one thing and the tap that meets the goal says two, in that order — moved out of `GoalPopCentre` so both surfaces read it. Two surfaces saying one thing the same way, and unable to drift on *what* is said.
+
+**It is an overlay, not a row in the stack, and that was the second attempt.** The first put the pill in the `VStack` above the grid, which pushed every row down for its two seconds — so the row that had just been tapped moved out from under the finger. Checking several habits off in a flurry is exactly what #272 says has to stay fast, and a layout shift per tap fights it. As an overlay nothing else on the screen moves at all.
+
+The cost is that the pill overlaps the weekday letters for its two seconds. That is the deliberate trade: the covered thing is a static header rather than the marks, and it comes back.
+
+**Not `privacySensitive`, unlike the Island and Lock Screen presentations** (#141). Those are readable by anyone holding the phone; this one is inside the app, already past the lock, and redacting a name shown in full on the row above would be theatre.
+
+One task, cancelled and replaced, for the same reason `PopWindow` guards the Island's: without it the first tap's dismissal fires two seconds after *its* tap and takes the second tap's pill with it.

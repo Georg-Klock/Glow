@@ -106,6 +106,23 @@ enum GoalPop {
     /// process that requested the pop is what ends it, and a widget tap's
     /// process loses its background assertion well before 30s. See
     /// docs/decisions.md and #102.
+    /// The registers one completion has to say, in the order it says them,
+    /// before preferences are asked.
+    ///
+    /// **Shared by both surfaces** (#273). The Island's pop and the app's own
+    /// say the same words for the same tap, and used to decide that separately
+    /// — `GoalPopCentre` had the only copy while the app deliberately said
+    /// nothing. Now that the app pops too, one rule keeps them from drifting
+    /// into disagreeing about what a tap means.
+    ///
+    /// The tap that meets the goal has two things to say (#119), and they share
+    /// the two seconds rather than getting one each: a compact Island state has
+    /// room for one short phrase, so "logged" hands over to "you did it"
+    /// partway through.
+    static func registers(justMetGoal: Bool) -> [Register] {
+        justMetGoal ? [.logged, .goal] : [.logged]
+    }
+
     static let duration: Duration = .seconds(2)
 
     /// How long the routine line holds before a goal-completing tap replaces it.
