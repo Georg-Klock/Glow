@@ -322,6 +322,31 @@ A widget extension is close to unobservable: its own process, under a second of
 animation, nothing to pause, and no debugger attached in ordinary use. This cost
 more time than it should have, so the working route is written down.
 
+**Start in the simulator.** This section is about a tethered phone because the
+questions that reached it were about the glow, and it left the impression that
+watching a widget at all needs hardware. It does not. A widget placed on the
+simulator's Home Screen exercises the real registration, the real gallery entry,
+the real provider and the real `WidgetTrace` — and the trace is easier to read
+there than on a phone, because the App Group container is a directory on this
+Mac:
+
+```
+plutil -p ~/Library/Developer/CoreSimulator/Devices/<udid>/data/Containers/\
+Shared/AppGroup/*/Library/Preferences/group.com.georgklock.glow.plist
+```
+
+Simulator crash reports land in `~/Library/Logs/DiagnosticReports/` and carry
+the same stacks as a phone's. #254 — the extension trapping inside WidgetKit's
+own evaluation of the widget's body — was diagnosed on a device and then
+reproduced in the simulator in under a minute, with an identical signature. It
+had survived a day of investigation because nobody had placed a widget in the
+simulator; the belief that widget behaviour needs a phone had quietly widened
+from the one thing that does.
+
+Two things still need hardware: the glow, and per-widget **configuration**,
+where chronod serves stale configurations in the simulator (`docs/decisions.md`).
+Everything else is cheaper here.
+
 `log stream --device-name "<phone>"` is the documented way to read a tethered
 phone's `os_log`. **The flag no longer exists** on current macOS —
 `log: unrecognized option '--device-name'` — and there is then no live view into

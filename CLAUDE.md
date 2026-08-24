@@ -225,6 +225,16 @@ actual bug. Every line here is something that already happened.
 - **The simulator has no EDR headroom, so the glow does not render there.**
   Geometry, layout, colour and animation are verifiable in the simulator. Glow
   is not — that needs a device. Say which one was checked.
+- **The widget extension does run in the simulator, and almost all of it is
+  verifiable there.** Place the widget on the simulator's Home Screen and the
+  real paths run: the extension registers, the gallery lists it under its
+  `configurationDisplayName`, the provider builds timelines, and `WidgetTrace`
+  records them into the App Group where `plutil -p` can read them straight out
+  of the device's container. #254 crash-looped the extension on a phone for a
+  day and reproduces in the simulator in seconds — nobody had placed a widget
+  there. What genuinely needs hardware is the glow, and per-widget
+  *configuration*, where chronod serves stale configurations (see
+  `docs/decisions.md`).
 - **A device build needs the phone unlocked.** A locked iPhone reports as
   "unavailable", which looks identical to "not plugged in".
 
