@@ -3858,3 +3858,63 @@ tree the tests walk is the tree the accessibility server hands out. That
 `ContentUnavailableView` vended four separate elements rather than one, that the
 icon vended none, and that the empty state's spoken content is exactly its two
 buttons are all unaffected.
+
+## The Widgets tab is part of the target (#235)
+
+**2026-08-24.** `docs/vision.md` named three screens — Today, This Week,
+Settings — while the app shipped Widgets, This Week and Settings. Two things had
+produced that gap and only one was written down: #209 took the Today screen out
+and the document was corrected in a single place, and #210 put a Widgets tab in
+the slot it vacated and the document never mentioned it at all.
+
+`CLAUDE.md` says what vision.md is: "the target… where the code disagrees with
+it, the code is the backlog." Read literally, the gap made the Widgets tab
+backlog — something to remove. That is not what it is.
+
+**The answer is that the Widgets tab is part of the target**, not a tenant of
+Today's slot until the per-day kind returns. #210's own title says the Today tab
+"becomes" a Widgets tab and its body says the slot is "repurposed rather than
+removed", which reads like a placeholder; what #225 built is not one. It asks
+`WidgetCenter` what is actually on the Home Screen, previews the shipping views
+over the person's own habits, and diffs the two by family rather than by kind.
+#237 then took the explanatory prose off it and varied the per-habit previews,
+and #238 moved it to the front of the bar. None of that is slot-warming.
+
+The argument underneath it is vision.md's own strongest claim — the widget is
+the main product, and the app is where you go when the widget is not enough. A
+screen whose job is showing you every widget you could have, drawn by the code
+that draws them, is that claim made literal, and it is why the tab leads. **It
+is not the stronger claim**, and vision.md now says so in the same breath: the
+app is not a widget installer. This Week is where the work happens and where
+every launch lands. A screen can be the purest statement of what a product is
+and still be the least visited one.
+
+**So this revision went the other direction, once.** `## Three screens` was
+brought up to the code rather than the code being brought up to it, and
+vision.md says that about itself at the top, with the date. The alternative —
+correcting it silently — leaves the next reader unable to tell a decision from
+drift, which is the failure the *kept in sync, dated, or deleted* rule above
+already exists to prevent.
+
+**What else the same pass found false**, none of it noticed by the issue: the
+`## Settings` section described its contents as "the two things that are neither
+today nor this week" and pointed at History as "what the year screen is today",
+which stopped being a screen when it became History; `## A habit is one kind or
+the other` still said the two kinds are "what splits the first two screens",
+which they no longer do in either direction — one kind ships, and the first two
+screens are the widgets and the week; and the widget section said both of the
+first two screens exist because somebody wanted more room than a widget, which
+is not true of the Widgets screen. The Today subsection moved into
+`## Deliberately later` whole rather than being deleted: the screen exists on
+`feature/daily-habits-2.0`, and vision.md is the document that says what is
+coming back.
+
+**The cold-launch paragraph was wrong in a new way**, which is the subtle one.
+It said This Week opens on a cold launch, with a note that in the shipped app
+that is every launch. Still true — but after #238 This Week is no longer the
+*first* tab, and a reader comparing the paragraph to the tab bar would find them
+contradicting each other. They are not: `RootTabView` holds the landing screen
+as `selection`'s default rather than as a consequence of declaration order,
+precisely so the two can differ. The first tab says what the app is about; the
+landing tab says what it opens to. vision.md now says that where it says the
+rest.
