@@ -275,7 +275,12 @@ final class Habit {
             completionCounts: dayCounts.reduce(into: [:]) { counts, entry in
                 counts[entry.key.date(in: calendar)] = entry.value
             },
-            isSpacer: isSpacer
+            isSpacer: isSpacer,
+            // Nil rather than the sentinel, for the reason #186 gives about
+            // `earliestRecordedDay`: a default `createdAt` means *unknown*, and
+            // a row that does not know when it began must not claim to.
+            createdDay: hasKnownCreation
+                ? WeekCalendar.day(createdAt, calendar: calendar) : nil
         )
     }
 

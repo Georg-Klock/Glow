@@ -207,6 +207,12 @@ enum WeekSpans {
         calendar: Calendar = WeekCalendar.calendar
     ) -> Date? {
         guard week.days.indices.contains(column) else { return nil }
+        // A span covering a week the habit did not live in is not a division of
+        // anything, so there is no day in it a tap could mean (#265). Daily
+        // rows are deliberately different: a dot *is* a day, so one before the
+        // habit existed stays tappable and back-filling it is allowed. What
+        // #265 removes is the accusation, not the ability to log.
+        guard habit.existed(on: week.days[column]) else { return nil }
         guard span.state != .filled || habit.completedDays.contains(week.days[column]) else {
             return nil
         }
@@ -268,6 +274,23 @@ enum WeekSpans {
         let todayStart = WeekCalendar.day(today, calendar: calendar)
         let dayCount = week.days.count
         guard target > 0, dayCount == 7 else { return [] }
+
+        // **A week the habit did not live in asks for nothing** (#265). Without
+        // this the arithmetic below runs normally: nothing is done, no day is
+        // actionable, so every rep is `lost` and the row draws a ✕ per span —
+        // the app asserting a failure for a week that ended before the habit
+        // was made. One unlit span across the week is the same claim a week
+        // still to come makes, which is the true one.
+        //
+        // The whole week, not a day of it: a habit made mid-week was alive that
+        // week, and the days before it in *that* week are the daily rows'
+        // question rather than this one's. See `HabitSnapshot.existed(on:)`.
+        if let last = week.days.last, !habit.existed(on: last) {
+            return [SlotSpan(
+                index: 0, firstDay: 0, lastDay: dayCount - 1,
+                state: .inactive, actionDay: nil
+            )]
+        }
 
         let completions = habit.completedDays.count { week.contains($0) }
         // A habit edited from 5x down to 2x can hold more completions than it
