@@ -302,15 +302,44 @@ struct WeekCalendarTests {
         #expect(weeksBack(TestCalendar.date(2026, 8, 5), latest: today) == "2 weeks ago")
     }
 
-    @Test("The count survives a year end and the cap at twelve")
+    @Test("The count survives a year end, and a floor years behind it")
     func theCountReachesTheFloor() {
         // `weekOfYear` restarts on 1 January, so a distance counted in week
         // numbers would read −39 here rather than 12. This one counts days.
         let january = TestCalendar.date(2026, 1, 14)
-        let earliest = WeekReach.from(
+        let quarter = WeekReach.from(
+            recordStart: TestCalendar.date(2025, 10, 22), today: january, calendar: calendar
+        ).earliest
+        #expect(weeksBack(quarter, latest: january) == "12 weeks ago")
+
+        // **And the floor is no longer twelve weeks away** (#186). A record
+        // that starts in 2020 is now reached in full, so the phrase this
+        // composes has to survive a three-figure count and six year ends. A
+        // count in `weekOfYear` could not express this distance at all: it
+        // restarts at each of them.
+        let deep = WeekReach.from(
             recordStart: TestCalendar.date(2020, 1, 1), today: january, calendar: calendar
         ).earliest
-        #expect(weeksBack(earliest, latest: january) == "12 weeks ago")
+        #expect(weeksBack(deep, latest: january) == "315 weeks ago")
+        // Which is the plain arithmetic: 2,205 days between the two Mondays.
+        let monday = TestCalendar.date(2026, 1, 12)
+        #expect(calendar.dateComponents([.day], from: deep, to: monday).day == 315 * 7)
+    }
+
+    /// The title ladder past its third rung, at a distance the cap made
+    /// unreachable (#186).
+    ///
+    /// A hundred weeks back the title is a date range carrying its year and the
+    /// subtitle is the count. Both halves are asserted here because the pair is
+    /// what reads — "21 Oct – 27 Oct 2024" over "100 weeks ago" says which week
+    /// and how far, and neither of them says it alone.
+    @Test("A hundred weeks back still names its week and its distance")
+    func aHundredWeeksBackReadsSensibly() {
+        let today = TestCalendar.date(2026, 9, 22)
+        let hundred = calendar.date(byAdding: .day, value: -700, to: today)!
+
+        #expect(weeksBack(hundred, latest: today) == "100 weeks ago")
+        #expect(title(hundred, today: today) == "21 Oct\(dash)27 Oct 2024")
     }
 
     @Test("A daylight-saving transition does not lose a day of the count")

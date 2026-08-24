@@ -120,12 +120,16 @@ enum WeekCalendar {
     /// that is how a date is written.
     ///
     /// **The year appears only when it is not today's**, which is `monthTitle`'s
-    /// rule kept: a week reachable from here is at most a quarter back, so
-    /// eleven months of the year a year would be chrome answering a question
-    /// nobody has. That rule is not one the interval style can express — asked
-    /// for a year it prints both — so a week that needs one is composed from
-    /// its two ends instead, and the year is dropped from the first end when
-    /// both ends share it: "Dec 29, 2025 – Jan 4", "Oct 20 – Oct 26, 2025".
+    /// rule kept: on the weeks anybody pages to most, a year would be chrome
+    /// answering a question nobody has. It used to be argued from the
+    /// twelve-week cap — a week reachable from here is at most a quarter back —
+    /// and the cap is gone (#186), so the rule stands on its own now and earns
+    /// more of its keep than it did: the pager reaches whole years, and those
+    /// are exactly the weeks that print one. That rule is not one the interval
+    /// style can express — asked for a year it prints both — so a week that
+    /// needs one is composed from its two ends instead, and the year is dropped
+    /// from the first end when both ends share it: "Dec 29, 2025 – Jan 4",
+    /// "Oct 20 – Oct 26, 2025".
     ///
     /// Formatted through the calendar's own locale *and time zone*, not the
     /// process's: a midnight formatted in the wrong zone is the previous day,

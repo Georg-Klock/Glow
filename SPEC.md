@@ -186,9 +186,9 @@ A build that violates one of these is broken regardless of what else works.
   grid edit today and nothing else. A rest day is never editable on any surface.
   The days *ahead* are editable only with demo history in — outside it you can
   correct the past, not claim the future. **The week it shows need not be this
-  one** (#117): the view pages back as far as the record reaches, capped at
-  twelve weeks, and a week entirely in the past is editable end to end. Forward
-  stops at the current week.
+  one** (#117): the view pages back as far as the record reaches — all of it,
+  with no cap since #186 — and a week entirely in the past is editable end to
+  end. Forward stops at the current week.
 - **R3.** A day holds zero or one completion. Never two. The per-day kind was
   the exception — one row per repetition, up to the habit's target — and it is
   gone (#209).
@@ -216,7 +216,8 @@ no today in it. `Tests/SlotEditingTests.swift` covers the rule itself and the
 geometry that resolves a touch on a span into a weekday.
 `Tests/WeekReachTests.swift` covers how far back the pager goes, and asserts the
 pager's one invariant — an enabled back chevron always lands on a *different
-week* — over nine time zones, three week starts and a year of days (#242). R3 is asserted
+week* — over nine time zones, three week starts and a year of days (#242), and
+again over a six-year record walked week by week to its first week (#186). R3 is asserted
 in `Tests/PersistenceTests.swift`, which also asserts the store's own refusal of
 a day still to come, and R4 in `Tests/DayIdentityTests.swift` — Los Angeles to
 Berlin and back, both DST directions, and a zone whose clocks move at midnight.
@@ -494,22 +495,27 @@ disabled when there is no record to page into; off it, `<` and `>` together. A
 forward chevron on the newest week there is would be a control that can never do
 anything. Off the current week the trailing slot holds **Today**, which jumps
 straight home rather than stepping — a way out of a place you paged into is not
-eleven taps. There is no gesture: #190's header swipe is out (#207), and the
+one tap per week you came back through, and with no cap that walk is as long as
+the record. There is no gesture: #190's header swipe is out (#207), and the
 rows keep their own swipe actions for edit and delete. An earlier week is edited
 exactly as this one is: the surface has not changed, and all seven of its
 columns are past, so all seven are tap targets. Nothing is open in it, because
 nothing is open anywhere but today (R1).
 
-**How far back: as far as the record reaches, capped at twelve weeks.** The
+**How far back: as far as the record reaches, and no further** (#186). The
 record starts at the first completion on record or the first habit's creation,
 whichever is earlier — the demo invents completions ten weeks before the habits
 that carry them, so neither alone is the answer. A week before anything existed
 holds nothing to correct, so a fresh install pages nowhere and the reach grows
-with the app's own history. The cap keeps the pager finite and makes the one
-unusable value harmless: `Habit.createdAt` defaults to `.distantPast` for rows
-written before the column existed. Forward stops at the current week; further
-back than a quarter, the surface is History, which is a year of days and does
-not respond to touch on purpose.
+with the app's own history. **There is no cap.** There was one, of twelve
+weeks, and both of its reasons are gone: how much rope a person gets was
+decided the other way, and the value that made an uncapped reach unbounded is
+refused where it is read rather than clipped where it is used —
+`Habit.createdAt` defaults to `.distantPast` for rows written before the column
+existed, which means *unknown*, and a habit whose only signal is that default
+starts no record at all. Forward stops at the current week. History is a year
+of days that does not respond to touch on purpose; it is a second view of the
+same record rather than where the week view runs out.
 
 **The title names the week you are looking at: how long ago, then which days**
 (#190, #207). "This Week", "Last Week", "Two Weeks Ago" — and past the third

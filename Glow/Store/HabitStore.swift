@@ -452,12 +452,32 @@ struct HabitStore {
     }
 
     /// The earliest day the record reaches, normalized to midnight, or nil for
-    /// a store with nothing in it.
+    /// a store that knows nothing about when it began.
     ///
     /// The first completion on record or the first habit's creation, whichever
     /// is earlier — the demo invents completions ten weeks before the habits
     /// that carry them, so neither table alone is the answer. `WeekReach` turns
-    /// it into how far the week view may be paged (#117).
+    /// it into how far the week view may be paged (#117), and since #186 that
+    /// is the whole of the bound: there is no cap behind this any more.
+    ///
+    /// **A habit with no creation date on record does not start the record**
+    /// (#186). `Habit.createdAt` defaults to `Habit.unknownCreation` for every
+    /// row written before that column existed, and a sentinel that sorts before
+    /// every real date is exactly what a `min` reaches for: one such row used to
+    /// make the record — and the pager over it — begin in the year 1. The
+    /// predicate is the *fetch's* rather than a filter after it, because
+    /// `fetchLimit = 1` over an unfiltered ascending sort returns the sentinel
+    /// row and hides every real date behind it.
+    ///
+    /// **So a store whose only signal is a sentinel answers nil**, and the
+    /// pager stays on this week. That is the same answer a fresh install gets
+    /// and it is the honest one: nothing is known about when this habit began,
+    /// and inventing a start would be inventing a past the record does not
+    /// hold. It costs a habit created before the column existed and never once
+    /// logged — the one store where the old cap gave twelve weeks of reach and
+    /// this gives none — and there is nothing in those weeks to correct,
+    /// because there is nothing in that store at all. Its first completion is
+    /// its record, from the day it is made.
     ///
     /// **A read, on the type that says reads do not go through it.** The
     /// exception is deliberate and narrow: this is a `min` over two tables, and
@@ -472,7 +492,11 @@ struct HabitStore {
     func earliestRecordedDay() -> Date? {
         var completions = FetchDescriptor<Completion>(sortBy: [SortDescriptor(\.day)])
         completions.fetchLimit = 1
-        var habits = FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdAt)])
+        let unknown = Habit.unknownCreation
+        var habits = FetchDescriptor<Habit>(
+            predicate: #Predicate<Habit> { $0.createdAt > unknown },
+            sortBy: [SortDescriptor(\.createdAt)]
+        )
         habits.fetchLimit = 1
 
         let logged = (try? context.fetch(completions))?.first?.day
