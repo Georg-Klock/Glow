@@ -7,29 +7,51 @@ import Foundation
 /// there are to visit — and it is a separate question from `SlotEditing`, which
 /// stays a fact about the surface rather than about which week is on screen.
 ///
-/// **The reach is the record's, capped at twelve weeks.** Both halves have a
-/// reason:
+/// **The reach is the record's, and that is the whole rule** (#186). A week
+/// before anything existed holds nothing to correct, so a fresh install can
+/// page nowhere, which is the truth about it; the reach grows as the app's own
+/// history does. `Habit.createdAt` alone would not do — demo history invents
+/// completions ten weeks before the habits that carry them — so the record's
+/// start is the earlier of the first completion and the first habit, taken by
+/// `HabitStore.earliestRecordedDay`.
 ///
-///  - *The record's*, because a week before anything existed holds nothing to
-///    correct. A fresh install can page nowhere, which is the truth about it;
-///    the reach grows as the app's own history does. `Habit.createdAt` alone
-///    would not do — demo history invents completions ten weeks before the
-///    habits that carry them — so the record's start is the earlier of the
-///    first completion and the first habit.
-///  - *Capped*, because the record is not a bound anybody can feel. It also
-///    makes the one unusable value harmless: `Habit.createdAt` defaults to
-///    `.distantPast` for every row written before it existed, and an
-///    uncapped pager over that is a scroll with no end. The cap is what the
-///    issue asked for and the record is what makes it meaningful.
+/// **It was capped at twelve weeks until #186, and the argument for the cap is
+/// kept rather than deleted**, because it had two halves and they are not the
+/// same kind of claim.
 ///
-/// Twelve is a quarter, and comfortably more than the ten weeks
-/// `SeededHistory` invents, so the demo's whole past is reachable. Beyond it
-/// the surface is History, which is a year of days and does not respond to
-/// touch on purpose — see `YearView`.
+///  - *The record is not a bound anybody can feel.* Twelve weeks is a quarter,
+///    comfortably more than the ten weeks `SeededHistory` invents, and a
+///    tracker that lets you edit a quarter of a year may be a tracker whose
+///    record cannot be trusted. That was a real argument about how much rope a
+///    person gets, and it was **overruled deliberately**: the pager pages back,
+///    and edits, as far as the record genuinely reaches. Splitting it — looking
+///    further than you may edit — was considered and refused; one bound, not
+///    two. The costs are storage and drawing, and neither justifies a cap:
+///    the history is SQLite, the grid draws one week at a time, and eight
+///    habits over ten years is about 29,000 rows. Measured, not assumed —
+///    `HistoryProjectionTests.aDeepWeekCostsWhatAWeekCosts`.
+///  - *`.distantPast` makes "as far as the record reaches" unbounded.*
+///    `Habit.createdAt` defaults to it for every row written before that column
+///    existed, and an uncapped pager over a record that starts in the year 1 is
+///    a scroll with no end. That half was simply true — and it is **fixed at
+///    its source instead of survived here**: a default creation date means
+///    *unknown*, not *the year 1*, and `HabitStore.earliestRecordedDay` no
+///    longer lets one start the record. See `Habit.hasKnownCreation`.
+///
+/// So one half was a judgement and was overruled, and the other was a hazard
+/// and was repaired. Neither is a reason to bound the pager, and nothing here
+/// bounds it under a second name.
+///
+/// **`recordStart` is trusted, and that is where the hazard now lives.** This
+/// type takes the date it is given; a caller that hands it a sentinel gets a
+/// reach back to the sentinel. The one guard is in `earliestRecordedDay`,
+/// which is where the tables are read — see `WeekReachTests.theSentinelIsNotThisTypesToRefuse`.
 ///
 /// **Forward stops at the current week.** There is nothing to correct in a week
 /// that has not happened; the days *ahead* are demo-history's, and only within
-/// the current week (#116).
+/// the current week (#116). History — a year of days, and deliberately not
+/// touchable — is a different view of the same record rather than what happens
+/// past the end of this one.
 ///
 /// Pure, per the `WeekGrid` pattern: dates in, bounds out, no store and no
 /// `Date()`.
@@ -39,15 +61,13 @@ struct WeekReach: Equatable, Sendable {
     /// The oldest week the view may show. Never after `latest`.
     let earliest: Date
 
-    /// The furthest back the pager ever goes, whatever the record says.
-    static let maximumWeeksBack = 12
-
     /// The reach for a record that starts at `recordStart`, or no reach at all
     /// when there is no record.
     ///
     /// `recordStart` is the earliest day anything is known about: the first
-    /// completion on record, or the first habit's creation, whichever is
-    /// earlier. Nil for an empty store.
+    /// completion on record, or the first habit's creation where that is a date
+    /// rather than the unknown-creation sentinel, whichever is earlier. Nil for
+    /// an empty store, and for one that holds nothing but sentinels.
     static func from(
         recordStart: Date?,
         today: Date,
@@ -56,19 +76,19 @@ struct WeekReach: Equatable, Sendable {
         let latest = WeekCalendar.startOfWeek(containing: today, calendar: calendar)
         guard let recordStart else { return WeekReach(latest: latest, earliest: latest) }
 
-        // Both floors are week starts. The cap is twelve weeks of days back
-        // from one, which is the same weekday but not reliably the same
-        // instant — a zone that changes its clocks at midnight can put it an
-        // hour inside or outside the week it names — and an `earliest` that is
-        // not a week start is compared against week starts by `contains`,
-        // `clamped` and the pager's own `.disabled` (#242).
-        let capDay = calendar.date(byAdding: .day, value: -7 * maximumWeeksBack, to: latest) ?? latest
-        let cap = WeekCalendar.startOfWeek(containing: capDay, calendar: calendar)
+        // **Both floors are week starts, and normalizing this one is
+        // load-bearing** (#242). An `earliest` that is not a week start is
+        // compared against week starts by `contains`, `clamped` and the pager's
+        // own `.disabled`, and in a zone that changes its clocks at midnight the
+        // two can name the same week an hour apart — which draws a back chevron
+        // that is lit and does nothing. The twelve-week cap this used to take a
+        // `max` against was normalized for exactly that reason; the cap is gone
+        // and the normalization is not.
         let recorded = WeekCalendar.startOfWeek(containing: recordStart, calendar: calendar)
-        // The later of the two floors, and never past the current week: a
-        // record that starts in the future — a demo, a sync, a clock that went
-        // backwards — leaves the pager exactly where it already is.
-        return WeekReach(latest: latest, earliest: min(latest, max(cap, recorded)))
+        // Never past the current week: a record that starts in the future — a
+        // demo, a sync, a clock that went backwards — leaves the pager exactly
+        // where it already is.
+        return WeekReach(latest: latest, earliest: min(latest, recorded))
     }
 
     /// Whether a week starting on `weekStart` is one the view may show.

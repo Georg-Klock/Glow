@@ -470,10 +470,14 @@ struct WeeklyGridView: View {
     /// Back to this week in one step, in the slot Edit and Add vacate.
     ///
     /// One jump rather than a walk back through the weeks between: this is the
-    /// way out of a place you paged into, and repeating a tap eleven times is
-    /// not a way out. It was a pill over the grid in #190 and is a toolbar
-    /// button in #207 — one fewer thing scrolling under the header, and it sits
-    /// where the eye already goes for the screen's other actions.
+    /// way out of a place you paged into, and a tap repeated once per week
+    /// between here and there is not a way out. It mattered when the pager
+    /// stopped at twelve weeks and it matters more now that it does not (#186):
+    /// the walk home is as long as the record, and this button is one tap from
+    /// the oldest week there is exactly as it is from last week's. It was a
+    /// pill over the grid in #190 and is a toolbar button in #207 — one fewer
+    /// thing scrolling under the header, and it sits where the eye already goes
+    /// for the screen's other actions.
     ///
     /// Plain, not prominent: the app's root tint is pure white and a
     /// `.borderedProminent` capsule under it fills white and writes its label
@@ -505,6 +509,14 @@ struct WeeklyGridView: View {
     ///
     /// Nothing on the current week — "This Week" over the lit column is the
     /// whole answer, and the dates are already under the weekday letters.
+    ///
+    /// **The count has no ceiling any more** (#186). With the cap gone this
+    /// line reads "137 weeks ago" on a record that long, which is a big number
+    /// and still the right one: the number is the *distance*, and the line
+    /// above it is the identity — a week that far back prints its year, so the
+    /// pair reads "Oct 20 – Oct 26, 2025" over "44 weeks ago". Rounding the
+    /// distance to years would lose the only precise thing this line says, and
+    /// it is the line nobody has to read.
     private var weekSubtitle: String? {
         switch weeksBack {
         case 0: return nil

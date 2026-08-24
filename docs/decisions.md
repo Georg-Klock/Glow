@@ -1950,6 +1950,10 @@ three candidates — the first completion on record, `Habit.createdAt`, or an
 arbitrary window — and an unbounded pager over `.distantPast` is a scroll with
 no end.
 
+**Reopened and changed by #186** — the cap is gone. What follows is the
+argument as it stood; the entry at the end of this file says which half of it
+was overruled and which half was repaired.
+
 **Decision.** As far back as the record reaches, capped at twelve weeks.
 `WeekReach` holds it as two week starts and nothing else. Both halves earn their
 place. The record's, because a week before anything existed holds nothing to
@@ -3918,3 +3922,107 @@ as `selection`'s default rather than as a consequence of declaration order,
 precisely so the two can differ. The first tab says what the app is about; the
 landing tab says what it opens to. vision.md now says that where it says the
 rest.
+
+## The twelve-week cap, removed (#186)
+
+**2026-08-24.** The week pager reaches as far back as the record does, and
+`WeekReach.maximumWeeksBack` is deleted. Both looking and editing are uncapped;
+splitting them — see further than you may correct — was considered and refused.
+This reopens #117, which is a decision rather than a rediscovery, and it is
+Georg's call.
+
+**What the cap was for, and why neither reason survives.** It had two, and they
+are not the same kind of claim.
+
+- *The record is not a bound anybody can feel.* Twelve weeks is a quarter, and
+  a tracker that lets you edit a quarter of a year may be a tracker whose record
+  cannot be trusted — #186 asked whether six weeks or four would make the past
+  more nearly fixed. That is a real argument about how much rope a person gets
+  and it was **overruled deliberately**: the pager pages back, and edits, as far
+  as the record genuinely reaches. Nothing in the code decided this and nothing
+  in the code could.
+- *`Habit.createdAt` defaults to `.distantPast`.* `HabitStore.earliestRecordedDay`
+  returns the earlier of the first completion and the first habit's creation, so
+  one row carrying that default made the record start in the year 1 — and an
+  uncapped pager over that is a scroll with no end. That half was simply true,
+  and it is **fixed at its source**: the default means *unknown*, not *the year
+  1*, and a sentinel is now refused where the tables are read.
+
+The second is the whole risk of the change and was fixed first. The predicate is
+the fetch's, not a filter after it: `fetchLimit = 1` over an ascending sort by
+`createdAt` returns the sentinel row and hides every real date behind it, so
+filtering afterwards would have answered "the year 1" exactly as before.
+
+**A habit with the default date and no completions answers nil — no reach.**
+This is the case where the sentinel is the only signal, and the three candidate
+answers are nil, today, and some invented floor. Invented floors are out on the
+app's own terms: light marks what happened, and opening twelve weeks of
+correctable past for a store that holds nothing is offering to correct weeks the
+record cannot vouch for. Nil and today produce the same reach — the current week
+— and nil is the honest spelling of it, because it is also what an empty store
+answers and the two stores know exactly as much about when they began: nothing.
+#117's own sentence settles it, "a week before anything existed holds nothing to
+correct".
+
+**What that costs, stated rather than discovered.** One store loses reach it had
+yesterday: a habit created before the `createdAt` column existed, never once
+logged. It had twelve weeks of pager and now has none, and there is nothing in
+those weeks to correct, because there is nothing in that store at all. Its first
+completion is its record, from the day it is made. A habit created before the
+column existed that *has* been logged is unaffected — its completions are the
+record and always were.
+
+**`WeekReach.from` still normalizes `earliest` through `WeekCalendar.startOfWeek`,
+and that is load-bearing.** It landed hours earlier as half of #242's fix: an
+`earliest` that is not a week start is compared against week starts by
+`contains`, `clamped` and the pager's own `.disabled`, and in a zone that changes
+its clocks at midnight the two can name one week an hour apart — a back chevron
+lit at the floor, one dead press. The cap it used to normalize is gone; the
+`startOfWeek` around the record's own start is not.
+
+**Storage and rendering do not justify a cap, and the second half of that is
+measured.** The history is SwiftData over SQLite and the grid draws one week at
+a time. Eight habits over ten years is 29,200 completions, and on that store the
+bounded read a week costs is the same read whether the week is recent or years
+back: medians of eight alternated rounds in one process,
+`HistoryProjectionTests.aDeepWeekCostsWhatAWeekCosts`, over two runs: **one
+week back 7.18 and 7.57 ms, 300 weeks back 7.72 and 7.91 ms** — the two arms
+half a millisecond apart on the same store in the same minute, and the gap
+between runs as large as the gap between the arms. A deep week is a predicate
+over a different range, not more rows.
+
+What that measurement does not say is that a week is free. The same read on the
+smaller store next to it — twelve habits, two years, 8,760 rows — is 3.2 ms, so
+the cost of drawing a week does grow with the size of the history behind it.
+That is the store's size and not the pager's depth, it is the same cost the
+current week already pays, and it is what a bounded read looks like next to the
+whole-history read it replaced: 234 ms.
+
+**What the titles do with a much larger N.** #207's ladder — This Week, Last
+Week, Two Weeks Ago, then the date range — is a switch over
+`WeekCalendar.weeksBack`, which is days divided by seven rather than a
+`weekOfYear` difference, and that choice is what survives the change: a count in
+week numbers restarts every 1 January and could not express 315 weeks at all. A
+hundred weeks back the pair reads "21 Oct – 27 Oct 2024" over "100 weeks ago",
+which is a big number and the right one — the range is the identity and the
+count is the distance. The year in the range title used to be argued from the
+cap ("a week reachable from here is at most a quarter back"); the rule is
+unchanged and now earns more of its keep, because the weeks that print a year
+are exactly the weeks the cap used to hide.
+
+**`SeededHistory` no longer constrains anything.** The cap had to exceed the ten
+weeks the demo invents, and that was asserted as `SeededHistory.weeks <=
+WeekReach.maximumWeeksBack`. Nothing encodes the constraint now; the test that
+carried it asserts the demo's first week is reachable, which is what the
+constraint was ever protecting.
+
+**Tested at the depth the cap used to hide.** #242's sweep keeps its parameters
+exactly — twelve weeks of enumeration, 86,349 enabled chevrons a zone — so its
+numbers stay comparable to the ones the fix was measured against, and twelve is
+now a sweep depth rather than a bound. Alongside it, a six-year record is walked
+week by week from the current week to its first: every step must land on a
+different week, the walk must take exactly one step per week of record, arrive at
+`reach.earliest`, and stop there. Nine zones, three week starts, twelve days
+spread across two years including both of Havana's midnight clock changes —
+11,268 steps a zone.
+

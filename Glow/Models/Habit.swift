@@ -36,8 +36,38 @@ final class Habit {
     /// single colour, so nothing reads this; dropping the column would be a
     /// migration for no gain.
     var accentRaw: String = ""
+    /// When this habit was made — or `Habit.unknownCreation`, which means
+    /// **unknown** rather than the year 1.
+    ///
+    /// The default is nobody's choice of date. Every property here carries one
+    /// so that a later CloudKit sync is a change of configuration rather than a
+    /// migration (see the note above the type), and a row written before this
+    /// column existed reads back with whatever default the column declares.
+    /// `.distantPast` is that default, and all it says is *this row predates the
+    /// column*.
+    ///
+    /// **A sentinel is not a date, and must never become one** (#186). It is
+    /// smaller than every real value, so anything taking a minimum over
+    /// creation dates picks it first and answers with the year 1 —
+    /// `HabitStore.earliestRecordedDay` did exactly that, and the week pager
+    /// over it was bounded only by a cap that existed to survive this.
+    /// Ask `hasKnownCreation` rather than comparing against `.distantPast` at
+    /// the call site.
     var createdAt: Date = Date.distantPast
     var sortOrder: Int = 0
+
+    /// What `createdAt` holds when the row has no creation date on record.
+    ///
+    /// Named rather than spelled `.distantPast` where it is used, so that the
+    /// comparison reads as *is this known* instead of *is this the year 1*.
+    static let unknownCreation = Date.distantPast
+
+    /// Whether `createdAt` is a date rather than the sentinel.
+    ///
+    /// `>` rather than `!=`: the sentinel is the earliest value the column can
+    /// hold, so this also rejects anything that has somehow landed below it,
+    /// and it is the same comparison the store's fetch predicate makes.
+    var hasKnownCreation: Bool { createdAt > Habit.unknownCreation }
 
     /// A blank row: no name, no icon, no track, nothing to complete.
     ///

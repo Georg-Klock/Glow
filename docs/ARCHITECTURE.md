@@ -28,10 +28,14 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
   slots to draw. This is the entire interaction model of the app, and it is one
   function.
 - `WeekReach` is how far back the week view may be paged: two week starts,
-  derived from where the record begins and capped at twelve weeks. Separate
+  derived from where the record begins and bounded by nothing else (#186 —
+  there was a twelve-week cap). Separate
   from `SlotEditing` on purpose — one says which weeks there are to visit, the
   other says what a tap may do on the week you are on, and neither needs to
-  know the other's answer.
+  know the other's answer. It trusts the date it is handed: the record's start
+  comes from `HabitStore.earliestRecordedDay`, which is where a habit carrying
+  the unknown-creation sentinel is refused, because an uncapped pager over the
+  year 1 is a scroll with no end.
 - `SlotLayout` is the row geometry, as a single formula that a 7-circle row and
   an N-pill row both go through.
 - `Frequency` normalizes cadence at construction, so no caller can build a

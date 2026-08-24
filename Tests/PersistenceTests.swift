@@ -199,6 +199,67 @@ struct PersistenceTests {
         #expect(store.earliestRecordedDay() == invented)
     }
 
+    /// **A habit with no creation date on record does not start the record**
+    /// (#186).
+    ///
+    /// `Habit.createdAt` defaults to `Habit.unknownCreation` — `.distantPast` —
+    /// for every row written before the column existed, and it sorts before
+    /// every real date, so the `min` this function takes used to answer with
+    /// the year 1 for any store holding one. That was survivable only because
+    /// the pager was capped at twelve weeks; with the cap gone it would be a
+    /// scroll with no end, so the sentinel is refused where the tables are read
+    /// rather than clamped where they are used.
+    @Test("A habit with no creation date on record does not start the record")
+    func unknownCreationDoesNotStartTheRecord() throws {
+        let context = try makeContext()
+        let store = makeStore(context)
+
+        let legacy = Habit(
+            name: "Walk", icon: "🚶", frequency: .daily,
+            createdAt: Habit.unknownCreation, sortOrder: 0
+        )
+        context.insert(legacy)
+        try context.save()
+        #expect(!legacy.hasKnownCreation)
+
+        // **Nil, not the year 1 and not today.** Nothing is known about when
+        // this habit began, and that is the same answer a fresh install gives:
+        // the pager stays on this week rather than opening weeks the record
+        // cannot vouch for. See `HabitStore.earliestRecordedDay`.
+        #expect(store.earliestRecordedDay() == nil)
+
+        // Its completions are still the record — a day logged is a day that
+        // happened, whatever the row that carries it knows about itself.
+        let logged = TestCalendar.date(2026, 6, 15)
+        context.insert(Completion(day: logged, habit: legacy, calendar: calendar))
+        try context.save()
+        #expect(store.earliestRecordedDay() == logged)
+    }
+
+    /// The sentinel row is exactly the row an ascending sort returns first, so
+    /// a limit of one over an unfiltered fetch hands it back and hides every
+    /// real creation date behind it. Two habits, one of each kind, and the
+    /// answer has to be the real one (#186).
+    @Test("A row with no creation date does not hide the rows that have one")
+    func unknownCreationDoesNotMaskARealOne() throws {
+        let context = try makeContext()
+        let store = makeStore(context)
+
+        context.insert(
+            Habit(
+                name: "Walk", icon: "🚶", frequency: .daily,
+                createdAt: Habit.unknownCreation, sortOrder: 0
+            )
+        )
+        let made = TestCalendar.date(2026, 7, 6)
+        context.insert(
+            Habit(name: "Read", icon: "📖", frequency: .daily, createdAt: made, sortOrder: 1)
+        )
+        try context.save()
+
+        #expect(store.earliestRecordedDay() == made)
+    }
+
     @Test("Permission to write ahead is not permission to write on the rest day")
     func theRestDayOutranksTheDemo() throws {
         let context = try makeContext()

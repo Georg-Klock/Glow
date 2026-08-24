@@ -303,4 +303,59 @@ struct HistoryProjectionTests {
         // the shape of the win does not.
         #expect(sevenDays * 10 < whole)
     }
+
+    /// **A week years back costs what last week costs** (#186).
+    ///
+    /// The twelve-week cap was removed on the reasoning that neither storage
+    /// nor rendering justifies one: the history is SwiftData over SQLite, the
+    /// grid draws one week at a time, and eight habits over ten years is about
+    /// 29,000 completions. That is the one part of the argument that was taken
+    /// on faith, so it is measured — a deep week is a *predicate over a
+    /// different range*, not more rows, but the range that used to be
+    /// unreachable is now the one the pager can sit on, and "the query is the
+    /// same shape" is a claim about an index rather than an observation.
+    ///
+    /// Both arms in one process, alternated, medians of eight rounds, for the
+    /// reason at the top of this file: two runs measure the machine.
+    @Test("A week five years back costs what a week back costs")
+    func aDeepWeekCostsWhatAWeekCosts() throws {
+        // Ten years for eight habits: 29,200 completions, the store the cap's
+        // removal was argued over.
+        let (_, habits) = try makeStore(habits: 8, days: 3650)
+        let lastWeek = week(of: calendar.date(byAdding: .day, value: -7, to: today)!)
+        let deepWeek = week(of: calendar.date(byAdding: .day, value: -7 * 300, to: today)!)
+
+        var recent: [Double] = []
+        var deep: [Double] = []
+        for round in 0..<9 {
+            var start = ContinuousClock.now
+            let near = Habit.snapshots(of: habits, within: lastWeek, calendar: calendar)
+            let nearTime = milliseconds(since: start)
+
+            start = ContinuousClock.now
+            let far = Habit.snapshots(of: habits, within: deepWeek, calendar: calendar)
+            let farTime = milliseconds(since: start)
+
+            // Both weeks are inside the seeded history, so both really read
+            // something: a week that hit nothing would time an empty fetch.
+            #expect(near.count == habits.count && far.count == habits.count)
+            #expect(near.allSatisfy { !$0.completionCounts.isEmpty })
+            #expect(far.allSatisfy { !$0.completionCounts.isEmpty })
+            if round > 0 {
+                recent.append(nearTime)
+                deep.append(farTime)
+            }
+        }
+
+        let near = median(recent)
+        let far = median(deep)
+        print(
+            "L186 medians over 8 rounds, 8 habits x 3,650 days (29,200 completions): "
+                + "one week back \(near)ms, 300 weeks back \(far)ms"
+        )
+        // A factor rather than a millisecond count, and a loose one: what would
+        // block an uncapped pager is a deep week costing a history, not a deep
+        // week costing a millisecond more than a near one.
+        #expect(far < near * 4 + 1)
+    }
 }
