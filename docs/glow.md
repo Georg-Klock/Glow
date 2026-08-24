@@ -306,15 +306,39 @@ not. Measured on an iPhone 14 Pro, driving the burst from a tethered Mac with
 ```
 
 **57ms** from the write to the provider being called, and the full eleven-entry
-burst timeline built. Reload latency is not the problem, and the expiry window
-has fifteen times the margin it needs.
+burst timeline built. Reload latency is not the problem.
+
+**The margin, though, was — and that sentence is now wrong** (#267). This used
+to end "and the expiry window has fifteen times the margin it needs", which was
+true of the burst it was measured on: the eleven-entry sampled spring, whose
+window was around a second. The burst then became a three-frame cross-fade and
+`WidgetBurst.duration` came down to **0.3s** — and because that one constant is
+both the fade's length *and* the note's expiry, the margin came down with it
+while this paragraph did not.
+
+Measured again in the simulator with the current constant, two taps on a placed
+week widget:
+
+```
+14:56:46.209  tap 3F757C9D-…: done, burst recorded
+14:56:46.389  timeline: 1 entry, still (burst none pending)
+14:58:49.208  tap 94676453-…: done, burst recorded
+14:58:49.341  timeline: 2 entries, burst 94676453-… starting 0.17s in
+```
+
+133–180ms against a 300ms window: under 2x, and one of the two taps lost the
+race outright. The other played two of three frames, starting 57% of the way
+through the fade. So the reload is still fast; the window it has to beat is what
+shrank.
 
 **The rendering has since been watched, and it half-works** (#40): the entries
 render — this is not the sweep's failure — but not at the rate they were
 sampled at, so the sampled spring came out as a stutter rather than a close.
 That observation is what turned the burst into the cross-fade above: frames
 few enough that arrival rate has nothing left to ruin. The cross-fade itself
-has not yet been watched on a device; when it is, this line should say so.
+has not yet been watched on a device; when it is, this line should say so — and
+per the measurement above, what is watched will usually be the tail of it or
+none of it until #267 is decided.
 
 ## How to see inside a widget at all
 
