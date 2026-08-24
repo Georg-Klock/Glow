@@ -437,8 +437,9 @@ struct RenderSignature: Codable, Equatable {
     static let side = 16
 
     /// The levels this app paints *flat* — the two colours of #111, as they
-    /// land in an sRGB byte. `GlowPalette.greyOpaque` is 43 and the lit white
-    /// is 255.
+    /// land in an sRGB byte. `GlowPalette.greyOpaque` is 141 (2026-08-24; it
+    /// was 43 before the default and Increase Contrast became one value) and
+    /// the lit white is 255.
     ///
     /// **Literals, deliberately, and the same argument the grey band in
     /// `WidgetRenderDiffTests` is written under.** A level read from
@@ -447,8 +448,8 @@ struct RenderSignature: Codable, Equatable {
     /// these are numbers a person wrote down, and moving the palette means
     /// moving them, in the same change, on purpose.
     /// `RenderBaselineTests.flatTonesAreReal` is what notices if that does not
-    /// happen.
-    static let flatTones = [43, 255]
+    /// happen — it is what just caught this one.
+    static let flatTones = [141, 255]
 
     var width: Int
     var height: Int

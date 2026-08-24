@@ -3,7 +3,7 @@ import WidgetKit
 
 /// Every colour and every effect in the grid.
 ///
-/// **Two colours, both opaque.** White is anything lit; `#2B2B2B` is everything
+/// **Two colours, both opaque.** White is anything lit; `#8D8D8D` is everything
 /// else. There is no third, and there is no scale between them — a slot is
 /// identified by whether there is light in it and by its silhouette, never by
 /// how far down a grey ramp it sits (#111).
@@ -14,13 +14,15 @@ import WidgetKit
 /// most of all, read as a grey scale when the whole premise is that brightness
 /// means one thing.
 ///
-/// #111 collapsed that ramp onto the socket's own value, `#171717`, so the one
-/// grey was inherited rather than invented. **`#2B2B2B` is not inherited from
-/// anything** (#194, #240): 23 was too dark in use and so was 36, and this is a
-/// value picked by eye for marks that have to be *findable* while staying
-/// unmistakably unlit. It measures about 1.48:1 on black against the 4.5:1 body
-/// text asks for, so what is dark is still plainly dark; it is just no longer at
-/// the edge of vanishing.
+/// #111 collapsed that ramp onto the socket's own value, `#171717`, and #194
+/// and #240 each nudged it brighter while holding to one rule: the default grey
+/// stays *findable*, never *legible* — that was `greyIncreasedContrast`'s job,
+/// behind a setting, so the reading "what stays dark is what never happened"
+/// held for everyone who had not asked otherwise. **That rule is retired**
+/// (2026-08-24): the default is now `#8D8D8D`, the same value
+/// `greyIncreasedContrast` already was — not a fourth nudge, a decision that
+/// the two tiers should read the same. See the full reasoning where
+/// `greyOpaque` is declared.
 ///
 /// **Two values below still carry alpha, and neither is a colour the app
 /// draws.** `greyAccented` is what the system is handed once it has already
@@ -71,39 +73,46 @@ enum GlowPalette {
     /// `greyOpaque`; see `GlowGrey`.
     static let grey = GlowGrey()
 
-    /// The second colour, as declared. `#2B2B2B`, opaque.
+    /// The second colour, as declared. `#8D8D8D`, opaque.
     ///
-    /// **Chosen, not derived** (#194, #240). It was `#171717` from #111 until
-    /// 2026-08-23, and that value *was* a derivation — 0.553 × 0.16 × 255 =
-    /// 22.6 → 23 = 0x17, exactly what the old ramp's socket composited to. 23
-    /// turned out to be too dark in use: on a real screen a ✕ and a weekday
-    /// letter at that level are nearly gone. #194 moved it to 36 and the same
-    /// report came back, so #240 moved it again, to 43.
+    /// **The guardrail this used to respect was retired on purpose, not
+    /// exceeded by accident** (2026-08-24). Three nudges — #111's `#171717`,
+    /// #194's `#242424`, #240's `#2B2B2B` — all held one rule: stay under 1.5:1
+    /// on black, unmistakably not-lit, because legible body text was
+    /// `greyIncreasedContrast`'s job behind a setting, not the default's. #240
+    /// said explicitly that the next report of "still unreadable" would be
+    /// asking to move that rule rather than nudge inside it, and that is what
+    /// this is: judged against a reference screenshot of ordinary dark-mode
+    /// body text, not a fourth guess.
     ///
-    /// 43 is a judgement about what reads, so there is no arithmetic to check it
-    /// against and none is asserted; what the tests hold are the two bounds it
-    /// has to stay inside. **It is also the top of the upper one.** 43/255
-    /// measures 1.483:1 on black and the test guardrail is `< 1.5`, which
-    /// 44/255 — `#2C2C2C`, 1.504:1 — no longer clears. So this is the last
-    /// value a nudge can reach: anything brighter is a request to move the
-    /// guardrail itself, which is a decision to take in the open rather than
-    /// back into. Legible body text is 4.5:1 and stays
-    /// `greyIncreasedContrast`'s job; this value's job is to stay unmistakably
-    /// not-lit while being findable.
-    static let greyOpaque = Color(
-        .sRGB, red: 43 / 255, green: 43 / 255, blue: 43 / 255, opacity: 1
-    )
+    /// **The value is `greyIncreasedContrast`'s, not a new one.** Rather than
+    /// pick a fresh point on the scale, this asks the same question #111 asked
+    /// when it first collapsed the ramp: is there already a number in this file
+    /// that means what is wanted here? There was — the app's own pre-#111 grey,
+    /// already measured at 6.3:1, comfortably clearing the 4.5:1 body text
+    /// asks for. So the default and Increase Contrast now read the same, and
+    /// the two-tier model — dark by default, legible on request — is gone.
+    /// `Tests/WidgetBackgroundTests.swift` asserts the equality directly, so a
+    /// future edit to one without the other fails loudly rather than drifting.
+    static let greyOpaque = greyIncreasedContrast
 
-    /// The grey when the reader has asked for **Increase Contrast**.
+    /// The grey Increase Contrast asks for — and, since 2026-08-24, the grey
+    /// everyone gets.
     ///
-    /// `#2B2B2B` against black is about 1.48:1, and a resting habit name is body
-    /// text. The design says so on purpose — what stays dark is what never
-    /// happened, carried through to type — so the answer is not to compromise it
-    /// for everyone but to honour the setting for the people who asked.
+    /// Kept under its own name for what it used to be the answer to: for #111
+    /// through #240, the default grey stayed deliberately dim — "what stays
+    /// dark is what never happened," carried through to type — and this was
+    /// the honouring of the setting for people who found that too dim to read.
+    /// That distinction is what retired; the number did not need to.
     ///
     /// `#8D8D8D` is not a number invented for this: it is what `grey` composited
     /// to before #111, so Increase Contrast gets the app's own previous grey.
     /// It measures 6.3:1 on black, comfortably past the 4.5:1 asked of body text.
+    ///
+    /// **`greyOpaque` now equals this exactly** (2026-08-24) — declared as its
+    /// own named constant still, because the setting and the default answer
+    /// different questions even on the day their values happen to agree, and a
+    /// future change to one is not implicitly a change to both.
     static let greyIncreasedContrast = Color(
         .sRGB, red: 141 / 255, green: 141 / 255, blue: 141 / 255, opacity: 1
     )
@@ -133,11 +142,12 @@ enum GlowPalette {
     /// Not `greyOpaque`, and the reason is measured. #124 gave the Settings
     /// toggles an explicit tint because white is what this app reserves for lit
     /// and a switch track is not lit; the ON track landed at 181,181,183 against
-    /// an untouched system OFF track at 90,90,94. The body grey would take that
-    /// ON track to roughly its own level — 23 when it was `#171717`, 43 now that
-    /// it is `#2B2B2B` — well *below* the OFF track, inverting the control. #194
-    /// and #240 both lightened the grey and neither comes close to changing that:
-    /// 43 is still less than half of 90.
+    /// an untouched system OFF track at 90,90,94. `greyOpaque` at 141 no longer
+    /// falls *below* the OFF track the way `#171717` and `#2B2B2B` did — the
+    /// 2026-08-24 move to `#8D8D8D` happens to clear it — but 141 is still well
+    /// short of the ON track's measured 181, so borrowing it would still be a
+    /// visibly dimmer switch than the one that was actually measured, not the
+    /// inverted one earlier values risked.
     ///
     /// A `Toggle` in a `Form` is one of iOS's own components on a support
     /// screen, which is the boundary #111 draws its own scope at. So it keeps
