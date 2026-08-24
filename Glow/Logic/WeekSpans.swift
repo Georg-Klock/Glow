@@ -170,10 +170,50 @@ enum WeekSpans {
             return spans
         case .week:
             return withColumnActions(
-                spans, in: week, today: today, editing: editing,
+                spans, for: habit, in: week, today: today, editing: editing,
                 restDay: restDay, calendar: calendar
             )
         }
+    }
+
+    /// The day a tap on one column of a span writes, or nil where that column
+    /// takes no write.
+    ///
+    /// `SlotEditing` decides whether the *surface* writes that day. This adds
+    /// the one thing that depends on the span: **a filled span is an undo, and
+    /// may only land on a day that carries a completion** (#256).
+    ///
+    /// `HabitStore.toggleCompletion` is a per-day toggle — on a day with
+    /// nothing logged it *adds* a completion rather than removing one. A filled
+    /// span covers columns that mostly have no dot on them, so without this a
+    /// tap between the dots logged a new day. On a row whose goal is already
+    /// met that is invisible: `done` is clamped to `target`, so the week stays
+    /// undivided and the only trace is a dot appearing. That is the whole of
+    /// the report in #256 — un-completing worked exactly when the finger landed
+    /// on one of the lit columns, and every miss added a completion the next
+    /// correct tap then had to get past.
+    ///
+    /// An open span is untouched: it exists to *take* a completion, so the
+    /// column under the finger is right whether or not anything is logged
+    /// there.
+    static func day(
+        atColumn column: Int,
+        of span: SlotSpan,
+        for habit: HabitSnapshot,
+        in week: Week,
+        today: Date,
+        editing: SlotEditing,
+        restDay: Int?,
+        calendar: Calendar = WeekCalendar.calendar
+    ) -> Date? {
+        guard week.days.indices.contains(column) else { return nil }
+        guard span.state != .filled || habit.completedDays.contains(week.days[column]) else {
+            return nil
+        }
+        return editing.day(
+            atColumn: column, in: week, today: today,
+            restDay: restDay, calendar: calendar
+        )
     }
 
     /// A span carries the last day inside it that this surface may write.
@@ -184,8 +224,15 @@ enum WeekSpans {
     /// activation, and the fallback for a touch that resolves to a column this
     /// surface will not take. The *last* writable column, because for the span
     /// today sits in that is today — every column after it is the future.
+    ///
+    /// **For a filled span, the last writable column that carries a
+    /// completion** (#256), by the same rule and for the same reason as
+    /// `day(atColumn:of:for:in:today:editing:restDay:calendar:)` above: the
+    /// fallback is what a location-less activation gets, and handing VoiceOver
+    /// a day with nothing on it would make its "un-complete" log a day instead.
     private static func withColumnActions(
         _ spans: [SlotSpan],
+        for habit: HabitSnapshot,
         in week: Week,
         today: Date,
         editing: SlotEditing,
@@ -194,9 +241,9 @@ enum WeekSpans {
     ) -> [SlotSpan] {
         spans.map { span in
             let day = (span.firstDay...span.lastDay).reversed().lazy.compactMap {
-                editing.day(
-                    atColumn: $0, in: week, today: today,
-                    restDay: restDay, calendar: calendar
+                Self.day(
+                    atColumn: $0, of: span, for: habit, in: week, today: today,
+                    editing: editing, restDay: restDay, calendar: calendar
                 )
             }.first
             return SlotSpan(

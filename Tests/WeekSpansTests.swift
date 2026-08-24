@@ -500,6 +500,95 @@ struct LateWeekSpansTests {
         #expect(demo.map(\.actionDay) == [day(4), day(6)])
     }
 
+    // MARK: - Undoing a span lands on a day that was logged (#256)
+
+    /// The week surface, so `withColumnActions` is the code under test.
+    private func weekRow(
+        target: Int, done: [Int], today: Date? = nil, restDay: Int? = nil
+    ) -> [SlotSpan] {
+        WeekSpans.spans(
+            for: .fixture(
+                frequency: .timesPerWeek(target),
+                completedDays: Set(done.map { day($0) })
+            ),
+            in: week, today: today ?? day(4), target: target,
+            editing: .week(allowingFuture: false), restDay: restDay, calendar: calendar
+        )
+    }
+
+    /// **A filled span may only hand out a day it can actually undo** (#256).
+    ///
+    /// `HabitStore.toggleCompletion` is a per-day toggle: on a day carrying no
+    /// completion it *adds* one. So a filled span whose `actionDay` is a day
+    /// with nothing logged does not un-complete anything when it is activated —
+    /// it logs a new day. On a row whose goal is already met that is invisible
+    /// in the spans, because `done` is clamped to `target` and the week stays
+    /// undivided; the only trace is a new dot.
+    ///
+    /// That is the whole of the report in #256, which read as "un-completing
+    /// mostly does not register". It registers exactly when the finger lands on
+    /// one of the columns that carries a dot, and those are the minority of the
+    /// bar. Worse, every miss adds a completion, so the next correct tap has one
+    /// more to remove before the row can drop below its target — the failure
+    /// compounds.
+    @Test("A filled span's action day is a day it can undo")
+    func filledSpansUndoADayThatWasLogged() {
+        // One a week, logged on Tuesday, today is Friday: goal met, one span
+        // across the whole week. The last column this surface may write is
+        // Friday — and Friday has nothing on it.
+        let row = weekRow(target: 1, done: [1])
+        #expect(row.count == 1)
+        #expect(row[0].state == .filled)
+        #expect(row[0].actionDay == day(1), "a filled span offered a day with no completion on it")
+    }
+
+    /// The same rule swept: every filled span, at every target, hands out a day
+    /// that carries a completion — or hands out nothing.
+    @Test("No filled span anywhere offers a day with nothing logged on it")
+    func filledSpansNeverOfferAnEmptyDay() {
+        for rest in [nil, 3] as [Int?] {
+            withRest(rest) { restDay in
+                for target in 1...6 {
+                    for doneCount in 1...target {
+                        let done = Array(0..<doneCount)
+                        let logged = Set(done.map { day($0) })
+                        for todayColumn in 0...6 {
+                            let spans = weekRow(
+                                target: target, done: done,
+                                today: week.days[todayColumn], restDay: restDay
+                            )
+                            for span in spans where span.state == .filled {
+                                guard let action = span.actionDay else { continue }
+                                #expect(
+                                    logged.contains(action),
+                                    """
+                                    target \(target), done \(doneCount), today \(todayColumn), \
+                                    rest \(String(describing: rest)): filled span \
+                                    \(span.firstDay)...\(span.lastDay) offers a day with \
+                                    nothing logged on it
+                                    """
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// An open span is untouched by the rule: it exists to *take* a completion,
+    /// so the day under the finger is exactly right whether or not anything is
+    /// logged there.
+    @Test("An open span still offers its own last writable day")
+    func openSpansAreUnchanged() {
+        // Two a week, nothing done, today Friday: the open span is Monday
+        // through Friday and its action is Friday, which has no completion on
+        // it and should not need one.
+        let row = weekRow(target: 2, done: [])
+        let open = row.first { $0.state == .open }
+        #expect(open?.actionDay == day(4))
+    }
+
     // MARK: - An earlier week (#117)
 
     /// A day two weeks after the week under test, so the week is over and the
@@ -552,10 +641,29 @@ struct LateWeekSpansTests {
                                 )
                             }
                             guard let action = span.actionDay else {
-                                // The only span with nothing to write is one
-                                // covering the rest day and nothing else.
-                                #expect(writable.isEmpty, "no action — \(what)")
+                                // **Two spans have nothing to write, not one.**
+                                // The first covers the rest day and nothing
+                                // else. The second is #256: a filled span is an
+                                // undo, so it may only offer a day that carries
+                                // a completion, and a filled span can cover
+                                // columns none of them landed on — spans say
+                                // how much, dots say when (#47). Toggling a day
+                                // with nothing on it would *log* one, which is
+                                // what this invariant used to require.
+                                let logged = writable.filter { done.contains($0) }
+                                #expect(
+                                    writable.isEmpty
+                                        || (span.state == .filled && logged.isEmpty),
+                                    "no action — \(what)"
+                                )
                                 continue
+                            }
+                            // A filled span hands out a day it can undo.
+                            if span.state == .filled {
+                                #expect(
+                                    week.index(of: action).map(done.contains) == true,
+                                    "filled span offers an unlogged day — \(what)"
+                                )
                             }
                             // The day a span hands out is a day it covers, and
                             // never the day nothing can happen on.

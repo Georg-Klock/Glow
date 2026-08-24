@@ -332,11 +332,17 @@ struct HabitRowView: View {
                         // A span covers several columns, so where it was
                         // touched decides which day a tap writes. The geometry
                         // runs backwards in `SlotLayout` and the verdict is
-                        // `SlotEditing`'s; the view does neither.
+                        // `WeekSpans`'; the view does neither.
+                        //
+                        // `WeekSpans.day` rather than `SlotEditing.day` because
+                        // the verdict depends on the span as well as on the
+                        // surface: a filled span is an undo and may only land
+                        // on a column that carries a completion (#256).
                         trackWidth: geometry.trackWidth,
                         dayAtColumn: { column in
-                            editing.day(
-                                atColumn: column, in: week, today: today, restDay: restDay
+                            WeekSpans.day(
+                                atColumn: column, of: span, for: snapshot, in: week,
+                                today: today, editing: editing, restDay: restDay
                             )
                         },
                         onToggle: onToggle
