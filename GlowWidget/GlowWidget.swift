@@ -81,7 +81,12 @@ struct GlowWidget: Widget {
         // Name, sentence and families all from `WidgetKind`. The Widgets tab
         // shows the same three families and says the same words about them, so
         // there is one list rather than two that can disagree (#210).
-        .configurationDisplayName("Glow Up: \(WidgetKind.week.displayName)")
+        //
+        // The name arrives as a `String` property rather than an interpolated
+        // literal, and that is the whole of #254: an interpolated literal here
+        // is a `LocalizedStringKey` carrying formatted text, which WidgetKit
+        // traps on while evaluating this very body.
+        .configurationDisplayName(WidgetKind.week.galleryName)
         .description(WidgetKind.week.summary)
         .supportedFamilies(WidgetKind.week.families)
     }

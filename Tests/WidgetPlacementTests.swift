@@ -315,6 +315,75 @@ struct WidgetPlacementTests {
         #expect(WidgetKind.month.displayName == "This Month")
     }
 
+    /// The gallery title is the app's name and the kind's, in that order.
+    @Test("The gallery title puts the app in front of the kind")
+    func galleryNameCarriesTheApp() {
+        #expect(WidgetKind.week.galleryName == "Glow Up: This Week")
+        #expect(WidgetKind.month.galleryName == "Glow Up: This Month")
+        for kind in WidgetKind.allCases {
+            #expect(kind.galleryName.hasSuffix(kind.displayName))
+        }
+    }
+
+    /// **No widget's gallery strings may be interpolated string literals** —
+    /// #254, which crash-looped the extension on a physical device for the best
+    /// part of an hour and left it out of the widget gallery entirely.
+    ///
+    /// `configurationDisplayName(_:)` and `description(_:)` are overloaded on
+    /// `LocalizedStringKey` and on `StringProtocol`. A bare literal picks the
+    /// first, and a `LocalizedStringKey` holding an interpolated segment is
+    /// *formatted text*, which WidgetKit refuses: `WidgetKit/Text.swift` traps
+    /// with "Formatted text for `…` is not supported", inside its own
+    /// evaluation of the widget's body. A `String` property picks the second
+    /// overload and is plain text. #210 turned two literals into interpolated
+    /// ones and that is the entire bug — `.description(_:)` was never affected
+    /// because `summary` was already a property.
+    ///
+    /// A source scan for the same reason `TestRunnerContractTests` uses them:
+    /// the property is which *overload* the compiler picked, and nothing at
+    /// runtime in this process can observe that. The trap is in WidgetKit, in
+    /// the widget's own process, and reaching it needs a phone.
+    @Test("No widget's gallery strings are interpolated literals")
+    func galleryStringsAreNotFormattedText() throws {
+        let widget = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("GlowWidget")
+        let files = try FileManager.default.contentsOfDirectory(
+            at: widget, includingPropertiesForKeys: nil
+        ).filter { $0.pathExtension == "swift" }
+
+        // The scan is only worth anything if it found the directory.
+        #expect(files.count > 3, "GlowWidget looks wrong: \(files.count) files")
+
+        var seen = 0
+        for file in files {
+            let source = try String(contentsOf: file, encoding: .utf8)
+            for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
+                let code = line.trimmingCharacters(in: .whitespaces)
+                // Doc comments here name the modifiers constantly, saying what
+                // must not be passed to them.
+                guard !code.hasPrefix("//") else { continue }
+                for modifier in [".configurationDisplayName(", ".description("] {
+                    guard let call = code.range(of: modifier) else { continue }
+                    seen += 1
+                    let argument = code[call.upperBound...]
+                    #expect(
+                        !argument.contains("\\("),
+                        """
+                        \(file.lastPathComponent) passes an interpolated literal to \
+                        \(modifier.dropFirst().dropLast()); WidgetKit traps on formatted \
+                        text. Pass a String property instead (#254): \(code)
+                        """
+                    )
+                }
+            }
+        }
+        // Both widgets declare both modifiers; if a rename ever makes this scan
+        // match nothing it should fail rather than pass silently.
+        #expect(seen >= 4, "the gallery-string scan matched \(seen) calls, expected 4")
+    }
+
     /// The sizes the previews are laid out at are the sizes the render harness
     /// renders at — one source, so a preview cannot be a layout no phone shows.
     @Test("Each family has the size the design is authored against")
