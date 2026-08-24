@@ -111,16 +111,18 @@ struct GoalPopTests {
 
     // MARK: - The switch
 
-    @Test("Default on, which an AppStorage default would have got wrong")
+    @Test("Default is everything, which an AppStorage default would have got wrong")
     func defaultIsOn() {
         let previous = GlowSettings.store.object(forKey: PopPreferences.key)
         defer { GlowSettings.store.set(previous, forKey: PopPreferences.key) }
 
         // The trap the sentinel exists for: a key nobody has written must read
-        // as *on*, and `@AppStorage`'s own default would hand back 0.
+        // as *on*, and `@AppStorage`'s own default would hand back 0. #185 made
+        // it `everything` rather than `goals` — people need encouragement, and
+        // a fresh install has no stored setting to protect.
         GlowSettings.store.removeObject(forKey: PopPreferences.key)
         #expect(PopPreferences.isEnabled)
-        #expect(PopPreferences.level == .goals)
+        #expect(PopPreferences.level == .everything)
 
         PopPreferences.level = .off
         #expect(!PopPreferences.isEnabled)
@@ -158,8 +160,8 @@ struct GoalPopTests {
         #expect(PopPreferences.allows(.logged, at: .everything))
         #expect(PopPreferences.allows(.goal, at: .everything))
 
-        // Unset is goals, everywhere it is asked.
-        #expect(!PopPreferences.allows(.logged, at: .unset))
+        // Unset is everything, everywhere it is asked (#185).
+        #expect(PopPreferences.allows(.logged, at: .unset))
         #expect(PopPreferences.allows(.goal, at: .unset))
     }
 

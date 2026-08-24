@@ -138,9 +138,18 @@ enum PopPreferences {
     static let key = "islandPop"
 
     enum Level: Int, CaseIterable, Identifiable {
-        /// Never written. Reads as `goals`, which is what "on" always meant.
+        /// Never written. Reads as `everything` for a fresh install (#185) —
+        /// people need encouragement, and a repetition now has its own quieter
+        /// register (`logged`, `counted`, `got it`) precisely so frequent
+        /// acknowledgement does not wear out the way it would have before #119
+        /// gave it one. An install that already stored `1` under the old
+        /// boolean scheme is a different question: see `goals`.
         case unset = 0
-        /// Only when the day's or the week's goal is met.
+        /// Only when the day's or the week's goal is met. Never the default
+        /// for a new install any more, but still what a *stored* `1` means —
+        /// the value "on" wrote before there were three levels, and that
+        /// install's setting does not change underneath it just because the
+        /// default facing a new one did.
         case goals = 1
         case off = 2
         /// Every repetition, and the goal on top of it.
@@ -149,7 +158,7 @@ enum PopPreferences {
         var id: Int { rawValue }
 
         /// What a stored value means, with `unset` resolved.
-        var effective: Level { self == .unset ? .goals : self }
+        var effective: Level { self == .unset ? .everything : self }
     }
 
     static var level: Level {

@@ -4026,3 +4026,11 @@ different week, the walk must take exactly one step per week of record, arrive a
 spread across two years including both of Havana's midnight clock changes —
 11,268 steps a zone.
 
+
+## The pop defaults to everything, for a new install (#185)
+
+**2026-08-24.** #185 asked the question and #119 had already supplied the reasoning without acting on it: the objection frequent pops raise — "twenty of these a day on a screen whose whole argument is that it says one thing" — is about the grid, and a pop was never on the grid. It is two seconds over the Island and leaves nothing behind. Georg's answer: people need encouragement. `PopPreferences.Level.unset.effective` moves from `.goals` to `.everything`.
+
+**Only for a new install.** `unset` is the sentinel for "this key has never been written" — nothing else reaches it. An install that turned the feature on under the old boolean scheme has an explicit `1` stored, which resolves to `.goals` directly rather than through `unset`, and that path is untouched: `storedOnStillMeansGoals` still asserts it. So "everything by default" is exactly the asymmetry #185 named rather than backed into — new installs get encouragement, installs that already chose `goals` keep it.
+
+`Tests/GoalPopTests.swift`'s `defaultIsOn` and `levelsAllowTheRightRegisters` moved with it; `storedOnStillMeansGoals` did not need to, and its lack of a diff is itself the evidence the compatibility guarantee held.
