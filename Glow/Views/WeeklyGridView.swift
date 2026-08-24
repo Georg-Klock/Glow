@@ -138,9 +138,7 @@ struct WeeklyGridView: View {
             .navigationTitle(weekTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    weekPager
-                }
+                weekPager
                 ToolbarItem(placement: .principal) {
                     weekReadout
                 }
@@ -616,24 +614,54 @@ struct WeeklyGridView: View {
     /// coincidence: on the current week the bar is `<` … Edit Add, and in the
     /// past it is `< >` … Today. The way home is on both sides exactly when
     /// there is a way home.
-    private var weekPager: some View {
-        HStack(spacing: 8) {
+    ///
+    /// **Two toolbar items, not one item holding two buttons** (#258). The bar
+    /// draws one glass platter per *item*, so the `HStack` this used to be —
+    /// inside a single `ToolbarItem` — put both chevrons on one platter and
+    /// they read as a fused pill rather than as the two independent controls
+    /// they have always been in code.
+    ///
+    /// This is `ToolbarContent` rather than a `View` because the items have to
+    /// be declared, not returned: two buttons behind a `some View` property
+    /// reach the toolbar as one opaque view whichever container they go in.
+    /// Being two items is necessary and, on iOS 26, not sufficient — see the
+    /// `ToolbarSpacer` below.
+    @ToolbarContentBuilder
+    private var weekPager: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
             Button {
                 step(-1)
             } label: {
                 Label("Previous Week", systemImage: "chevron.left")
             }
+            .labelStyle(.iconOnly)
             .disabled(weekStart <= reach.earliest)
+        }
 
-            if !isOnCurrentWeek {
+        if !isOnCurrentWeek {
+            // **What actually separates the platters** (#258). iOS 26 gathers
+            // adjacent toolbar items at the same placement into one glass
+            // container, so two `ToolbarItem`s are drawn exactly as the single
+            // `HStack` was — measured in the simulator at each step, because
+            // every arrangement short of this one looks like it should work.
+            // `ToolbarSpacer` is the API that breaks the container.
+            //
+            // Availability-gated because the deployment target is iOS 18, and
+            // that is the honest shape rather than a workaround: before 26
+            // there is no glass platter to divide, so there is nothing for this
+            // to do there.
+            if #available(iOS 26.0, *) {
+                ToolbarSpacer(.fixed, placement: .topBarLeading)
+            }
+            ToolbarItem(placement: .topBarLeading) {
                 Button {
                     step(1)
                 } label: {
                     Label("Next Week", systemImage: "chevron.right")
                 }
+                .labelStyle(.iconOnly)
             }
         }
-        .labelStyle(.iconOnly)
     }
 
     private func step(_ weeks: Int) {
