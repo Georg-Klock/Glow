@@ -3,12 +3,19 @@ import SwiftData
 import Testing
 @testable import Glow
 
-/// #129 and #143: a blank row is a *position*, and it kept being treated as an
-/// identity and as a general-purpose deleted-habit slot.
+/// #129 and #143 made a blank row a *position* rather than an identity or a
+/// general-purpose deleted-habit slot. **#257 removed the position** (2026-08-24):
+/// a delete collapses its row, and `addHabit` appends rather than filling one.
 ///
-/// One suite because they are one change. Both issues land on the same two
-/// functions — `addHabit`'s reuse of a blank row and `delete`'s conversion into
-/// one — and fixing either alone leaves the other's reproduction working.
+/// What survives from #129 is the half that was never about layout — a deleted
+/// habit's `id` and history must stop resolving to anything, because widget
+/// configurations and widget intents resolve by `id` and a widget snapshot can
+/// outlive what it draws. Deleting the row outright is a stronger form of that
+/// guarantee than retiring the `id` of a row that stays.
+///
+/// The blank rows that express grouping are unaffected: `addSpacer` still makes
+/// them, they are still refused every day-shaped write, and deleting one still
+/// removes it. They are simply the only blank rows now.
 @Suite("Spacer identity")
 @MainActor
 struct SpacerIdentityTests {
@@ -35,11 +42,11 @@ struct SpacerIdentityTests {
 
     // MARK: - Identity
 
-    @Test("A deleted habit's id does not survive as a blank row")
+    @Test("A deleted habit's id does not survive at all")
     func deleteRetiresTheIdentity() throws {
         // The id is what a widget configuration and a widget intent both
-        // resolve by, so a row that kept it hands the next habit the last
-        // one's widget.
+        // resolve by. It used to be retired on a row that stayed; since #257
+        // the row goes with it, which is the same guarantee without the row.
         let context = try makeContext()
         let store = makeStore(context)
         let habit = try store.addHabit(name: "Read", icon: "📖", frequency: .timesPerWeek(3))
@@ -47,29 +54,25 @@ struct SpacerIdentityTests {
 
         try store.delete(habit)
 
-        let row = try #require(try rows(context).first)
-        #expect(row.isSpacer)
-        #expect(row.id != before)
+        #expect(try rows(context).isEmpty, "the row survived the delete")
+        #expect(try !rows(context).contains { $0.id == before })
     }
 
-    @Test("The habit that fills a blank row is a new habit")
-    func reuseTakesANewIdentity() throws {
+    @Test("A habit added after a delete is a new habit in a new row")
+    func addAfterDeleteIsANewRow() throws {
         let context = try makeContext()
         let store = makeStore(context)
         let first = try store.addHabit(name: "Read", icon: "📖", frequency: .timesPerWeek(3))
-        // Read *before* the delete. A SwiftData object is live, not a snapshot:
-        // `first`, the blank row and `second` are all the same instance here,
-        // so asking `first.id` afterwards asks the new habit for its own id and
-        // the assertion compares a value to itself.
+        // Read *before* the delete. A SwiftData object is live, not a snapshot.
         let firstID = first.id
         try store.delete(first)
-        let spacerID = try #require(try rows(context).first).id
+        #expect(try rows(context).isEmpty)
 
         let second = try store.addHabit(name: "Walk", icon: "🚶", frequency: .timesPerWeek(2))
 
         #expect(second.id != firstID)
-        #expect(second.id != spacerID)
-        #expect(try rows(context).count == 1, "the position was reused, not appended to")
+        #expect(try rows(context).count == 1, "the row was appended, not reused")
+        #expect(!second.isSpacer)
     }
 
     @Test("No completion outlives the habit it belonged to")
@@ -96,9 +99,8 @@ struct SpacerIdentityTests {
         // processes share.
         let context = try makeContext()
         let store = makeStore(context)
-        let habit = try store.addHabit(name: "Read", icon: "📖", frequency: .timesPerWeek(3))
-        try store.delete(habit)
-        let spacer = try #require(try rows(context).first)
+        // A deliberate blank row, which since #257 is the only kind there is.
+        let spacer = try store.addSpacer()
 
         #expect(try store.toggleCompletion(for: spacer, on: today) == .refused)
         #expect(try store.addCompletion(for: spacer, on: today) == 0)
@@ -112,23 +114,45 @@ struct SpacerIdentityTests {
     // `feature/daily-habits-2.0` with the kind they described (#209). What is
     // left below is the rule they were guarding, which was never theirs.
 
-    @Test("A weekly habit still leaves and still takes a blank row")
-    func weeklyBehaviourIsUnchanged() throws {
-        // The rule this whole change is protecting, so it is asserted rather
-        // than assumed: a position stays put through delete and refill.
+    /// **The reversal itself** (#257). This test is the old
+    /// `weeklyBehaviourIsUnchanged` turned around: it used to assert that a
+    /// position stays put through delete and refill, which is exactly the
+    /// behaviour that was reported as a delete that did not work.
+    @Test("Deleting a habit collapses its row and everything below moves up")
+    func deleteCollapsesTheRow() throws {
         let context = try makeContext()
         let store = makeStore(context)
         let a = try store.addHabit(name: "A", icon: "a", frequency: .timesPerWeek(3))
         let b = try store.addHabit(name: "B", icon: "b", frequency: .daily)
-        let orderOfA = a.sortOrder
+        #expect(a.sortOrder < b.sortOrder)
 
         try store.delete(a)
-        #expect(try rows(context).count == 2)
 
+        // One act, one row gone — not a blank row that has to be deleted again.
+        #expect(try rows(context).map(\.name) == ["B"])
+
+        // And the next habit lands after B rather than in the gap A left.
         let c = try store.addHabit(name: "C", icon: "c", frequency: .timesPerWeek(2))
-        #expect(c.sortOrder == orderOfA, "C took A's position")
-        #expect(try rows(context).count == 2)
-        #expect(b.sortOrder > c.sortOrder, "B did not move")
+        #expect(try rows(context).map(\.name) == ["B", "C"])
+        #expect(c.sortOrder > b.sortOrder, "C landed in A's old position")
+    }
+
+    /// A deliberate blank row is not consumed by the next habit either — it is
+    /// the grouping somebody put there, and taking it away is the same failure
+    /// as leaving one behind, from the other side.
+    @Test("A deliberate blank row survives adding a habit")
+    func addingDoesNotEatASpacer() throws {
+        let context = try makeContext()
+        let store = makeStore(context)
+        try store.addHabit(name: "A", icon: "a", frequency: .daily)
+        try store.addSpacer()
+
+        try store.addHabit(name: "B", icon: "b", frequency: .daily)
+
+        let all = try rows(context)
+        #expect(all.count == 3)
+        #expect(all.map(\.isSpacer) == [false, true, false])
+        #expect(all.map(\.name) == ["A", "", "B"])
     }
 
     @Test("A blank row is still deleted outright")

@@ -38,17 +38,17 @@ struct HabitStore {
 
     // MARK: - Habits
 
-    /// Adds a habit, filling the first blank row if there is one.
+    /// Adds a habit at the end of the list.
     ///
-    /// A blank row is a position waiting to be used, so a new habit takes it
-    /// rather than landing past it — the row count stays put and whatever
-    /// clustering the rows were expressing survives. Appending is what happens
-    /// when there are none left.
+    /// **It used to fill the first blank row instead** (#129, #143), because
+    /// `delete` left one behind and the pair kept a row's existence stable
+    /// while only its contents changed. #257 reversed that: a delete collapses
+    /// its row now, so there is no automatic blank row for this to consume, and
+    /// consuming a *deliberate* one — the blank rows `addSpacer` makes, which
+    /// are the grouping — would take away the separator somebody put there.
     ///
-    /// The mirror of `delete`, which leaves a blank row behind rather than
-    /// collapsing one. Between them a row's existence is stable and only its
-    /// contents change, which is what makes the grid something you can arrange.
-    ///
+    /// So this appends, always. See the 2026-08-24 entry in
+    /// `docs/decisions.md`.
     @discardableResult
     func addHabit(
         name: String,
@@ -57,23 +57,6 @@ struct HabitStore {
         now: Date = Date()
     ) throws -> Habit {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if let blank = try firstBlankRow() {
-            // A new habit is a new habit, not the old one wearing new text
-            // (#129). Widget configurations and widget intents both resolve by
-            // `id`, so a row that keeps its identity through delete-and-refill
-            // hands the next habit the last one's widget selection — and any
-            // completion a stale widget tap managed to write in between.
-            blank.id = UUID()
-            blank.name = trimmed
-            blank.icon = icon
-            blank.frequency = frequency
-            blank.createdAt = now
-            blank.isSpacer = false
-            try clearHistory(of: blank)
-            try commit()
-            return blank
-        }
 
         let habit = Habit(
             name: trimmed,
@@ -190,16 +173,6 @@ struct HabitStore {
         return DefaultHabits.all.count
     }
 
-    /// The topmost blank row, or nil when the grid has none.
-    private func firstBlankRow() throws -> Habit? {
-        var descriptor = FetchDescriptor<Habit>(
-            predicate: #Predicate { $0.isSpacer },
-            sortBy: [SortDescriptor(\.sortOrder)]
-        )
-        descriptor.fetchLimit = 1
-        return try context.fetch(descriptor).first
-    }
-
     /// A blank row, held in the order so habits can be grouped around it.
     @discardableResult
     func addSpacer(now: Date = Date()) throws -> Habit {
@@ -228,42 +201,29 @@ struct HabitStore {
         try commit()
     }
 
-    /// Deleting a habit leaves a blank row where it was. Deleting a blank row
-    /// removes it.
+    /// Deleting a row removes it. Everything below moves up.
     ///
-    /// The grid is a layout the user arranges, and collapsing a row pulls
-    /// everything below it up a line — so removing one habit silently rewrites
-    /// the grouping of every habit under it. Leaving a gap keeps what they
-    /// arranged, and the gap is a real thing they can then delete or drag.
+    /// **This reverses #129/#143** (#257). Deleting a habit used to blank its
+    /// row in place and leave the gap behind, on the reasoning that the grid is
+    /// a layout somebody arranged and collapsing a row silently rewrites the
+    /// grouping of every habit under it. The gap was meant to be the honest
+    /// thing to leave.
     ///
-    /// The habit itself is genuinely gone either way: name, icon, cadence,
-    /// every completion — **and its identity** (#129). What survives is the
-    /// position, and a position is not an identity.
+    /// In use it was not: a delete that leaves a row behind reads as a delete
+    /// that did not work, and the row then has to be deleted a second time to
+    /// actually go. One act, one row gone, is what a delete means. The blank
+    /// rows that express grouping are still there and still deliberate —
+    /// `addSpacer` makes those, and they are the only ones now. See the
+    /// 2026-08-24 entry in `docs/decisions.md`; the older one stays true as a
+    /// record of why the other behaviour existed.
     ///
+    /// **The identity goes with the row** (#129). Widget configurations and
+    /// widget intents resolve habits by `id`, and a deleted habit's `id` must
+    /// stop resolving to anything — which deleting the row does outright,
+    /// rather than by retiring the `id` of a row that survives.
     func delete(_ habit: Habit) throws {
-        guard !habit.isSpacer else {
-            // A blank row *is* a position and nothing else, so deleting one
-            // deletes it rather than leaving another behind.
-            try clearHistory(of: habit)
-            context.delete(habit)
-            try commit()
-            return
-        }
-
         try clearHistory(of: habit)
-        // A new UUID, and this is the whole of #129. Widget configurations and
-        // widget intents resolve habits by `id`: a row that kept its id through
-        // delete-and-refill would let a configured widget silently start
-        // showing an unrelated habit, and would let a widget tap made against
-        // the *deleted* habit — from a snapshot WidgetKit has not replaced yet
-        // — land as history on whatever fills the row next. Retiring the id
-        // makes both of those resolve to nothing, which is what a deleted
-        // habit should be.
-        habit.id = UUID()
-        habit.name = ""
-        habit.icon = ""
-        habit.frequency = .daily
-        habit.isSpacer = true
+        context.delete(habit)
         try commit()
     }
 

@@ -302,11 +302,12 @@ struct DeletionTests {
         return ModelContext(container)
     }
 
-    @Test("Deleting a habit leaves a blank row where it was")
-    func deleteLeavesASpacer() throws {
-        // The grid is a layout the user arranged. Collapsing a row pulls
-        // everything below it up a line, so removing one habit would silently
-        // regroup every habit under it.
+    @Test("Deleting a habit removes its row and moves the rest up")
+    func deleteCollapsesTheRow() throws {
+        // **Reversed by #257.** This used to assert the opposite — that the row
+        // stayed as a blank one — on the reasoning that collapsing silently
+        // regroups the habits below. In use, a row left behind reads as a
+        // delete that did not work and then has to be deleted a second time.
         let context = try makeContext()
         let store = HabitStore(context: context)
         let first = try store.addHabit(name: "One", icon: "book", frequency: .daily)
@@ -317,10 +318,8 @@ struct DeletionTests {
         let rows = try context.fetch(
             FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder)])
         )
-        #expect(rows.count == 2)
-        #expect(rows[0].isSpacer)
-        #expect(rows[0].name.isEmpty)
-        #expect(rows[1].id == second.id)
+        #expect(rows.count == 1)
+        #expect(rows[0].id == second.id)
     }
 
     @Test("The habit itself is gone, completions and all")
@@ -353,7 +352,10 @@ struct DeletionTests {
     }
 }
 
-@Suite("Adding fills blank rows")
+/// **`addHabit` appends** (#257). It used to fill the first blank row, which
+/// was the mirror of a delete leaving one behind; with delete collapsing, there
+/// is no automatic blank row to fill, and the deliberate ones are the grouping.
+@Suite("Adding appends")
 @MainActor
 struct AddingTests {
     private func makeContext() throws -> ModelContext {
@@ -368,8 +370,8 @@ struct AddingTests {
         try context.fetch(FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder)]))
     }
 
-    @Test("A new habit takes the first blank row rather than landing past it")
-    func addFillsTheFirstBlank() throws {
+    @Test("A new habit lands past every blank row rather than taking one")
+    func addAppendsPastBlanks() throws {
         let context = try makeContext()
         let store = HabitStore(context: context)
         try store.addHabit(name: "One", icon: "book", frequency: .daily)
@@ -378,14 +380,13 @@ struct AddingTests {
 
         try store.addHabit(name: "Two", icon: "drop", frequency: .timesPerWeek(3))
 
-        // Three rows, not four: the count is stable and the clustering the rows
-        // were expressing survives.
+        // Four rows. The two blank ones are grouping somebody put there, and
+        // consuming one would take away a separator (#257).
         let all = try rows(context)
-        #expect(all.count == 3)
-        #expect(all[1].name == "Two")
-        #expect(all[1].isSpacer == false)
-        #expect(all[1].frequency == .timesPerWeek(3))
-        #expect(all[2].isSpacer)
+        #expect(all.count == 4)
+        #expect(all.map(\.isSpacer) == [false, true, true, false])
+        #expect(all[3].name == "Two")
+        #expect(all[3].frequency == .timesPerWeek(3))
     }
 
     @Test("With no blank rows it appends, as it always did")
@@ -401,10 +402,12 @@ struct AddingTests {
         #expect(all.map(\.name) == ["One", "Two"])
     }
 
-    @Test("Delete then add reuses the same row")
-    func deleteThenAddIsStable() throws {
-        // The two halves of one idea: a row's existence is stable and only its
-        // contents change. Deleting leaves the position, adding takes it back.
+    @Test("Delete then add does not put the new habit in the old one's place")
+    func deleteThenAddAppends() throws {
+        // **Reversed by #257.** These were the two halves of one idea — a row's
+        // existence is stable, deleting leaves the position and adding takes it
+        // back. Both halves went together: the delete collapses, so the add has
+        // nothing to take back and lands at the end.
         let context = try makeContext()
         let store = HabitStore(context: context)
         let first = try store.addHabit(name: "One", icon: "book", frequency: .daily)
@@ -415,7 +418,7 @@ struct AddingTests {
 
         let all = try rows(context)
         #expect(all.count == 2)
-        #expect(all.map(\.name) == ["Three", "Two"])
+        #expect(all.map(\.name) == ["Two", "Three"])
     }
 }
 

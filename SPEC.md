@@ -458,20 +458,26 @@ more three weeks ago than they mean now. The editor opened on the adding
 screen's *kind* while there were two of them (#209); there is one, so it opens
 on the count and nothing else.
 
-**A blank row is This Week's layout** (#143). A habit leaves its position
-behind when it goes and the next habit takes it, which is the rule that makes
-the grid something you can arrange. The clause that kept per-day habits out of
-that — they never filled a blank row and never left one — went with them.
+**A blank row is grouping somebody put there** (#143, narrowed by #257).
+Blank rows exist so habits can be clustered, and they are made deliberately —
+"Add Blank Row" — never as a side effect. Deleting a habit removes its row and
+everything below moves up; adding a habit appends past every blank row rather
+than consuming one. Both of those were the other way around until 2026-08-24,
+as one pair: a row's existence was stable and only its contents changed. A
+delete that leaves a row behind reads as a delete that did not work, and then
+has to be done twice; an add that eats a blank row takes away a separator. See
+`docs/decisions.md`.
 
-**A deleted habit does not keep its identity** (#129). The row survives; the
-`id` does not. Widget configurations and widget intents both resolve habits by
-`id`, so a row that kept it would hand the next habit the last one's widget
-selection, and would let a tap made from a widget snapshot rendered *before* the
-delete land as history on whatever fills the row next. The store also refuses
-every day-shaped write to a blank row or to a habit of the wrong cadence, on the
-same reasoning as the rest day's refusal: the widget runs in a second process
-and its surface can outlive what it draws, so the rule lives on the write path
-both processes share.
+**A deleted habit does not keep its identity** (#129). Widget configurations
+and widget intents both resolve habits by `id`, so a deleted habit's `id` must
+stop resolving to anything — otherwise a configured widget could start showing
+an unrelated habit, and a tap made from a widget snapshot rendered *before* the
+delete could land as history on whatever came next. Deleting the row outright
+is what provides that now; it used to be provided by retiring the `id` of the
+blank row left behind. The store also refuses every day-shaped write to a blank
+row or to a habit of the wrong cadence, on the same reasoning as the rest day's
+refusal: the widget runs in a second process and its surface can outlive what it
+draws, so the rule lives on the write path both processes share.
 
 **"Daily" meant two different things, and one of them is gone** (#209). The
 editor had a `Daily` segment meaning *counted within a day* — a ring on Today,
