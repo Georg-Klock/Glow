@@ -46,25 +46,28 @@ struct WidgetRenderDiffTests {
         // used to be everything above 40, which caught a four-step ramp from 23
         // to 141. There is one grey now, so the band is that grey with three
         // levels of slack either side for antialiasing against the ground. A
-        // band that still reached to 141 would pass on halo bleed alone and
-        // stop being evidence that anything unlit was drawn.
+        // band wide enough to reach into lit territory would pass on halo
+        // bleed alone and stop being evidence that anything unlit was drawn.
         //
         // It tracked `#171717` as 20...26, `#242424` as 33...39 after #194,
-        // and is 40...46 since #240 moved the grey to `#2B2B2B`. The band is a
+        // `#2B2B2B` as 40...46 after #240, and is 138...144 since the default
+        // grey became `#8D8D8D` (2026-08-24) — the value `greyIncreasedContrast`
+        // already was, not a fifth point on the old ramp. The band is a
         // function of the palette, so it moves whenever the palette does — and
         // it is written as a literal rather than derived from `GlowPalette`
         // because a band computed from the value it is checking would agree
         // with any value. That is the trade: this line is the one assertion in
         // this file a palette move still has to touch, and it is deliberate.
         // Everything else here asks about a *relationship* measured in the same
-        // frame — see `isUnlit(_:beside:)` — and #240 moved the grey seven
-        // levels without any of it moving.
+        // frame — see `isUnlit(_:beside:)`, whose own multiplier this move did
+        // require touching, because a 98-level jump is not the seven-level one
+        // #240 made.
         let pixels = try rgba(of: image)
         var lit = 0, grey = 0
         for i in stride(from: 0, to: pixels.count, by: 4) {
             let value = max(pixels[i], pixels[i + 1], pixels[i + 2])
             if value > 200 { lit += 1 }
-            else if (40...46).contains(value) { grey += 1 }
+            else if (138...144).contains(value) { grey += 1 }
         }
         #expect(lit > 500, "no lit marks in the render")
         #expect(grey > 500, "nothing unlit in the render: \(grey) pixels at the grey")
@@ -270,8 +273,8 @@ struct WidgetRenderDiffTests {
     /// either side of its centre.
     ///
     /// Not at the centre, because since #71 the widget draws the rest cut
-    /// there: a flat 2pt rule in `GlowPalette.grey`, which composites to 43
-    /// on black and would be read as a mark. The cut casts no halo, so a
+    /// there: a flat 2pt rule in `GlowPalette.grey`, which composites to 141
+    /// on black (2026-08-24) and would be read as a mark. The cut casts no halo, so a
     /// quarter-slot clears it, and that is still well inside the window the
     /// span is supposed to have lost.
     private func brightestInRestColumn(_ index: Int, in pixels: [UInt8]) -> Int {
@@ -284,7 +287,7 @@ struct WidgetRenderDiffTests {
 
     /// The rest day's own line, sampled down the centre of its column — the
     /// flat `GlowPalette.grey` rule `RestCut` draws there, which composites to
-    /// 43 on black.
+    /// 141 on black (2026-08-24).
     ///
     /// The counterpart to `brightestInRestColumn`, which steps around it, and
     /// the quantity that says the rest day's column was *drawn* rather than
@@ -298,13 +301,25 @@ struct WidgetRenderDiffTests {
     /// rather than against a level.
     ///
     /// The palette has two colours and nothing between them (#111): the grey
-    /// composites to 43 on black and a lit mark to 255. A quarter of the
-    /// frame's own lit level sits far above the first and far below the second,
-    /// so this says "grey, not white" without naming either number — and it
-    /// goes on saying it the next time the palette moves, which the fixed band
-    /// it replaces did not. #194 moved the grey thirteen levels underneath a
-    /// bound of 60 and nothing noticed.
-    private func isUnlit(_ value: Int, beside lit: Int) -> Bool { value * 4 < lit }
+    /// composites to 141 on black (2026-08-24; it was 43 before) and a lit
+    /// mark to 255. This says "grey, not white" without naming either number —
+    /// and it goes on saying it the next time the palette moves, which the
+    /// fixed band `renderIsReal` still needs did not. #194 moved the grey
+    /// thirteen levels underneath the multiplier below and nothing noticed;
+    /// this move of ninety-eight levels did, which is exactly why the
+    /// multiplier itself had to change this time rather than just the number
+    /// it is compared against.
+    ///
+    /// **This was `value * 4 < lit` until 2026-08-24.** At `#2B2B2B` (43) that
+    /// gave roughly 21 levels of tolerance above the raw grey before the check
+    /// failed — plenty against halo bleed at a gap this wide (255:43, better
+    /// than 5.9:1). `#8D8D8D` (141) closed most of that gap (255:141, 1.8:1),
+    /// and `* 4` no longer holds at all: `141 * 4 = 564`, which is not less
+    /// than any lit value this app renders. `* 1.5` gives 141 about 29 levels
+    /// of the same kind of headroom — comparable slack, recomputed for the
+    /// ratio that actually exists now rather than kept as a constant that
+    /// quietly assumed the old one.
+    private func isUnlit(_ value: Int, beside lit: Int) -> Bool { Double(value) * 1.5 < Double(lit) }
 
     /// One habit, so the first row's band is unambiguous.
     private func oneHabit(_ frequency: Frequency, done: [Int], todayColumn: Int) -> WeekEntry {
@@ -333,16 +348,17 @@ struct WidgetRenderDiffTests {
 
     /// A span's own line, unlit. Since #47 an achieved span is structure rather
     /// than a mark, so "is the span there" is a question about the grey line,
-    /// not about light — `GlowPalette.grey` composites to 43 on black.
+    /// not about light — `GlowPalette.grey` composites to 141 on black
+    /// (2026-08-24; it was 43 before the default and Increase Contrast became
+    /// one value).
     private static let lineFloor = 15
 
     /// Nothing drawn here at all — not "unlit", which is a different claim.
     ///
     /// The two are not interchangeable and #226 is where that matters.
-    /// `isUnlit(_:beside:)` asks whether a tone is grey rather than white, and
-    /// admits everything up to a quarter of the frame's lit level; the scans
-    /// below rule out a *grey line* running where it should not, which sits
-    /// well inside that. So this stays a level. It is a level against the
+    /// `isUnlit(_:beside:)` asks whether a tone is grey rather than white; the
+    /// scans below rule out a *grey line* running where it should not, which
+    /// sits well inside that. So this stays a level. It is a level against the
     /// ground rather than against the palette, which is why it does not move
     /// when the palette does — and why `lineFloor` sits above it: between them
     /// is the band nothing is ever painted in.
