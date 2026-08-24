@@ -39,7 +39,7 @@ struct MonthWidget: Widget {
         // Widgets tab says the same three things about this widget and a
         // second copy of them is a page that eventually describes a widget
         // the gallery does not have (#210).
-        .configurationDisplayName("Glow Up: \(WidgetKind.month.displayName)")
+        .configurationDisplayName(WidgetKind.month.galleryName)
         .description(WidgetKind.month.summary)
         .supportedFamilies(WidgetKind.month.families)
     }

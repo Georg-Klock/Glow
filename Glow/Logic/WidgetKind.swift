@@ -46,15 +46,33 @@ enum WidgetKind: String, CaseIterable, Sendable {
     }
 
     /// What the widget gallery calls this kind, without the app's name in
-    /// front of it. `configurationDisplayName` is `"Glow Up: \(displayName)"`,
-    /// which is how the gallery has always read; inside the app the prefix
-    /// would only repeat the app you are already in.
+    /// front of it. The gallery itself shows `galleryName`, which puts the app
+    /// in front; inside the app the prefix would only repeat the app you are
+    /// already in.
     var displayName: String {
         switch self {
         case .week: "This Week"
         case .month: "This Month"
         }
     }
+
+    /// The gallery's own title, prefixed with the app — the exact argument
+    /// `configurationDisplayName` is given.
+    ///
+    /// **This exists as a `String` property because the alternative crashed the
+    /// extension** (#254). Written at the call site as
+    /// `.configurationDisplayName("Glow Up: \(displayName)")`, the interpolated
+    /// literal binds to the `LocalizedStringKey` overload rather than the
+    /// `StringProtocol` one, and a `LocalizedStringKey` carrying an interpolated
+    /// segment is *formatted text*. WidgetKit refuses it — `WidgetKit/Text.swift`
+    /// traps with "Formatted text for `…` is not supported" — inside its own
+    /// evaluation of the widget's body, before any provider runs.
+    ///
+    /// A `String` binds to the `StringProtocol` overload, which is plain text
+    /// and is what the literal was before #210 introduced the interpolation.
+    /// `summary` was never affected for the same reason: it is a property, so
+    /// `.description(_:)` has always taken the string overload.
+    var galleryName: String { "Glow Up: \(displayName)" }
 
     /// The gallery's own sentence about the widget — `configurationDisplayName`'s
     /// companion, read by `GlowWidget` and `MonthWidget` as `.description(_:)`.

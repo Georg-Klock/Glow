@@ -247,6 +247,18 @@ actual bug. Every line here is something that already happened.
 - **A widget's background can be removed by the user.** The measurement that
   said otherwise held for `fullColor` rendering only. Handle
   `widgetRenderingMode`.
+- **Never pass an interpolated string literal to `configurationDisplayName` or
+  `description`** (#254). Those take a `LocalizedStringKey` *or* a
+  `StringProtocol`; a bare literal picks the first, and a `LocalizedStringKey`
+  holding an interpolated segment is formatted text, which WidgetKit refuses —
+  `WidgetKit/Text.swift` traps with ``Formatted text for `…` is not
+  supported``, inside its own evaluation of the widget's body, before any
+  provider runs. The extension crash-loops and then drops out of the widget
+  gallery entirely, which reads as a signing or registration fault and is not
+  one. #210 turned two literals into interpolated ones and killed the widget in
+  every build that shipped after it. Pass a `String` property —
+  `WidgetKind.galleryName` — and `WidgetPlacementTests` scans for the
+  interpolated form.
 - **`navigationDestination` attached to the `NavigationStack` itself** compiles,
   renders nothing, and leaves a dead tap target. It must be *inside*.
 - **`@Environment(\.editMode)` read by a view that *contains* the
