@@ -393,10 +393,11 @@ struct SettingsView: View {
 
     /// How much the Dynamic Island says.
     ///
-    /// A binding rather than `@AppStorage`, because the default is **goals**
-    /// and `@AppStorage` hands back `0` for a key nobody has written — a plain
-    /// stored default reads as whatever `0` maps to until it is changed twice.
-    /// `PopPreferences` keeps the sentinel; this reflects it.
+    /// A binding rather than `@AppStorage`, because the default is
+    /// **everything** (#185) and `@AppStorage` hands back `0` for a key nobody
+    /// has written — a plain stored default reads as whatever `0` maps to
+    /// until it is changed twice. `PopPreferences` keeps the sentinel; this
+    /// reflects it.
     ///
     /// **A plain synchronous write, and #203 asked for `withAnimation`.** The
     /// footer under this picker is one sentence, two, or a longer two-clause
