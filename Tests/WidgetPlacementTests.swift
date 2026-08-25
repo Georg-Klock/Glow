@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import SwiftUI
 import WidgetKit
 @testable import Glow
 
@@ -398,5 +399,98 @@ struct WidgetPlacementTests {
             == CGSize(width: WidgetMetrics.largeWidth, height: WidgetMetrics.smallSide))
         #expect(WidgetMetrics.size(of: .systemLarge)
             == CGSize(width: WidgetMetrics.largeWidth, height: WidgetMetrics.largeHeight))
+    }
+}
+
+
+/// #274: a Small widget has a neighbour on a real Home Screen, and the page
+/// used to draw it a column. #273: which appearance the previews are drawn
+/// under is a choice, because nothing reports the device's.
+@Suite("Widget preview layout")
+struct WidgetPreviewLayoutTests {
+    private func group(_ family: WidgetFamily, cards: Int) -> WidgetCardGroup {
+        let placement = WidgetPlacement(kind: .month, family: family)
+        return WidgetCardGroup(
+            placement: placement,
+            isPlaced: false,
+            cards: (0..<cards).map {
+                _ in WidgetCard(placement: placement, isPlaced: false, habitID: UUID())
+            }
+        )
+    }
+
+    @Test("Two Smalls to a line, because two fit in a Medium's width")
+    func smallsPairUp() {
+        // Not a written-down 2: `smallSide` is 158 and `largeWidth` is 338, so
+        // two fit and three do not. If either number moves this moves with it.
+        #expect(WidgetMetrics.perRow(.systemSmall) == 2)
+        #expect(group(.systemSmall, cards: 4).rows.map(\.count) == [2, 2])
+    }
+
+    @Test("A trailing odd card is a line of its own, not a stretched one")
+    func oddCardStandsAlone() {
+        // #237 gives the month widget up to three cards, which is the case
+        // this actually renders.
+        #expect(group(.systemSmall, cards: 3).rows.map(\.count) == [2, 1])
+        #expect(group(.systemSmall, cards: 1).rows.map(\.count) == [1])
+        #expect(group(.systemSmall, cards: 0).rows.isEmpty)
+    }
+
+    @Test("Medium and Large fill the width, so they are lines of one")
+    func wideFamiliesStayStacked() {
+        #expect(WidgetMetrics.perRow(.systemMedium) == 1)
+        #expect(WidgetMetrics.perRow(.systemLarge) == 1)
+        #expect(group(.systemMedium, cards: 3).rows.map(\.count) == [1, 1, 1])
+    }
+
+    @Test("Every card survives the split, in order")
+    func rowsLoseNothing() {
+        let g = group(.systemSmall, cards: 5)
+        #expect(g.rows.flatMap { $0 } == g.cards)
+    }
+
+    @Test("Glass renders accented; Default does not")
+    func appearanceDrivesTheRenderingMode() {
+        // This is what makes the previews the real thing rather than a
+        // drawing: `GlowPalette.grey` resolves against this value, so the
+        // accented branch is the one a Home Screen runs.
+        #expect(WidgetAppearance.standard.renderingMode == .fullColor)
+        #expect(WidgetAppearance.glass.renderingMode == .accented)
+    }
+
+    @Test("Two appearances, because Tinted and Clear draw the same picture")
+    func tintedAndClearAreOneCase() {
+        // Measured, not assumed: `Glass.regular` and `Glass.clear` over the
+        // page's plate came out pixel-identical inside a preview card. Two
+        // segments drawing the same thing would claim a distinction the page
+        // cannot make, so the one segment says both names. See
+        // `WidgetAppearance`.
+        #expect(WidgetAppearance.allCases.count == 2)
+        #expect(WidgetAppearance.glass.displayName == "Tinted or Clear")
+    }
+
+    @Test("Only Default keeps the widget's declared background")
+    func onlyDefaultKeepsTheBackground() {
+        // The system drops `containerBackground` under the other appearance
+        // and substitutes glass (#53), which is why the page draws a different
+        // panel rather than tinting the same one.
+        #expect(WidgetAppearance.standard.keepsDeclaredBackground)
+        #expect(!WidgetAppearance.glass.keepsDeclaredBackground)
+    }
+
+    @Test("The grey the marks resolve to follows the appearance")
+    @MainActor
+    func greyFollowsTheAppearance() {
+        // The whole reason `GlowPalette.grey` is a `ShapeStyle` and not a
+        // `Color`: under accented the system keeps only alpha, so an opaque
+        // grey would come back as a lit mark and the hierarchy would collapse
+        // into one tone. Asserted here because the preview page is now a
+        // second surface that can put a view into that mode.
+        var environment = EnvironmentValues()
+        environment.widgetRenderingMode = WidgetAppearance.glass.renderingMode
+        #expect(GlowPalette.grey.resolve(in: environment) == GlowPalette.greyAccented)
+
+        environment.widgetRenderingMode = WidgetAppearance.standard.renderingMode
+        #expect(GlowPalette.grey.resolve(in: environment) == GlowPalette.greyOpaque)
     }
 }
