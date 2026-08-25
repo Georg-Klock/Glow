@@ -4,7 +4,7 @@ import Foundation
 ///
 /// A widget cannot run a continuous animation, and paying for one out of the
 /// daily reload allowance is not worth it (see docs/glow.md). But a tap already
-/// costs a reload: `ToggleHabitIntent` writes to the store and asks WidgetKit
+/// costs a reload: `MarkHabitIntent` writes to the store and asks WidgetKit
 /// for a new timeline. That timeline can carry a second's worth of entries
 /// before it settles, so the completion animates for free.
 ///

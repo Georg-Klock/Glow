@@ -285,13 +285,21 @@ struct HabitStore {
 
     // MARK: - Completions
 
-    /// What a toggle attempt did.
+    /// What a write attempt did.
     ///
     /// A refusal is an outcome rather than an error, because it is the rule
     /// working: the rest day refusing a write is not a failure of anything.
     enum ToggleOutcome: Equatable {
         case completed
         case uncompleted
+        /// The day was already in the state that was asked for, so nothing was
+        /// written (#272, #292).
+        ///
+        /// Only `setCompletion` can return this, and it is the whole point of
+        /// that method: a second delivery of the same request is a no-op rather
+        /// than a reversal. `toggleCompletion` always asks for the opposite of
+        /// what it found, so it never sees this.
+        case unchanged
         /// Nothing was logged and nothing removed. The rest day, a day still to
         /// come, a blank row, or a habit this surface does not own.
         case refused
@@ -357,9 +365,55 @@ struct HabitStore {
     /// make the slot flicker back to done on the next redraw. Un-marking a day
     /// means the day is not marked.
     @discardableResult
+    /// Flips a day's completion. The app's own surfaces use this, because they
+    /// are never stale: they redraw in-process from the store they just wrote.
+    ///
+    /// **A widget must not use it** — see `setCompletion`, which is what the
+    /// widget's marks call and why.
     func toggleCompletion(
         for habit: Habit,
         on date: Date,
+        allowingFuture: Bool = false
+    ) throws -> ToggleOutcome {
+        // Read, then ask for the opposite. The guards live once, in
+        // `setCompletion`, and a toggle is the degenerate case of a set.
+        let isDone = !(try completions(of: habit, on: DayID(date, calendar: calendar))).isEmpty
+        return try setCompletion(
+            for: habit, on: date, done: !isDone, allowingFuture: allowingFuture
+        )
+    }
+
+    /// Puts a day's completion into the state asked for, and says whether that
+    /// changed anything.
+    ///
+    /// **Idempotent, and that is the point** (#272, #292). The widget's marks
+    /// call this rather than `toggleCompletion`, because a toggle is a
+    /// *relative* operation and a widget is a surface that can be both stale
+    /// and delivered twice:
+    ///
+    /// * **Delivered twice.** A single tap has been measured performing the
+    ///   intent twice, 13ms apart, on an iPhone 14 Pro. Under a toggle the
+    ///   second performance undid the first and the tap did nothing; under a
+    ///   set it finds the day already in the requested state and writes
+    ///   nothing.
+    /// * **Stale.** WidgetKit's pixels can lag the store by seconds, so
+    ///   somebody taps what is drawn as an open ring on a day the store already
+    ///   has as done. A toggle reads that as "flip it" and *removes* a
+    ///   completion they were trying to make. A set reads the ring as the
+    ///   request it was — "make this done" — and the record survives.
+    ///
+    /// Both failures were the same complaint: checking habits off quickly
+    /// un-does them. The asymmetry is what settles the design — the worst a
+    /// set can do is nothing, and the worst a toggle can do is silently retract
+    /// a completion.
+    ///
+    /// `done` is the state the *rendered control* was asking for, not the
+    /// state the store is believed to be in. The call sites pass the complement
+    /// of what they drew.
+    func setCompletion(
+        for habit: Habit,
+        on date: Date,
+        done: Bool,
         allowingFuture: Bool = false
     ) throws -> ToggleOutcome {
         let dayID = DayID(date, calendar: calendar)
@@ -394,6 +448,12 @@ struct HabitStore {
         guard acceptsDayWrite(habit) else { return .refused }
 
         let existing = try completions(of: habit, on: dayID)
+        // The idempotent step: already what was asked for, so nothing is
+        // written and nothing is reported as having happened. A caller that
+        // animates on `.completed` therefore animates once per real change
+        // rather than once per delivery.
+        guard existing.isEmpty == done else { return .unchanged }
+
         if !existing.isEmpty {
             let ids = Set(existing.map(\.id))
             habit.completions?.removeAll { ids.contains($0.id) }

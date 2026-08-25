@@ -746,11 +746,18 @@ struct WeeklyGridView: View {
                 showPop(for: habit, on: day)
             case .uncompleted:
                 Haptics.uncompleted()
-            case .refused:
+            case .refused, .unchanged:
                 // The grid never hands out a rest-day tap, and never a day
                 // ahead unless the demo is in — but the store's answer is the
                 // truth, and nothing changed, so nothing haptic and nothing to
                 // reload.
+                //
+                // `.unchanged` cannot arrive here: `toggleCompletion` reads the
+                // day and asks for its opposite, so there is always something
+                // to change. It is handled beside the refusal because both mean
+                // the same thing to this view — the store wrote nothing — and
+                // an unreachable case is better answered than left to a
+                // `default` that would also swallow a future outcome.
                 return
             }
         } catch {

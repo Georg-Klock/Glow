@@ -6,6 +6,14 @@ import WidgetKit
 
 /// Marks today done, or undoes it, from the widget.
 ///
+/// **It sets, it does not toggle, and the name says so** (#272, #292). It was
+/// `ToggleHabitIntent` and it flipped whatever the store held. A widget is the
+/// wrong surface for a relative operation: its pixels lag the store, and a
+/// single tap has been measured performing this intent *twice*, 13ms apart, on
+/// an iPhone 14 Pro. Both failures produced the same complaint — checking
+/// habits off quickly un-does them — and both are answered by carrying the
+/// state the rendered control asked for. See `HabitStore.setCompletion`.
+///
 /// This is what makes the widget worth having: the whole product claim is that
 /// logging a habit is one tap, and a widget you have to open the app from is
 /// two taps and a launch.
@@ -20,8 +28,8 @@ import WidgetKit
 /// bring the app forward, which is the property that had to be measured rather
 /// than assumed: the whole point of this intent is that it never leaves the home
 /// screen, and that is still true.
-struct ToggleHabitIntent: LiveActivityIntent {
-    static let title: LocalizedStringResource = "Toggle Habit"
+struct MarkHabitIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Mark Habit"
     static let description = IntentDescription("Marks today's slot done, or undoes it.")
 
     /// Deliberately not `openAppWhenRun`. The point is to never leave the home
@@ -32,10 +40,20 @@ struct ToggleHabitIntent: LiveActivityIntent {
     @Parameter(title: "Habit")
     var habitID: String
 
+    /// The state the tapped mark was *asking for*, not the state the store is
+    /// believed to hold.
+    ///
+    /// The call sites pass the complement of what they drew: a ring means
+    /// "make this done", a dot means "make it not done". That is what makes a
+    /// second delivery harmless — it asks for the same thing again.
+    @Parameter(title: "Done")
+    var done: Bool
+
     init() {}
 
-    init(habitID: UUID) {
+    init(habitID: UUID, done: Bool) {
         self.habitID = habitID.uuidString
+        self.done = done
     }
 
     @MainActor
@@ -51,7 +69,8 @@ struct ToggleHabitIntent: LiveActivityIntent {
         // `TapHabitIntent` gives: the widget's write has to land on the day the
         // widget drew as open, and this asked the clock three times.
         let today = WeekCalendar.today()
-        let result = try HabitStore(context: context).toggleCompletion(for: habit, on: today)
+        let result = try HabitStore(context: context)
+            .setCompletion(for: habit, on: today, done: done)
 
         // A tap already costs a timeline reload, so the completion can animate
         // inside the timeline that reload produces. This is the note the
@@ -102,6 +121,10 @@ struct ToggleHabitIntent: LiveActivityIntent {
         let verdict = switch result {
         case .completed: "done"
         case .uncompleted: "undone"
+        // The idempotent no-op, and worth its own word in the trace: a
+        // duplicate delivery and a stale surface both land here, and neither
+        // used to be distinguishable from a real write (#272).
+        case .unchanged: "already \(done ? "done" : "undone")"
         case .refused: "refused, rest day"
         }
         // The origin is here and not on every line (#272): a single tap has
