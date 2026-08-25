@@ -405,6 +405,19 @@ A still widget reads:
 and a tap should add the intent's write followed by a burst timeline of a few
 entries — the cross-fade's stills and the settle.
 
+The tap line carries the process that performed the intent, as `app:<pid>` or
+`widget:<pid>`:
+
+```
+08:31:28.518  tap 41A508AC-… [app:9042]: done, burst recorded
+```
+
+It is there because a single tap has been seen toggling a habit twice, 13ms
+apart (#272) — too fast to be two thumbs — and the trace could not say whether
+that was one process performing twice or `LiveActivityIntent`'s handover from
+the extension into the app running both halves. Those two have different
+fixes.
+
 ## The widget gallery's preview is a cached picture
 
 **The iOS widget gallery — long-press the Home Screen, tap +, pick Glow Up — does not ask the extension for anything.** Its preview is a rendering the system took at some earlier moment and kept, and there is no public call that invalidates it. `WidgetCenter.reloadAllTimelines()` refreshes *placed* widgets and does not touch it.
