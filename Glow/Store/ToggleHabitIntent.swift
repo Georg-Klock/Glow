@@ -96,7 +96,10 @@ struct ToggleHabitIntent: LiveActivityIntent {
         case .uncompleted: "undone"
         case .refused: "refused, rest day"
         }
-        let outcome = "tap \(id.uuidString): \(verdict), burst \(result == .completed ? "recorded" : "skipped")"
+        // The origin is here and not on every line (#272): a single tap has
+        // been seen performing this intent twice, 13ms apart, and what the
+        // trace could not say was whether that was one process or two.
+        let outcome = "tap \(id.uuidString) [\(WidgetTrace.origin)]: \(verdict), burst \(result == .completed ? "recorded" : "skipped")"
         GlowLog.widget.notice("\(outcome, privacy: .public)")
         WidgetTrace.record(outcome)
 

@@ -106,11 +106,26 @@ dramatic outdoors and subtle in a dim room.
 
 `peakHeadroom` is a user setting now, not a constant: Settings has a slider over
 1x to 12x, stored in the App Group so the widget's halo scales with it too. The
-default is 6x.
+default is **12x** — the top of the range, because "the glow is the product;
+there is no reason for it to open at half strength" (`GlowSettings`).
+
+This paragraph said 6x until 2026-08-25 and the table below said `6.0`. Both
+were left behind when the default moved, and the drift is worth naming because
+of what it cost: a device found running at **1.5** was read against a remembered
+default of 6 and called "a quarter of it", when against the real default it is
+one eighth, and `GlowRenderer.sdrThreshold` is 1.05 — so that phone was one and
+a half notches above the point where the encoder abandons PQ altogether. Every
+perceptual judgement made on it was a judgement about a glow that was very
+nearly off. **A stale default in a document is not a cosmetic error when the
+number is the product.**
+
+The 6.0 that remains in the codebase is `GlowRenderer.peakHeadroom`'s own
+property default, which `GlowImageCache` overwrites from the setting on every
+render. It is not what anybody sees.
 
 | Property | Default | Effect |
 | --- | --- | --- |
-| `peakHeadroom` | 6.0, user-set | How far above SDR white the glow peaks |
+| `peakHeadroom` | 12.0, user-set | How far above SDR white the glow peaks |
 | `edgeFalloff` | 0.62 | Edge brightness relative to centre |
 | `tileSize` | 16 | Edge of the uniform tile, in pixels |
 
@@ -404,6 +419,19 @@ A still widget reads:
 
 and a tap should add the intent's write followed by a burst timeline of a few
 entries — the cross-fade's stills and the settle.
+
+The tap line carries the process that performed the intent, as `app:<pid>` or
+`widget:<pid>`:
+
+```
+08:31:28.518  tap 41A508AC-… [app:9042]: done, burst recorded
+```
+
+It is there because a single tap has been seen toggling a habit twice, 13ms
+apart (#272) — too fast to be two thumbs — and the trace could not say whether
+that was one process performing twice or `LiveActivityIntent`'s handover from
+the extension into the app running both halves. Those two have different
+fixes.
 
 ## The widget gallery's preview is a cached picture
 

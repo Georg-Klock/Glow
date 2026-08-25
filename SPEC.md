@@ -702,6 +702,32 @@ would actually get you. The clause that kept Week-Small to a single card — it
 had no per-habit axis to vary a second one over until #188 gave it one — went
 with the family itself (PR #277).
 
+**The Small previews sit two to a line, the way a Home Screen sits them**
+(#274). Two Small widgets occupy the footprint of one Medium, so a column of
+them was a picture of an arrangement nobody has; the gutter between them is
+what is left of a Medium's width once two Smalls are in it. A trailing odd
+card is a line of its own, at one widget's size, in the place the next one
+would go. Medium and Large fill the width and are unaffected.
+
+**One picker chooses the Home Screen appearance every preview is drawn under**
+(#273). Under Default the widget keeps the background it declares; under
+Tinted or Clear the system drops it, substitutes glass, and renders the widget
+*accented*, where colour is thrown away and only alpha survives. The previews
+answer that by injecting the rendering mode, so the marks take the same
+alpha-stored grey by the same line of code they take on a Home Screen — the
+content is the real thing, not a drawing of it. The panel behind is not: the
+system composites it out of a wallpaper this app cannot see, so the page draws
+its own neutral plate under SwiftUI's glass and says so.
+
+**Tinted and Clear are one segment, not two.** Both put the widget into
+accented rendering, so the content is identical by construction, and the two
+glass styles measured pixel-identical over the page's plate. Two segments
+drawing the same picture would claim a distinction the page cannot make.
+**And the picker cannot default to the device's own appearance**, because
+nothing reports it: no trait, environment value or WidgetKit call, checked
+against the iOS 26.5 SDK rather than remembered. `widgetRenderingMode` reads
+`.fullColor` inside the app whatever the Home Screen is doing.
+
 The previews are of *unconfigured* widgets, which is the same narrowing the
 grid's boundary hairline took (#188). They draw the app's own list because
 that is what a widget nobody has configured draws, and per-widget rows mean the

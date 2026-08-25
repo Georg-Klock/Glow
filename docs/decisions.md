@@ -4124,6 +4124,78 @@ The references now point at the pull requests that actually did the work, `PR #2
 
 **The rule this produces: never cite an issue number that does not exist yet.** If work has no issue, either file one first and use the number it is given, or cite the change itself. Counting forward from the highest number seen is guessing at a value another process is allocating, and it fails silently — the reference reads perfectly and points at the wrong thing.
 
+## The Widgets tab shows two appearances, and Tinted and Clear are one of them
+
+**2026-08-25.** #273 asked for the previews to carry the Tinted/Clear glass
+treatment rather than only the Default opaque background, and left two
+questions open: whether to match the device's actual appearance, and whether
+to draw one card per appearance or three.
+
+**The device's appearance cannot be read.** No trait, environment value or
+WidgetKit call reports it — checked against the iOS 26.5 SDK's
+`SwiftUICore.swiftinterface` and `WidgetKit.swiftinterface`, not remembered.
+`widgetRenderingMode` is the nearest thing and WidgetKit only populates it for
+a widget WidgetKit is rendering; inside the app it reads `.fullColor` whatever
+the Home Screen is doing. So the first question answers itself: the page
+cannot match the device, and the appearance is a choice the person makes.
+
+**One picker for the page, not a card per appearance.** The page already
+carries a card per family and, since #237, a card per habit. Multiplying that
+by appearance would have doubled the month section. Appearance is a property of
+the Home Screen rather than of any one widget, so it is asked once and every
+preview answers together.
+
+**Tinted and Clear are one segment, and that was measured.** Both put a widget
+into `.accented` rendering, so the *content* of the two is identical by
+construction. The panel behind is the system's, composited from a wallpaper the
+app cannot see. Rendered with SwiftUI's `Glass.regular` against `Glass.clear`
+over the page's stand-in plate, the two came out pixel-identical inside a
+preview card — 0.0% of pixels differing by more than 6/255, maximum difference
+1. Two segments drawing the same picture would be the page claiming a
+distinction it cannot make.
+
+**The honest half and the approximated half are different halves.** The content
+is not an approximation: the preview injects `widgetRenderingMode`, and
+`GlowPalette.grey` is a `ShapeStyle` that resolves against exactly that value,
+so the marks take the alpha-stored grey by the same line of code that runs on a
+Home Screen. `GlowWidget.swift` records that the *real* widget cannot
+approximate the glass, and that finding stands — it is about a widget the
+system composites, which has no say over what replaces its background. This
+page draws its own background by hand, as it already draws its own corner and
+its own border, so an approximation is available here.
+
+**The plate under the glass has to be opaque, and that was found by looking.**
+Rendered translucent, `glassEffect` sampled what was behind it — which on this
+page is the page, not a wallpaper — and the caption above each preview appeared
+ghosted inside the widget. Screenshotted at 2x through a hosted window, not
+reasoned about.
+
+**`ImageRenderer` cannot render this page.** It returns SwiftUI's yellow
+unsupported-view placeholder for a hierarchy with `NavigationStack` and
+`ScrollView` in it, and returns it *identically* for every input — so three
+appearances rendered byte-identical PNGs and briefly looked like proof the
+appearance was not reaching the previews. `UIHostingController` in a real
+`UIWindow`, snapshotted with `drawHierarchy`, is what renders it, and is what
+`EmptyStateAccessibilityTests` already uses for its own reasons.
+
+## Small previews sit two to a line
+
+**2026-08-25.** Every card on the Widgets tab was a line of its own, whatever
+its family (#274). Two Small widgets occupy one Medium's footprint on a real
+Home Screen, so a column of Smalls was a picture of an arrangement nobody has.
+
+How many fit is derived rather than written down: `WidgetMetrics.perRow`
+divides `largeWidth` by the family's own width, so two falls out of 158 fitting
+twice into 338 and moves if either number does. The gutter is the same
+subtraction. `WidgetCardGroup.rows` does the split, pure and tested.
+
+A trailing odd card is a line of its own at one widget's size, in the place the
+next one would go — not stretched, not centred. With #237's up-to-three month
+cards that is the case this actually renders, and it was looked at.
+
+Medium and Large fill the width and have no neighbour on a Home Screen either,
+so this is a no-op for them.
+
 ## A widget's rows are its own, and the app's line narrows (#188)
 
 The week widget mirrored the app's habit order and had no way not to. #172
