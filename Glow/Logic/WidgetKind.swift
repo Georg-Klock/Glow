@@ -38,7 +38,7 @@ enum WidgetKind: String, CaseIterable, Sendable {
     var families: [WidgetFamily] {
         switch self {
         // Medium and large, each independently placeable. **Small was here and
-        // is gone** (#274): it drew the same habits with the labels dropped,
+        // is gone** (PR #277): it drew the same habits with the labels dropped,
         // so it said how much of the week was done without saying what of —
         // and #237 had already found it had no per-habit axis to vary a
         // second preview over. A size that can only be read by someone who

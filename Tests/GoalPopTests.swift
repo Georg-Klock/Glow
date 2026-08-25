@@ -234,7 +234,7 @@ struct PopWindowTests {
 }
 
 
-/// #273: the app pops too, so both surfaces decide *what* to say in one place.
+/// PR #275: the app pops too, so both surfaces decide *what* to say in one place.
 @Suite("The pop's registers")
 struct PopRegisterTests {
     @Test("A routine log says one thing; the tap that meets the goal says two")
