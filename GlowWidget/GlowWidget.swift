@@ -176,14 +176,8 @@ struct WeekProvider: AppIntentTimelineProvider {
         guard let burst = WidgetBurst.pending(now: now), !WidgetBurst.reduceMotion else {
             let why = WidgetBurst.pending(now: now) == nil ? "none pending" : "suppressed by reduce motion"
             GlowLog.widget.notice("timeline: 1 entry, still (burst \(why, privacy: .public))")
-<<<<<<< HEAD
             WidgetTrace.record("timeline: 1 entry, still (burst \(why), load \(load))")
-            completion(Timeline(entries: [entry], policy: .after(midnight)))
-            return
-=======
-            WidgetTrace.record("timeline: 1 entry, still (burst \(why))")
             return Timeline(entries: [entry], policy: .after(midnight))
->>>>>>> origin/main
         }
 
         // The cross-fade's few stills and the settle, dated from *this moment*
