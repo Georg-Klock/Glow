@@ -49,6 +49,19 @@ enum WidgetMetrics {
         }
     }
 
+    /// How many widgets of this family sit side by side on a Home Screen.
+    ///
+    /// Derived from the sizes above rather than written down, for the reason
+    /// everything in this type is: two Small widgets occupy one Medium's
+    /// footprint because `smallSide` fits twice into `largeWidth`, and if
+    /// either number ever moves this answer moves with it. The Widgets tab
+    /// lays its previews out on this (#274).
+    static func perRow(_ family: WidgetFamily) -> Int {
+        let width = size(of: family).width
+        guard width > 0 else { return 1 }
+        return max(1, Int(largeWidth / width))
+    }
+
     /// How many rows a large widget shows.
     ///
     /// Eleven, and derived rather than written down — every input to it has

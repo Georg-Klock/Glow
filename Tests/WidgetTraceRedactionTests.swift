@@ -44,6 +44,22 @@ struct WidgetTraceRedactionTests {
         #expect(WidgetTrace.elapsed(since: start, now: start.addingTimeInterval(0.0006)) == "1ms")
     }
 
+    @Test("The origin names a process kind and a run, and nothing else")
+    func originIsAProcessAndAPid() {
+        // #272: a single tap toggled a habit twice, 13ms apart. The trace
+        // could not say whether that was one process performing twice or the
+        // `LiveActivityIntent` handover running both halves, so the tap line
+        // now carries which.
+        let origin = WidgetTrace.origin
+        let parts = origin.split(separator: ":")
+        #expect(parts.count == 2, "expected kind:pid, got \(origin)")
+        #expect(["app", "widget"].contains(String(parts[0])))
+        #expect(Int(parts[1]) == Int(ProcessInfo.processInfo.processIdentifier))
+        // Hosted in the app, so this is the app half — the widget half is only
+        // observable on a device, which is the whole reason the line exists.
+        #expect(parts[0] == "app")
+    }
+
     // MARK: - The claim itself
 
     /// This repository's Swift sources, found from the test file's own path.

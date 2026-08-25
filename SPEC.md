@@ -425,7 +425,10 @@ it. It runs from the **top of the first habit** to the **bottom of the last one
 the surface shows**, and no further: never into the header's air, never past the
 last row. `RestCut.rows` decides which rows carry it, taking the surface's
 capacity — the widget's `rowCapacity`, the app's `largeRowCapacity`, so the app's
-line ends on the same hairline that marks where the widget ends. A blank row
+line ends on the same hairline that marks where an unconfigured large widget
+ends. On a configured widget the cut runs over the rows that widget draws, in
+the order it draws them, because `RestCut.rows` has an opinion about a list and
+none about where the list came from. A blank row
 *between* two habits is inside the cut and draws its segment; a blank row at
 either end is outside it. All three week widget families draw it, on the same
 `RestCut` numbers the app uses.
@@ -615,6 +618,40 @@ Rows are as many as fit, then a hard cut — no "+N more" row, per
 docs/vision.md: a row spent saying how much is missing is a row not showing a
 habit. The app's own grid marks the boundary, where there is room to say it.
 
+**Which rows is a per-widget choice; the order is always the app's.** Both
+families offer it. The picker lists every week-shaped row in the app's order —
+including the blank rows, labelled "Blank Row", which the month widget's
+picker excludes — and the widget draws the chosen ones **in the app's order**,
+whatever order they were chosen in. A widget nobody has configured keeps the
+whole of the app's list, which is what every widget already placed does after
+this ships. A chosen row that has since been deleted is dropped rather than
+held as a gap; a widget whose every chosen row is gone shows the empty state
+rather than silently becoming someone else's first rows. `WidgetRows` decides
+all of that and is where the rules are tested.
+
+**The order is dropped deliberately, not for want of one.** #188 asked for
+"which habits and in what order", and the ordering half turned out to be
+available: measured on an iPhone 14 Pro, WidgetKit hands an array-of-entity
+parameter to the provider **in the sequence the rows were tapped** (#191). It
+is not used, because the system's picker draws checkmarks — no handles, no
+numbers, no edit mode, on hardware as in the simulator — so an order carried
+out of it is a side effect of the sequence somebody happened to tap in:
+invisible while choosing, unexplained afterwards, and unfixable without
+clearing every row and re-tapping. #172's actual complaint, a blank row landing
+on the medium widget's cut, is answered by *which* rows alone. A real ordering
+surface would be the in-app screen #188 names as its fallback, where the order
+would be visible while being chosen.
+
+The hard cut is unchanged and is not configurable: a medium widget shows five
+rows and a person configuring six gets the first five. There is no per-family
+row count stored anywhere — `WeekWidgetView` measures its own frame and
+applies `WidgetMetrics.rowCapacity` to it, because a widget's point size
+differs by phone. `largeRowCapacity` exists for the app's own use and is now
+a narrower claim: it is where an *unconfigured* large widget stops, which is
+what the grid's boundary hairline marks and where its rest-day cut ends. No
+line in a scrolling list can stand for several differently-configured widgets
+at once, and the app does not try.
+
 **The Today widget is not in this build** (#209). It was small and medium —
 one configurable habit's ring, and the first three per-day habits — and it went
 with the kind it drew. Its kind strings, `GlowTodaySmall` and `GlowTodayMedium`,
@@ -664,6 +701,40 @@ still one card, drawing the widget's own empty state — what adding it today
 would actually get you. The clause that kept Week-Small to a single card — it
 had no per-habit axis to vary a second one over until #188 gave it one — went
 with the family itself (PR #277).
+
+**The Small previews sit two to a line, the way a Home Screen sits them**
+(#274). Two Small widgets occupy the footprint of one Medium, so a column of
+them was a picture of an arrangement nobody has; the gutter between them is
+what is left of a Medium's width once two Smalls are in it. A trailing odd
+card is a line of its own, at one widget's size, in the place the next one
+would go. Medium and Large fill the width and are unaffected.
+
+**One picker chooses the Home Screen appearance every preview is drawn under**
+(#273). Under Default the widget keeps the background it declares; under
+Tinted or Clear the system drops it, substitutes glass, and renders the widget
+*accented*, where colour is thrown away and only alpha survives. The previews
+answer that by injecting the rendering mode, so the marks take the same
+alpha-stored grey by the same line of code they take on a Home Screen — the
+content is the real thing, not a drawing of it. The panel behind is not: the
+system composites it out of a wallpaper this app cannot see, so the page draws
+its own neutral plate under SwiftUI's glass and says so.
+
+**Tinted and Clear are one segment, not two.** Both put the widget into
+accented rendering, so the content is identical by construction, and the two
+glass styles measured pixel-identical over the page's plate. Two segments
+drawing the same picture would claim a distinction the page cannot make.
+**And the picker cannot default to the device's own appearance**, because
+nothing reports it: no trait, environment value or WidgetKit call, checked
+against the iOS 26.5 SDK rather than remembered. `widgetRenderingMode` reads
+`.fullColor` inside the app whatever the Home Screen is doing.
+
+The previews are of *unconfigured* widgets, which is the same narrowing the
+grid's boundary hairline took (#188). They draw the app's own list because
+that is what a widget nobody has configured draws, and per-widget rows mean the
+page cannot know what any particular placed widget shows — `WidgetCenter`
+reports a kind and a family, never a configuration. A preview per placed widget
+would be four previews of one widget, and a wrong one is worse than a generic
+one.
 
 **Nothing on that page places a widget, because no API can.** No public call
 opens the widget gallery or adds anything to a Home Screen; `WidgetCenter`

@@ -51,6 +51,23 @@ enum WidgetTrace {
         id?.uuidString ?? "unset"
     }
 
+    /// Which process wrote a line, and which run of it.
+    ///
+    /// **Because a single tap has been seen toggling a habit twice, 13ms
+    /// apart** (#272). A human cannot tap twice in 13ms, so that was one
+    /// gesture performed twice — and the trace could not say whether the two
+    /// performs came from one process or from two, which is the difference
+    /// between a duplicated delivery and `LiveActivityIntent`'s handover from
+    /// the extension into the app running both halves.
+    ///
+    /// The bundle extension is the ordinary way to tell an appex from its
+    /// host; the pid separates two runs of the same one. Neither is anything
+    /// a person typed, so this stays inside what `WidgetTrace` records.
+    static var origin: String {
+        let kind = Bundle.main.bundleURL.pathExtension == "appex" ? "widget" : "app"
+        return "\(kind):\(ProcessInfo.processInfo.processIdentifier)"
+    }
+
     /// One entity query's answer: how many were asked for, and which came back.
     ///
     /// Resolution is the step that silently failed under extension-only

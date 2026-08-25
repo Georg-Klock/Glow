@@ -3374,7 +3374,6 @@ would go on passing if the line under the dot were lost. Fixing it means moving
 where that scan samples or changing the fixture, which is a different change
 from this one. The code says so where it samples.
 
-
 ## Tinted and Clear stay glass (#53)
 
 **2026-08-22.** Closed, accepted rather than fixed. `containerBackgroundRemovable(false)` was built, measured on device, and does not do what the issue wanted: on iOS 26 that flag governs contexts with no background at all — StandBy, the iPad Lock Screen gallery — and Tinted and Clear are a restyling of the Home Screen, not one of those, so both still substitute glass regardless of the flag. A black image drawn as ordinary content inside the container fails the same way, silently. Worse than the background: the halo does not survive Tinted or Clear either, with or without the flag, so a lit mark already reads as a bright shape rather than a glow one layer before the background question even applies.
@@ -4124,3 +4123,219 @@ Six tests encoded the three-family week and now encode two: the catalog's shape,
 The references now point at the pull requests that actually did the work, `PR #275` and `PR #277`. That is the honest target: a merged PR is a permanent record of the change, and it cannot collide with a number somebody else is about to use.
 
 **The rule this produces: never cite an issue number that does not exist yet.** If work has no issue, either file one first and use the number it is given, or cite the change itself. Counting forward from the highest number seen is guessing at a value another process is allocating, and it fails silently — the reference reads perfectly and points at the wrong thing.
+
+## The Widgets tab shows two appearances, and Tinted and Clear are one of them
+
+**2026-08-25.** #273 asked for the previews to carry the Tinted/Clear glass
+treatment rather than only the Default opaque background, and left two
+questions open: whether to match the device's actual appearance, and whether
+to draw one card per appearance or three.
+
+**The device's appearance cannot be read.** No trait, environment value or
+WidgetKit call reports it — checked against the iOS 26.5 SDK's
+`SwiftUICore.swiftinterface` and `WidgetKit.swiftinterface`, not remembered.
+`widgetRenderingMode` is the nearest thing and WidgetKit only populates it for
+a widget WidgetKit is rendering; inside the app it reads `.fullColor` whatever
+the Home Screen is doing. So the first question answers itself: the page
+cannot match the device, and the appearance is a choice the person makes.
+
+**One picker for the page, not a card per appearance.** The page already
+carries a card per family and, since #237, a card per habit. Multiplying that
+by appearance would have doubled the month section. Appearance is a property of
+the Home Screen rather than of any one widget, so it is asked once and every
+preview answers together.
+
+**Tinted and Clear are one segment, and that was measured.** Both put a widget
+into `.accented` rendering, so the *content* of the two is identical by
+construction. The panel behind is the system's, composited from a wallpaper the
+app cannot see. Rendered with SwiftUI's `Glass.regular` against `Glass.clear`
+over the page's stand-in plate, the two came out pixel-identical inside a
+preview card — 0.0% of pixels differing by more than 6/255, maximum difference
+1. Two segments drawing the same picture would be the page claiming a
+distinction it cannot make.
+
+**The honest half and the approximated half are different halves.** The content
+is not an approximation: the preview injects `widgetRenderingMode`, and
+`GlowPalette.grey` is a `ShapeStyle` that resolves against exactly that value,
+so the marks take the alpha-stored grey by the same line of code that runs on a
+Home Screen. `GlowWidget.swift` records that the *real* widget cannot
+approximate the glass, and that finding stands — it is about a widget the
+system composites, which has no say over what replaces its background. This
+page draws its own background by hand, as it already draws its own corner and
+its own border, so an approximation is available here.
+
+**The plate under the glass has to be opaque, and that was found by looking.**
+Rendered translucent, `glassEffect` sampled what was behind it — which on this
+page is the page, not a wallpaper — and the caption above each preview appeared
+ghosted inside the widget. Screenshotted at 2x through a hosted window, not
+reasoned about.
+
+**`ImageRenderer` cannot render this page.** It returns SwiftUI's yellow
+unsupported-view placeholder for a hierarchy with `NavigationStack` and
+`ScrollView` in it, and returns it *identically* for every input — so three
+appearances rendered byte-identical PNGs and briefly looked like proof the
+appearance was not reaching the previews. `UIHostingController` in a real
+`UIWindow`, snapshotted with `drawHierarchy`, is what renders it, and is what
+`EmptyStateAccessibilityTests` already uses for its own reasons.
+
+## Small previews sit two to a line
+
+**2026-08-25.** Every card on the Widgets tab was a line of its own, whatever
+its family (#274). Two Small widgets occupy one Medium's footprint on a real
+Home Screen, so a column of Smalls was a picture of an arrangement nobody has.
+
+How many fit is derived rather than written down: `WidgetMetrics.perRow`
+divides `largeWidth` by the family's own width, so two falls out of 158 fitting
+twice into 338 and moves if either number does. The gutter is the same
+subtraction. `WidgetCardGroup.rows` does the split, pure and tested.
+
+A trailing odd card is a line of its own at one widget's size, in the place the
+next one would go — not stretched, not centred. With #237's up-to-three month
+cards that is the case this actually renders, and it was looked at.
+
+Medium and Large fill the width and have no neighbour on a Home Screen either,
+so this is a no-op for them.
+
+## A widget's rows are its own, and the app's line narrows (#188)
+
+The week widget mirrored the app's habit order and had no way not to. #172
+measured what that costs: the app's own clustering (#123) puts a blank row
+where a medium widget's cut falls, so medium shows four habits instead of five,
+and the only way to ask for a different five was to reorder the whole app. #172
+decided against moving the seed clustering — the app's order is the app's
+order — and for letting a widget deviate from it. This is that.
+
+**The decision is `WidgetRows.rows(from:chosen:)`**, in `Glow/Logic/`, and it is
+eleven lines. Everything interesting about it is what happens when a choice
+outlives the store it was made against: an id that no longer exists is dropped
+rather than held as a gap, because a deleted habit is not a blank row; a
+repeated id appears once, because the view's `ForEach` is keyed by id and the
+rest cut is a range of indices into the same list; and the order is the
+configuration's, with the app's list consulted only for what a row *is*. A
+widget whose every chosen row has been deleted draws the empty state rather
+than silently becoming somebody else's first rows, which is the rule the month
+widget already follows for its one deleted habit.
+
+**No `mediumRowCapacity`, no `smallRowCapacity`.** #188 expected to need them
+and it does not. The premise was that medium and small "truncate by SwiftUI
+running out of frame", so a person-chosen list would need an explicit count to
+slice by — but `WeekWidgetView` has always measured `proxy.size` inside its
+`GeometryReader` and applied `WidgetMetrics.rowCapacity` to it, then done an
+explicit `prefix`. The cut is deliberate code, not clipping. Storing the two
+numbers would have been worse than not: a widget's point size differs by phone,
+so a constant derived from the 6.1" the design is authored for is right there
+and wrong everywhere else, while the measured frame is right everywhere.
+`largeRowCapacity` stays, for the one job it has always had — the *app* needs a
+number to draw its boundary at, and cannot measure a widget it is not in.
+
+What is asserted instead is the formula's answer per family, which is what the
+tests can honestly claim: eleven large, five medium, six small. And that a
+configured medium is **a choice among five, not a dial** — five rows need
+127.28pt of a 128pt content box, and the 0.72pt left over does not buy a sixth
+from anywhere. Both candidate donors are spoken for: `padVertical` already gave
+its point to buy the fifth (#57), and `rowGap` is set by how far a halo spills
+out of a row, so closing it would put each row's light into its neighbour.
+
+**The app's hairline means something narrower now.** `WeeklyGridView` reads
+`largeRowCapacity` twice — for the boundary line and for the rest cut's end —
+on the assumption that there is one widget row count the app can know. Per-widget
+configuration ends that assumption, and the answer is to narrow the claim rather
+than to draw more lines: the hairline marks where an *unconfigured* large widget
+stops. Every widget starts unconfigured and most stay that way, and somebody who
+has opened the sheet already knows what their widget shows. Several boundaries,
+one per placed widget, would be the app explaining the home screen back to
+itself in a list that scrolls.
+
+**What the system's sheet actually offers is not what this was built for, and
+that is recorded rather than resolved.** #188 named the unknown — whether
+WidgetKit presents an array-of-entity parameter as a reorderable list — and said
+to say which path this needs before writing the provider. Measured in the
+simulator: the sheet is an unordered multi-select checklist in the query's own
+suggested order, with no reordering affordance, and the stored choice arrived at
+the timeline as an **empty array** on every render while
+`WeekRowQuery.entities(for:)` was never called in the extension at all. The
+trace is in #191, with what to check on a device and what the fallback costs.
+This still ships, and the reason is the fallback rule rather than optimism:
+empty and nil both mean the app's own order, so a widget that cannot receive its
+configuration draws exactly what it drew before this change. The failure mode is
+invisible, which is the property that makes an open question safe to merge past.
+
+## An array-of-entity widget parameter arrives, and it is ordered — and the order is dropped
+
+**2026-08-25.** #191 asked two things about `@Parameter var rows: [WeekRowEntity]?`: whether it reaches the timeline provider at all, and whether it carries an order. A simulator said no to the first and could not answer the second. A phone says yes to both.
+
+iPhone 14 Pro, iOS 26.5.2, three rows selected through the system's own Edit Widget sheet:
+
+```
+week query resolve 3 id(s) -> 334920AF-…,1E23A402-…,465AF651-…
+week timeline: rows=3
+```
+
+**It arrives.** `rows=3`, non-empty, and `WeekRowQuery.entities(for:)` ran inside the extension — which it never once did across four reloads in the simulator. The simulator's empty array was the stale-configuration artifact this file already records for chronod, not a platform limit. That is the second time a per-widget configuration question has been unanswerable in a simulator and settled in one gesture on hardware; `MonthWidgetConfig` records the first.
+
+**And it is ordered by the sequence the rows were tapped.** `entities(for:)` traces the identifiers as asked, and the row tapped first came back first — putting the app's own first habit second in the resolved array. An unordered multi-select would have handed back the suggested order.
+
+**The order is nonetheless dropped, and that is the decision.** `WidgetRows.rows(from:chosen:)` walks the app's list and filters it, rather than walking the choice; `entities(for:)` does the same so the sheet's summary reads the way the widget draws.
+
+The reason is that the control cannot express an order. The picker draws **checkmarks, not positions** — confirmed on hardware as well as in the simulator, no handles, no numbers, no edit mode. So an order carried out of it is gesture history: invisible while it is being made, unexplained afterwards, and unfixable without clearing every row and re-tapping in sequence. A widget that quietly reorders itself according to which checkbox somebody hit first is worse than one that matches the app, and #172's actual complaint — the app's clustering putting a blank row on the medium widget's cut — is answered by *which* rows alone.
+
+**So #188 ships as half of what it asked for, on purpose.** The other half is not blocked by the platform; it is waiting for a surface that can show an order while it is being chosen, which is the in-app screen #188 already names as its fallback. `WidgetRows.rows` takes `[UUID]?` and does not care which surface supplies it.
+
+**The baseline gained one frame and moved nothing.** `week medium configured` is the only committed render with a blank row in it, and it now also pins this decision: the fixture chooses four rows in an order that is not the app's, and the frame draws Workout, blank, Study, Touch Grass — the app's. `month small`, `week large` and `week medium` are bit-identical to `main`'s.
+
+## The burst window is two numbers, not one
+
+**2026-08-25.** `WidgetBurst.duration` was both how long the tap cross-fade
+runs and how long the note the intent leaves stays valid. Reload latency came
+out of the same 0.3s, so most taps spent most of the animation before the
+provider was asked for it (#267).
+
+**The phone settled how bad it is.** iPhone 14 Pro, iOS 26.5.2, on `main` at
+`a03fea9`, taps made by hand on a placed week widget: 431ms and 3.17s from the
+tap to the week provider running. Both bursts were recorded correctly and
+**neither animated**. The simulator's 133–180ms was the best case, not the
+typical one.
+
+A second pull the same morning widened the picture. The week provider runs
+**45, 112, 138, 241, 325, 347, 378 and 427ms** after the taps it answers
+promptly, and **1.2s, 2.2s and 3.2s** after the ones it does not. Across both
+pulls, four of fourteen provider runs with a note pending animated anything.
+
+So the two questions are two constants. `duration` stays 0.3s and still means
+what #40 decided it means — a handful of stills, not a sampled curve.
+`maximumLag` is 0.6s and means *how late a reload may arrive and still be worth
+animating*. The frames are dated from the moment the provider ran rather than
+from the tap, so latency delays the fade instead of being subtracted from it.
+
+**0.6s is bracketed by measurement from both sides, and the upper bound is the
+one worth having.** From below, 427ms: the slowest reload that still arrived
+promptly, under which animations the system delivered on time are thrown away.
+From above, **798ms**: the tightest gap measured between one reload wave and
+the next. Under a flurry the week widget's provider runs again in waves, so a
+note still valid when the second wave arrives animates one tap twice — the same
+completion cross-fading in again a second later, which reads as a glitch. 0.6s
+is the geometric midpoint, 584ms rounded.
+
+That upper bound is the reason this is a decision rather than a widening. The
+obvious move — make the note live long enough to catch everything — has a
+measured price, and past 798ms the failure mode stops being "the fade was
+missed" and becomes "the fade played again". The multi-second delays stay
+unanimated on purpose: they are #121's to explain.
+
+**What `WidgetBurstTests.burstExpires` protects is unchanged.** That guard
+exists so a midnight rollover or an edit in the app cannot replay somebody's
+tap hours later, and two seconds is as unable to do that as 0.3 was. The test
+now expires against `maximumLag` rather than against `duration`, and a second
+test holds `maximumLag` at or under three seconds so the number cannot drift
+until it stops mattering.
+
+**One thing the longer note made necessary.** At 0.3s an undo could not land
+inside the window. At 2s it can, and a note that outlives the state it
+describes is a widget animating a lie — a ring cross-fading into a dot for a
+slot the store has just reopened. `ToggleHabitIntent` clears the note whenever
+the toggle is not a completion, scoped to that habit so undoing one does not
+swallow the fade another is owed.
+
+**Not decided here:** whether a repeat tap on the same habit inside a short
+window should be a no-op rather than a toggle (#272). That is a change to the
+only path that writes history and wants its own decision.

@@ -106,6 +106,16 @@ struct WeeklyGridView: View {
     ///
     /// Rows, not habits: a blank row occupies a slot on the home screen exactly
     /// as a habit does, so it counts against the same eleven.
+    ///
+    /// **What the line means since #188**: where a large widget *nobody has
+    /// configured* stops. It used to mean where the large widget stops, full
+    /// stop, and per-widget rows ended that — a configured widget shows the
+    /// rows it was given, in its own order, and no line in this list can stand
+    /// for all of them at once. The narrower claim is still the useful one:
+    /// every widget starts unconfigured, an unconfigured one takes this list
+    /// from the top, and someone who has opened the sheet already knows what
+    /// their widget shows. Drawing several boundaries, one per placed widget,
+    /// would be the app explaining the home screen back to itself.
     private var showsWidgetBoundary: Bool {
         habits.count > WidgetMetrics.largeRowCapacity
     }
@@ -326,9 +336,10 @@ struct WeeklyGridView: View {
                             bottom: geometry.rowInset, trailing: geometry.horizontalPadding
                         ))
                         .listRowSeparator(.hidden)
-                        // Everything above this line is what the large widget
-                        // shows. Below it a habit exists only in the app, and
-                        // without the line nothing would say so.
+                        // Everything above this line is what an unconfigured
+                        // large widget shows. Below it a habit exists only in
+                        // the app, and without the line nothing would say so.
+                        // See `showsWidgetBoundary` for what #188 narrowed.
                         //
                         // Drawn only once there is a row beneath it, so it never
                         // appears on a fresh install and never explains a limit

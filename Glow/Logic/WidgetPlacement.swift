@@ -112,6 +112,31 @@ struct WidgetCardGroup: Hashable, Identifiable, Sendable {
     var id: WidgetPlacement { placement }
 }
 
+extension WidgetCardGroup {
+    /// The cards as the page lays them out: as many to a line as the Home
+    /// Screen puts side by side (#274).
+    ///
+    /// A real Home Screen is a grid, and two Small widgets occupy the footprint
+    /// of one Medium — which is a fact `WidgetMetrics` already encodes, since
+    /// `smallSide` is 158 and `largeWidth` is 338. The page used to stack every
+    /// preview one per line regardless, so a run of Small cards read as a
+    /// column of widgets nobody's Home Screen looks like.
+    ///
+    /// Medium and Large fill the width and have no neighbour to sit beside, so
+    /// they are lines of one and this is a no-op for them.
+    ///
+    /// A trailing odd card is a line of its own rather than being stretched or
+    /// centred: it is one widget, at one widget's size, in the place the next
+    /// one would go.
+    var rows: [[WidgetCard]] {
+        let width = WidgetMetrics.perRow(placement.family)
+        guard width > 1 else { return cards.map { [$0] } }
+        return stride(from: 0, to: cards.count, by: width).map {
+            Array(cards[$0..<min($0 + width, cards.count)])
+        }
+    }
+}
+
 /// Everything this app can put on a Home Screen, and the diff against what is
 /// already there.
 ///
