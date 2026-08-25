@@ -23,7 +23,7 @@ struct WeekWidgetView: View {
     @Environment(\.widgetFamily) private var environmentFamily
     private var family: WidgetFamily { familyOverride ?? environmentFamily }
 
-    /// **Always, since #274 dropped Week-Small.** The labels came off at the
+    /// **Always, since PR #277 dropped Week-Small.** The labels came off at the
     /// small family and nowhere else; with that family gone there is no size
     /// this widget is offered at that hides them. Kept as a computed property
     /// rather than inlined so the two metrics below still read as a pair, and

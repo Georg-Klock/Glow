@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The pop, said inside the app.
 ///
-/// **#103 decided the app would stay quiet, and that is reversed here** (#273).
+/// **#103 decided the app would stay quiet, and that is reversed here** (PR #275).
 /// The Island does not render a Live Activity while its own app is in the
 /// foreground — measured, and still true — so a completion logged in the app
 /// fired a pop nobody could see. #103's answer was to stop firing it and let

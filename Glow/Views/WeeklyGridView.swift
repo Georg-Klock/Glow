@@ -47,7 +47,7 @@ struct WeeklyGridView: View {
     @State private var editMode: EditMode = .inactive
     @State private var isShowingLowPowerNotice = false
     @State private var lowPower = LowPowerMonitor()
-    /// The pop currently on screen, or nil. See `InAppPop` and #273.
+    /// The pop currently on screen, or nil. See `InAppPop` and PR #275.
     @State private var pop: InAppPop.PopContent?
     /// Cancels a pop's own dismissal when a newer one replaces it, so the
     /// first tap's timer cannot cut short the second tap's pill.
@@ -141,7 +141,7 @@ struct WeeklyGridView: View {
             // draws it — the principal item takes the centre — but it is what
             // a `NavigationLink` pushed from here would name its back button,
             // and what the system reads when the toolbar is not on screen.
-            // **An overlay, not a row in the stack** (#273). Put in the
+            // **An overlay, not a row in the stack** (PR #275). Put in the
             // `VStack` it pushed the whole grid down for its two seconds, so
             // the row that was just tapped moved out from under the finger —
             // which is precisely the flurry #272 says has to stay fast. It
@@ -727,7 +727,7 @@ struct WeeklyGridView: View {
             ) {
             case .completed:
                 Haptics.completed()
-                // **#103 said no pop here and #273 reverses it.** The Island
+                // **#103 said no pop here and PR #275 reverses it.** The Island
                 // still will not render a Live Activity while its own app is in
                 // front, which is why this draws its own rather than asking for
                 // one. Same words, same order, same preferences — see

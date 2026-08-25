@@ -109,7 +109,7 @@ enum GoalPop {
     /// The registers one completion has to say, in the order it says them,
     /// before preferences are asked.
     ///
-    /// **Shared by both surfaces** (#273). The Island's pop and the app's own
+    /// **Shared by both surfaces** (PR #275). The Island's pop and the app's own
     /// say the same words for the same tap, and used to decide that separately
     /// — `GoalPopCentre` had the only copy while the app deliberately said
     /// nothing. Now that the app pops too, one rule keeps them from drifting

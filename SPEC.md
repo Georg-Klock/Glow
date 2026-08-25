@@ -596,10 +596,10 @@ given room, which stays a matter of looking at it.
 Two widgets, reading the same store through an App Group. They were three
 until #209. Three placeable configurations, since the week's two families are
 added independently — which is the unit the Widgets tab counts in. It was four
-until #274 dropped Week-Small.
+until PR #277 dropped Week-Small.
 
 **The week widget**: two families, medium and large. **Small was one of them
-and is gone** (#274) — it drew the same habits with the labels dropped, so it
+and is gone** (PR #277) — it drew the same habits with the labels dropped, so it
 said how much of the week was done without saying what of, and a size only
 legible to somebody who already knows their own row order is not a size worth
 offering. Removing a family is not removing a kind (#209): `GlowWidget` serves
@@ -663,7 +663,7 @@ once, so "which one is this" is not a question it asks. Zero weekly habits is
 still one card, drawing the widget's own empty state — what adding it today
 would actually get you. The clause that kept Week-Small to a single card — it
 had no per-habit axis to vary a second one over until #188 gave it one — went
-with the family itself (#274).
+with the family itself (PR #277).
 
 **Nothing on that page places a widget, because no API can.** No public call
 opens the widget gallery or adds anything to a Home Screen; `WidgetCenter`

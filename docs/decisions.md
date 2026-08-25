@@ -4101,7 +4101,7 @@ One task, cancelled and replaced, for the same reason `PopWindow` guards the Isl
 
 ## The week widget drops its small family
 
-**2026-08-24.** `WidgetKind.week` offered small, medium and large. Small is gone (#274).
+**2026-08-24.** `WidgetKind.week` offered small, medium and large. Small is gone (PR #277).
 
 Small was the only family that dropped the habit labels — `WeekWidgetView.showsLabels` was `family != .systemSmall` and nothing else ever hid them. So it drew the week's marks without saying what any row was: readable only by somebody who already knows their own habit order, and unreadable the moment the order changes. It said how much of the week was done without saying what of.
 
@@ -4112,3 +4112,15 @@ Small was the only family that dropped the habit labels — `WeekWidgetView.show
 `showsLabels` is now `true` and stays a computed property rather than being inlined, so the two metrics beside it still read as a pair and restoring a label-less family is one line.
 
 Six tests encoded the three-family week and now encode two: the catalog's shape, the per-family independence pair, the page's order and titles, the querier seam, the per-size card count, and the placement-not-preview rule. The render suite lost its `week small` frame and the committed baseline lost that entry with it; `GlowRenderTests` still reports 13, because the frames are data inside the tests rather than tests of their own, so no floor in `Tools/test-inventory.json` moved.
+
+## Two issue numbers were invented, and both were wrong
+
+**2026-08-24.** Two pieces of work landed today with no issue behind them: the app drawing its own pop, and the week widget dropping its small family. Both were asked for directly rather than filed, and both were written up citing `#273` and `#274` — numbers picked by counting forward from the last one that existed.
+
+**Neither number was free by the time the work merged.** Issues filed while the work was in progress took both: `#273` is "The Widgets tab previews the Default background only, never Tinted or Clear glass" and `#274` is "Two Small widget previews should sit side by side". So every cross-reference in the code, `SPEC.md` and the two entries above pointed at unrelated requests.
+
+**And #274 was closed by it.** The Week-Small pull request said "Closes #274", which GitHub honoured — an open request of Georg's was closed by a change that has nothing to do with it. Reopened, with a note saying why it went.
+
+The references now point at the pull requests that actually did the work, `PR #275` and `PR #277`. That is the honest target: a merged PR is a permanent record of the change, and it cannot collide with a number somebody else is about to use.
+
+**The rule this produces: never cite an issue number that does not exist yet.** If work has no issue, either file one first and use the number it is given, or cite the change itself. Counting forward from the highest number seen is guessing at a value another process is allocating, and it fails silently — the reference reads perfectly and points at the wrong thing.

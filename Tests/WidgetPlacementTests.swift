@@ -34,7 +34,7 @@ struct WidgetPlacementTests {
     }
 
     /// The catalog is the gallery's list, so the week's two sizes are two
-    /// entries and not one. **It was three until #274 dropped Week-Small.**
+    /// entries and not one. **It was three until PR #277 dropped Week-Small.**
     @Test("The week is two placeable widgets, the month one")
     func weekIsTwoWidgets() {
         let week = WidgetCatalog.all.filter { $0.kind == .week }
@@ -57,7 +57,7 @@ struct WidgetPlacementTests {
     }
 
     /// Two sizes of one kind, placed, are two "Added" marks and not four.
-    /// **The week's small was one of these until #274 removed the family**, so
+    /// **The week's small was one of these until PR #277 removed the family**, so
     /// the pair is now medium and large.
     @Test("Each family answers for itself")
     func familiesAreIndependent() {
@@ -136,7 +136,7 @@ struct WidgetPlacementTests {
     func orderFollowsTheCatalog() {
         let cards = WidgetCatalog.cards(placed: [])
         #expect(cards.map(\.placement) == WidgetCatalog.all)
-        // "This Week, Small" was the first of these until #274.
+        // "This Week, Small" was the first of these until PR #277.
         #expect(cards.map(\.placement.title) == [
             "This Week, Medium", "This Week, Large",
             "This Month, Small",
@@ -239,7 +239,7 @@ struct WidgetPlacementTests {
         let counts = week.map(\.cards.count)
         let previewed: [UUID?] = week.flatMap(\.cards).map(\.habitID)
         #expect(week.map(\.placement.family) == WidgetKind.week.families)
-        // Two families since #274, not three. Compared against
+        // Two families since PR #277, not three. Compared against
         // `WidgetKind.week.families` above, so this pair moves with it.
         #expect(counts == [1, 1])
         #expect(previewed == [nil, nil])
