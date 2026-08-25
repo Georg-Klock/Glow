@@ -551,8 +551,6 @@ struct WidgetRenderDiffTests {
     private func families() -> [(String, AnyView, CGSize)] {
         let week = entry()
         return [
-            ("week small", AnyView(WeekWidgetView(entry: week, familyOverride: .systemSmall)),
-             WidgetMetrics.size(of: .systemSmall)),
             ("week medium", AnyView(WeekWidgetView(entry: week, familyOverride: .systemMedium)),
              WidgetMetrics.size(of: .systemMedium)),
             ("week large", AnyView(WeekWidgetView(entry: week, familyOverride: .systemLarge)),

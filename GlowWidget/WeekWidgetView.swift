@@ -23,7 +23,12 @@ struct WeekWidgetView: View {
     @Environment(\.widgetFamily) private var environmentFamily
     private var family: WidgetFamily { familyOverride ?? environmentFamily }
 
-    private var showsLabels: Bool { family != .systemSmall }
+    /// **Always, since #274 dropped Week-Small.** The labels came off at the
+    /// small family and nowhere else; with that family gone there is no size
+    /// this widget is offered at that hides them. Kept as a computed property
+    /// rather than inlined so the two metrics below still read as a pair, and
+    /// so restoring a label-less family is one line.
+    private var showsLabels: Bool { true }
     /// Only the large family has the height to spend a row on the header.
     private var showsHeader: Bool { family == .systemLarge }
 
