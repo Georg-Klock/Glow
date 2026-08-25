@@ -274,6 +274,14 @@ struct RenderBaselineTests {
                   view: AnyView(WeekWidgetView(entry: week, familyOverride: .systemMedium))),
             Frame(name: "week large", size: WidgetMetrics.size(of: .systemLarge),
                   view: AnyView(WeekWidgetView(entry: week, familyOverride: .systemLarge))),
+            // A widget somebody configured (#188), and the only committed
+            // frame with a blank row in it — nothing rendered a spacer before
+            // this landed. It also pins the ordering decision: the choice was
+            // made in a different order and the render is in the app's.
+            Frame(name: "week medium configured", size: WidgetMetrics.size(of: .systemMedium),
+                  view: AnyView(WeekWidgetView(
+                      entry: Fixture.configuredWeek(), familyOverride: .systemMedium
+                  ))),
             Frame(name: "month small", size: WidgetMetrics.size(of: .systemSmall),
                   view: AnyView(MonthWidgetView(entry: month))),
         ]
@@ -323,6 +331,36 @@ struct RenderBaselineTests {
                     habit(6, "Touch Grass", "leaf", .daily, done: [monday, tuesday]),
                     habit(7, "Sunset", "sunrise", .timesPerWeek(1), done: [monday]),
                 ]
+            )
+        }
+
+        /// The same week, as a widget somebody configured: four rows in an
+        /// order the app does not have, with a blank one third.
+        ///
+        /// Built through `WidgetRows` rather than by hand, so the picture this
+        /// gate commits to is the one the provider would produce. A hand-typed
+        /// array would pass forever while the selection regressed — the mirror
+        /// copy this project's test rules already forbid.
+        static func configuredWeek() -> WeekEntry {
+            let base = week()
+            let spacer = HabitSnapshot(
+                id: id(90), name: "", icon: "", frequency: .daily,
+                completedDays: [], isSpacer: true
+            )
+            // The app's own list, with the blank row where the app's own
+            // clustering puts it — third, which is the shape #172 measured the
+            // cost of.
+            var all = base.habits
+            all.insert(spacer, at: 2)
+            // Chosen in an order that is not the app's, and one the system can
+            // really deliver: #191 measured WidgetKit handing this array back
+            // in tap order. The frame commits to the widget ignoring it —
+            // Workout, blank, Study, Touch Grass, in the app's order.
+            let chosen = [all[6].id, all[3].id, spacer.id, all[0].id]
+            return WeekEntry(
+                date: base.date,
+                week: base.week,
+                habits: WidgetRows.rows(from: all, chosen: chosen)
             )
         }
 

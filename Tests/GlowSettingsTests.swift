@@ -205,3 +205,38 @@ struct WidgetBurstTests {
         #expect(WidgetBurst.duration <= 0.75)
     }
 }
+
+/// The glow's default, and the one document that publishes it.
+///
+/// `docs/glow.md` said 6x for long enough that a device found running at 1.5
+/// was measured against the wrong number twice in one session. The default is
+/// the product's loudest single decision; a document that disagrees with it is
+/// not a cosmetic error.
+@Suite("Glow default")
+struct GlowDefaultTests {
+    @Test("The default is the top of the range")
+    func defaultIsTheTop() {
+        // Not a literal 12: the claim is the *rule* — "the glow is the
+        // product; there is no reason for it to open at half strength" — so
+        // moving the ceiling moves the default with it and this still holds.
+        #expect(GlowSettings.defaultValue == GlowSettings.range.upperBound)
+    }
+
+    @Test("docs/glow.md publishes the number the code holds")
+    func theDocAgrees() throws {
+        // The same shape as `WidgetTraceRedactionTests`' source scan: a claim
+        // about a file this repository owns, checked against the file.
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let doc = try String(
+            contentsOf: root.appending(path: "docs/glow.md"), encoding: .utf8
+        )
+        let value = GlowSettings.defaultValue
+        let whole = String(Int(value))
+        #expect(doc.contains("| `peakHeadroom` | \(value)"),
+                "docs/glow.md's tuning table does not publish \(value)")
+        #expect(doc.contains("default is **\(whole)x**"),
+                "docs/glow.md does not say the default is \(whole)x")
+    }
+}
