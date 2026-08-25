@@ -4124,3 +4124,47 @@ Six tests encoded the three-family week and now encode two: the catalog's shape,
 The references now point at the pull requests that actually did the work, `PR #275` and `PR #277`. That is the honest target: a merged PR is a permanent record of the change, and it cannot collide with a number somebody else is about to use.
 
 **The rule this produces: never cite an issue number that does not exist yet.** If work has no issue, either file one first and use the number it is given, or cite the change itself. Counting forward from the highest number seen is guessing at a value another process is allocating, and it fails silently — the reference reads perfectly and points at the wrong thing.
+
+## The burst window is two numbers, not one
+
+**2026-08-25.** `WidgetBurst.duration` was both how long the tap cross-fade
+runs and how long the note the intent leaves stays valid. Reload latency came
+out of the same 0.3s, so most taps spent most of the animation before the
+provider was asked for it (#267).
+
+**The phone settled how bad it is.** iPhone 14 Pro, iOS 26.5.2, on `main` at
+`a03fea9`, taps made by hand on a placed week widget: 431ms and 3.17s from the
+tap to the week provider running. Both bursts were recorded correctly and
+**neither animated**. The simulator's 133–180ms was the best case, not the
+typical one.
+
+So the two questions are two constants. `duration` stays 0.3s and still means
+what #40 decided it means — a handful of stills, not a sampled curve.
+`maximumLag` is 2.0s and means *how late a reload may arrive and still be worth
+animating*. The frames are dated from the moment the provider ran rather than
+from the tap, so latency delays the fade instead of being subtracted from it.
+
+**Two seconds is chosen against the measurement, not to cover it.** It clears
+the fast path — 133–180ms in the simulator, 431ms on the phone — by more than
+4x. It deliberately does not reach 3.17s: a cross-fade played three seconds
+after the thumb left the glass is not a report of what just happened, and the
+still frame is the honest render. The multi-second delay is #121's to explain,
+and widening this constant until it stopped mattering would have hidden it.
+
+**What `WidgetBurstTests.burstExpires` protects is unchanged.** That guard
+exists so a midnight rollover or an edit in the app cannot replay somebody's
+tap hours later, and two seconds is as unable to do that as 0.3 was. The test
+now expires against `maximumLag` rather than against `duration`, and a second
+test holds `maximumLag` at or under three seconds so the number cannot drift
+until it stops mattering.
+
+**One thing the longer note made necessary.** At 0.3s an undo could not land
+inside the window. At 2s it can, and a note that outlives the state it
+describes is a widget animating a lie — a ring cross-fading into a dot for a
+slot the store has just reopened. `ToggleHabitIntent` clears the note whenever
+the toggle is not a completion, scoped to that habit so undoing one does not
+swallow the fade another is owed.
+
+**Not decided here:** whether a repeat tap on the same habit inside a short
+window should be a no-op rather than a toggle (#272). That is a change to the
+only path that writes history and wants its own decision.

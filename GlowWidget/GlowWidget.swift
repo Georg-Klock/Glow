@@ -148,31 +148,35 @@ struct WeekProvider: TimelineProvider {
             return
         }
 
-        // The cross-fade's few stills, skipping any the reload latency has
-        // already spent. This used to sample the app's closing spring at
-        // 40fps — seventeen entries — and on a real home screen it read as a
-        // stutter rather than a snap: entries do not arrive at the rate they
-        // were sampled at. See WidgetBurst and docs/glow.md.
-        var entries: [WeekEntry] = []
-        let elapsed = now.timeIntervalSince(burst.startedAt)
-        for frame in WidgetBurst.frames where frame.offset >= elapsed {
-            entries.append(WeekEntry(
-                date: burst.startedAt.addingTimeInterval(frame.offset),
+        // The cross-fade's few stills and the settle, dated from *this moment*
+        // rather than from the tap (#267) — the frames used to be offset from
+        // the tap and the spent ones dropped, which charged the animation for
+        // reload latency instead of merely delaying it. The decision is
+        // `WidgetBurst.timeline(renderedAt:)`, which is pure and tested; this
+        // is the part that turns it into entries.
+        //
+        // The fade itself is still a handful of stills on purpose. It used to
+        // sample the app's closing spring at 40fps — seventeen entries — and
+        // on a real home screen it read as a stutter rather than a snap:
+        // entries do not arrive at the rate they were sampled at. See
+        // WidgetBurst and docs/glow.md.
+        //
+        // The burst rides inside this one timeline, so it spends no reloads of
+        // its own, and nothing follows the settle until the day turns over.
+        let entries = WidgetBurst.timeline(renderedAt: now).map { step in
+            WeekEntry(
+                date: step.date,
                 week: entry.week,
                 habits: entry.habits,
-                burstHabit: burst.habitID,
-                progress: frame.progress
-            ))
+                burstHabit: step.progress == nil ? nil : burst.habitID,
+                progress: step.progress ?? 1
+            )
         }
-        // Settle, and then nothing until the day turns over. The burst rides
-        // inside this one timeline, so it spends no reloads of its own.
-        entries.append(WeekEntry(
-            date: burst.startedAt.addingTimeInterval(WidgetBurst.duration),
-            week: entry.week,
-            habits: entry.habits
-        ))
+        // The lag is no longer subtracted from the fade, so this line is now
+        // purely a measurement — and the one #121 is about. Every tap reports
+        // how long WidgetKit took to ask.
         let lag = String(format: "%.2f", now.timeIntervalSince(burst.startedAt))
-        let summary = "timeline: \(entries.count) entries, burst \(burst.habitID.uuidString) starting \(lag)s in"
+        let summary = "timeline: \(entries.count) entries, burst \(burst.habitID.uuidString) \(lag)s after the tap"
         GlowLog.widget.notice("\(summary, privacy: .public)")
         WidgetTrace.record(summary)
         completion(Timeline(entries: entries, policy: .after(midnight)))
