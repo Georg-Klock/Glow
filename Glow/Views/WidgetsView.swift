@@ -24,6 +24,15 @@ import WidgetKit
 /// convenient width instead would have been a different layout, not a smaller
 /// one.
 ///
+/// **They are previews of an unconfigured widget** (#188). The week widget's
+/// rows are a per-widget choice, and nothing here can know a placed widget's:
+/// `WidgetCenter` reports a kind and a family and no configuration. So the
+/// previews draw the app's own list, which is exactly what an unconfigured
+/// widget draws — the same claim the grid's boundary hairline narrowed to, and
+/// narrowed for the same reason. One preview per placed widget would be several
+/// pictures of the same card, and a confidently wrong one is worse than a
+/// generic one.
+///
 /// The glow is real here too, and unverifiable in the simulator like every
 /// other lit surface in this app.
 struct WidgetsView: View {

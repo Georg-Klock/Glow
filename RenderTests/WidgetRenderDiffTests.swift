@@ -255,10 +255,15 @@ struct WidgetRenderDiffTests {
     /// span is a 2pt bar on the centre and an open one is a capsule outline
     /// whose strokes are at the top and bottom — one scan line would find one
     /// and miss the other.
-    private func brightest(atColumn centre: CGFloat, in pixels: [UInt8]) -> Int {
+    ///
+    /// `row` is which band, counted from the first one under the header. It
+    /// defaults to the first, which is what every scan here wanted until a
+    /// configured widget had to be checked row by row (#188).
+    private func brightest(atColumn centre: CGFloat, row: Int = 0, in pixels: [UInt8]) -> Int {
         let width = Int(Self.size.width * Self.scale)
         let side = SlotLayout.slotHeight(trackWidth: track)
         let top = WidgetMetrics.padVertical + WidgetMetrics.headerHeight + WidgetMetrics.headerGap
+            + CGFloat(row) * (side + WidgetMetrics.rowGap)
         let x = Int((centre * Self.scale).rounded())
         var best = 0
         for y in Int((top * Self.scale).rounded())..<Int(((top + side) * Self.scale).rounded()) {
@@ -524,6 +529,75 @@ struct WidgetRenderDiffTests {
             // in this column, and what is in it is not the span.
             #expect(isUnlit(window, beside: arcs),
                     "the open span crosses the rest day (\(window), against arcs at \(arcs))")
+        }
+    }
+
+    // MARK: - A configured widget (#188)
+
+    @Test("A configured widget draws the chosen rows in the app's order")
+    func configuredRowsAreDrawnInTheAppsOrder() throws {
+        // The claim `WidgetRowsTests` cannot make: that the selection filters
+        // the *pixels* without reordering them. Two daily habits logged on
+        // different days, so which row is which is readable off the render
+        // without reading any text — Alpha is lit on Monday and missed on
+        // Wednesday, Beta is the mirror image.
+        //
+        // The chosen order below is deliberately the reverse of the app's, and
+        // it is an order the system really can deliver: #191 measured on an
+        // iPhone 14 Pro that WidgetKit hands the array back in tap order. So
+        // this asserts a decision, not a platform limit — see `WidgetRows`.
+        let week = WeekCalendar.week(containing: WeekCalendar.day(Date()))
+        func habit(_ name: String, done: [Int]) -> HabitSnapshot {
+            HabitSnapshot(
+                id: UUID(), name: name, icon: "figure.run", frequency: .daily,
+                completedDays: Set(done.map { week.days[$0] })
+            )
+        }
+        let alpha = habit("Alpha", done: [0])
+        let beta = habit("Beta", done: [2])
+        let spacer = HabitSnapshot(
+            id: UUID(), name: "", icon: "", frequency: .daily,
+            completedDays: [], isSpacer: true
+        )
+        // The app's own order is Beta, blank, Alpha. The choice asks for the
+        // reverse and gets the app's order anyway; if tap order were still
+        // reaching the render, every assertion below would land on the wrong
+        // row.
+        let all = [beta, spacer, alpha]
+        let rows = WidgetRows.rows(from: all, chosen: [alpha.id, spacer.id, beta.id])
+        #expect(rows.map(\.name) == ["Beta", "", "Alpha"])
+
+        // Friday, so Monday and Wednesday are both behind it and both readable.
+        let entry = WeekEntry(date: week.days[4], week: week, habits: rows)
+
+        try withRestColumn(6, of: week) {
+            // The halo is off for this one. It is not part of the claim, and
+            // with it on a lit dot's light reaches the row above and below —
+            // which is exactly where the blank row's assertion looks.
+            try withoutHalo {
+                let pixels = try rgba(of: try render(entry))
+
+                #expect(brightest(atColumn: columnCentre(2), row: 0, in: pixels) > 150,
+                        "row 0 is not Beta: nothing lit on Wednesday")
+                #expect(brightest(atColumn: columnCentre(0), row: 0, in: pixels) < 150,
+                        "row 0 is lit on Monday — the tap order reached the render")
+                #expect(brightest(atColumn: columnCentre(0), row: 2, in: pixels) > 150,
+                        "row 2 is not Alpha: nothing lit on Monday")
+                #expect(brightest(atColumn: columnCentre(2), row: 2, in: pixels) < 150,
+                        "row 2 is lit on Wednesday — the tap order reached the render")
+
+                // The blank row draws nothing — no socket, no cross, no dot —
+                // in any column but the rest day's, where the cut crosses it.
+                // That is `RestCut`'s own rule, and until now no committed
+                // render contained a spacer at all, so nothing was checking it.
+                for column in 0..<6 {
+                    let value = brightest(atColumn: columnCentre(column), row: 1, in: pixels)
+                    #expect(value <= Self.clear,
+                            "the blank row drew something at column \(column) (\(value))")
+                }
+                #expect(brightest(atColumn: columnCentre(6), row: 1, in: pixels) > Self.lineFloor,
+                        "the rest day's cut does not cross the blank row")
+            }
         }
     }
 

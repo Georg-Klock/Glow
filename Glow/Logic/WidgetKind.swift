@@ -6,8 +6,8 @@ import WidgetKit
 /// **A kind is a persistent identifier, not a label.** WidgetKit stores it
 /// against every widget a person has placed, so renaming one orphans their
 /// widget — it stops being the thing they configured. That is why these live
-/// here as a fixed list rather than being spelled out at each `StaticConfiguration`
-/// and again wherever a reload is asked for.
+/// here as a fixed list rather than being spelled out at each widget's own
+/// configuration and again wherever a reload is asked for.
 ///
 /// It is also what makes `reloadTimelines(ofKind:)` usable at all: a kind that
 /// drifts from the widget's own is not an error, it is a reload that silently

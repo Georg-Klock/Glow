@@ -3374,7 +3374,6 @@ would go on passing if the line under the dot were lost. Fixing it means moving
 where that scan samples or changing the fixture, which is a different change
 from this one. The code says so where it samples.
 
-
 ## Tinted and Clear stay glass (#53)
 
 **2026-08-22.** Closed, accepted rather than fixed. `containerBackgroundRemovable(false)` was built, measured on device, and does not do what the issue wanted: on iOS 26 that flag governs contexts with no background at all — StandBy, the iPad Lock Screen gallery — and Tinted and Clear are a restyling of the Home Screen, not one of those, so both still substitute glass regardless of the flag. A black image drawn as ordinary content inside the container fails the same way, silently. Worse than the background: the halo does not survive Tinted or Clear either, with or without the flag, so a lit mark already reads as a bright shape rather than a glow one layer before the background question even applies.
@@ -4196,3 +4195,90 @@ cards that is the case this actually renders, and it was looked at.
 
 Medium and Large fill the width and have no neighbour on a Home Screen either,
 so this is a no-op for them.
+
+## A widget's rows are its own, and the app's line narrows (#188)
+
+The week widget mirrored the app's habit order and had no way not to. #172
+measured what that costs: the app's own clustering (#123) puts a blank row
+where a medium widget's cut falls, so medium shows four habits instead of five,
+and the only way to ask for a different five was to reorder the whole app. #172
+decided against moving the seed clustering — the app's order is the app's
+order — and for letting a widget deviate from it. This is that.
+
+**The decision is `WidgetRows.rows(from:chosen:)`**, in `Glow/Logic/`, and it is
+eleven lines. Everything interesting about it is what happens when a choice
+outlives the store it was made against: an id that no longer exists is dropped
+rather than held as a gap, because a deleted habit is not a blank row; a
+repeated id appears once, because the view's `ForEach` is keyed by id and the
+rest cut is a range of indices into the same list; and the order is the
+configuration's, with the app's list consulted only for what a row *is*. A
+widget whose every chosen row has been deleted draws the empty state rather
+than silently becoming somebody else's first rows, which is the rule the month
+widget already follows for its one deleted habit.
+
+**No `mediumRowCapacity`, no `smallRowCapacity`.** #188 expected to need them
+and it does not. The premise was that medium and small "truncate by SwiftUI
+running out of frame", so a person-chosen list would need an explicit count to
+slice by — but `WeekWidgetView` has always measured `proxy.size` inside its
+`GeometryReader` and applied `WidgetMetrics.rowCapacity` to it, then done an
+explicit `prefix`. The cut is deliberate code, not clipping. Storing the two
+numbers would have been worse than not: a widget's point size differs by phone,
+so a constant derived from the 6.1" the design is authored for is right there
+and wrong everywhere else, while the measured frame is right everywhere.
+`largeRowCapacity` stays, for the one job it has always had — the *app* needs a
+number to draw its boundary at, and cannot measure a widget it is not in.
+
+What is asserted instead is the formula's answer per family, which is what the
+tests can honestly claim: eleven large, five medium, six small. And that a
+configured medium is **a choice among five, not a dial** — five rows need
+127.28pt of a 128pt content box, and the 0.72pt left over does not buy a sixth
+from anywhere. Both candidate donors are spoken for: `padVertical` already gave
+its point to buy the fifth (#57), and `rowGap` is set by how far a halo spills
+out of a row, so closing it would put each row's light into its neighbour.
+
+**The app's hairline means something narrower now.** `WeeklyGridView` reads
+`largeRowCapacity` twice — for the boundary line and for the rest cut's end —
+on the assumption that there is one widget row count the app can know. Per-widget
+configuration ends that assumption, and the answer is to narrow the claim rather
+than to draw more lines: the hairline marks where an *unconfigured* large widget
+stops. Every widget starts unconfigured and most stay that way, and somebody who
+has opened the sheet already knows what their widget shows. Several boundaries,
+one per placed widget, would be the app explaining the home screen back to
+itself in a list that scrolls.
+
+**What the system's sheet actually offers is not what this was built for, and
+that is recorded rather than resolved.** #188 named the unknown — whether
+WidgetKit presents an array-of-entity parameter as a reorderable list — and said
+to say which path this needs before writing the provider. Measured in the
+simulator: the sheet is an unordered multi-select checklist in the query's own
+suggested order, with no reordering affordance, and the stored choice arrived at
+the timeline as an **empty array** on every render while
+`WeekRowQuery.entities(for:)` was never called in the extension at all. The
+trace is in #191, with what to check on a device and what the fallback costs.
+This still ships, and the reason is the fallback rule rather than optimism:
+empty and nil both mean the app's own order, so a widget that cannot receive its
+configuration draws exactly what it drew before this change. The failure mode is
+invisible, which is the property that makes an open question safe to merge past.
+
+## An array-of-entity widget parameter arrives, and it is ordered — and the order is dropped
+
+**2026-08-25.** #191 asked two things about `@Parameter var rows: [WeekRowEntity]?`: whether it reaches the timeline provider at all, and whether it carries an order. A simulator said no to the first and could not answer the second. A phone says yes to both.
+
+iPhone 14 Pro, iOS 26.5.2, three rows selected through the system's own Edit Widget sheet:
+
+```
+week query resolve 3 id(s) -> 334920AF-…,1E23A402-…,465AF651-…
+week timeline: rows=3
+```
+
+**It arrives.** `rows=3`, non-empty, and `WeekRowQuery.entities(for:)` ran inside the extension — which it never once did across four reloads in the simulator. The simulator's empty array was the stale-configuration artifact this file already records for chronod, not a platform limit. That is the second time a per-widget configuration question has been unanswerable in a simulator and settled in one gesture on hardware; `MonthWidgetConfig` records the first.
+
+**And it is ordered by the sequence the rows were tapped.** `entities(for:)` traces the identifiers as asked, and the row tapped first came back first — putting the app's own first habit second in the resolved array. An unordered multi-select would have handed back the suggested order.
+
+**The order is nonetheless dropped, and that is the decision.** `WidgetRows.rows(from:chosen:)` walks the app's list and filters it, rather than walking the choice; `entities(for:)` does the same so the sheet's summary reads the way the widget draws.
+
+The reason is that the control cannot express an order. The picker draws **checkmarks, not positions** — confirmed on hardware as well as in the simulator, no handles, no numbers, no edit mode. So an order carried out of it is gesture history: invisible while it is being made, unexplained afterwards, and unfixable without clearing every row and re-tapping in sequence. A widget that quietly reorders itself according to which checkbox somebody hit first is worse than one that matches the app, and #172's actual complaint — the app's clustering putting a blank row on the medium widget's cut — is answered by *which* rows alone.
+
+**So #188 ships as half of what it asked for, on purpose.** The other half is not blocked by the platform; it is waiting for a surface that can show an order while it is being chosen, which is the in-app screen #188 already names as its fallback. `WidgetRows.rows` takes `[UUID]?` and does not care which surface supplies it.
+
+**The baseline gained one frame and moved nothing.** `week medium configured` is the only committed render with a blank row in it, and it now also pins this decision: the fixture chooses four rows in an order that is not the app's, and the frame draws Workout, blank, Study, Touch Grass — the app's. `month small`, `week large` and `week medium` are bit-identical to `main`'s.
