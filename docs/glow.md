@@ -405,6 +405,22 @@ A still widget reads:
 and a tap should add the intent's write followed by a burst timeline of a few
 entries — the cross-fade's stills and the settle.
 
+## The widget gallery's preview is a cached picture
+
+**The iOS widget gallery — long-press the Home Screen, tap +, pick Glow Up — does not ask the extension for anything.** Its preview is a rendering the system took at some earlier moment and kept, and there is no public call that invalidates it. `WidgetCenter.reloadAllTimelines()` refreshes *placed* widgets and does not touch it.
+
+Measured on an iPhone 17 Pro simulator, iOS 26:
+
+1. Gallery opened, Week-Medium preview shows Gratitude with Monday lit.
+2. Gratitude un-completed in the app. The placed widget on the Home Screen redraws to an open ring.
+3. Gallery reopened. **Still Monday lit.**
+
+`WeekProvider.getSnapshot` traces every call with `context.isPreview`, and across both gallery visits it recorded nothing at all — so this is not the extension returning stale data, it is the extension never being asked. The cached image also survived a reinstall of the app between steps 2 and 3, so the cache is not per-install either.
+
+`placeholder(in:)` is not what is shown: it returns no habits, and the gallery draws real ones. What the gallery holds is an old `getSnapshot` result, rendered.
+
+**The app's own Widgets tab is the live version of the same thing** (#210), and it does update — it draws `WeekWidgetView` directly over a live `@Query`, in-process, with no WidgetKit cache in the way. When somebody wants to see what a widget would look like *right now*, that page is the answer and the gallery cannot be.
+
 ## When the glow will not appear
 
 Low Power Mode reduces the headroom iOS grants, so the tile tone-maps back to

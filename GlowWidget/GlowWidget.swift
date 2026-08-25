@@ -103,7 +103,16 @@ struct WeekProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (WeekEntry) -> Void) {
-        completion(loadEntry())
+        let entry = loadEntry()
+        // Traced to answer one question the trace could not: whether the widget
+        // gallery's preview is stale because WidgetKit never asks us, or
+        // because it asks and then shows something older. `isPreview` is what
+        // separates the gallery's call from a placed widget's. Counts only, per
+        // `WidgetTrace`.
+        WidgetTrace.record(
+            "week snapshot: preview=\(context.isPreview), habits=\(entry.habits.count)"
+        )
+        completion(entry)
     }
 
     /// One still entry and a midnight refresh — plus, after a tap, the few
