@@ -4282,3 +4282,60 @@ The reason is that the control cannot express an order. The picker draws **check
 **So #188 ships as half of what it asked for, on purpose.** The other half is not blocked by the platform; it is waiting for a surface that can show an order while it is being chosen, which is the in-app screen #188 already names as its fallback. `WidgetRows.rows` takes `[UUID]?` and does not care which surface supplies it.
 
 **The baseline gained one frame and moved nothing.** `week medium configured` is the only committed render with a blank row in it, and it now also pins this decision: the fixture chooses four rows in an order that is not the app's, and the frame draws Workout, blank, Study, Touch Grass — the app's. `month small`, `week large` and `week medium` are bit-identical to `main`'s.
+
+## The burst window is two numbers, not one
+
+**2026-08-25.** `WidgetBurst.duration` was both how long the tap cross-fade
+runs and how long the note the intent leaves stays valid. Reload latency came
+out of the same 0.3s, so most taps spent most of the animation before the
+provider was asked for it (#267).
+
+**The phone settled how bad it is.** iPhone 14 Pro, iOS 26.5.2, on `main` at
+`a03fea9`, taps made by hand on a placed week widget: 431ms and 3.17s from the
+tap to the week provider running. Both bursts were recorded correctly and
+**neither animated**. The simulator's 133–180ms was the best case, not the
+typical one.
+
+A second pull the same morning widened the picture. The week provider runs
+**45, 112, 138, 241, 325, 347, 378 and 427ms** after the taps it answers
+promptly, and **1.2s, 2.2s and 3.2s** after the ones it does not. Across both
+pulls, four of fourteen provider runs with a note pending animated anything.
+
+So the two questions are two constants. `duration` stays 0.3s and still means
+what #40 decided it means — a handful of stills, not a sampled curve.
+`maximumLag` is 0.6s and means *how late a reload may arrive and still be worth
+animating*. The frames are dated from the moment the provider ran rather than
+from the tap, so latency delays the fade instead of being subtracted from it.
+
+**0.6s is bracketed by measurement from both sides, and the upper bound is the
+one worth having.** From below, 427ms: the slowest reload that still arrived
+promptly, under which animations the system delivered on time are thrown away.
+From above, **798ms**: the tightest gap measured between one reload wave and
+the next. Under a flurry the week widget's provider runs again in waves, so a
+note still valid when the second wave arrives animates one tap twice — the same
+completion cross-fading in again a second later, which reads as a glitch. 0.6s
+is the geometric midpoint, 584ms rounded.
+
+That upper bound is the reason this is a decision rather than a widening. The
+obvious move — make the note live long enough to catch everything — has a
+measured price, and past 798ms the failure mode stops being "the fade was
+missed" and becomes "the fade played again". The multi-second delays stay
+unanimated on purpose: they are #121's to explain.
+
+**What `WidgetBurstTests.burstExpires` protects is unchanged.** That guard
+exists so a midnight rollover or an edit in the app cannot replay somebody's
+tap hours later, and two seconds is as unable to do that as 0.3 was. The test
+now expires against `maximumLag` rather than against `duration`, and a second
+test holds `maximumLag` at or under three seconds so the number cannot drift
+until it stops mattering.
+
+**One thing the longer note made necessary.** At 0.3s an undo could not land
+inside the window. At 2s it can, and a note that outlives the state it
+describes is a widget animating a lie — a ring cross-fading into a dot for a
+slot the store has just reopened. `ToggleHabitIntent` clears the note whenever
+the toggle is not a completion, scoped to that habit so undoing one does not
+swallow the fade another is owed.
+
+**Not decided here:** whether a repeat tap on the same habit inside a short
+window should be a no-op rather than a toggle (#272). That is a change to the
+only path that writes history and wants its own decision.

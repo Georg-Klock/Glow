@@ -94,13 +94,92 @@ struct WidgetBurstTests {
     func burstExpires() {
         // Otherwise a midnight rollover, or an edit made in the app, would
         // re-animate somebody's last tap hours after they made it.
+        //
+        // **This used to expire against `duration` and now expires against
+        // `maximumLag`** (#267). The two were one constant, so widening the
+        // window a late reload can still ride widened this guard with it;
+        // splitting them is what lets the fade stay 0.3s while the note
+        // survives long enough to be read. The guard is unchanged in what it
+        // protects — an hour later is still nothing — and `burstLagStaysShort`
+        // below is what stops the new constant drifting until it stops
+        // mattering.
         let id = UUID()
         let started = Date()
         WidgetBurst.record(habitID: id, at: started, reduceMotion: false)
 
         #expect(WidgetBurst.pending(now: started.addingTimeInterval(0.1))?.habitID == id)
-        #expect(WidgetBurst.pending(now: started.addingTimeInterval(WidgetBurst.duration + 1)) == nil)
+        // Past the fade and still valid: this is the whole point of the split.
+        #expect(WidgetBurst.pending(
+            now: started.addingTimeInterval(WidgetBurst.duration + 0.1)
+        )?.habitID == id)
+        #expect(WidgetBurst.pending(
+            now: started.addingTimeInterval(WidgetBurst.maximumLag + 0.1)
+        ) == nil)
         #expect(WidgetBurst.pending(now: started.addingTimeInterval(3600)) == nil)
+    }
+
+    @Test("The note outlives the fade, and stops short of the next reload wave")
+    func burstLagStaysShort() {
+        // Both bounds are measured, and the upper one is the point (#267).
+        //
+        // Below: the note must outlive the fade, or reload latency is
+        // subtracted from the animation — the slowest *prompt* reload measured
+        // on a device was 427ms.
+        //
+        // Above: under a flurry the week widget's provider runs again in
+        // waves, and the tightest gap measured between waves was 798ms. A note
+        // still valid then animates one tap twice. So this constant cannot
+        // simply be widened until it stops mattering, and 0.75 is the fence
+        // that says so.
+        #expect(WidgetBurst.maximumLag > WidgetBurst.duration)
+        #expect(WidgetBurst.maximumLag >= 0.45, "under the 427ms fast path")
+        #expect(WidgetBurst.maximumLag <= 0.75, "into the 798ms gap between reload waves")
+    }
+
+    @Test("However late the provider runs, the whole fade plays")
+    func fadeStartsWhenTheProviderRuns() {
+        // The frames used to be offset from the tap and the spent ones
+        // dropped, so a provider called part-way through the window played
+        // part of the fade and one called after it played none (#267). Dated
+        // from the render instead, the same frames come out whenever it runs —
+        // latency delays the animation rather than being subtracted from it.
+        let now = Date()
+        let late = now.addingTimeInterval(WidgetBurst.maximumLag - 0.01)
+
+        for moment in [now, late] {
+            let steps = WidgetBurst.timeline(renderedAt: moment)
+            // Every fade frame, and the settle.
+            #expect(steps.count == WidgetBurst.frames.count + 1)
+            #expect(steps.first?.progress == 0)
+            #expect(steps.first?.date == moment)
+            #expect(steps.last?.progress == nil)
+            #expect(steps.map(\.date) == steps.map(\.date).sorted())
+            // Nothing is scheduled before the moment it was asked for: a
+            // timeline entry dated in the past is one WidgetKit has already
+            // missed.
+            #expect(steps.allSatisfy { $0.date >= moment })
+            // And nothing outlives the fade's own length.
+            #expect(steps.allSatisfy {
+                $0.date <= moment.addingTimeInterval(WidgetBurst.duration)
+            })
+        }
+    }
+
+    @Test("An undo drops its own habit's note, and only its own")
+    func undoClearsTheNote() {
+        // A note outliving its fade is what makes this necessary (#267):
+        // complete, undo before the provider has run, and without this the
+        // widget would cross-fade a ring into a dot for a slot the store has
+        // just reopened.
+        let completed = UUID()
+        let other = UUID()
+
+        WidgetBurst.record(habitID: completed, at: Date(), reduceMotion: false)
+        WidgetBurst.clear(habitID: other)
+        #expect(WidgetBurst.pending()?.habitID == completed, "another habit's undo took this note")
+
+        WidgetBurst.clear(habitID: completed)
+        #expect(WidgetBurst.pending() == nil)
     }
 
     @Test("Reduce Motion travels with the note, so the provider never reads UIKit")

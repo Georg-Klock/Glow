@@ -346,14 +346,74 @@ race outright. The other played two of three frames, starting 57% of the way
 through the fade. So the reload is still fast; the window it has to beat is what
 shrank.
 
+**On a phone it is not fast, and the window lost every time.** The same
+measurement off an iPhone 14 Pro, iOS 26.5.2, two placed week widgets and three
+placed month widgets, taps made by hand on the widget's own ring:
+
+```
+08:31:28.518  tap 41A508AC-…: done, burst recorded
+08:31:28.949  timeline: 1 entry, still (burst none pending)   ← 431ms
+08:31:29.105  tap 41A508AC-…: done, burst recorded
+08:31:32.273  timeline: 1 entry, still (burst none pending)   ← 3.17s
+```
+
+Two recorded bursts, **neither animated**. The simulator's 133–180ms is the
+best case, not the typical one; what the phone adds is #121's multi-second
+scheduling delay, and at a 300ms window that delay is indistinguishable from
+the burst never having been recorded.
+
+A second pull the same morning caught a five-tap flurry and a later isolated
+tap, and the picture is wider than either half suggested: the week provider ran
+**45, 112, 138, 241, 325, 347, 378 and 427ms** after the taps it answered
+promptly, and **1.2s, 2.2s and 3.2s** after the ones it did not. Across both
+pulls, four of fourteen provider runs with a note pending animated anything,
+and each of those played only the tail of the fade.
+
+### What was decided
+
+`WidgetBurst.duration` was one constant answering two questions, and they are
+now two constants. The fade is still **0.3s** — #40's argument for a handful of
+stills is untouched. `WidgetBurst.maximumLag` is **0.6s**: how late a reload may
+arrive and still be worth animating.
+
+And the frames are dated from **when the provider ran**, not from the tap. The
+provider used to offset each frame from the tap and drop the ones already
+spent, which charged the animation for latency rather than merely delaying it.
+Latency is WidgetKit's to spend and nothing here can shorten it; what this can
+stop doing is subtracting it from the fade.
+
+**0.6s is bracketed by measurement from both sides**, and the upper bound is
+the part worth keeping:
+
+| Bound | Value | What sets it |
+| --- | --- | --- |
+| Lower | 427ms | The slowest reload that still arrived *promptly*. Below this, animations the system delivered on time are thrown away — the bug being fixed. |
+| Upper | 798ms | The tightest gap measured between one reload wave and the next. Above this, a note is still valid when the *second* wave arrives, and one tap animates twice. |
+
+0.6s is the geometric midpoint of those two, 584ms rounded. The upper bound is
+what stops the constant being widened until it stops mattering: past 798ms the
+failure mode stops being "the fade was missed" and becomes "the fade played
+again", which is worse. It deliberately does not reach the multi-second cases —
+those are #121, and a cross-fade played seconds after the thumb left the glass
+is not a report of what just happened.
+
+**The note outliving its fade needed one more thing.** At 0.3s an undo could
+not land inside the window; at 2s it can, and a note that outlives the state it
+describes would have the widget cross-fading a ring into a dot for a slot the
+store had just reopened. `ToggleHabitIntent` now clears the note when the
+toggle is not a completion, scoped to that habit so one undo does not swallow
+another habit's fade.
+
 **The rendering has since been watched, and it half-works** (#40): the entries
 render — this is not the sweep's failure — but not at the rate they were
 sampled at, so the sampled spring came out as a stutter rather than a close.
 That observation is what turned the burst into the cross-fade above: frames
 few enough that arrival rate has nothing left to ruin. The cross-fade itself
-has not yet been watched on a device; when it is, this line should say so — and
-per the measurement above, what is watched will usually be the tail of it or
-none of it until #267 is decided.
+has not yet been watched on a device; when it is, this line should say so.
+Before #267 what was watched would have been the tail of it or none of it —
+the device trace above records two recorded bursts and no animation at all.
+Now that the frames are dated from the render, a fade that plays plays whole;
+what is still unwatched is whether it *reads* as a cross-fade.
 
 ## How to see inside a widget at all
 

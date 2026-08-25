@@ -89,6 +89,14 @@ struct ToggleHabitIntent: LiveActivityIntent {
                 in: week,
                 today: today
             )
+        } else {
+            // Anything that is not a completion drops this habit's note, if it
+            // is still holding one (#267). A note now outlives its fade, so an
+            // undo landing before the provider has run would otherwise leave a
+            // cross-fade queued for a slot the store has just reopened — the
+            // widget animating a completion being taken back. Scoped to this
+            // habit, so undoing one does not swallow the fade another is owed.
+            WidgetBurst.clear(habitID: id)
         }
 
         let verdict = switch result {

@@ -106,11 +106,14 @@ struct GlowApp: App {
     ///
     /// This is not a substitute for watching the animation — it cannot say
     /// whether anything moved. What it can answer is the question underneath:
-    /// the note expires after `WidgetBurst.duration`, one second, so if
-    /// WidgetKit takes longer than that to call the provider, the burst is
-    /// always gone before it is read and the widget renders still no matter how
-    /// correct the logic is. The trace timestamps both ends, so the gap is
-    /// measurable rather than argued about. See docs/glow.md.
+    /// the note expires after `WidgetBurst.maximumLag`, so if WidgetKit takes
+    /// longer than that to call the provider, the burst is always gone before
+    /// it is read and the widget renders still no matter how correct the logic
+    /// is. The trace timestamps both ends, so the gap is measurable rather
+    /// than argued about.
+    ///
+    /// That gap is the whole of #267: the expiry used to be `duration`, 0.3s,
+    /// and a phone measured 431ms and 3.17s of it. See docs/glow.md.
     private static func forceBurst(in container: ModelContainer) {
         let context = ModelContext(container)
         let descriptor = FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder)])
