@@ -29,6 +29,21 @@ struct WidgetTraceRedactionTests {
             == "query resolve 2 id(s) -> none")
     }
 
+    @Test("Elapsed is whole milliseconds, and nothing else")
+    func elapsedIsMilliseconds() {
+        // #121: the two providers were timing different things — the month
+        // recorded on entry, the week on the way out — so a comparison between
+        // them counted one's store work and not the other's. Both carry this
+        // now, and the reader subtracts it from the stamp to get the call.
+        let start = Date(timeIntervalSince1970: 1_000)
+        #expect(WidgetTrace.elapsed(since: start, now: start) == "0ms")
+        #expect(WidgetTrace.elapsed(since: start, now: start.addingTimeInterval(0.012)) == "12ms")
+        #expect(WidgetTrace.elapsed(since: start, now: start.addingTimeInterval(3.2)) == "3200ms")
+        // Rounds rather than truncates, so a sub-millisecond load is not 0ms
+        // when it is nearer 1.
+        #expect(WidgetTrace.elapsed(since: start, now: start.addingTimeInterval(0.0006)) == "1ms")
+    }
+
     @Test("The origin names a process kind and a run, and nothing else")
     func originIsAProcessAndAPid() {
         // #272: a single tap toggled a habit twice, 13ms apart. The trace

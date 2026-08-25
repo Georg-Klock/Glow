@@ -77,6 +77,22 @@ enum WidgetTrace {
         return "\(label) resolve \(asked.count) id(s) -> \(ids)"
     }
 
+    /// How long something took, in whole milliseconds, for a trace line.
+    ///
+    /// **Because the two providers were not timing the same thing** (#121).
+    /// `MonthProvider` recorded on entry, before it touched the store;
+    /// `WeekProvider` recorded on the way out, after it had read every weekly
+    /// habit and projected the week. So a comparison between the two counted
+    /// the week's store work and none of the month's, and the trace could not
+    /// separate "WidgetKit called the provider late" from "the provider took a
+    /// long time inside" — which are different bugs with different owners.
+    ///
+    /// Both now record on the way out and carry this, so the call time is the
+    /// stamp minus the load and the reader can have either.
+    static func elapsed(since start: Date, now: Date = Date()) -> String {
+        "\(Int((now.timeIntervalSince(start) * 1000).rounded()))ms"
+    }
+
     private static var store: UserDefaults { GlowSettings.store }
 
     static var lines: [String] {
