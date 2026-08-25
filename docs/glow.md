@@ -399,8 +399,16 @@ leaves the phone by itself.
 A still widget reads:
 
 ```
-14:55:01.649  timeline: 1 entry, still (burst none pending)
+14:55:01.649  timeline: 1 entry, still (burst none pending, load 11ms)
 ```
+
+**The stamp is when the provider *finished*, and `load` is how much of that was
+its own store work** (#121). Subtracting gives when WidgetKit called it. Both
+providers carry it and both record on the way out; the month widget used to
+record on *entry*, before it touched the store, which made the two
+incomparable in exactly the comparison they were being used for — "the week
+provider ran 3.2s after the tap and the month ran in 20ms" was counting the
+week's read and none of the month's.
 
 and a tap should add the intent's write followed by a burst timeline of a few
 entries — the cross-fade's stills and the settle.

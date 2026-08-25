@@ -56,14 +56,22 @@ struct MonthProvider: AppIntentTimelineProvider {
 
     func timeline(for configuration: SelectWeeklyHabitIntent, in context: Context) async -> Timeline<MonthEntry> {
         let now = Date()
+        // Built before the line is written, and timed, so this means the same
+        // thing the week widget's line means (#121). It used to record on
+        // entry, before any store work — which made the two providers'
+        // timestamps incomparable in exactly the comparison they were being
+        // used for.
+        let loadStarted = Date()
+        let built = entry(for: configuration)
         WidgetTrace.record(
             "month timeline: habit=\(WidgetTrace.tag(configuration.habit?.id))"
+                + ", load \(WidgetTrace.elapsed(since: loadStarted))"
         )
         // One entry, and a refresh at midnight: the open dot is defined as
         // "today", and a month only ever changes at a midnight too. Writes
         // reload the timelines explicitly, same as the other widgets.
         return Timeline(
-            entries: [entry(for: configuration)],
+            entries: [built],
             policy: .after(MonthStore.midnight(after: now))
         )
     }

@@ -129,7 +129,14 @@ struct WeekProvider: TimelineProvider {
         // entries far finer than the minute it is usually credited with. It
         // still came out, because entries are free and reloads are not. See
         // docs/glow.md.
+        // Timed, and recorded on the way out with the time in it (#121). The
+        // stamp on a trace line is when the provider *finished*, so without
+        // the load it cannot be told apart from when WidgetKit *called* —
+        // and those are a slow store and a late reload, which are different
+        // problems.
+        let loadStarted = Date()
         let entry = loadEntry()
+        let load = WidgetTrace.elapsed(since: loadStarted)
         let now = Date()
         let midnight = WeekCalendar.calendar.date(
             byAdding: .day, value: 1, to: WeekCalendar.day(now)
@@ -143,7 +150,7 @@ struct WeekProvider: TimelineProvider {
         guard let burst = WidgetBurst.pending(now: now), !WidgetBurst.reduceMotion else {
             let why = WidgetBurst.pending(now: now) == nil ? "none pending" : "suppressed by reduce motion"
             GlowLog.widget.notice("timeline: 1 entry, still (burst \(why, privacy: .public))")
-            WidgetTrace.record("timeline: 1 entry, still (burst \(why))")
+            WidgetTrace.record("timeline: 1 entry, still (burst \(why), load \(load))")
             completion(Timeline(entries: [entry], policy: .after(midnight)))
             return
         }
@@ -172,7 +179,7 @@ struct WeekProvider: TimelineProvider {
             habits: entry.habits
         ))
         let lag = String(format: "%.2f", now.timeIntervalSince(burst.startedAt))
-        let summary = "timeline: \(entries.count) entries, burst \(burst.habitID.uuidString) starting \(lag)s in"
+        let summary = "timeline: \(entries.count) entries, burst \(burst.habitID.uuidString) starting \(lag)s in, load \(load)"
         GlowLog.widget.notice("\(summary, privacy: .public)")
         WidgetTrace.record(summary)
         completion(Timeline(entries: entries, policy: .after(midnight)))
