@@ -4138,18 +4138,31 @@ tap to the week provider running. Both bursts were recorded correctly and
 **neither animated**. The simulator's 133–180ms was the best case, not the
 typical one.
 
+A second pull the same morning widened the picture. The week provider runs
+**45, 112, 138, 241, 325, 347, 378 and 427ms** after the taps it answers
+promptly, and **1.2s, 2.2s and 3.2s** after the ones it does not. Across both
+pulls, four of fourteen provider runs with a note pending animated anything.
+
 So the two questions are two constants. `duration` stays 0.3s and still means
 what #40 decided it means — a handful of stills, not a sampled curve.
-`maximumLag` is 2.0s and means *how late a reload may arrive and still be worth
+`maximumLag` is 0.6s and means *how late a reload may arrive and still be worth
 animating*. The frames are dated from the moment the provider ran rather than
 from the tap, so latency delays the fade instead of being subtracted from it.
 
-**Two seconds is chosen against the measurement, not to cover it.** It clears
-the fast path — 133–180ms in the simulator, 431ms on the phone — by more than
-4x. It deliberately does not reach 3.17s: a cross-fade played three seconds
-after the thumb left the glass is not a report of what just happened, and the
-still frame is the honest render. The multi-second delay is #121's to explain,
-and widening this constant until it stopped mattering would have hidden it.
+**0.6s is bracketed by measurement from both sides, and the upper bound is the
+one worth having.** From below, 427ms: the slowest reload that still arrived
+promptly, under which animations the system delivered on time are thrown away.
+From above, **798ms**: the tightest gap measured between one reload wave and
+the next. Under a flurry the week widget's provider runs again in waves, so a
+note still valid when the second wave arrives animates one tap twice — the same
+completion cross-fading in again a second later, which reads as a glitch. 0.6s
+is the geometric midpoint, 584ms rounded.
+
+That upper bound is the reason this is a decision rather than a widening. The
+obvious move — make the note live long enough to catch everything — has a
+measured price, and past 798ms the failure mode stops being "the fade was
+missed" and becomes "the fade played again". The multi-second delays stay
+unanimated on purpose: they are #121's to explain.
 
 **What `WidgetBurstTests.burstExpires` protects is unchanged.** That guard
 exists so a midnight rollover or an edit in the app cannot replay somebody's

@@ -118,16 +118,22 @@ struct WidgetBurstTests {
         #expect(WidgetBurst.pending(now: started.addingTimeInterval(3600)) == nil)
     }
 
-    @Test("The note may outlive the fade, but not by much")
+    @Test("The note outlives the fade, and stops short of the next reload wave")
     func burstLagStaysShort() {
-        // The fade is short by design (#40) and the note has to outlive it or
-        // reload latency eats the animation (#267) — but "long enough to be
-        // read" must not creep into "long enough to be wrong". A cross-fade
-        // played seconds after the thumb left the glass is not a report of
-        // what just happened; that case is #121's to fix, not this constant's
-        // to paper over.
+        // Both bounds are measured, and the upper one is the point (#267).
+        //
+        // Below: the note must outlive the fade, or reload latency is
+        // subtracted from the animation — the slowest *prompt* reload measured
+        // on a device was 427ms.
+        //
+        // Above: under a flurry the week widget's provider runs again in
+        // waves, and the tightest gap measured between waves was 798ms. A note
+        // still valid then animates one tap twice. So this constant cannot
+        // simply be widened until it stops mattering, and 0.75 is the fence
+        // that says so.
         #expect(WidgetBurst.maximumLag > WidgetBurst.duration)
-        #expect(WidgetBurst.maximumLag <= 3)
+        #expect(WidgetBurst.maximumLag >= 0.45, "under the 427ms fast path")
+        #expect(WidgetBurst.maximumLag <= 0.75, "into the 798ms gap between reload waves")
     }
 
     @Test("However late the provider runs, the whole fade plays")

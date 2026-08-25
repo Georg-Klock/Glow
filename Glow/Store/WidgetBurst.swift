@@ -40,24 +40,38 @@ enum WidgetBurst {
     /// questions and were only equal by accident, so reload latency came out
     /// of the animation: at 0.3s for both, a provider called 150ms after the
     /// tap played the back half of the fade, and one called later played none
-    /// of it. Measured on an iPhone 14 Pro against real taps on a placed week
-    /// widget, the week provider ran 431ms and 3.17s after the taps that
-    /// asked for it — so at 0.3s *neither* recorded burst animated at all.
+    /// of it.
     ///
-    /// Two seconds is chosen against that measurement rather than to cover it.
-    /// It clears the fast path — the 133–180ms the simulator measures, and the
-    /// 431ms the phone did — by more than 4x, so a fade that is lost now is
-    /// lost to something worth calling a bug. It deliberately does **not**
-    /// cover the multi-second case: that is #121, and a cross-fade played
-    /// three seconds after the thumb left the glass is not a report of what
-    /// just happened. The still frame is the honest render there.
+    /// **The value is bracketed by measurement from both sides**, which is why
+    /// it is 0.6 and not simply "bigger". Taken from an iPhone 14 Pro, iOS
+    /// 26.5.2, two placed week widgets, taps made by hand:
     ///
-    /// What `WidgetBurstTests.burstExpires` protects is untouched by the
-    /// change. The guard exists so a midnight rollover or an edit made in the
-    /// app cannot replay somebody's tap hours later, and two seconds is as
-    /// unable to do that as 0.3 was. The number that must stay small is
-    /// `duration`; this one only has to stay far below "later".
-    static let maximumLag: TimeInterval = 2.0
+    /// - **From below, 427ms.** That is the slowest reload that still arrived
+    ///   *promptly* — the fast path runs 45, 112, 138, 241, 325, 347, 378 and
+    ///   427ms. A lifetime under that throws away animations the system
+    ///   delivered on time, which is the bug this constant exists to fix.
+    /// - **From above, 798ms.** Under a flurry the week widget's provider runs
+    ///   again in waves, and the tightest gap between one wave and the next
+    ///   measured 798ms. A note still valid when the *second* wave arrives is
+    ///   a note that animates one tap twice — the same completion cross-fading
+    ///   in again a second later, which reads as a glitch rather than as a
+    ///   report.
+    ///
+    /// 0.6s is the geometric midpoint of those two bounds (584ms, rounded).
+    /// **The upper bound is the interesting one**: it says the note must not
+    /// simply be widened until it stops mattering, and it says so with a
+    /// number rather than with caution.
+    ///
+    /// It deliberately does not reach the multi-second case — 1.2s, 2.2s and
+    /// 3.2s all appear in the same traces. Those are #121, and a cross-fade
+    /// played seconds after the thumb left the glass is not a report of what
+    /// just happened; the still frame is the honest render there.
+    ///
+    /// What `WidgetBurstTests.burstExpires` protects is untouched. The guard
+    /// exists so a midnight rollover or an edit made in the app cannot replay
+    /// somebody's tap hours later, and 0.6s is as unable to do that as 0.3
+    /// was.
+    static let maximumLag: TimeInterval = 0.6
 
     /// The cross-fade, as the still frames a timeline carries: evenly spaced,
     /// linear, done. Offset is from the *start of the fade*; progress is 0
