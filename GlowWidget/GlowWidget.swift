@@ -120,7 +120,16 @@ struct WeekProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: SelectWeekLayoutIntent, in context: Context) async -> WeekEntry {
-        loadEntry(for: configuration)
+        let entry = loadEntry(for: configuration)
+        // Traced to answer one question the trace could not: whether the widget
+        // gallery's preview is stale because WidgetKit never asks us, or
+        // because it asks and then shows something older. `isPreview` is what
+        // separates the gallery's call from a placed widget's. Counts only, per
+        // `WidgetTrace`.
+        WidgetTrace.record(
+            "week snapshot: preview=\(context.isPreview), habits=\(entry.habits.count)"
+        )
+        return entry
     }
 
     /// One still entry and a midnight refresh — plus, after a tap, the few

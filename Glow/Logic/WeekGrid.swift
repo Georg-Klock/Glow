@@ -103,6 +103,20 @@ struct HabitSnapshot: Identifiable, Equatable, Sendable {
     /// A blank row held in the order to group the habits around it. Draws
     /// nothing and is never counted as due, done or missed.
     var isSpacer: Bool
+    /// The midnight this habit was made, or nil when that is not known.
+    ///
+    /// **A day before this is not a day that was missed** (#265). It used to be
+    /// absent here, so a week earlier than the habit drew a ✕ on every column —
+    /// the app asserting a failure on days when there was nothing to fail. A ✕
+    /// means "this became unavoidable" (#82), and nothing becomes unavoidable
+    /// before it is asked for.
+    ///
+    /// Nil is *unknown*, not *the beginning of time*: `Habit.createdAt` defaults
+    /// to `Habit.unknownCreation` for every row written before that column
+    /// existed, and #186 established that such a row must not be trusted to
+    /// bound anything. An unknown creation means every day is treated as after
+    /// it, which is exactly the behaviour that shipped before this existed.
+    var createdDay: Date?
 
     init(
         id: UUID,
@@ -110,7 +124,8 @@ struct HabitSnapshot: Identifiable, Equatable, Sendable {
         icon: String,
         frequency: Frequency,
         completionCounts: [Date: Int],
-        isSpacer: Bool = false
+        isSpacer: Bool = false,
+        createdDay: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -118,6 +133,14 @@ struct HabitSnapshot: Identifiable, Equatable, Sendable {
         self.frequency = frequency
         self.completionCounts = completionCounts
         self.isSpacer = isSpacer
+        self.createdDay = createdDay
+    }
+
+    /// Whether the habit existed on `day`. True when the creation day is
+    /// unknown — see `createdDay`.
+    func existed(on day: Date) -> Bool {
+        guard let createdDay else { return true }
+        return day >= createdDay
     }
 
     /// A habit whose days are done or not done, which is every weekly cadence.
@@ -211,11 +234,16 @@ enum WeekGrid {
             // nothing.
             let isRest = WeekPreferences.isRestDay(day, restDay: restDay, calendar: calendar)
 
+            // A day before the habit existed is `.inactive`, never `.missed`
+            // (#265): it draws the unlit dot a day still to come draws, which
+            // is the honest mark for a day nothing was ever asked of. The
+            // ordering matters — a completion still wins, because a day can
+            // carry one from an import or a store older than the column.
             let state: SlotState =
                 if isRest { .rest }
                 else if isDone { .filled }
                 else if isToday { .open }
-                else if day < today { .missed }
+                else if day < today { habit.existed(on: day) ? .missed : .inactive }
                 else { .inactive }
 
             // Which days carry an action is the surface's answer, not this

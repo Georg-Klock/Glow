@@ -43,12 +43,8 @@ enum GoalPopCentre {
         calendar: Calendar = WeekCalendar.calendar
     ) {
         let met = GoalMet.justMet(habit: habit, in: week)
-        // The routine line, and then the goal's — the tap that meets the goal
-        // has two things to say (#119). They share the two seconds rather than
-        // getting one each: a compact Island state has room for one short
-        // phrase, so "logged" hands over to "you did it" partway through.
-        let registers: [GoalPop.Register] = met ? [.logged, .goal] : [.logged]
-        let due = registers.filter { PopPreferences.allows($0) }
+        // One rule, shared with the app's own pop — see `GoalPop.registers`.
+        let due = GoalPop.registers(justMetGoal: met).filter { PopPreferences.allows($0) }
         guard let first = due.first else { return }
 
         pop(habitID: habit.id, name: habit.name, on: today, register: first, calendar: calendar)

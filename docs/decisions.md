@@ -4050,6 +4050,80 @@ So: `HabitStore.delete` deletes every row outright, spacer or habit; `HabitStore
 
 `Tests/SpacerIdentityTests.swift`, `Tests/SeedingTests.swift` and `Tests/PersistenceTests.swift` each carried an assertion of the old rule; all three now assert the new one and say in the test which way they were turned. Two new tests hold the parts that are easy to lose next time: that a deliberate blank row survives an add, and that a delete moves the rows below it up.
 
+## The two-tier grey retires; the default reads as Increase Contrast always did
+
+**2026-08-24.** #111 set one rule and #194 and #240 both nudged inside it without questioning it: the default grey stays dark enough to be unmistakably not-lit, and legible body text is what Increase Contrast is for. #240 said explicitly that the next report of "still unreadable" would be a request to move that rule rather than a fourth nudge inside it. It came the same day, against a reference screenshot of ordinary dark-mode secondary text — not a simulator capture, not another guess at a hex code — and the answer was to retire the rule rather than raise its ceiling again.
+
+`GlowPalette.greyOpaque` is now `greyIncreasedContrast`'s own value, `#8D8D8D` — not a new number. #111 asked, when it first collapsed the four-step ramp, whether a value already in the file meant what was wanted; #194 and #240 both answered that question by inventing a new point on the scale instead. This is the same question asked again, with the file's own accessibility value as the answer: the two tiers — dark by default, legible on request — collapse into one, because the setting's whole existence was arguing that the default should have been this bright from the start.
+
+**What moved, mechanically:**
+
+- `GlowPalette.greyOpaque = greyIncreasedContrast` — a reference, not a duplicated literal, so the two can never drift apart silently.
+- The `< 1.5:1` contrast ceiling in `Tests/WidgetBackgroundTests.swift` became an equality assertion (`greyOpaque == greyIncreasedContrast`) plus a `> 4.5:1` floor — the guardrail's shape flipped from "must stay dim" to "must stay legible," which is the honest way to record that the rule itself changed rather than just the number it was checking.
+- `RenderTests/RenderBaselineTests.swift`'s `flatTones` literal (`[43, 255]` → `[141, 255]`) and `RenderTests/WidgetRenderDiffTests.swift`'s grey band (`40...46` → `138...144`) both had to move by hand, on purpose — both are written as literals specifically so a palette change cannot silently agree with itself, and both caught real, working assertions that would otherwise have gone on checking for a colour nothing draws any more.
+- `isUnlit(_:beside:)` in `WidgetRenderDiffTests.swift` needed its own fix, not just a number: `value * 4 < lit` was calibrated for a grey near 43 against a lit level near 255 — comfortable margin at a 5.9:1 ratio. At 141 the ratio closes to 1.8:1, and `* 4` stopped holding for any real value (`141 * 4 = 564`, never less than a lit pixel). It is `value * 1.5 < lit` now, recomputed for the ratio that actually exists rather than carried over as a constant that quietly assumed the old one. This is the one place in the whole change where a bigger jump (98 levels, against #194's 13 and #240's 7) broke a mechanism outright rather than just moving a number inside it — worth remembering the next time a value this deep in the app moves by more than a nudge.
+- The committed render baseline (`RenderTests/Baselines/render-signatures.json`) moved and was approved, per `Tools/validate-test-result.py`'s own printed instruction — every family's picture genuinely looks different now, which is the point.
+
+**Tested at 509/509 after both fixes, not before either.** The first full run caught `flatTonesAreReal` failing on a stale literal test-writing hadn't yet reached; the second caught the render baseline needing re-approval against the corrected run rather than the one still carrying that bug. Both are recorded here rather than smoothed over, because a change this deep in the palette touching four files' worth of literals is exactly the shape of change where "it built" and "it is right" are different claims.
+
+## The pager reaches twelve weeks whether or not the record does
+
+**2026-08-24.** #186 settled that the reach is the record's and nothing else: a week before anything existed holds nothing to correct, so a fresh install could page nowhere. #259 widens that, and the entry above stays as the record of why the narrower rule existed.
+
+**The rule was right about the data and wrong about the control.** A back chevron that is present and does nothing reads as broken — it is the same complaint #242 fixed for a different cause, arrived at from the other direction. "There is nothing back there" is a thing the app can say by showing an empty week, and saying it that way is better than refusing to move.
+
+**It only became honest to say with #265.** Before that, a week earlier than a habit drew a ✕ on every column, so paging into one would have answered "nothing was logged here" with a wall of accusations. #265 makes such a week draw unlit dots, which is what an empty week should look like — so the two changes are one idea and #265 had to land first.
+
+**Twelve weeks is not a new number.** It is the cap #186 removed, turned around: it used to be the furthest the pager could reach and is now the least it always reaches. A quarter was argued then as about as much as a person still holds in mind, and that argument serves a floor as well as it served a ceiling. Reusing it also keeps the count of invented constants in this file where it was.
+
+`WeekReach.from` takes `min(recorded, floor)`, so the record still extends the reach and can never shorten it. A record starting in the future — a clock that went backwards, a sync from a device whose did — cannot pull the pager forward past the floor either, which the same `min` says without a second clause.
+
+**What moved in the tests, and it is most of the reviewable surface.** `noRecordNoReach` and `freshInstallHasNoReach` asserted the old rule directly and now assert the floor. `reachFollowsTheRecord` ran 0...11 and every one of those is now floored, so it is `shortRecordsAreFloored` and says so. `theDemoIsReachableEndToEnd` went from `==` to `>=`, which is the honest form of what it was always about: the demo must be reachable, not exactly reachable. `steppingBackStopsAtTheFloor` and `clampingBothEnds` had records shorter than the floor and now use longer ones, so the floor under test is still the record's own.
+
+The two Havana tests needed restating rather than renumbering. They are #242's property — that `earliest` is a normalized week start, so a comparison against a week start cannot disagree by an hour — and they asserted it by checking `earliest == thisWeek`, which was only true because the record was short. They now assert the property itself: that `earliest` normalizes to itself, sits on a midnight, contains the current week, and does not move when stepped back from. That is what those tests were for, and it no longer depends on where the floor happens to be.
+
+## The app pops too, reversing #103's silence
+
+**2026-08-24.** #103 settled that the app says nothing when a completion is logged inside it. The reasoning was sound and is unchanged: the Island does not render a Live Activity while its own app is in the foreground — measured, `Activity.request` succeeds and `chronod` subscribes a renderer with the right metrics, and the Island stays a plain pill until the app is backgrounded — so firing one from a tap in the app spent two seconds on nothing. #103's answer was to stop firing it and let the app's own acknowledgement stand: the ring closes, the label dims, the row goes quiet.
+
+**In use that reads as the app saying less the moment you are actually looking at it.** The pop is wanted every time, foreground included. So the app draws its own rather than asking the Island for one it will not show.
+
+`InAppPop` is the Live Activity's Lock Screen presentation, not a new design: the same mark, the same glowing line, the same habit name in grey, at the same `WidgetMetrics`. And `GoalPop.registers` — the rule that a routine log says one thing and the tap that meets the goal says two, in that order — moved out of `GoalPopCentre` so both surfaces read it. Two surfaces saying one thing the same way, and unable to drift on *what* is said.
+
+**It is an overlay, not a row in the stack, and that was the second attempt.** The first put the pill in the `VStack` above the grid, which pushed every row down for its two seconds — so the row that had just been tapped moved out from under the finger. Checking several habits off in a flurry is exactly what #272 says has to stay fast, and a layout shift per tap fights it. As an overlay nothing else on the screen moves at all.
+
+The cost is that the pill overlaps the weekday letters for its two seconds. That is the deliberate trade: the covered thing is a static header rather than the marks, and it comes back.
+
+**Not `privacySensitive`, unlike the Island and Lock Screen presentations** (#141). Those are readable by anyone holding the phone; this one is inside the app, already past the lock, and redacting a name shown in full on the row above would be theatre.
+
+One task, cancelled and replaced, for the same reason `PopWindow` guards the Island's: without it the first tap's dismissal fires two seconds after *its* tap and takes the second tap's pill with it.
+
+## The week widget drops its small family
+
+**2026-08-24.** `WidgetKind.week` offered small, medium and large. Small is gone (PR #277).
+
+Small was the only family that dropped the habit labels — `WeekWidgetView.showsLabels` was `family != .systemSmall` and nothing else ever hid them. So it drew the week's marks without saying what any row was: readable only by somebody who already knows their own habit order, and unreadable the moment the order changes. It said how much of the week was done without saying what of.
+
+#237 had already found the other half of the same problem from a different direction: Week-Small has no per-habit axis to vary a second gallery preview over, so the Widgets tab could only ever show one card of it, and that card was the medium's content at a smaller size.
+
+**Removing a family is not removing a kind** (#209). `GlowWidget` still serves `"GlowWidget"`, so a placed medium or large is untouched; a placed *small* stops being served. `WidgetCatalog` already drops a family a kind does not support — `unsupportedFamilyIsIgnored` — so the Widgets tab says nothing about one rather than showing a row it cannot explain.
+
+`showsLabels` is now `true` and stays a computed property rather than being inlined, so the two metrics beside it still read as a pair and restoring a label-less family is one line.
+
+Six tests encoded the three-family week and now encode two: the catalog's shape, the per-family independence pair, the page's order and titles, the querier seam, the per-size card count, and the placement-not-preview rule. The render suite lost its `week small` frame and the committed baseline lost that entry with it; `GlowRenderTests` still reports 13, because the frames are data inside the tests rather than tests of their own, so no floor in `Tools/test-inventory.json` moved.
+
+## Two issue numbers were invented, and both were wrong
+
+**2026-08-24.** Two pieces of work landed today with no issue behind them: the app drawing its own pop, and the week widget dropping its small family. Both were asked for directly rather than filed, and both were written up citing `#273` and `#274` — numbers picked by counting forward from the last one that existed.
+
+**Neither number was free by the time the work merged.** Issues filed while the work was in progress took both: `#273` is "The Widgets tab previews the Default background only, never Tinted or Clear glass" and `#274` is "Two Small widget previews should sit side by side". So every cross-reference in the code, `SPEC.md` and the two entries above pointed at unrelated requests.
+
+**And #274 was closed by it.** The Week-Small pull request said "Closes #274", which GitHub honoured — an open request of Georg's was closed by a change that has nothing to do with it. Reopened, with a note saying why it went.
+
+The references now point at the pull requests that actually did the work, `PR #275` and `PR #277`. That is the honest target: a merged PR is a permanent record of the change, and it cannot collide with a number somebody else is about to use.
+
+**The rule this produces: never cite an issue number that does not exist yet.** If work has no issue, either file one first and use the number it is given, or cite the change itself. Counting forward from the highest number seen is guessing at a value another process is allocating, and it fails silently — the reference reads perfectly and points at the wrong thing.
+
 ## A widget's rows are its own, and the app's line narrows (#188)
 
 The week widget mirrored the app's habit order and had no way not to. #172

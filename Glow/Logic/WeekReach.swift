@@ -7,13 +7,31 @@ import Foundation
 /// there are to visit — and it is a separate question from `SlotEditing`, which
 /// stays a fact about the surface rather than about which week is on screen.
 ///
-/// **The reach is the record's, and that is the whole rule** (#186). A week
-/// before anything existed holds nothing to correct, so a fresh install can
-/// page nowhere, which is the truth about it; the reach grows as the app's own
-/// history does. `Habit.createdAt` alone would not do — demo history invents
-/// completions ten weeks before the habits that carry them — so the record's
-/// start is the earlier of the first completion and the first habit, taken by
-/// `HabitStore.earliestRecordedDay`.
+/// **The reach is the record's, or twelve weeks, whichever is further back**
+/// (#186, widened by #259).
+///
+/// #186's rule was that the reach is the record's and nothing else: a week
+/// before anything existed holds nothing to correct, so a fresh install could
+/// page nowhere. That was true about the *data* and wrong about the *control* —
+/// a back chevron that is present and does nothing reads as broken, and "there
+/// is nothing back there" is a thing the app can say by showing an empty week
+/// rather than by refusing to move.
+///
+/// Saying it that way only became honest with #265. Before it, a week earlier
+/// than a habit drew a ✕ on every column, so paging into one would have
+/// answered "nothing was logged" with a wall of accusations. Now such a week
+/// draws unlit dots, which is what an empty week should look like.
+///
+/// **Twelve weeks is not a new number.** It is the cap #186 removed, turned
+/// around: it used to be the furthest the pager could reach and is now the
+/// least it always reaches. A quarter was argued then as the span a person can
+/// still hold in mind, and that argument is as good for a floor as it was for
+/// a ceiling.
+///
+/// The record still extends it. `Habit.createdAt` alone would not do — demo
+/// history invents completions ten weeks before the habits that carry them —
+/// so the record's start is the earlier of the first completion and the first
+/// habit, taken by `HabitStore.earliestRecordedDay`.
 ///
 /// **It was capped at twelve weeks until #186, and the argument for the cap is
 /// kept rather than deleted**, because it had two halves and they are not the
@@ -61,20 +79,33 @@ struct WeekReach: Equatable, Sendable {
     /// The oldest week the view may show. Never after `latest`.
     let earliest: Date
 
-    /// The reach for a record that starts at `recordStart`, or no reach at all
-    /// when there is no record.
+    /// How far back the pager reaches regardless of the record (#259).
+    ///
+    /// Twelve weeks: the cap #186 removed, turned into a floor. See the note
+    /// above for why the same number serves both.
+    static let minimumWeeks = 12
+
+    /// The reach for a record that starts at `recordStart`.
     ///
     /// `recordStart` is the earliest day anything is known about: the first
     /// completion on record, or the first habit's creation where that is a date
     /// rather than the unknown-creation sentinel, whichever is earlier. Nil for
-    /// an empty store, and for one that holds nothing but sentinels.
+    /// an empty store, and for one that holds nothing but sentinels — which
+    /// since #259 still reaches `minimumWeeks` back rather than nowhere.
     static func from(
         recordStart: Date?,
         today: Date,
         calendar: Calendar = WeekCalendar.calendar
     ) -> WeekReach {
         let latest = WeekCalendar.startOfWeek(containing: today, calendar: calendar)
-        guard let recordStart else { return WeekReach(latest: latest, earliest: latest) }
+        // Day arithmetic rather than `weekOfYear`, for the reason `step` gives:
+        // a DST transition makes one day 23 or 25 hours long, and a span added
+        // as anything but whole days can land on the wrong midnight.
+        let floorDay = calendar.date(
+            byAdding: .day, value: -7 * minimumWeeks, to: latest
+        ) ?? latest
+        let floor = WeekCalendar.startOfWeek(containing: floorDay, calendar: calendar)
+        guard let recordStart else { return WeekReach(latest: latest, earliest: floor) }
 
         // **Both floors are week starts, and normalizing this one is
         // load-bearing** (#242). An `earliest` that is not a week start is
@@ -85,10 +116,11 @@ struct WeekReach: Equatable, Sendable {
         // `max` against was normalized for exactly that reason; the cap is gone
         // and the normalization is not.
         let recorded = WeekCalendar.startOfWeek(containing: recordStart, calendar: calendar)
-        // Never past the current week: a record that starts in the future — a
-        // demo, a sync, a clock that went backwards — leaves the pager exactly
-        // where it already is.
-        return WeekReach(latest: latest, earliest: min(latest, recorded))
+        // The record extends the floor and never shortens it, and a record that
+        // starts in the future — a demo, a sync, a clock that went backwards —
+        // cannot pull the pager forward past the floor either. `min` of the two
+        // says both at once.
+        return WeekReach(latest: latest, earliest: min(recorded, floor))
     }
 
     /// Whether a week starting on `weekStart` is one the view may show.

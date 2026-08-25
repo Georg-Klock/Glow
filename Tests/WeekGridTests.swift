@@ -403,3 +403,130 @@ struct WeekGridTests {
         #expect(row.allSatisfy { !$0.isTappable })
     }
 }
+
+/// #265: a habit draws no mark of failure for a week it did not live in.
+///
+/// The reported shape was a habit created today showing seven ✕ across last
+/// week — the app asserting seven missed days on days when there was nothing
+/// to miss. `SlotState.missed` means "this became unavoidable" (#82), and
+/// nothing becomes unavoidable before it is asked for.
+@Suite("Before a habit existed")
+struct BeforeCreationTests {
+    private let calendar = TestCalendar.monday
+    /// Wednesday of the week beginning Monday 2026-08-17.
+    private var week: Week {
+        WeekCalendar.week(containing: TestCalendar.date(2026, 8, 19), calendar: calendar)
+    }
+    private func day(_ column: Int) -> Date { week.days[column] }
+
+    private func slots(createdColumn: Int?, todayColumn: Int = 4) -> [Slot] {
+        let habit = HabitSnapshot(
+            id: UUID(), name: "New", icon: "star", frequency: .daily,
+            completionCounts: [:], isSpacer: false,
+            createdDay: createdColumn.map { day($0) }
+        )
+        return WeekGrid.slots(
+            for: habit, in: week, today: day(todayColumn),
+            editing: .week(allowingFuture: false), restDay: nil, calendar: calendar
+        )
+    }
+
+    @Test("A day before the habit existed is unlit, not missed")
+    func daysBeforeCreationAreInactive() {
+        // Created Wednesday, today Friday. Monday and Tuesday are past days the
+        // habit was not alive for; Wednesday and Thursday are past days it was.
+        let row = slots(createdColumn: 2)
+        #expect(row[0].state == .inactive, "Monday: \(row[0].state)")
+        #expect(row[1].state == .inactive, "Tuesday: \(row[1].state)")
+        #expect(row[2].state == .missed, "Wednesday: \(row[2].state)")
+        #expect(row[3].state == .missed, "Thursday: \(row[3].state)")
+        #expect(row[4].state == .open, "today: \(row[4].state)")
+    }
+
+    /// The mark, not just the state — an unlit dot is what #265 asked for.
+    @Test("Those days draw the same unlit dot a day still to come draws")
+    func theyDrawAnUnlitDot() {
+        let row = slots(createdColumn: 2)
+        #expect(row[0].mark == .upcoming)
+        #expect(row[1].mark == .upcoming)
+        #expect(row[5].mark == .upcoming, "a day still to come draws the same")
+        #expect(row[2].mark == .missed)
+    }
+
+    /// A whole week before the habit: nothing on the row claims anything.
+    @Test("A week entirely before the habit has no misses in it")
+    func awholeWeekBeforeIsClean() {
+        // Created after this week ends, today later still.
+        let later = TestCalendar.date(2026, 8, 31)
+        let habit = HabitSnapshot(
+            id: UUID(), name: "New", icon: "star", frequency: .daily,
+            completionCounts: [:], isSpacer: false, createdDay: later
+        )
+        let row = WeekGrid.slots(
+            for: habit, in: week, today: later,
+            editing: .week(allowingFuture: false), restDay: nil, calendar: calendar
+        )
+        #expect(row.allSatisfy { $0.state == .inactive })
+        #expect(row.allSatisfy { $0.mark == .upcoming })
+    }
+
+    /// An unknown creation date means *unknown*, so nothing changes for it —
+    /// the pre-#265 behaviour, kept for every row written before the column
+    /// existed (#186).
+    @Test("A habit with no known creation still misses as it always did")
+    func unknownCreationIsUnchanged() {
+        let row = slots(createdColumn: nil)
+        #expect(row[0].state == .missed)
+        #expect(row[3].state == .missed)
+    }
+
+    /// A completion still wins, wherever it came from — an import, or a store
+    /// older than the column.
+    @Test("A completion before the creation date is still drawn")
+    func completionsOutrankTheCreationDate() {
+        let habit = HabitSnapshot(
+            id: UUID(), name: "New", icon: "star", frequency: .daily,
+            completionCounts: [day(0): 1], isSpacer: false, createdDay: day(2)
+        )
+        let row = WeekGrid.slots(
+            for: habit, in: week, today: day(4),
+            editing: .week(allowingFuture: false), restDay: nil, calendar: calendar
+        )
+        #expect(row[0].state == .filled)
+    }
+
+    /// The span rows, whose ✕ comes from `lost` rather than from a past day.
+    @Test("A span row draws one unlit span for a week before the habit")
+    func spanRowsAreOneInactiveSpan() {
+        let later = TestCalendar.date(2026, 8, 31)
+        let habit = HabitSnapshot(
+            id: UUID(), name: "New", icon: "star", frequency: .timesPerWeek(3),
+            completionCounts: [:], isSpacer: false, createdDay: later
+        )
+        let spans = WeekSpans.spans(
+            for: habit, in: week, today: later, target: 3,
+            editing: .week(allowingFuture: false), restDay: nil, calendar: calendar
+        )
+        #expect(spans.count == 1)
+        #expect(spans[0].state == .inactive)
+        #expect(spans[0].firstDay == 0 && spans[0].lastDay == 6)
+        #expect(spans[0].actionDay == nil)
+        #expect(!spans.contains { $0.state == .missed })
+    }
+
+    /// And a span row the habit *did* live through is untouched.
+    @Test("A span row in a week the habit lived through still loses reps")
+    func spanRowsAreOtherwiseUnchanged() {
+        let later = TestCalendar.date(2026, 8, 31)
+        let habit = HabitSnapshot(
+            id: UUID(), name: "Old", icon: "star", frequency: .timesPerWeek(3),
+            completionCounts: [:], isSpacer: false, createdDay: day(0)
+        )
+        let spans = WeekSpans.spans(
+            for: habit, in: week, today: later, target: 3,
+            editing: .week(allowingFuture: false), restDay: nil, calendar: calendar
+        )
+        #expect(spans.count == 3)
+        #expect(spans.contains { $0.state == .missed })
+    }
+}

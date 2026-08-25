@@ -33,12 +33,12 @@ struct WidgetPlacementTests {
         }
     }
 
-    /// The catalog is the gallery's list, so the week's three sizes are three
-    /// entries and not one.
-    @Test("The week is three placeable widgets, the month one")
-    func weekIsThreeWidgets() {
+    /// The catalog is the gallery's list, so the week's two sizes are two
+    /// entries and not one. **It was three until PR #277 dropped Week-Small.**
+    @Test("The week is two placeable widgets, the month one")
+    func weekIsTwoWidgets() {
         let week = WidgetCatalog.all.filter { $0.kind == .week }
-        #expect(week.map(\.family) == [.systemSmall, .systemMedium, .systemLarge])
+        #expect(week.map(\.family) == [.systemMedium, .systemLarge])
         #expect(WidgetCatalog.all.filter { $0.kind == .month }.map(\.family) == [.systemSmall])
     }
 
@@ -57,20 +57,21 @@ struct WidgetPlacementTests {
     }
 
     /// Two sizes of one kind, placed, are two "Added" marks and not four.
+    /// **The week's small was one of these until PR #277 removed the family**, so
+    /// the pair is now medium and large.
     @Test("Each family answers for itself")
     func familiesAreIndependent() {
         let cards = WidgetCatalog.cards(placed: [
-            PlacedWidget(kind: .week, family: .systemSmall),
+            PlacedWidget(kind: .week, family: .systemMedium),
             PlacedWidget(kind: .week, family: .systemLarge),
             PlacedWidget(kind: .month, family: .systemSmall),
         ])
         let placed = Set(cards.filter(\.isPlaced).map(\.placement))
         #expect(placed == [
-            WidgetPlacement(kind: .week, family: .systemSmall),
+            WidgetPlacement(kind: .week, family: .systemMedium),
             WidgetPlacement(kind: .week, family: .systemLarge),
             WidgetPlacement(kind: .month, family: .systemSmall),
         ])
-        #expect(cards.first { $0.placement.family == .systemMedium }?.isPlaced == false)
     }
 
     @Test("Two of the same size are still one Added")
@@ -135,8 +136,9 @@ struct WidgetPlacementTests {
     func orderFollowsTheCatalog() {
         let cards = WidgetCatalog.cards(placed: [])
         #expect(cards.map(\.placement) == WidgetCatalog.all)
+        // "This Week, Small" was the first of these until PR #277.
         #expect(cards.map(\.placement.title) == [
-            "This Week, Small", "This Week, Medium", "This Week, Large",
+            "This Week, Medium", "This Week, Large",
             "This Month, Small",
         ])
     }
@@ -145,10 +147,10 @@ struct WidgetPlacementTests {
 
     @Test("The diff is whatever the querier reports")
     func queriedPlacementsFeedTheDiff() async throws {
-        let stub = StubPlacements(reported: [PlacedWidget(kind: .week, family: .systemSmall)])
+        let stub = StubPlacements(reported: [PlacedWidget(kind: .week, family: .systemMedium)])
         let cards = WidgetCatalog.cards(placed: try await stub.placedWidgets())
         #expect(cards.filter(\.isPlaced).map(\.placement)
-            == [WidgetPlacement(kind: .week, family: .systemSmall)])
+            == [WidgetPlacement(kind: .week, family: .systemMedium)])
     }
 
     /// "We could not ask" must not render as "you have no widgets". The view
@@ -237,8 +239,10 @@ struct WidgetPlacementTests {
         let counts = week.map(\.cards.count)
         let previewed: [UUID?] = week.flatMap(\.cards).map(\.habitID)
         #expect(week.map(\.placement.family) == WidgetKind.week.families)
-        #expect(counts == [1, 1, 1])
-        #expect(previewed == [nil, nil, nil])
+        // Two families since PR #277, not three. Compared against
+        // `WidgetKind.week.families` above, so this pair moves with it.
+        #expect(counts == [1, 1])
+        #expect(previewed == [nil, nil])
     }
 
     /// "Added" answers for the Home Screen, and the Home Screen knows nothing
@@ -255,7 +259,7 @@ struct WidgetPlacementTests {
         #expect(month.isPlaced)
         #expect(month.cards.count == 3)
         #expect(month.cards.map(\.isPlaced) == [true, true, true])
-        #expect(weekPlacement == [false, false, false])
+        #expect(weekPlacement == [false, false])
     }
 
     /// `ForEach` draws one row per id: two cards sharing one is a preview that

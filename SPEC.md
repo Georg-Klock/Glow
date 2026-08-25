@@ -597,10 +597,17 @@ given room, which stays a matter of looking at it.
 ## 9. The widgets
 
 Two widgets, reading the same store through an App Group. They were three
-until #209. Four placeable configurations, since the week's three families are
-added independently — which is the unit the Widgets tab counts in.
+until #209. Three placeable configurations, since the week's two families are
+added independently — which is the unit the Widgets tab counts in. It was four
+until PR #277 dropped Week-Small.
 
-**The week widget**: three families. Today's slot is a button backed by an
+**The week widget**: two families, medium and large. **Small was one of them
+and is gone** (PR #277) — it drew the same habits with the labels dropped, so it
+said how much of the week was done without saying what of, and a size only
+legible to somebody who already knows their own row order is not a size worth
+offering. Removing a family is not removing a kind (#209): `GlowWidget` serves
+the same kind string, so a placed medium or large is untouched and a placed
+small stops being served. Today's slot is a button backed by an
 `AppIntent`, so a habit can be logged from the home screen without launching
 the app. Past days are not buttons here even though the app's own grid now
 edits them: a widget is a glance and a single confirmed action, and it has no
@@ -652,13 +659,12 @@ days get no month-specific treatment beyond what `WeekGrid` already says
 about them.
 
 **The Widgets tab is where they are found from inside the app** (#210). It
-shows every widget this app ships — the week at all three families, the month
+shows every widget this app ships — the week at both its families, the month
 at its one — drawn by `WeekWidgetView` and `MonthWidgetView` themselves rather
 than illustrated, at the point size each family really gets, over the user's
 own habits. Each one says whether it is already on the Home Screen, and
-**"added" means that family**: the week's small, medium and large are three
-independently placeable widgets, and having one says nothing about the other
-two. `WidgetCenter` is asked fresh whenever the app becomes active, because
+**"added" means that family**: the week's medium and large are two
+independently placeable widgets, and having one says nothing about the other. `WidgetCenter` is asked fresh whenever the app becomes active, because
 placing a widget happens while the app is not frontmost.
 
 **The page is names, sizes and widgets** (#237). No kind carries an explaining
@@ -679,8 +685,9 @@ seeded habits would make that one section longer than the rest of the page. The
 week is one preview per size at every size: it already shows every habit at
 once, so "which one is this" is not a question it asks. Zero weekly habits is
 still one card, drawing the widget's own empty state — what adding it today
-would actually get you. Week-Small is left alone until #188 gives it a per-habit
-axis to vary over; without one, a second card would be the first card again.
+would actually get you. The clause that kept Week-Small to a single card — it
+had no per-habit axis to vary a second one over until #188 gave it one — went
+with the family itself (PR #277).
 
 The previews are of *unconfigured* widgets, which is the same narrowing the
 grid's boundary hairline took (#188). They draw the app's own list because
