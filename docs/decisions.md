@@ -4098,3 +4098,17 @@ The cost is that the pill overlaps the weekday letters for its two seconds. That
 **Not `privacySensitive`, unlike the Island and Lock Screen presentations** (#141). Those are readable by anyone holding the phone; this one is inside the app, already past the lock, and redacting a name shown in full on the row above would be theatre.
 
 One task, cancelled and replaced, for the same reason `PopWindow` guards the Island's: without it the first tap's dismissal fires two seconds after *its* tap and takes the second tap's pill with it.
+
+## The week widget drops its small family
+
+**2026-08-24.** `WidgetKind.week` offered small, medium and large. Small is gone (#274).
+
+Small was the only family that dropped the habit labels — `WeekWidgetView.showsLabels` was `family != .systemSmall` and nothing else ever hid them. So it drew the week's marks without saying what any row was: readable only by somebody who already knows their own habit order, and unreadable the moment the order changes. It said how much of the week was done without saying what of.
+
+#237 had already found the other half of the same problem from a different direction: Week-Small has no per-habit axis to vary a second gallery preview over, so the Widgets tab could only ever show one card of it, and that card was the medium's content at a smaller size.
+
+**Removing a family is not removing a kind** (#209). `GlowWidget` still serves `"GlowWidget"`, so a placed medium or large is untouched; a placed *small* stops being served. `WidgetCatalog` already drops a family a kind does not support — `unsupportedFamilyIsIgnored` — so the Widgets tab says nothing about one rather than showing a row it cannot explain.
+
+`showsLabels` is now `true` and stays a computed property rather than being inlined, so the two metrics beside it still read as a pair and restoring a label-less family is one line.
+
+Six tests encoded the three-family week and now encode two: the catalog's shape, the per-family independence pair, the page's order and titles, the querier seam, the per-size card count, and the placement-not-preview rule. The render suite lost its `week small` frame and the committed baseline lost that entry with it; `GlowRenderTests` still reports 13, because the frames are data inside the tests rather than tests of their own, so no floor in `Tools/test-inventory.json` moved.

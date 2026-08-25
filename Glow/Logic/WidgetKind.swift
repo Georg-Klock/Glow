@@ -37,9 +37,20 @@ enum WidgetKind: String, CaseIterable, Sendable {
     /// are what a second list eventually produces.
     var families: [WidgetFamily] {
         switch self {
-        // Small, medium and large, each independently placeable: three widgets
-        // as far as the Home Screen is concerned, from one kind.
-        case .week: [.systemSmall, .systemMedium, .systemLarge]
+        // Medium and large, each independently placeable. **Small was here and
+        // is gone** (#274): it drew the same habits with the labels dropped,
+        // so it said how much of the week was done without saying what of —
+        // and #237 had already found it had no per-habit axis to vary a
+        // second preview over. A size that can only be read by someone who
+        // already knows the row order is not a size worth offering.
+        //
+        // Removing a family is not removing a kind (#209): `GlowWidget` still
+        // serves the same kind string, so a placed medium or large is
+        // untouched, and a placed *small* stops being served. `WidgetCatalog`
+        // already drops a family a kind does not support — see
+        // `unsupportedFamilyIsIgnored` — so the Widgets tab says nothing about
+        // one rather than showing a row it cannot explain.
+        case .week: [.systemMedium, .systemLarge]
         // Small only, deliberately — see `MonthWidget`.
         case .month: [.systemSmall]
         }
