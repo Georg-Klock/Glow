@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Glow
 
-/// Which rows a configured week widget draws, and in what order (#188).
+/// Which rows a configured week widget draws (#188).
 ///
 /// The half of this feature that is a decision rather than a fetch or a
 /// layout. Every case below is about a configuration outliving the store it
@@ -38,11 +38,34 @@ struct WidgetRowsTests {
         #expect(WidgetRows.rows(from: all, chosen: []) == all)
     }
 
-    @Test("The configured order is the drawn order")
-    func orderIsTheConfiguration() {
+    @Test("The app's order is the drawn order, whatever order was chosen in")
+    func orderIsTheApps() {
+        // **The selection does carry an order and it is deliberately dropped**
+        // (#191). Measured on an iPhone 14 Pro: WidgetKit hands the array back
+        // in the sequence the rows were tapped, so this could have been the
+        // configuration's order. It is not, because the system's picker draws
+        // checkmarks — an order chosen there is invisible while it is being
+        // chosen and unfixable afterwards without clearing every row. See
+        // `WidgetRows`.
         let all = appOrder()
         let chosen = [all[4].id, all[0].id, all[3].id]
-        #expect(WidgetRows.rows(from: all, chosen: chosen).map(\.name) == ["Read", "Workout", "Study"])
+        #expect(WidgetRows.rows(from: all, chosen: chosen).map(\.name) == ["Workout", "Study", "Read"])
+    }
+
+    @Test("The same selection draws the same rows however it was tapped")
+    func tapOrderIsNotRemembered() {
+        // The property the one above asserts by example, asserted as a
+        // property: this is what stops a widget quietly reordering itself by
+        // gesture history.
+        let all = appOrder()
+        let ids = [all[4].id, all[0].id, all[3].id]
+        let orderings = [
+            [ids[0], ids[1], ids[2]],
+            [ids[2], ids[1], ids[0]],
+            [ids[1], ids[2], ids[0]],
+        ]
+        let drawn = orderings.map { WidgetRows.rows(from: all, chosen: $0).map(\.name) }
+        #expect(Set(drawn).count == 1, "the tap order changed what was drawn: \(drawn)")
     }
 
     @Test("A blank row is chosen and placed like any other row")
@@ -53,7 +76,9 @@ struct WidgetRowsTests {
         let spacer = all[2]
         let chosen = [all[3].id, spacer.id, all[0].id]
         let rows = WidgetRows.rows(from: all, chosen: chosen)
-        #expect(rows.map(\.name) == ["Study", "", "Workout"])
+        // The app's order, so the blank row sits where the app has it —
+        // between Workout and Study — rather than where it was tapped.
+        #expect(rows.map(\.name) == ["Workout", "", "Study"])
         #expect(rows.map(\.isSpacer) == [false, true, false])
     }
 

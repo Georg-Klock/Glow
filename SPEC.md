@@ -618,16 +618,29 @@ Rows are as many as fit, then a hard cut — no "+N more" row, per
 docs/vision.md: a row spent saying how much is missing is a row not showing a
 habit. The app's own grid marks the boundary, where there is room to say it.
 
-**Which rows, and in what order, is a per-widget choice.** All three families
-offer it. The picker lists every week-shaped row in the app's order —
+**Which rows is a per-widget choice; the order is always the app's.** Both
+families offer it. The picker lists every week-shaped row in the app's order —
 including the blank rows, labelled "Blank Row", which the month widget's
-picker excludes — and the widget draws the chosen ones in the chosen order.
-A widget nobody has configured keeps the app's own order exactly, which is
-what every widget already placed does after this ships. A chosen row that has
-since been deleted is dropped rather than held as a gap; a widget whose every
-chosen row is gone shows the empty state rather than silently becoming
-someone else's first rows. `WidgetRows` decides all of that and is where the
-rules are tested.
+picker excludes — and the widget draws the chosen ones **in the app's order**,
+whatever order they were chosen in. A widget nobody has configured keeps the
+whole of the app's list, which is what every widget already placed does after
+this ships. A chosen row that has since been deleted is dropped rather than
+held as a gap; a widget whose every chosen row is gone shows the empty state
+rather than silently becoming someone else's first rows. `WidgetRows` decides
+all of that and is where the rules are tested.
+
+**The order is dropped deliberately, not for want of one.** #188 asked for
+"which habits and in what order", and the ordering half turned out to be
+available: measured on an iPhone 14 Pro, WidgetKit hands an array-of-entity
+parameter to the provider **in the sequence the rows were tapped** (#191). It
+is not used, because the system's picker draws checkmarks — no handles, no
+numbers, no edit mode, on hardware as in the simulator — so an order carried
+out of it is a side effect of the sequence somebody happened to tap in:
+invisible while choosing, unexplained afterwards, and unfixable without
+clearing every row and re-tapping. #172's actual complaint, a blank row landing
+on the medium widget's cut, is answered by *which* rows alone. A real ordering
+surface would be the in-app screen #188 names as its fallback, where the order
+would be visible while being chosen.
 
 The hard cut is unchanged and is not configurable: a medium widget shows five
 rows and a person configuring six gets the first five. There is no per-family

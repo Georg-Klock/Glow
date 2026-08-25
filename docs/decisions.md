@@ -4187,3 +4187,26 @@ This still ships, and the reason is the fallback rule rather than optimism:
 empty and nil both mean the app's own order, so a widget that cannot receive its
 configuration draws exactly what it drew before this change. The failure mode is
 invisible, which is the property that makes an open question safe to merge past.
+
+## An array-of-entity widget parameter arrives, and it is ordered — and the order is dropped
+
+**2026-08-25.** #191 asked two things about `@Parameter var rows: [WeekRowEntity]?`: whether it reaches the timeline provider at all, and whether it carries an order. A simulator said no to the first and could not answer the second. A phone says yes to both.
+
+iPhone 14 Pro, iOS 26.5.2, three rows selected through the system's own Edit Widget sheet:
+
+```
+week query resolve 3 id(s) -> 334920AF-…,1E23A402-…,465AF651-…
+week timeline: rows=3
+```
+
+**It arrives.** `rows=3`, non-empty, and `WeekRowQuery.entities(for:)` ran inside the extension — which it never once did across four reloads in the simulator. The simulator's empty array was the stale-configuration artifact this file already records for chronod, not a platform limit. That is the second time a per-widget configuration question has been unanswerable in a simulator and settled in one gesture on hardware; `MonthWidgetConfig` records the first.
+
+**And it is ordered by the sequence the rows were tapped.** `entities(for:)` traces the identifiers as asked, and the row tapped first came back first — putting the app's own first habit second in the resolved array. An unordered multi-select would have handed back the suggested order.
+
+**The order is nonetheless dropped, and that is the decision.** `WidgetRows.rows(from:chosen:)` walks the app's list and filters it, rather than walking the choice; `entities(for:)` does the same so the sheet's summary reads the way the widget draws.
+
+The reason is that the control cannot express an order. The picker draws **checkmarks, not positions** — confirmed on hardware as well as in the simulator, no handles, no numbers, no edit mode. So an order carried out of it is gesture history: invisible while it is being made, unexplained afterwards, and unfixable without clearing every row and re-tapping in sequence. A widget that quietly reorders itself according to which checkbox somebody hit first is worse than one that matches the app, and #172's actual complaint — the app's clustering putting a blank row on the medium widget's cut — is answered by *which* rows alone.
+
+**So #188 ships as half of what it asked for, on purpose.** The other half is not blocked by the platform; it is waiting for a surface that can show an order while it is being chosen, which is the in-app screen #188 already names as its fallback. `WidgetRows.rows` takes `[UUID]?` and does not care which surface supplies it.
+
+**The baseline gained one frame and moved nothing.** `week medium configured` is the only committed render with a blank row in it, and it now also pins this decision: the fixture chooses four rows in an order that is not the app's, and the frame draws Workout, blank, Study, Touch Grass — the app's. `month small`, `week large` and `week medium` are bit-identical to `main`'s.

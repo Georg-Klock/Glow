@@ -534,13 +534,18 @@ struct WidgetRenderDiffTests {
 
     // MARK: - A configured widget (#188)
 
-    @Test("A configured widget draws the rows it was given, in that order")
-    func configuredRowsAreDrawnInOrder() throws {
-        // The claim `WidgetRowsTests` cannot make: that the chosen order
-        // reaches the *pixels*, rather than only the array. Two daily habits
-        // logged on different days, so which row is which is readable off the
-        // render without reading any text — Alpha is lit on Monday and missed
-        // on Wednesday, Beta is the mirror image.
+    @Test("A configured widget draws the chosen rows in the app's order")
+    func configuredRowsAreDrawnInTheAppsOrder() throws {
+        // The claim `WidgetRowsTests` cannot make: that the selection filters
+        // the *pixels* without reordering them. Two daily habits logged on
+        // different days, so which row is which is readable off the render
+        // without reading any text — Alpha is lit on Monday and missed on
+        // Wednesday, Beta is the mirror image.
+        //
+        // The chosen order below is deliberately the reverse of the app's, and
+        // it is an order the system really can deliver: #191 measured on an
+        // iPhone 14 Pro that WidgetKit hands the array back in tap order. So
+        // this asserts a decision, not a platform limit — see `WidgetRows`.
         let week = WeekCalendar.week(containing: WeekCalendar.day(Date()))
         func habit(_ name: String, done: [Int]) -> HabitSnapshot {
             HabitSnapshot(
@@ -554,12 +559,13 @@ struct WidgetRenderDiffTests {
             id: UUID(), name: "", icon: "", frequency: .daily,
             completedDays: [], isSpacer: true
         )
-        // The app's own order, deliberately not the one asked for: if the
-        // widget were still mirroring the store, every assertion below would
-        // land on the wrong row.
+        // The app's own order is Beta, blank, Alpha. The choice asks for the
+        // reverse and gets the app's order anyway; if tap order were still
+        // reaching the render, every assertion below would land on the wrong
+        // row.
         let all = [beta, spacer, alpha]
         let rows = WidgetRows.rows(from: all, chosen: [alpha.id, spacer.id, beta.id])
-        #expect(rows.map(\.name) == ["Alpha", "", "Beta"])
+        #expect(rows.map(\.name) == ["Beta", "", "Alpha"])
 
         // Friday, so Monday and Wednesday are both behind it and both readable.
         let entry = WeekEntry(date: week.days[4], week: week, habits: rows)
@@ -571,14 +577,14 @@ struct WidgetRenderDiffTests {
             try withoutHalo {
                 let pixels = try rgba(of: try render(entry))
 
-                #expect(brightest(atColumn: columnCentre(0), row: 0, in: pixels) > 150,
-                        "row 0 is not Alpha: nothing lit on Monday")
-                #expect(brightest(atColumn: columnCentre(2), row: 0, in: pixels) < 150,
-                        "row 0 is lit on Wednesday, which is Beta's day")
-                #expect(brightest(atColumn: columnCentre(2), row: 2, in: pixels) > 150,
-                        "row 2 is not Beta: nothing lit on Wednesday")
-                #expect(brightest(atColumn: columnCentre(0), row: 2, in: pixels) < 150,
-                        "row 2 is lit on Monday, which is Alpha's day")
+                #expect(brightest(atColumn: columnCentre(2), row: 0, in: pixels) > 150,
+                        "row 0 is not Beta: nothing lit on Wednesday")
+                #expect(brightest(atColumn: columnCentre(0), row: 0, in: pixels) < 150,
+                        "row 0 is lit on Monday — the tap order reached the render")
+                #expect(brightest(atColumn: columnCentre(0), row: 2, in: pixels) > 150,
+                        "row 2 is not Alpha: nothing lit on Monday")
+                #expect(brightest(atColumn: columnCentre(2), row: 2, in: pixels) < 150,
+                        "row 2 is lit on Wednesday — the tap order reached the render")
 
                 // The blank row draws nothing — no socket, no cross, no dot —
                 // in any column but the rest day's, where the cut crosses it.

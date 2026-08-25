@@ -2,7 +2,7 @@ import AppIntents
 import Foundation
 import SwiftData
 
-/// The week widget's configuration: which rows it shows, and in what order.
+/// The week widget's configuration: which rows it shows.
 ///
 /// In the shared sources for the same load-bearing reason as
 /// `MonthWidgetConfig`: the system consolidates AppIntents metadata under the
@@ -40,14 +40,18 @@ struct WeekRowEntity: AppEntity, Identifiable {
 struct WeekRowQuery: EntityQuery {
     func entities(for identifiers: [UUID]) async throws -> [WeekRowEntity] {
         let all = try await suggestedEntities()
-        // Resolved **in the order asked for**, not in the store's order. This
-        // query is the only place the configuration's order can survive: the
-        // system hands back an array, and returning it sorted by `sortOrder`
-        // would silently undo any ordering the identifiers carry. Whether they
-        // carry one is the open question — see `SelectWeekLayoutIntent`. This
-        // side of it is correct either way, and costs nothing.
-        let byID = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let matched = identifiers.compactMap { byID[$0] }
+        // Resolved **in the app's own order**, not in the order asked for.
+        //
+        // The identifiers do carry an order: #191 measured on an iPhone 14 Pro
+        // that WidgetKit hands this array back in the sequence the rows were
+        // tapped. The order is deliberately dropped here for the reason
+        // `WidgetRows` records — the picker draws checkmarks, so a tap order is
+        // invisible while it is being made — and it is dropped *here* as well
+        // as there so the sheet's own summary reads in the same order the
+        // widget draws. Two surfaces describing one selection differently would
+        // be the configuration explaining itself wrongly.
+        let wanted = Set(identifiers)
+        let matched = all.filter { wanted.contains($0.id) }
         // Resolution is the step that silently failed under extension-only
         // metadata, so it stays traced for the device check. Ids only — see
         // `WidgetTrace`.
@@ -76,22 +80,34 @@ struct WeekRowQuery: EntityQuery {
 /// * A **multi-select checklist**, in this query's suggested order, with a
 ///   confirm button. Selection persists and the sheet summarises it
 ///   ("Charlie and Bla…", or "All").
-/// * **No reordering.** No drag handles, no edit mode, and the summary reads
-///   back in the suggested order rather than the order the rows were tapped.
-///   So the "and in what order" half of #188 is *not* something this control
-///   can express today; the fallback the issue names — an in-app screen
-///   reached through `widgetURL` — is what would express it.
+/// * **No reordering affordance.** No drag handles, no edit mode, no numbered
+///   selection — checkmarks only, confirmed on an iPhone 14 Pro as well as in
+///   the simulator.
 /// * On that simulator the stored choice **did not reach the timeline**:
 ///   `rows` arrived as an empty array on every render, whatever was selected,
-///   and `WeekRowQuery.entities(for:)` was never called in the extension. That
-///   is the same class of failure `MonthWidgetConfig` records for the
-///   single-entity case, which only a device could settle. Empty falls back to
-///   the app's order (`WidgetRows.rows`), so the widget kept drawing exactly
-///   what it draws today — which is why this is shippable while the question
-///   is open. See #191, which carries the trace and what to check on hardware.
+///   and `WeekRowQuery.entities(for:)` was never called in the extension.
+///
+/// **The device disagreed with the simulator on both counts** (#191). On an
+/// iPhone 14 Pro, iOS 26.5.2, three rows selected through the real sheet:
+///
+/// ```
+/// week query resolve 3 id(s) -> 334920AF-…,1E23A402-…,465AF651-…
+/// week timeline: rows=3
+/// ```
+///
+/// The query ran in the extension and the parameter arrived non-empty — so the
+/// simulator's empty array was the stale-configuration artifact
+/// `docs/decisions.md` already records for chronod, not a platform limit. And
+/// the array **is ordered by the sequence the rows were tapped**: the row
+/// tapped first came back first, putting the app's own first habit second.
+///
+/// That ordering is deliberately not used. `WidgetRows` and `entities(for:)`
+/// both re-impose the app's order, and the reason is on `WidgetRows`: a control
+/// that draws checkmarks cannot show an order while it is being chosen, so
+/// carrying one out of it is gesture history rather than a decision.
 struct SelectWeekLayoutIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Choose Habits"
-    static let description = IntentDescription("Which habits this widget shows, and in what order.")
+    static let description = IntentDescription("Which habits this widget shows.")
 
     /// Nil until someone opens the sheet, and nil is the answer that keeps
     /// today's behaviour — see `WidgetRows.rows`. It is also what every widget
@@ -119,13 +135,13 @@ enum WeekWidgetStore {
         return (try? context.fetch(descriptor))?.map { ($0.id, $0.name, $0.isSpacer) } ?? []
     }
 
-    /// The rows this widget draws over `week`, in the order it draws them.
+    /// The rows this widget draws over `week`, in the app's own order.
     ///
-    /// `chosen` is the configured order, or nil on a widget nobody has
+    /// `chosen` is the configured selection, or nil on a widget nobody has
     /// configured. Which rows come out is `WidgetRows`' decision and is tested
     /// there; this reads the store and hands it the answer.
     ///
-    /// The whole chosen order comes back, uncut. How many of them fit is the
+    /// Every chosen row comes back, uncut. How many of them fit is the
     /// view's question, because only the view has measured a frame — see
     /// `WidgetRows`.
     static func rows(chosen: [UUID]?, in week: Week) -> [HabitSnapshot] {

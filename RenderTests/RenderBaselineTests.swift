@@ -274,10 +274,10 @@ struct RenderBaselineTests {
                   view: AnyView(WeekWidgetView(entry: week, familyOverride: .systemMedium))),
             Frame(name: "week large", size: WidgetMetrics.size(of: .systemLarge),
                   view: AnyView(WeekWidgetView(entry: week, familyOverride: .systemLarge))),
-            // A widget somebody configured (#188), and the only committed frame
-            // with a blank row in it. Both halves were ungated until this
-            // landed: nothing rendered a spacer, and nothing rendered a row
-            // list that disagrees with the app's own order.
+            // A widget somebody configured (#188), and the only committed
+            // frame with a blank row in it — nothing rendered a spacer before
+            // this landed. It also pins the ordering decision: the choice was
+            // made in a different order and the render is in the app's.
             Frame(name: "week medium configured", size: WidgetMetrics.size(of: .systemMedium),
                   view: AnyView(WeekWidgetView(
                       entry: Fixture.configuredWeek(), familyOverride: .systemMedium
@@ -347,8 +347,16 @@ struct RenderBaselineTests {
                 id: id(90), name: "", icon: "", frequency: .daily,
                 completedDays: [], isSpacer: true
             )
-            let all = base.habits + [spacer]
-            let chosen = [all[5].id, all[2].id, spacer.id, all[0].id]
+            // The app's own list, with the blank row where the app's own
+            // clustering puts it — third, which is the shape #172 measured the
+            // cost of.
+            var all = base.habits
+            all.insert(spacer, at: 2)
+            // Chosen in an order that is not the app's, and one the system can
+            // really deliver: #191 measured WidgetKit handing this array back
+            // in tap order. The frame commits to the widget ignoring it —
+            // Workout, blank, Study, Touch Grass, in the app's order.
+            let chosen = [all[6].id, all[3].id, spacer.id, all[0].id]
             return WeekEntry(
                 date: base.date,
                 week: base.week,
