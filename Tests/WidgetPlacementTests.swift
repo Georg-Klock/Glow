@@ -389,6 +389,50 @@ struct WidgetPlacementTests {
         #expect(seen >= 4, "the gallery-string scan matched \(seen) calls, expected 4")
     }
 
+    /// **A widget mark is a `Toggle`, never a `Button(intent:)`** (#292).
+    ///
+    /// The distinction is invisible until the pixels lag: both perform the
+    /// same intent, but only an AppIntent-backed `Toggle` is drawn
+    /// optimistically by the system while `perform()` runs. A mark that slides
+    /// back to `Button` compiles, renders identically in every still frame,
+    /// and quietly reopens the seconds-long wait (#121) that made people tap
+    /// their completions back off (#272). Nothing at runtime in this process
+    /// can see the difference, so — like the gallery-string scan above — the
+    /// source is the only place to hold it.
+    @Test("The widget's marks are Toggles, not intent Buttons")
+    func marksAreTogglesNotButtons() throws {
+        let widget = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("GlowWidget")
+        let files = try FileManager.default.contentsOfDirectory(
+            at: widget, includingPropertiesForKeys: nil
+        ).filter { $0.pathExtension == "swift" }
+        #expect(files.count > 3, "GlowWidget looks wrong: \(files.count) files")
+
+        var toggles = 0
+        for file in files {
+            let source = try String(contentsOf: file, encoding: .utf8)
+            for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
+                let code = line.trimmingCharacters(in: .whitespaces)
+                guard !code.hasPrefix("//") else { continue }
+                #expect(
+                    !code.contains("Button(intent"),
+                    """
+                    \(file.lastPathComponent) wraps a mark in Button(intent:), which \
+                    renders the stale state until the provider runs. Use SlotToggle, \
+                    whose style draws the state the tap requested (#292): \(code)
+                    """
+                )
+                if code.contains("SlotToggle(") { toggles += 1 }
+            }
+        }
+        // The week slot, the week span and the month cell. If a rename ever
+        // makes this scan match nothing it should fail rather than pass
+        // silently.
+        #expect(toggles >= 3, "the mark scan found \(toggles) SlotToggles, expected 3")
+    }
+
     /// The sizes the previews are laid out at are the sizes the render harness
     /// renders at — one source, so a preview cannot be a layout no phone shows.
     @Test("Each family has the size the design is authored against")

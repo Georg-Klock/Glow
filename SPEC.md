@@ -5,8 +5,11 @@ which in the same session you find it.
 
 ## 1. Concept
 
-A habit tracker whose weekly overview is the whole app: a grid of habits by
-day, filled when done.
+A habit tracker built around one weekly overview: a grid of habits by day,
+filled when done. Two more tabs stand beside it — Widgets, which is how the
+main product gets onto a Home Screen, and Settings — see `docs/vision.md`'s
+three-screen section; the grid is where the work happens and where every
+launch lands.
 
 Today's column physically glows on HDR-capable screens: it is drawn from an
 image encoded in a colour space with real headroom above SDR white, which is
@@ -81,10 +84,25 @@ sentence with an exception is two sentences.
   temporary directory, and never otherwise. That is a privacy claim true by
   construction rather than by policy. `HistoryExport` is pure and its bytes are
   asserted. **And it is all or nothing** (#282): the snapshot read throws, so a
-  fetch failure stops the export before a file exists — no share sheet ever
-  opens over a partial read, no partial file is left behind, and the failure is
-  said out loud with a safe retry (an export is a read; retrying doubles
-  nothing).
+  fetch failure stops the export before a file exists — no share sheet and no
+  mail composer ever opens over a partial read, no partial file is left behind,
+  and the failure is said out loud with a safe retry (an export is a read;
+  retrying doubles nothing).
+
+  **Email My History** is the same export, one step closer to "send it to
+  myself" (#289): the same file, written by the same code at the moment of the
+  tap, handed to Apple's mail composer instead of the share sheet — a dated
+  subject, a two-sentence body, the attachment with its exact MIME type, and
+  **no recipient**, because the app does not know an address and does not
+  guess one. Nothing is sent until the person reviews the message and presses
+  Send; the composer is the system's and gives the app no send call. On a
+  device Mail cannot send from, the offer is the existing share sheet with the
+  same file. Glow's temporary copy is released when the composer goes away,
+  whichever of its four ways out it took; a sent message or saved draft is
+  Mail's copy, not Glow's. The file remains an export, not a backup — no
+  recovery promise attaches to it (see the 2026-08-25 entries in
+  docs/decisions.md). `MailExport` is pure and holds the subject, body,
+  recipients, MIME types, routing and outcome handling under test.
 - **No undo — and one action that therefore has to ask twice.** Settings → Data
   → **Reset to Default Habits** deletes every habit and every completion and
   installs `DefaultHabits.all` fresh, which is the way back to the shipped list
@@ -158,6 +176,18 @@ toggle can do is silently retract a record of something that happened. **The
 app's own surfaces keep the toggle**, because they redraw in-process from the
 store they just wrote and are never the stale caller this is about.
 
+**And the mark draws the state it asked for, without waiting** (#292). The
+tappable mark is an AppIntent-backed `Toggle` whose style renders
+`configuration.isOn` — the one mechanism WidgetKit gives an app for pixels
+that change at the tap rather than after the provider has been scheduled,
+which #121 measured at seconds. The tap flips the mark in place, the intent
+writes, and the guaranteed reload reconciles to the store — which is also how
+a refusal takes an optimistic flip back. `SlotToggle` owns the control; the
+week's slots and spans and the month's cell are its three call sites, and a
+mark that is not tappable is not a `Toggle`, exactly as it was never a
+`Button`. VoiceOver's label, value and hint follow the same `isOn` the pixels
+do, so the announcement cannot lag the mark.
+
   **It fires from the home screen only** (#103). The Island does not render a
   Live Activity while its own app is in the foreground, so a goal met inside
   the app would spend its two seconds on nobody. `GoalPopCentre` is called from
@@ -194,10 +224,14 @@ moment in every zone, so 19 August compared unequal to itself after a flight,
 left the grid, and let the next tap write a second row for a day that already
 had one.
 
-**Week boundary.** Weeks start Monday, matching the M T W T F S S header. All
-"this week" queries filter into `[startOfWeek(Monday), +7 days)` using the
-user's calendar, with `firstWeekday` forced to Monday. Locale would otherwise
-decide, and in the US that means Sunday, silently shifting every column.
+**Week boundary.** A week starts on the weekday Settings says it does:
+`WeekPreferences.firstWeekday`, defaulting to Monday and never to the locale's
+answer — locale would say Sunday in the US and silently shift every column,
+and the week start is not a formatting detail here, because it decides which
+seven days a "week" of habits is and so which completions count toward a
+weekly goal. All "this week" queries filter into `[startOfWeek, +7 days)`
+using the user's calendar with that `firstWeekday` applied, and the weekday
+header rotates to match (`WeekCalendar.weekdayInitials`).
 
 ## 5. Invariants
 
@@ -262,7 +296,8 @@ than trusting it.
 Each habit is one row: icon and name on the left, a fixed-width status track on
 the right.
 
-- **Daily:** 7 equal slots, Monday to Sunday, day-pinned.
+- **Daily:** 7 equal slots, one per weekday in the calendar's own week order,
+  day-pinned.
 - **N per week:** N equal slots, the same height as a daily one, filling the
   same total track width.
 
@@ -409,8 +444,10 @@ reason demo history does: the phone is where this app is tested.
 (`WeekPreferences.restDay`) and handed to the grids as a parameter rather than
 looked up by them (#181), is true rest: its slot is never open, never
 missed, and never writable. Nothing can be logged on it and nothing un-logged
-— `HabitStore.setCompletion` refuses the write, which holds in the widget's
-process too, where a stale surface can still offer a button — and the week is
+— `HabitStore.setCompletion` refuses the write, which holds for the widget's
+taps too, because its surface renders in another process and can still offer a
+stale button (the tap itself arrives through `MarkHabitIntent`, in the app's
+process since #58's `LiveActivityIntent` conformance) — and the week is
 not made up around it: an unreachable weekly goal on a rest week is stopped,
 not excused. Frequency rows stop with it: on the rest day nothing is open, so
 nothing glows.
@@ -511,8 +548,8 @@ delete could land as history on whatever came next. Deleting the row outright
 is what provides that now; it used to be provided by retiring the `id` of the
 blank row left behind. The store also refuses every day-shaped write to a blank
 row or to a habit of the wrong cadence, on the same reasoning as the rest day's
-refusal: the widget runs in a second process and its surface can outlive what it
-draws, so the rule lives on the write path both processes share.
+refusal: the widget's surface renders in a second process and can outlive what
+it draws, so the rule lives on the one write path every surface's tap reaches.
 
 **"Daily" meant two different things, and one of them is gone** (#209). The
 editor had a `Daily` segment meaning *counted within a day* — a ring on Today,
@@ -601,7 +638,8 @@ where the crossfade already was.
 
 ## 8. Acceptance criteria
 
-- [x] A daily habit shows exactly 7 circles for the current Monday-Sunday week.
+- [x] A daily habit shows exactly 7 circles for the current week, in the
+      calendar's own week order.
 - [x] An N-times habit shows exactly N pills, per the width formula, with the
       same margins as a daily row.
 - [x] Tapping today's open slot marks it complete, persists a `Completion`, and
@@ -639,13 +677,14 @@ said how much of the week was done without saying what of, and a size only
 legible to somebody who already knows their own row order is not a size worth
 offering. Removing a family is not removing a kind (#209): `GlowWidget` serves
 the same kind string, so a placed medium or large is untouched and a placed
-small stops being served. Today's slot is a button backed by an
-`AppIntent`, so a habit can be logged from the home screen without launching
-the app. Past days are not buttons here even though the app's own grid now
-edits them: a widget is a glance and a single confirmed action, and it has no
-touch location to resolve a span's column with. `SlotEditing.todayOnly` is how
-the surface says so, and `HabitStore` refuses a day ahead whatever the surface
-offers.
+small stops being served. Today's slot is an `AppIntent`-backed toggle
+(`SlotToggle`, #292), so a habit can be logged from the home screen without
+launching the app and the mark flips at the tap rather than at the next
+provider run. Past days are not tappable here even though the app's own grid
+now edits them: a widget is a glance and a single confirmed action, and it has
+no touch location to resolve a span's column with. `SlotEditing.todayOnly` is
+how the surface says so, and `HabitStore` refuses a day ahead whatever the
+surface offers.
 Rows are as many as fit, then a hard cut — no "+N more" row, per
 docs/vision.md: a row spent saying how much is missing is a row not showing a
 habit. The app's own grid marks the boundary, where there is room to say it.
@@ -695,9 +734,9 @@ intended.
 as marks on weekday columns — the same marks the week draws, decided by
 `MonthGrid` asking `WeekGrid`, so the two surfaces cannot disagree about a
 day. The 1st sits under the weekday it really falls on, so the first and last
-rows are ragged. The habit is chosen per widget. Today's dot is a button
-through `MarkHabitIntent` — no other day is, which is R2 in a third grid —
-and everything else opens This Week. Two readings held deliberately small
+rows are ragged. The habit is chosen per widget. Today's dot is the same
+`SlotToggle` through `MarkHabitIntent` — no other day is tappable, which is R2
+in a third grid — and everything else opens This Week. Two readings held deliberately small
 until decided otherwise (#41): an N×/week habit's empty days are sockets,
 never crosses — the week grid's own rule, not a per-week verdict — and rest
 days get no month-specific treatment beyond what `WeekGrid` already says

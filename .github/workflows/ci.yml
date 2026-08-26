@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
 
+# Read-only by declaration, not only by the repository default. The default
+# workflow permission is a setting a click can change; this line is a reviewed
+# fact in the same diff as the jobs it governs. Nothing here writes to the
+# repository — the artifact upload uses its own token scope, not contents.
+permissions:
+  contents: read
+
 # A new push to a branch makes the previous run's answer irrelevant, and macOS
 # runners are the expensive kind.
 concurrency:
@@ -21,7 +28,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      # Every third-party ref in this file is a full commit SHA, because a tag
+      # is a pointer its owner can move without a commit here. The comment names
+      # the release the SHA was resolved from; Tools/check-workflows.py fails
+      # the build when either half is missing. Dependabot proposes updates as
+      # SHA diffs, so pinning does not mean freezing.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # First, because everything below trusts what this parses: the workflow
+      # policy — full-SHA pins, version comments, least-privilege permissions —
+      # is itself a gate that can weaken silently.
+      - name: The workflows obey the pinning and permissions policy
+        run: |
+          python3 Tools/check-workflows.py --self-test
+          python3 Tools/check-workflows.py
+
       - name: The validator rejects what it claims to reject
         run: python3 Tools/validate-test-result.py --self-test
 
@@ -32,6 +53,19 @@ jobs:
       - name: The release validator rejects what it claims to reject
         run: python3 Tools/check-release-build.py --self-test
 
+      # #281: the entitlement denylist is a gate whose whole job is a build
+      # that does not exist yet, so only fixtures can watch it fail. The real
+      # check runs inside Tools/generate.sh on the macOS lane.
+      - name: The project validator rejects what it claims to reject
+        run: python3 Tools/check-project.py --self-test
+
+      # #288: known documentation contradictions must not come back. The gate
+      # proves itself against mutation fixtures, then checks the working tree.
+      - name: The docs gate rejects what it claims to reject
+        run: |
+          python3 Tools/check-docs.py --self-test
+          python3 Tools/check-docs.py
+
   build-and-test:
     name: Build and test
     # Pinned rather than macos-latest: the test suite reads gain-map metadata,
@@ -41,14 +75,14 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Not `brew install xcodegen`, which resolves whatever is current on the
       # day. The version and the digest of its release archive are pinned in
       # Tools/xcodegen.pin, so this runner and a developer machine generate the
       # project with the same bytes. Cached by that version.
       - name: Cache the pinned XcodeGen
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: Tools/.xcodegen
           key: xcodegen-${{ hashFiles('Tools/xcodegen.pin') }}
@@ -145,9 +179,129 @@ jobs:
       # evidence.
       - name: Keep the evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: test-run-${{ github.run_id }}-${{ github.run_attempt }}
+          path: Artifacts/
+          if-no-files-found: error
+          retention-days: 14
+
+  # #286: the project declares iOS 18.0 and the lane above runs on whichever
+  # runtime is newest — which proves nothing about the declared minimum; the
+  # audited green run executed on iOS 26.5. This lane runs the same
+  # authoritative suite on the oldest supported runtime, as its own job so a
+  # compatibility failure is legible as one and the current lane's evidence
+  # stays comparable to a developer machine's. The CI-time cost is accepted;
+  # keeping the 18.0 target and gating it is the decision.
+  build-and-test-min:
+    name: Build and test (iOS 18)
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      # The newest iOS 18 simulator runtime Apple ships. Bump deliberately;
+      # the runtime cache key follows this value.
+      GLOW_MIN_IOS: "18.5"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Cache the pinned XcodeGen
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: Tools/.xcodegen
+          key: xcodegen-${{ hashFiles('Tools/xcodegen.pin') }}
+
+      - name: Install the pinned XcodeGen
+        run: Tools/install-xcodegen.sh
+
+      # The runner image ships only current runtimes. The dmg is gigabytes
+      # from Apple's CDN, so it is cached; `-exportPath` downloads without
+      # installing, and `simctl runtime add` installs from the file — the same
+      # path a cache hit takes, so both are exercised by whichever happens.
+      - name: Cache the iOS 18 simulator runtime
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: Tools/.ios-runtime
+          key: ios-simulator-runtime-${{ env.GLOW_MIN_IOS }}
+
+      - name: Install the iOS 18 simulator runtime
+        run: |
+          installed() {
+            xcrun simctl runtime list | grep "iOS ${GLOW_MIN_IOS}" | grep -v Unusable
+          }
+          if installed; then
+            echo "iOS ${GLOW_MIN_IOS} runtime already installed"
+          else
+            if ! ls Tools/.ios-runtime/*.dmg >/dev/null 2>&1; then
+              mkdir -p Tools/.ios-runtime
+              xcodebuild -downloadPlatform iOS \
+                -buildVersion "$GLOW_MIN_IOS" \
+                -exportPath Tools/.ios-runtime
+            fi
+            # Run 32917914973 measured what -exportPath actually does: it
+            # *installs* the runtime and exports the dmg. `runtime add` on the
+            # dmg it had just installed failed with SimDiskImageErrorDomain
+            # code 6 and left an Unusable duplicate image. So add only when
+            # the runtime is still absent — the cache-hit path, where the dmg
+            # is all there is.
+            if ! installed; then
+              xcrun simctl runtime add Tools/.ios-runtime/*.dmg
+            fi
+          fi
+          xcrun simctl runtime list
+
+      # The smallest iPhone the declared minimum supports, created explicitly
+      # rather than trusted to exist — the whole lane is about not inheriting
+      # whatever the image happens to have.
+      - name: Create the minimum-iOS iPhone
+        run: |
+          RUNTIME_ID=$(xcrun simctl list runtimes --json | /usr/bin/python3 -c '
+          import json, sys
+          runtimes = [r for r in json.load(sys.stdin)["runtimes"]
+                      if r.get("platform") == "iOS"
+                      and r["version"].startswith("18.")
+                      and r.get("isAvailable")]
+          if not runtimes:
+              raise SystemExit("error: no available iOS 18 runtime after install")
+          print(max(runtimes, key=lambda r: r["version"])["identifier"])
+          ')
+          xcrun simctl create "Glow minimum iPhone" \
+            com.apple.CoreSimulator.SimDeviceType.iPhone-SE-3rd-generation \
+            "$RUNTIME_ID"
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun simctl list runtimes | grep iOS || true
+
+      - name: Generate and validate the project
+        run: Tools/generate.sh
+
+      # GLOW_EXPECTED_RUNTIME_MAJOR restricts selection to iOS 18 and then
+      # asserts the chosen device matches — the lane fails loudly rather than
+      # falling forward to the image's newer runtime, which is exactly the
+      # failure #286 names.
+      - name: Run tests on the minimum iOS
+        env:
+          GLOW_ERASE_SIMULATOR: "1"
+          GLOW_EXPECTED_RUNTIME_MAJOR: "18"
+        run: Tools/test.sh
+
+      - name: Publish the verdict
+        if: always()
+        run: |
+          summary=$(ls Artifacts/*/summary.md 2>/dev/null | head -1 || true)
+          if [ -n "$summary" ]; then
+            cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No summary was written — the run did not reach the validator." \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-run-min-ios-${{ github.run_id }}-${{ github.run_attempt }}
           path: Artifacts/
           if-no-files-found: error
           retention-days: 14

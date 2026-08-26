@@ -1,7 +1,8 @@
 # Glow Up
 
-A one-screen iPhone habit tracker. The one twist is in the name: a mark
-**physically glows** on an HDR-capable screen.
+An iPhone habit tracker: three tabs — Widgets, This Week, Settings — around
+one weekly grid. The one twist is in the name: a mark **physically glows** on
+an HDR-capable screen.
 
 **Light marks the habit; what stays dark is what never happened.** Today's open
 slot glows because it is still actionable, and every completion glows too,
@@ -22,10 +23,35 @@ contradicting §1. See #75 and docs/decisions.md. The ring itself went to
 `feature/daily-habits-2.0` with the rest of the per-day kind (#209); what it
 settled did not go with it.
 
+## What outranks what
+
+When two sources disagree, the higher one on this list is the one to follow —
+and the disagreement is worth fixing in the same session, because a
+contradiction left standing reads as an instruction to whoever finds it next.
+
+1. **Founder invariants** — the settled product and safety rules: local-only,
+   no telemetry, nothing leaves the device unless a person sends it; SPEC §1's
+   light rule; the working rules in this file.
+2. **Current code, with `SPEC.md` and `docs/ARCHITECTURE.md`** — shipped
+   behaviour. Where the code and those two disagree, one of them is a bug; say
+   which.
+3. **`docs/vision.md`** — the dated target. Aspirational unless a section says
+   it shipped; it does not describe what the app does today.
+4. **`docs/decisions.md`** — historical, append-only. The latest entry that
+   explicitly supersedes an earlier one wins; an early entry is what was
+   decided then, not necessarily what is true now.
+5. **Closed issues** — snapshots of the moment they were written.
+6. **Open issues and PRs** — backlog hypotheses. Verify their claims against
+   the current code before acting on them; file:line references and counts in
+   an issue body go stale.
+
 ## Read first
 
-- `docs/vision.md` — **the target.** The product intent as three screens, dated.
-  Where the code disagrees with it, the code is the backlog.
+- `docs/vision.md` — **the dated target.** The product intent as three screens.
+  Where the code disagrees with it, that is backlog to raise, not a licence to
+  move the app back toward the prose — a stale line there once left the Widgets
+  tab one reading away from being filed for removal (#235). The authority order
+  above is the rule.
 - `SPEC.md` — product truth for what exists today.
 - `docs/glow.md` — how the glow actually works, and why PQ rather than gain
   maps. **Read this before touching anything HDR.** Every gain-map encoding came
@@ -100,6 +126,14 @@ settled did not go with it.
   When the render baseline moves, the script prints the one command that
   approves it. Approving is a decision: say in the pull request what moved.
 
+  It picks the newest installed runtime by default. A lane that exists to test
+  a *specific* one sets `GLOW_EXPECTED_RUNTIME_MAJOR` (e.g. `18`), which
+  restricts the selection to that iOS major and then asserts the chosen device
+  matches — a pinned `GLOW_SIMULATOR_UDID` included — so the minimum-iOS lane
+  fails loudly instead of falling forward to a newer runtime (#286). What ran
+  is recorded either way: runtime and device on the console, in
+  `<run>/simulator.txt`, and at the end of `summary.md`.
+
 - **Regenerate the symbol picker catalog:** `Tools/make-symbol-catalog.py`
 - **Render the website's HDR word images:** `Tools/make-glow-word.swift`
 
@@ -130,18 +164,55 @@ settled did not go with it.
   the device SDK and `Tools/ship-testflight.sh` runs it on the archive and on
   the exported `.ipa`, so the gate and the release path cannot disagree about
   what "matching" means. What it checks is declared in
-  `Tools/test-inventory.json`. See #133.
+  `Tools/test-inventory.json`. See #133. With `--require-signing` it also
+  rejects the six iCloud/ubiquity entitlement keys and anything outside its
+  entitlement allowlist in what the signature grants — the artifact half of
+  the local-only invariant (#281).
 - **Validate the generated project on its own:** `Tools/check-project.py`
+  (and `--self-test`). Besides App Groups and extension-only API, it rejects
+  iCloud/ubiquity entitlements and any capability or entitlement outside its
+  allowlist — the requested half of the local-only invariant (#281), whose
+  source half is `LocalOnlyContractTests` (`cloudKitDatabase: .none` at every
+  production store, and no network/CloudKit API spellings outside a reviewed
+  allowlist).
+- **Check whether a checkout may ship, without shipping:**
+  `Tools/ship-testflight.sh --preflight-only`
+
+  The release path refuses a dirty tree, a `HEAD` that is not fetched
+  `origin/main` (or a pushed annotated tag), and a SHA without a successful CI
+  verdict — before credentials are read — and records source SHA, ref, CI
+  verdict, Xcode build and versions into `private/provenance/`. The one narrow
+  override is `--allow-unverified-ci`, for the CI-verdict proof only, and it is
+  recorded. See #287.
+- **Validate the workflows' pinning and permissions policy:**
+  `Tools/check-workflows.py` (and `--self-test`). Every `uses:` in a tracked
+  workflow is a full commit SHA with its release named beside it, and
+  `permissions:` is explicit and no broader than the checker's allowlist.
 - **Validate a kept result bundle on its own:**
   `Tools/validate-test-result.py --xcresult Artifacts/latest/Glow.xcresult`
-- **Check the gates themselves:** `Tools/validate-test-result.py --self-test`
-  and `Tools/check-release-build.py --self-test`. Both run on every push, on a
-  Linux runner: a checker nobody checks can weaken silently.
+- **Check the documentation for known contradictions:** `Tools/check-docs.py`
+
+  Fails when a contradiction this repository has already paid to remove comes
+  back into a normative document: a literal `L1 n/n` count, the app described
+  as a single screen, the week start described as fixed to one weekday rather
+  than as a setting, or the week widget's dropped small family stated as
+  current. Narrow on purpose — it scans for those reintroductions, not for
+  prose it dislikes, and `docs/decisions.md` is exempt because a history is
+  allowed to say what used to be true. See #288.
+- **Check the gates themselves:** `--self-test` on
+  `Tools/check-workflows.py`, `Tools/validate-test-result.py`,
+  `Tools/check-release-build.py`, `Tools/check-project.py` and
+  `Tools/check-docs.py`. All five run on every push, on a Linux runner: a
+  checker nobody checks can weaken silently.
 
 CI runs the tests on every pull request and on merges to `main`
 (`.github/workflows/ci.yml`), on a pinned macOS runner — pinned rather than
 `macos-latest` because the suite reads gain-map metadata and where that metadata
-lives has already been seen to differ between platform versions.
+lives has already been seen to differ between platform versions. Two lanes run
+the suite: the current runtime, and the declared minimum — an iOS 18 simulator
+runtime the lane installs and pins with `GLOW_EXPECTED_RUNTIME_MAJOR` so it
+cannot silently fall forward (#286). The deployment target stays 18.0 because
+that lane gates it; raising it is a product decision.
 
 ## Working rules
 
@@ -162,8 +233,12 @@ lives has already been seen to differ between platform versions.
   generic "AI". No `Co-Authored-By` trailer when Claude is the author; it would
   name the same party twice. **Commits Georg genuinely wrote stay his** — the
   practice only works if it is accurate in both directions.
-- **Run `Tools/test.sh` before opening a PR and state the count in the body**
-  ("L1 143/143"). A PR that does not state its result has not been tested.
+- **Run `Tools/test.sh` before opening a PR and paste its verdict in the body**
+  — the `L1 <passed>/<ran>` line the script itself printed, verbatim, never a
+  number remembered or copied from an earlier PR. A PR that does not state its
+  result has not been tested. `Tools/check-docs.py` fails on a literal count
+  written into this file or the PR template, because every one that was ever
+  written here went stale.
 - **Tests must exercise the real types** (`@testable import Glow`). Never
   re-implement app logic inside a test file — a mirror copy passes forever while
   the app regresses.
