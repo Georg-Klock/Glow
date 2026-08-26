@@ -3449,7 +3449,6 @@ column is not empty, and a column is not empty for lots of reasons. Naming the
 tone is what stops the next fixture edit putting a dot back on a sample point
 without anything noticing.
 
-
 ## A fresh install chooses its starting point (#228)
 
 **2026-08-23.** `HabitSeeder` is deleted. A fresh install used to open with
@@ -4024,7 +4023,6 @@ different week, the walk must take exactly one step per week of record, arrive a
 `reach.earliest`, and stop there. Nine zones, three week starts, twelve days
 spread across two years including both of Havana's midnight clock changes —
 11,268 steps a zone.
-
 
 ## The pop defaults to everything, for a new install (#185)
 
