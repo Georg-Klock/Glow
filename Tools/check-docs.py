@@ -41,6 +41,7 @@ NORMATIVE = (
     "SPEC.md",
     "docs/vision.md",
     "docs/ARCHITECTURE.md",
+    "docs/data-inventory.md",
     ".github/pull_request_template.md",
 )
 
