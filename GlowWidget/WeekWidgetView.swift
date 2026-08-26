@@ -36,7 +36,14 @@ struct WeekWidgetView: View {
     private var labelGap: CGFloat { showsLabels ? WidgetMetrics.labelGap : 0 }
 
     var body: some View {
-        if entry.habits.isEmpty {
+        // The three answers a read can give, kept apart all the way to the
+        // pixels (#282): only a store that was *read* and holds nothing may
+        // say "No habits yet". A failed read is a different sentence with a
+        // recovery path, not a plausible emptiness.
+        switch entry.habits {
+        case .unavailable:
+            WidgetUnavailableView()
+        case .empty:
             VStack(spacing: 6) {
                 Image(systemName: "circle.dotted")
                     .font(.title2)
@@ -45,67 +52,71 @@ struct WeekWidgetView: View {
             }
             .foregroundStyle(GlowPalette.grey)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            // One measurement for the whole widget, so every row divides the
-            // same track by the same rule and the columns line up. Measured once
-            // here rather than per row, which is also how the app does it.
-            GeometryReader { proxy in
-                let track = max(0, proxy.size.width - labelWidth - labelGap)
-                let side = SlotLayout.slotHeight(trackWidth: track)
-                // As many as fit, then a hard cut. A row spent saying how much
-                // is missing is a row not showing a habit (docs/vision.md).
-                // The app marks the boundary in its own grid, which is where
-                // there is room to say it.
-                let capacity = WidgetMetrics.rowCapacity(
-                    height: proxy.size.height, slot: side, hasHeader: showsHeader
-                )
-                let shown = Array(entry.habits.prefix(capacity))
-                // **The widget's one read of the rest day** (#181). A widget
-                // renders out of process from an archived surface, so there is
-                // no `@AppStorage` to observe and nothing to observe it for:
-                // the value is read once per render and handed to every row,
-                // which is the same shape the app's row uses.
-                let restDay = WeekPreferences.restDay
-                // The rest day's line, decided once for the whole widget: which
-                // column it falls in, and which of the rows it actually shows
-                // run through it. Both ends land on a habit — see RestCut.
-                let restIndex = entry.week.days.firstIndex(where: {
-                    WeekPreferences.isRestDay($0, restDay: restDay)
-                })
-                let cut = RestCut.rows(entry.habits, capacity: capacity)
+        case .loaded(let habits):
+            grid(habits)
+        }
+    }
 
-                VStack(alignment: .leading, spacing: WidgetMetrics.rowGap) {
-                    if showsHeader {
-                        WidgetHeader(
-                            week: entry.week,
-                            today: entry.date,
-                            track: track,
-                            labelWidth: labelWidth,
-                            labelGap: labelGap
-                        )
-                        // The header stands further from the first row than the
-                        // rows stand from each other.
-                        .padding(.bottom, WidgetMetrics.headerGap - WidgetMetrics.rowGap)
-                    }
-                    ForEach(Array(shown.enumerated()), id: \.element.id) { index, habit in
-                        WidgetRow(
-                            habit: habit,
-                            week: entry.week,
-                            today: entry.date,
-                            track: track,
-                            side: side,
-                            labelWidth: labelWidth,
-                            labelGap: labelGap,
-                            showsLabel: showsLabels,
-                            index: index,
-                            cut: cut,
-                            restIndex: restIndex,
-                            restDay: restDay,
-                            burst: entry.burstHabit == habit.id ? entry.progress : nil
-                        )
-                    }
-                    Spacer(minLength: 0)
+    private func grid(_ habits: [HabitSnapshot]) -> some View {
+        // One measurement for the whole widget, so every row divides the
+        // same track by the same rule and the columns line up. Measured once
+        // here rather than per row, which is also how the app does it.
+        GeometryReader { proxy in
+            let track = max(0, proxy.size.width - labelWidth - labelGap)
+            let side = SlotLayout.slotHeight(trackWidth: track)
+            // As many as fit, then a hard cut. A row spent saying how much
+            // is missing is a row not showing a habit (docs/vision.md).
+            // The app marks the boundary in its own grid, which is where
+            // there is room to say it.
+            let capacity = WidgetMetrics.rowCapacity(
+                height: proxy.size.height, slot: side, hasHeader: showsHeader
+            )
+            let shown = Array(habits.prefix(capacity))
+            // **The widget's one read of the rest day** (#181). A widget
+            // renders out of process from an archived surface, so there is
+            // no `@AppStorage` to observe and nothing to observe it for:
+            // the value is read once per render and handed to every row,
+            // which is the same shape the app's row uses.
+            let restDay = WeekPreferences.restDay
+            // The rest day's line, decided once for the whole widget: which
+            // column it falls in, and which of the rows it actually shows
+            // run through it. Both ends land on a habit — see RestCut.
+            let restIndex = entry.week.days.firstIndex(where: {
+                WeekPreferences.isRestDay($0, restDay: restDay)
+            })
+            let cut = RestCut.rows(habits, capacity: capacity)
+
+            VStack(alignment: .leading, spacing: WidgetMetrics.rowGap) {
+                if showsHeader {
+                    WidgetHeader(
+                        week: entry.week,
+                        today: entry.date,
+                        track: track,
+                        labelWidth: labelWidth,
+                        labelGap: labelGap
+                    )
+                    // The header stands further from the first row than the
+                    // rows stand from each other.
+                    .padding(.bottom, WidgetMetrics.headerGap - WidgetMetrics.rowGap)
                 }
+                ForEach(Array(shown.enumerated()), id: \.element.id) { index, habit in
+                    WidgetRow(
+                        habit: habit,
+                        week: entry.week,
+                        today: entry.date,
+                        track: track,
+                        side: side,
+                        labelWidth: labelWidth,
+                        labelGap: labelGap,
+                        showsLabel: showsLabels,
+                        index: index,
+                        cut: cut,
+                        restIndex: restIndex,
+                        restDay: restDay,
+                        burst: entry.burstHabit == habit.id ? entry.progress : nil
+                    )
+                }
+                Spacer(minLength: 0)
             }
         }
     }

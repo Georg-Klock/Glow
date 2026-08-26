@@ -115,7 +115,7 @@ struct WeekProvider: AppIntentTimelineProvider {
         return WeekEntry(
             date: today,
             week: WeekCalendar.week(containing: today),
-            habits: []
+            habits: .empty
         )
     }
 
@@ -127,7 +127,7 @@ struct WeekProvider: AppIntentTimelineProvider {
         // separates the gallery's call from a placed widget's. Counts only, per
         // `WidgetTrace`.
         WidgetTrace.record(
-            "week snapshot: preview=\(context.isPreview), habits=\(entry.habits.count)"
+            "week snapshot: preview=\(context.isPreview), habits=\(entry.habits.traced)"
         )
         return entry
     }
@@ -230,8 +230,23 @@ struct WeekProvider: AppIntentTimelineProvider {
         return WeekEntry(
             date: today,
             week: week,
+            // Three outcomes, not two (#282): the store's answer arrives typed
+            // and stays typed, so a failed container renders "unavailable"
+            // rather than the new-user empty state.
             habits: WeekWidgetStore.rows(chosen: configuration.rows?.map(\.id), in: week)
         )
+    }
+}
+
+extension StoreRead where Value == [HabitSnapshot] {
+    /// A count for a trace line, or the outcome when there is none. Never a
+    /// name, per `WidgetTrace`.
+    var traced: String {
+        switch self {
+        case .loaded(let habits): "\(habits.count)"
+        case .empty: "0"
+        case .unavailable: "unavailable"
+        }
     }
 }
 

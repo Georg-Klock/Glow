@@ -12,6 +12,42 @@ import Foundation
 /// `Date()` — the export's own timestamp is passed in, so a test can assert the
 /// bytes rather than the shape of the bytes.
 enum HistoryExport {
+    /// The two files this can produce. CSV opens in a spreadsheet; JSON
+    /// parses. Named here rather than in the view (#282), so the render and
+    /// the file it lands in are one decision a test can exercise.
+    enum Format: CaseIterable {
+        case csv, json
+
+        var fileExtension: String {
+            switch self {
+            case .csv: "csv"
+            case .json: "json"
+            }
+        }
+    }
+
+    /// One export, rendered and named, or an error — never half of one.
+    ///
+    /// The all-or-nothing half of #282's export rule lives in the callers'
+    /// order of operations; what this guarantees is that a file's text and its
+    /// name cannot come from two different renders, and that a render that
+    /// throws produces no text at all.
+    static func file(
+        habits: [HabitSnapshot],
+        format: Format,
+        exportedAt: Date,
+        calendar: Calendar = WeekCalendar.calendar
+    ) throws -> (name: String, text: String) {
+        let text = switch format {
+        case .csv: csv(habits: habits, calendar: calendar)
+        case .json: try json(habits: habits, exportedAt: exportedAt, calendar: calendar)
+        }
+        return (
+            filename(on: exportedAt, extension: format.fileExtension, calendar: calendar),
+            text
+        )
+    }
+
     /// The cadence, as one word that means the same thing in both formats.
     ///
     /// `Frequency`'s own cases are the source; this is the wire spelling, kept

@@ -324,7 +324,7 @@ struct RenderBaselineTests {
             return WeekEntry(
                 date: tuesday,
                 week: week,
-                habits: [
+                habits: .loaded([
                     habit(1, "Workout", "figure.run", .daily, done: [monday]),
                     habit(2, "Stretch", "figure.flexibility", .daily, done: [tuesday]),
                     habit(3, "Study", "book", .daily, done: [tuesday]),
@@ -332,7 +332,7 @@ struct RenderBaselineTests {
                     habit(5, "Hydration", "drop", .daily, done: []),
                     habit(6, "Touch Grass", "leaf", .daily, done: [monday, tuesday]),
                     habit(7, "Sunset", "sunrise", .timesPerWeek(1), done: [monday]),
-                ]
+                ])
             )
         }
 
@@ -352,7 +352,7 @@ struct RenderBaselineTests {
             // The app's own list, with the blank row where the app's own
             // clustering puts it — third, which is the shape #172 measured the
             // cost of.
-            var all = base.habits
+            var all = base.habits.value ?? []
             all.insert(spacer, at: 2)
             // Chosen in an order that is not the app's, and one the system can
             // really deliver: #191 measured WidgetKit handing this array back
@@ -362,7 +362,7 @@ struct RenderBaselineTests {
             return WeekEntry(
                 date: base.date,
                 week: base.week,
-                habits: WidgetRows.rows(from: all, chosen: chosen)
+                habits: .loaded(WidgetRows.rows(from: all, chosen: chosen))
             )
         }
 
@@ -370,11 +370,11 @@ struct RenderBaselineTests {
             let week = WeekCalendar.week(containing: WeekCalendar.day(anchor))
             return MonthEntry(
                 date: WeekCalendar.day(anchor),
-                habit: HabitSnapshot(
+                habit: .loaded(HabitSnapshot(
                     id: id(1), name: "Workout", icon: "figure.run",
                     frequency: .daily,
                     completedDays: Set(week.days.prefix(2))
-                )
+                ))
             )
         }
     }

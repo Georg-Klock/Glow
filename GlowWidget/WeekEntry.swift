@@ -9,7 +9,10 @@ import WidgetKit
 struct WeekEntry: TimelineEntry {
     let date: Date
     let week: Week
-    let habits: [HabitSnapshot]
+    /// What the store said, kept as it said it (#282): a failed container or
+    /// fetch arrives here as `.unavailable` and renders as such, never as the
+    /// new-user empty state.
+    let habits: StoreRead<[HabitSnapshot]>
     /// The habit whose completion is mid-animation, if any.
     var burstHabit: UUID?
     /// How far through the completion cross-fade this frame is, 0 through 1:

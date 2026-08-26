@@ -47,7 +47,7 @@ struct MonthWidget: Widget {
 
 struct MonthProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> MonthEntry {
-        MonthEntry(date: Date(), habit: nil)
+        MonthEntry(date: Date(), habit: .empty)
     }
 
     func snapshot(for configuration: SelectWeeklyHabitIntent, in context: Context) async -> MonthEntry {

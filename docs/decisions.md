@@ -4822,3 +4822,57 @@ framing, because #235 already litigated how that sentence handles exceptions;
 what changed is that `CLAUDE.md` no longer repeats it without the caveat. And
 the gate stays narrow on purpose: four reintroductions it can name exactly, no
 broad word blacklist, so honest historical discussion stays writable.
+
+## A failed read is not an empty store, and a failed tap is not a silent one (#282)
+
+**2026-08-25.** Several read paths encoded three different facts — the
+container did not open, the fetch failed, the store holds nothing — as one
+empty value, and the widgets drew all three as "No habits yet". On the write
+side every mutation threw correctly, rolled back correctly, and then told
+only the OS log. Both were the same missing thing: state modeling at the
+persistence/UI boundary. #282 confirmed the mapping statically; nothing here
+required inducing a store fault.
+
+**Reads now travel typed.** `StoreRead` (Glow/Logic) is `loaded`, `empty`,
+`unavailable`, produced at the store boundary — `WeekWidgetStore.rows`,
+`MonthStore.month` — and carried into `WeekEntry`/`MonthEntry`, so no view
+can collapse the three again. The widgets draw `unavailable` as a distinct
+"Data unavailable — Open Glow" surface (`WidgetUnavailableView`, the same
+glyph as `StoreUnavailableView` because the deep link lands there), and the
+configuration pickers throw on a failed read — the system sheet shows its own
+retry — rather than offering an empty list. The boundary functions take an
+injectable `container:` so tests hand them the failure the simulator cannot
+produce on demand; `nil` is exactly what `makeReadOnlyContainer()` returns
+when the real open fails.
+
+**Why empty is a case and not a derived condition:** the view switching on
+the enum has to handle it *somewhere*, and a `.loaded([])` that renders the
+empty state is one `if` away from a `.unavailable` that does too. Three cases
+make the false-empty bug unrepresentable at the view.
+
+**The export is all or nothing.** `Habit.fetchedSnapshots` keeps the fetch
+failure the non-throwing helpers flatten (they stay, for grids mid-render,
+where a frame missing marks beats no frame), and `ExportStore.writeHistory`
+orders the steps — read everything, render everything, only then let a file
+exist — so a throw anywhere means no file, no share sheet, and a visible
+error with a safe retry. The previous export, possibly still under a share
+sheet, is untouched by a later failure: the sweep lives inside `write`, which
+a failed read never reaches.
+
+**Failed mutations are told to the person.** `OperationNotices` is the one
+mechanism: a fixed catalogue of sentences (never the error's text, a name, a
+UUID or a path — the log keeps the diagnostics, as before), presented as an
+alert by `operationNoticeAlert()` on `RootTabView` and on the editor sheet,
+because an alert attached under an active sheet cannot present. Retry travels
+with the notice only where the operation is safe to repeat, and the type
+drops it for destructive operations — `delete` and `reset` go back through
+their own confirmed gestures or not at all. That asymmetry is the same one
+that settled #272: the worst a declined retry costs is a repeated gesture;
+the worst an automatic destructive retry could do is destroy something under
+a confirmation that has expired.
+
+**Not done here:** feedback for a failed `MarkHabitIntent` in the widget
+process — WidgetKit offers no alert surface, so the trace and the refused
+write remain the whole story there; and any redesign of the app's own
+history surfaces, whose `@Query` reads do not surface failures to catch. Both
+are #282's remainder if they are wanted at all.

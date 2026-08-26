@@ -11,9 +11,11 @@ import WidgetKit
 /// (#210). The entry is the view's input, so it travels with the view.
 struct MonthEntry: TimelineEntry {
     let date: Date
-    /// The habit shown, or nil when there is nothing to show — no weekly
-    /// habits at all, or a chosen habit that has since been deleted.
-    let habit: HabitSnapshot?
+    /// The habit shown, kept as the store answered it (#282): `empty` when
+    /// there is genuinely nothing to show — no weekly habits at all, or a
+    /// chosen habit that has since been deleted — and `unavailable` when the
+    /// store did not answer, which must never wear the empty state's words.
+    let habit: StoreRead<HabitSnapshot>
 }
 
 /// The habit's name over its month of marks.
@@ -26,9 +28,12 @@ struct MonthWidgetView: View {
     let entry: MonthEntry
 
     var body: some View {
-        if let habit = entry.habit {
-            month(for: habit)
-        } else {
+        // Empty and unavailable stay two different sentences (#282), exactly
+        // as on the week widget.
+        switch entry.habit {
+        case .unavailable:
+            WidgetUnavailableView()
+        case .empty:
             VStack(spacing: 6) {
                 Image(systemName: "circle.dotted")
                     .font(.title2)
@@ -37,6 +42,8 @@ struct MonthWidgetView: View {
             }
             .foregroundStyle(GlowPalette.grey)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .loaded(let habit):
+            month(for: habit)
         }
     }
 

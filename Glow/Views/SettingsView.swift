@@ -532,11 +532,10 @@ struct SettingsView: View {
 
     // MARK: - Export
 
-    enum ExportFormat { case csv, json }
-
-    /// Writes the file, then hands it to the share sheet.
-    private func export(as format: ExportFormat) {
-        guard let url = writeExport(as: format) else { return }
+    /// Writes the file, then hands it to the share sheet — or neither (#282).
+    private func export(as format: HistoryExport.Format) {
+        guard let url = writeExport(as: format, retry: { export(as: format) })
+        else { return }
         exportFile = HistoryFile(url: url)
     }
 
@@ -549,8 +548,9 @@ struct SettingsView: View {
     /// sent until the person reviews the message and presses Send. What the
     /// mail provider then keeps is the provider's; what Glow wrote is
     /// released when the composer goes away.
-    private func emailExport(as format: ExportFormat) {
-        guard let url = writeExport(as: format) else { return }
+    private func emailExport(as format: HistoryExport.Format) {
+        guard let url = writeExport(as: format, retry: { emailExport(as: format) })
+        else { return }
         switch MailExport.route(canSendMail: MailComposeView.canSendMail()) {
         case .composer:
             guard let data = try? Data(contentsOf: url),
@@ -584,28 +584,29 @@ struct SettingsView: View {
     /// One writer for both ways out — the share sheet and the composer attach
     /// the same bytes, and a second serializer would be a second thing to
     /// drift (#289).
-    private func writeExport(as format: ExportFormat) -> URL? {
-        let now = Date()
-        let snapshots = habits.map { $0.snapshot() }
+    ///
+    /// **All or nothing** (#282). The snapshots used to come from the
+    /// non-throwing helpers, which flatten a failed completion fetch into
+    /// empty history — so the one error neither way out must paper over was
+    /// already erased before the `do` block began, and a person could share
+    /// or mail a file silently missing rows. `Habit.fetchedSnapshots` keeps
+    /// the failure, and `ExportStore.writeHistory` orders the steps so a
+    /// throw anywhere leaves no file: no sheet and no composer opens over a
+    /// partial read, and the failure is said out loud with a safe retry — an
+    /// export is a read, and the caller passes the retry so the way out that
+    /// failed is the way that is retried.
+    private func writeExport(
+        as format: HistoryExport.Format, retry: @escaping @MainActor () -> Void
+    ) -> URL? {
         do {
-            let text: String
-            let name: String
-            switch format {
-            case .csv:
-                text = HistoryExport.csv(habits: snapshots)
-                name = HistoryExport.filename(on: now, extension: "csv")
-            case .json:
-                text = try HistoryExport.json(habits: snapshots, exportedAt: now)
-                name = HistoryExport.filename(on: now, extension: "json")
+            let url = try exportStore.writeHistory(format: format, exportedAt: Date()) {
+                try Habit.fetchedSnapshots(of: habits)
             }
-            // Written through `ExportStore` rather than straight into the
-            // temporary directory: the file has a lifetime now, and something
-            // has to own it. See #142.
-            let url = try exportStore.write(text, named: name)
             pendingExport = url
             return url
         } catch {
             HabitStore.report(error, operation: "exportHistory")
+            OperationNotices.shared.report(.export, retry: retry)
             return nil
         }
     }
@@ -692,6 +693,11 @@ struct SettingsView: View {
                     }
                 } catch {
                     HabitStore.report(error, operation: wantsDemo ? "seedDemo" : "removeDemo")
+                    // No retry closure: the toggle below re-reads the record,
+                    // so the switch is already showing the truth, and flipping
+                    // it again *is* the retry — through the same confirmed
+                    // gesture (#282).
+                    OperationNotices.shared.report(.demo)
                 }
                 isDemoSeeded = demo.isSeeded
                 // Demo history writes through `DemoHistory` rather than
@@ -784,6 +790,12 @@ struct SettingsView: View {
             demo.discardLegacyRecord()
         } catch {
             HabitStore.report(error, operation: "resetToDefaults")
+            // Destructive, so no retry is offered — `OperationNotices` would
+            // drop one anyway. The reset is one transaction, so a failure
+            // means the store still holds everything it held, and the message
+            // says exactly that; the way to try again is the typed
+            // confirmation, again (#282).
+            OperationNotices.shared.report(.reset)
         }
         // Whether the reset threw or not: the toggle shows what the store
         // holds, and after a failure that is whatever it held before.

@@ -30,6 +30,7 @@ targets:
       - path: GlowWidget/WeekWidgetView.swift
       - path: GlowWidget/MonthWidgetView.swift
       - path: GlowWidget/WeekEntry.swift
+      - path: GlowWidget/WidgetUnavailableView.swift
       - path: GlowWidget/SlotToggle.swift
       # Explicit, and as a resource, because it has to land at the bundle root
       # of the shipped .app. See #132.
@@ -207,6 +208,7 @@ targets:
       - path: GlowWidget/WeekWidgetView.swift
       - path: GlowWidget/MonthWidgetView.swift
       - path: GlowWidget/WeekEntry.swift
+      - path: GlowWidget/WidgetUnavailableView.swift
       - path: GlowWidget/SlotToggle.swift
       - path: Glow/Logic
       - path: Glow/Models

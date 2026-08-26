@@ -332,10 +332,10 @@ struct WidgetRenderDiffTests {
         return WeekEntry(
             date: week.days[todayColumn],
             week: week,
-            habits: [HabitSnapshot(
+            habits: .loaded([HabitSnapshot(
                 id: UUID(), name: "Gym", icon: "figure.run",
                 frequency: frequency, completedDays: Set(done.map { week.days[$0] })
-            )]
+            )])
         )
     }
 
@@ -488,7 +488,7 @@ struct WidgetRenderDiffTests {
         let entry = oneHabit(.timesPerWeek(2), done: [], todayColumn: 4)
         try withRestColumn(2, of: entry.week) {
             let spans = WeekSpans.spans(
-                for: entry.habits[0], in: entry.week, today: entry.date, target: 2,
+                for: (entry.habits.value ?? [])[0], in: entry.week, today: entry.date, target: 2,
                 editing: .todayOnly,
                 restDay: WeekCalendar.calendar.component(
                     .weekday, from: entry.week.days[2]
@@ -568,7 +568,7 @@ struct WidgetRenderDiffTests {
         #expect(rows.map(\.name) == ["Beta", "", "Alpha"])
 
         // Friday, so Monday and Wednesday are both behind it and both readable.
-        let entry = WeekEntry(date: week.days[4], week: week, habits: rows)
+        let entry = WeekEntry(date: week.days[4], week: week, habits: .loaded(rows))
 
         try withRestColumn(6, of: week) {
             // The halo is off for this one. It is not part of the claim, and
@@ -644,11 +644,11 @@ struct WidgetRenderDiffTests {
         let week = entry()
         return MonthEntry(
             date: week.date,
-            habit: HabitSnapshot(
+            habit: .loaded(HabitSnapshot(
                 id: UUID(), name: "Workout", icon: "figure.run",
                 frequency: .daily,
                 completedDays: Set(week.week.days.prefix(2))
-            )
+            ))
         )
     }
 
@@ -807,7 +807,7 @@ struct WidgetRenderDiffTests {
         return WeekEntry(
             date: tuesday,
             week: week,
-            habits: [
+            habits: .loaded([
                 habit("Workout", "figure.run", .daily, done: [monday]),
                 habit("Stretch", "figure.flexibility", .daily, done: [tuesday]),
                 habit("Study", "book", .daily, done: [tuesday]),
@@ -816,7 +816,7 @@ struct WidgetRenderDiffTests {
                 habit("Touch Grass", "leaf", .daily, done: [monday, tuesday]),
                 habit("Touch Grass", "leaf", .timesPerWeek(2), done: [tuesday]),
                 habit("Watch Sunset", "sunrise", .timesPerWeek(1), done: [monday]),
-            ]
+            ])
         )
     }
 
