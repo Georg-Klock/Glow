@@ -232,6 +232,20 @@ enum GlowPalette {
     /// halo is the part that needs it. If a due label ever reads under-lit on a
     /// device, the thing to suspect is that the file's number was a radius after
     /// all and one of these divisions is spurious.
+    ///
+    /// **Looked at, and it does not** (#101, claim 5). iPhone 14 Pro, iOS
+    /// 26.5.2, 2026-08-25, with `glowPeakHeadroom` at the shipping default of
+    /// 12 — a due habit's name beside its own due mark, the label's halo at
+    /// 0.75pt against the mark's rendered 15.26pt. Georg: the name reads lit.
+    ///
+    /// That is the observation this comment asked for, and it is worth being
+    /// exact about what it settles. It does **not** prove 0.75 is the number
+    /// the design file meant; nothing short of the file itself could. It closes
+    /// the specific failure named above — a label that reads under-lit next to
+    /// its mark, which is what a spurious division would produce and what four
+    /// halved-twice glows looked like the last time this trap was sprung. The
+    /// arithmetic in #63 and the device now agree, which is as much as this
+    /// number can be asked to carry.
     static let labelHalo: CGFloat = 3.0 / 2 / 2
     static let headerHalo: CGFloat = 4.0 / 2 / 2
 
