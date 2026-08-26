@@ -24,6 +24,17 @@ import SwiftData
 enum GlowStore {
     static let schema = Schema([Habit.self, Completion.self])
 
+    /// The read failed — thrown where a caller can throw (the entity
+    /// queries), carrying a stable sentence and nothing else. Never a habit
+    /// name, a path, or the framework's own error text (#282): the underlying
+    /// error is logged privately where it happened, and this is what a person
+    /// may be shown.
+    struct Unreadable: LocalizedError {
+        var errorDescription: String? {
+            "Glow's data could not be read. Open Glow, then try again."
+        }
+    }
+
     /// Opens the one store, migrating an earlier one into place first.
     ///
     /// **Throws rather than opening when the migration could not be completed.**

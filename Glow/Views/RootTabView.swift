@@ -31,6 +31,7 @@ struct RootTabView: View {
     /// The landing screen. Deep links overwrite it before anything shows.
     @State private var selection: Screen = .week
 
+
     /// Not named `Tab`: SwiftUI has its own, and shadowing it makes the builder
     /// below construct this instead, which does not compile and does not say why.
     enum Screen: Hashable {
@@ -56,6 +57,10 @@ struct RootTabView: View {
             }
         }
         .tint(GlowPalette.color)
+        // A failed operation's one visible surface (#282); the editor sheet
+        // carries the same modifier, because an alert attached under an active
+        // sheet cannot present. See `operationNoticeAlert()`.
+        .operationNoticeAlert()
         .onOpenURL { url in
             switch DeepLink.destination(for: url) {
             case .week: selection = .week

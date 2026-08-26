@@ -311,6 +311,22 @@ final class Habit {
     static func dayCounts(
         of habits: [Habit], within days: ClosedRange<DayID>? = nil, in context: ModelContext
     ) -> [UUID: [DayID: Int]] {
+        (try? fetchedDayCounts(of: habits, within: days, in: context)) ?? [:]
+    }
+
+    /// The same counts, with the fetch failure kept (#282).
+    ///
+    /// `dayCounts` above swallows a failed fetch into an empty dictionary,
+    /// which is the right degradation for a grid mid-render — a frame with the
+    /// marks missing beats a frame that never arrives — and the wrong one
+    /// everywhere the counts *are* the answer: the export, where an empty
+    /// dictionary silently becomes a file missing somebody's history, and the
+    /// widget stores, where it becomes "No habits yet" about a store that
+    /// merely failed to answer. Those callers use this and decide at their own
+    /// boundary.
+    static func fetchedDayCounts(
+        of habits: [Habit], within days: ClosedRange<DayID>? = nil, in context: ModelContext
+    ) throws -> [UUID: [DayID: Int]] {
         let wanted = Set(habits.map(\.id))
         guard !wanted.isEmpty else { return [:] }
         var descriptor = FetchDescriptor<Completion>(predicate: rowsFalling(in: days))
@@ -318,7 +334,7 @@ final class Habit {
         // the group below asks for it row by row, which trades n fetches of
         // completions for rather more fetches of habits.
         descriptor.relationshipKeyPathsForPrefetching = [\.habit]
-        guard let rows = try? context.fetch(descriptor) else { return [:] }
+        let rows = try context.fetch(descriptor)
 
         var counts: [UUID: [DayID: Int]] = [:]
         for row in rows {
@@ -392,6 +408,34 @@ final class Habit {
             return habits.map { $0.snapshot(calendar: calendar) }
         }
         let counts = dayCounts(of: habits, within: days, in: context)
+        return habits.map { habit in
+            habit.snapshot(dayCounts: counts[habit.id] ?? [:], calendar: calendar)
+        }
+    }
+
+    /// Snapshots whose fetch failure reaches the caller (#282).
+    ///
+    /// `snapshots(of:within:calendar:)` above degrades a failed completion
+    /// fetch into snapshots with no history, because a grid mid-render has
+    /// nothing better to do with the error. Two callers do: the export, whose
+    /// whole contract is that the file holds everything or does not exist, and
+    /// the widget stores, which must render *unavailable* rather than a
+    /// plausible emptiness. Both build from this one throwing pass.
+    ///
+    /// No range means all of it — the export's case — through the same shared
+    /// fetch; the measured equality between one shared fetch and one per habit
+    /// (see `dayCounts`) is what makes that the same cost as before. Fixtures
+    /// — habits with no context — carry their rows in the cached array, where
+    /// there is nothing to fetch and nothing to fail.
+    static func fetchedSnapshots(
+        of habits: [Habit],
+        within days: ClosedRange<DayID>? = nil,
+        calendar: Calendar = WeekCalendar.calendar
+    ) throws -> [HabitSnapshot] {
+        guard let context = habits.lazy.compactMap(\.modelContext).first else {
+            return habits.map { $0.snapshot(calendar: calendar) }
+        }
+        let counts = try fetchedDayCounts(of: habits, within: days, in: context)
         return habits.map { habit in
             habit.snapshot(dayCounts: counts[habit.id] ?? [:], calendar: calendar)
         }

@@ -62,7 +62,7 @@ struct WeekRowQuery: EntityQuery {
     }
 
     func suggestedEntities() async throws -> [WeekRowEntity] {
-        WeekWidgetStore.rowNames().map {
+        try WeekWidgetStore.rowNames().map {
             WeekRowEntity(id: $0.id, name: $0.name, isSpacer: $0.isSpacer)
         }
     }
@@ -129,10 +129,17 @@ enum WeekWidgetStore {
     /// they occupy a slot on the home screen exactly as a habit does — which is
     /// the same reason `WeeklyGridView` counts them against the widget's
     /// capacity.
-    static func rowNames() -> [(id: UUID, name: String, isSpacer: Bool)] {
-        guard let container = GlowStore.makeReadOnlyContainer() else { return [] }
+    ///
+    /// **Throws on a failed read** (#282). The caller is an entity query,
+    /// which is `async throws` for exactly this: the system's picker shows its
+    /// own failure and offers the person another try, where a silent `[]` was
+    /// a configuration sheet claiming there is nothing to choose.
+    static func rowNames(
+        container: ModelContainer? = GlowStore.makeReadOnlyContainer()
+    ) throws -> [(id: UUID, name: String, isSpacer: Bool)] {
+        guard let container else { throw GlowStore.Unreadable() }
         let context = ModelContext(container)
-        return (try? context.fetch(descriptor))?.map { ($0.id, $0.name, $0.isSpacer) } ?? []
+        return try context.fetch(descriptor).map { ($0.id, $0.name, $0.isSpacer) }
     }
 
     /// The rows this widget draws over `week`, in the app's own order.
@@ -144,16 +151,36 @@ enum WeekWidgetStore {
     /// Every chosen row comes back, uncut. How many of them fit is the
     /// view's question, because only the view has measured a frame — see
     /// `WidgetRows`.
-    static func rows(chosen: [UUID]?, in week: Week) -> [HabitSnapshot] {
-        guard let container = GlowStore.makeReadOnlyContainer() else { return [] }
+    ///
+    /// **A failed read is `unavailable`, not an empty week** (#282). The
+    /// container failing to open and the fetch failing both used to come back
+    /// as `[]`, which the view drew as "No habits yet" — a database failure
+    /// rendered as the deletion of every habit. The three outcomes now stay
+    /// three all the way to the view. `container` is injectable so a test can
+    /// hand this the failure the simulator cannot produce on demand.
+    static func rows(
+        chosen: [UUID]?, in week: Week,
+        container: ModelContainer? = GlowStore.makeReadOnlyContainer()
+    ) -> StoreRead<[HabitSnapshot]> {
+        guard let container else {
+            WidgetTrace.record("week rows: container unavailable")
+            return .unavailable
+        }
         let context = ModelContext(container)
         // Bounded to the week it draws (#135). A home screen widget reloading
         // every time a completion lands was reading every completion of every
         // habit to fill in seven columns.
-        let all = Habit.snapshots(
-            of: (try? context.fetch(descriptor)) ?? [], within: week.dayIDs()
-        )
-        return WidgetRows.rows(from: all, chosen: chosen)
+        do {
+            let all = try Habit.fetchedSnapshots(
+                of: context.fetch(descriptor), within: week.dayIDs()
+            )
+            return StoreRead(read: WidgetRows.rows(from: all, chosen: chosen))
+        } catch {
+            // Counts and outcomes only, per `WidgetTrace` — never the error's
+            // own text, which can carry a path.
+            WidgetTrace.record("week rows: fetch failed")
+            return .unavailable
+        }
     }
 
     /// One definition, so the picker and the grid cannot offer different rows.

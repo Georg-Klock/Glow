@@ -171,6 +171,10 @@ struct HabitEditorView: View {
         } message: {
             Text("This also removes every day logged against it. It cannot be undone.")
         }
+        // This view is a sheet, and `RootTabView`'s copy of this alert cannot
+        // present under an active sheet — a save failure in here would be
+        // feedback nobody sees. See `operationNoticeAlert()` (#282).
+        .operationNoticeAlert()
     }
 
     /// The background every platter draws, at one radius for all three.
@@ -295,6 +299,9 @@ struct HabitEditorView: View {
             dismiss()
         } catch {
             HabitStore.report(error, operation: "delete")
+            // Destructive: no retry. The delete rolled back and the editor
+            // stays up, still showing the habit that is still there (#282).
+            OperationNotices.shared.report(.delete)
         }
     }
 
@@ -309,6 +316,10 @@ struct HabitEditorView: View {
             dismiss()
         } catch {
             HabitStore.report(error, operation: isEditing ? "update" : "addHabit")
+            // The save rolled back and `dismiss()` was never reached, so the
+            // editor still holds everything that was typed; the retry re-runs
+            // the same save over the same fields (#282).
+            OperationNotices.shared.report(.save) { save() }
         }
     }
 }

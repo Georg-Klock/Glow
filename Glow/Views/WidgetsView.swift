@@ -420,8 +420,11 @@ struct WidgetsView: View {
             date: today,
             week: week,
             // Bounded to the week it draws, exactly as the provider bounds it
-            // (#135).
-            habits: Habit.snapshots(of: habits, within: week.dayIDs())
+            // (#135). This preview reads the app's own live query, which is a
+            // read that already succeeded — so the entry is loaded or empty,
+            // never unavailable, and `StoreRead(read:)` makes that mapping the
+            // same one the provider makes (#282).
+            habits: StoreRead(read: Habit.snapshots(of: habits, within: week.dayIDs()))
         )
     }
 
@@ -442,12 +445,10 @@ struct WidgetsView: View {
     private func monthEntry(for habitID: UUID?) -> MonthEntry {
         let offered = previewHabits
         let chosen = habitID.map { id in offered.first { $0.id == id } } ?? offered.first
-        guard let chosen, let days = MonthGrid.dayRange(containing: today)
-        else { return MonthEntry(date: today, habit: nil) }
-        return MonthEntry(
-            date: today,
-            habit: Habit.snapshots(of: [chosen], within: days).first
-        )
+        guard let chosen, let days = MonthGrid.dayRange(containing: today),
+              let snapshot = Habit.snapshots(of: [chosen], within: days).first
+        else { return MonthEntry(date: today, habit: .empty) }
+        return MonthEntry(date: today, habit: .loaded(snapshot))
     }
 
     /// Asks again. A failure leaves the last answer standing rather than

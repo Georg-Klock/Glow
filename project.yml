@@ -30,6 +30,7 @@ targets:
       - path: GlowWidget/WeekWidgetView.swift
       - path: GlowWidget/MonthWidgetView.swift
       - path: GlowWidget/WeekEntry.swift
+      - path: GlowWidget/WidgetUnavailableView.swift
       # Explicit, and as a resource, because it has to land at the bundle root
       # of the shipped .app. See #132.
       - path: Glow/Resources/PrivacyInfo.xcprivacy
@@ -206,6 +207,7 @@ targets:
       - path: GlowWidget/WeekWidgetView.swift
       - path: GlowWidget/MonthWidgetView.swift
       - path: GlowWidget/WeekEntry.swift
+      - path: GlowWidget/WidgetUnavailableView.swift
       - path: Glow/Logic
       - path: Glow/Models
       - path: Glow/Store

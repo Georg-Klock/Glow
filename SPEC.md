@@ -80,7 +80,11 @@ sentence with an exception is two sentences.
   sends it** — the file is written at the moment of the tap, into the app's own
   temporary directory, and never otherwise. That is a privacy claim true by
   construction rather than by policy. `HistoryExport` is pure and its bytes are
-  asserted.
+  asserted. **And it is all or nothing** (#282): the snapshot read throws, so a
+  fetch failure stops the export before a file exists — no share sheet ever
+  opens over a partial read, no partial file is left behind, and the failure is
+  said out loud with a safe retry (an export is a read; retrying doubles
+  nothing).
 - **No undo — and one action that therefore has to ask twice.** Settings → Data
   → **Reset to Default Habits** deletes every habit and every completion and
   installs `DefaultHabits.all` fresh, which is the way back to the shipped list
@@ -221,6 +225,14 @@ A build that violates one of these is broken regardless of what else works.
 - **R7.** Weeks reset clean. A frequency habit's unmet goal does not carry over.
 - **R8.** The glow is encoded in a colour space with headroom above SDR white.
   Without EDR the app renders flat colour, never a broken or blank slot.
+- **R9.** Empty means read-and-found-nothing, never read-failed (#282). A
+  surface may show "No habits yet" only after a successful read of a store
+  that holds no habits; a failed container or fetch renders a distinct
+  unavailable state that points at the app. And a failed user action is told
+  to the person who acted — a fixed sentence through `OperationNotices`, with
+  a retry only where retrying is safe and never on a destructive operation —
+  not only to the log. Error surfaces never carry habit names, identifiers,
+  paths, or framework error text.
 
 **"Today" is whatever `WeekCalendar.today()` answers**, not what the clock says
 (#204). R1 and R2 are stated against that rather than against the clock, so the
@@ -786,6 +798,20 @@ old one left where it is. A migration that cannot be completed stops the launch
 on a screen that says so rather than starting with an empty list. Without the
 App Group entitlement the app falls back to its own container and keeps working;
 only the widget goes blank, which is a better failure than refusing to launch.
+
+**A widget that cannot read the store says so; it never says "No habits yet"**
+(#282). Empty and unavailable are different facts and each widget draws them
+apart: a store that was read and holds nothing gets the empty state's words,
+and a container or fetch that failed gets a distinct "Data unavailable — Open
+Glow" surface (`WidgetUnavailableView`), because a database failure drawn as
+the deletion of every habit is a false claim about the record. The whole
+widget already deep-links into the app, and a launch that hits the same
+failure lands on the store-unavailable screen, which is the recovery surface.
+The three outcomes travel typed (`StoreRead`) from the store boundary into
+`WeekEntry`/`MonthEntry`, so no view can collapse them again; the widgets'
+configuration pickers throw on a failed read rather than offering an empty
+list, so the system shows its own retry. What the unavailable surface never
+shows is why — no framework error text, no paths, no names.
 
 ## 10. Resolved questions
 

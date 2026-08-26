@@ -447,36 +447,32 @@ struct SettingsView: View {
 
     // MARK: - Export
 
-    enum ExportFormat { case csv, json }
-
-    /// Writes the file, then hands it to the share sheet.
+    /// Writes the file, then hands it to the share sheet — or neither (#282).
     ///
     /// Written at the moment of the tap rather than kept ready: a history file
     /// sitting on disk that nobody asked for is exactly the thing this feature
     /// promises not to make. It goes to the app's own temporary directory,
     /// which the system reclaims.
-    private func export(as format: ExportFormat) {
-        let now = Date()
-        let snapshots = habits.map { $0.snapshot() }
+    ///
+    /// **All or nothing.** The snapshots used to come from the non-throwing
+    /// helpers, which flatten a failed completion fetch into empty history —
+    /// so the one error the share sheet must never paper over was already
+    /// erased before the `do` block began, and a person could share a file
+    /// silently missing rows. `Habit.fetchedSnapshots` keeps the failure, and
+    /// `ExportStore.writeHistory` orders the steps so a throw anywhere leaves
+    /// no file: no share sheet opens over a partial read, and the failure is
+    /// said out loud with a safe retry — the export is a read, so retrying
+    /// cannot double anything.
+    private func export(as format: HistoryExport.Format) {
         do {
-            let text: String
-            let name: String
-            switch format {
-            case .csv:
-                text = HistoryExport.csv(habits: snapshots)
-                name = HistoryExport.filename(on: now, extension: "csv")
-            case .json:
-                text = try HistoryExport.json(habits: snapshots, exportedAt: now)
-                name = HistoryExport.filename(on: now, extension: "json")
+            let url = try exportStore.writeHistory(format: format, exportedAt: Date()) {
+                try Habit.fetchedSnapshots(of: habits)
             }
-            // Written through `ExportStore` rather than straight into the
-            // temporary directory: the file has a lifetime now, and something
-            // has to own it. See #142.
-            let url = try exportStore.write(text, named: name)
             pendingExport = url
             exportFile = HistoryFile(url: url)
         } catch {
             HabitStore.report(error, operation: "exportHistory")
+            OperationNotices.shared.report(.export) { export(as: format) }
         }
     }
 
@@ -550,6 +546,11 @@ struct SettingsView: View {
                     }
                 } catch {
                     HabitStore.report(error, operation: wantsDemo ? "seedDemo" : "removeDemo")
+                    // No retry closure: the toggle below re-reads the record,
+                    // so the switch is already showing the truth, and flipping
+                    // it again *is* the retry — through the same confirmed
+                    // gesture (#282).
+                    OperationNotices.shared.report(.demo)
                 }
                 isDemoSeeded = demo.isSeeded
                 // Demo history writes through `DemoHistory` rather than
@@ -642,6 +643,12 @@ struct SettingsView: View {
             demo.discardLegacyRecord()
         } catch {
             HabitStore.report(error, operation: "resetToDefaults")
+            // Destructive, so no retry is offered — `OperationNotices` would
+            // drop one anyway. The reset is one transaction, so a failure
+            // means the store still holds everything it held, and the message
+            // says exactly that; the way to try again is the typed
+            // confirmation, again (#282).
+            OperationNotices.shared.report(.reset)
         }
         // Whether the reset threw or not: the toggle shows what the store
         // holds, and after a failure that is whatever it held before.

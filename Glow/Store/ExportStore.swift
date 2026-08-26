@@ -46,6 +46,28 @@ struct ExportStore {
         return url
     }
 
+    /// One export, end to end: read, render, write — or nothing (#282).
+    ///
+    /// **All or nothing is the whole contract.** The snapshots arrive through
+    /// a throwing closure so that a failed completion fetch stops the export
+    /// *before* anything exists on disk — the old path had already flattened
+    /// fetch failures into empty history by the time the file was written, so
+    /// a person could share a file silently missing rows. Here the order is
+    /// fixed: every habit and every completion is read, the whole text is
+    /// rendered in memory, and only then does a file get a name. A throw at
+    /// any step leaves the directory exactly as the sweep left it: no partial
+    /// file, nothing to share, and an error the caller must surface.
+    func writeHistory(
+        format: HistoryExport.Format,
+        exportedAt: Date,
+        snapshots: () throws -> [HabitSnapshot]
+    ) throws -> URL {
+        let file = try HistoryExport.file(
+            habits: try snapshots(), format: format, exportedAt: exportedAt
+        )
+        return try write(file.text, named: file.name)
+    }
+
     /// Removes one export, if it is one of ours.
     ///
     /// Called when the share sheet goes away, whether it was used or cancelled —

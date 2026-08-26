@@ -571,6 +571,8 @@ struct WeeklyGridView: View {
             try store.addSpacer()
         } catch {
             HabitStore.report(error, operation: "addSpacer")
+            // A failed save rolled back, so trying again starts clean (#282).
+            OperationNotices.shared.report(.addSpacer) { addSpacer() }
         }
     }
 
@@ -596,6 +598,10 @@ struct WeeklyGridView: View {
             refreshReach()
         } catch {
             HabitStore.report(error, operation: "startWithDefaults")
+            // One transaction, so a failure left the store empty exactly as it
+            // was — which is the only state this button is offered on, so the
+            // retry re-runs the same unguarded install (#282).
+            OperationNotices.shared.report(.installDefaults) { startWithDefaults() }
         }
     }
 
@@ -762,6 +768,10 @@ struct WeeklyGridView: View {
             }
         } catch {
             HabitStore.report(error, operation: "toggleCompletion")
+            // The failed save rolled back, so the day still holds what it held
+            // and a retry is a fresh toggle of it — the same request the tap
+            // was making. The message names no habit and no day (#282).
+            OperationNotices.shared.report(.mark) { toggle(habit, on: day) }
         }
     }
 
@@ -814,6 +824,11 @@ struct WeeklyGridView: View {
             try store.reorder(habits, from: source, to: destination)
         } catch {
             HabitStore.report(error, operation: "reorder")
+            // No retry closure: the captured offsets describe a list the next
+            // render re-draws from the store, where nothing moved — so the
+            // honest retry is the drag itself, against what is on screen
+            // (#282).
+            OperationNotices.shared.report(.reorder)
         }
     }
 
@@ -833,6 +848,10 @@ struct WeeklyGridView: View {
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
             HabitStore.report(error, operation: "delete")
+            // Destructive: no retry is offered, and `OperationNotices` would
+            // drop one anyway. The delete rolled back, the row is still there,
+            // and going again means the same swipe (#282).
+            OperationNotices.shared.report(.delete)
         }
     }
 }
