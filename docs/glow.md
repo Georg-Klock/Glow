@@ -438,6 +438,16 @@ store had just reopened. `ToggleHabitIntent` now clears the note when the
 toggle is not a completion, scoped to that habit so one undo does not swallow
 another habit's fade.
 
+**The tapped mark no longer waits for any of this** (#292). Since the marks
+became AppIntent-backed `Toggle`s (`SlotToggle`), the system flips the tapped
+mark's own pixels at the tap, before the provider runs — so reload latency
+now delays only the burst and the rest of the row, not the acknowledgement.
+The burst's first frame still draws the ring at full opacity, which after an
+optimistic dot reads as dot → ring → dot; whether the cross-fade earns its
+place under an optimistic control is an open question recorded in
+docs/decisions.md, and it belongs to the transition owner (#267), not to the
+control.
+
 **The rendering has since been watched, and it half-works** (#40): the entries
 render — this is not the sweep's failure — but not at the rate they were
 sampled at, so the sampled spring came out as a stutter rather than a close.

@@ -4654,3 +4654,62 @@ worth recording beside the lane: an iPhone 12 Pro Max on iOS 18.6.2 ran a
 Debug build of `main` on 2026-08-25 — extension registered, widgets placed,
 intents performed, store loaded in 4–10ms. That is a run-there proof, not a
 correctness proof; the lane is what gates the claim from now on.
+
+## The widget's mark is a Toggle, and it draws the state it asked for
+
+**2026-08-26.** The tappable marks in both widgets were `Button(intent:)`, and
+a button's pixels are the entry's: however fast `MarkHabitIntent` wrote, the
+mark held its old shape until WidgetKit scheduled the provider and composited
+the result — 431ms and 3.17s measured on a phone (#121), which is the gap
+people filled by tapping again (#272). They are now `Toggle(isOn:intent:)`
+behind one control, `SlotToggle`, whose style renders `configuration.isOn`:
+the one mechanism WidgetKit offers for pixels that change at the tap. This is
+the second half of #292; #295's idempotent set was the first.
+
+**Believed, on Apple's word:** an AppIntent-backed widget `Toggle` updates its
+appearance optimistically while `perform()` runs, *provided* the style draws
+`configuration.isOn` rather than anything captured from the snapshot. That
+proviso is the entire design of `SlotMarkToggleStyle` — both faces are built
+from the entry, but which one shows is the system's bit, so the system can
+flip it before the intent has run.
+
+**Measured, in a simulator (iPhone 17 Pro, iOS 26.5):** all three call sites —
+week slot, week span, month cell — perform through the placed widget, and the
+ordering is visible in `WidgetTrace`. On an undo tap, a screenshot taken
+immediately afterwards showed the mark already mid-flip while the entry-driven
+label still said done; the tap line landed in the trace after that frame, and
+the provider ran 4.2s after the tap. Changed pixels before the provider ran
+can only be the toggle. What a simulator cannot say is how it *feels* on a
+phone — whether the flip lands inside the finger's dwell — and nobody has
+looked yet.
+
+**Decided along the way:**
+
+- **The faces are per call site, the control is not.** A slot's completed face
+  carries the burst cross-fade; a span's faces carry its width and rest
+  window; the month's are plain marks. `SlotToggle` owns the toggle, the
+  style, and the spoken strings; the call sites own what a face looks like,
+  which is exactly the split `SlotMarkView` already draws along.
+- **A span's optimistic frame is its own two states at its own geometry.** Tap
+  an open span and the ask goes quiet — `.openToday` to the same unlit
+  structure a filled span draws (#47). The lit dot on today and the
+  re-division of the row are the store's answers, and they arrive with the
+  reload; the toggle owns its own pixels and nothing beside them.
+- **VoiceOver follows `isOn`.** Label and hint are computed inside the style
+  from the same bit the pixels are drawn from, so the announcement agrees with
+  the optimistic state; the system adds the toggle's on/off value from that
+  bit too. Reduce Motion is untouched: the flip is a state change, not
+  motion, so acknowledgement survives it, and the burst stays the thing
+  Reduce Motion skips.
+- **Which marks are interactive did not move.** Tappability is still
+  `Slot.isTappable`, `SlotSpan.isTappable` and `MonthCell.isTappable`; a mark
+  that takes no tap is a plain `SlotMarkView` with no control trait, exactly
+  as before. `WidgetPlacementTests` now scans `GlowWidget/` for
+  `Button(intent` so the migration cannot quietly regress one call site.
+
+**Not decided here:** the burst's first frame draws the ring at full opacity,
+which is now the second time the dot has been on screen — optimistic dot,
+ring, cross-fade back to dot. Whether the cross-fade still earns its place
+when the acknowledgement it was standing in for happens at the tap is #267's
+question and stays open; nothing about `WidgetBurst`, its window, or the
+intent's write path moved with this change.

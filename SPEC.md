@@ -154,6 +154,18 @@ toggle can do is silently retract a record of something that happened. **The
 app's own surfaces keep the toggle**, because they redraw in-process from the
 store they just wrote and are never the stale caller this is about.
 
+**And the mark draws the state it asked for, without waiting** (#292). The
+tappable mark is an AppIntent-backed `Toggle` whose style renders
+`configuration.isOn` — the one mechanism WidgetKit gives an app for pixels
+that change at the tap rather than after the provider has been scheduled,
+which #121 measured at seconds. The tap flips the mark in place, the intent
+writes, and the guaranteed reload reconciles to the store — which is also how
+a refusal takes an optimistic flip back. `SlotToggle` owns the control; the
+week's slots and spans and the month's cell are its three call sites, and a
+mark that is not tappable is not a `Toggle`, exactly as it was never a
+`Button`. VoiceOver's label, value and hint follow the same `isOn` the pixels
+do, so the announcement cannot lag the mark.
+
   **It fires from the home screen only** (#103). The Island does not render a
   Live Activity while its own app is in the foreground, so a goal met inside
   the app would spend its two seconds on nobody. `GoalPopCentre` is called from
@@ -627,13 +639,14 @@ said how much of the week was done without saying what of, and a size only
 legible to somebody who already knows their own row order is not a size worth
 offering. Removing a family is not removing a kind (#209): `GlowWidget` serves
 the same kind string, so a placed medium or large is untouched and a placed
-small stops being served. Today's slot is a button backed by an
-`AppIntent`, so a habit can be logged from the home screen without launching
-the app. Past days are not buttons here even though the app's own grid now
-edits them: a widget is a glance and a single confirmed action, and it has no
-touch location to resolve a span's column with. `SlotEditing.todayOnly` is how
-the surface says so, and `HabitStore` refuses a day ahead whatever the surface
-offers.
+small stops being served. Today's slot is an `AppIntent`-backed toggle
+(`SlotToggle`, #292), so a habit can be logged from the home screen without
+launching the app and the mark flips at the tap rather than at the next
+provider run. Past days are not tappable here even though the app's own grid
+now edits them: a widget is a glance and a single confirmed action, and it has
+no touch location to resolve a span's column with. `SlotEditing.todayOnly` is
+how the surface says so, and `HabitStore` refuses a day ahead whatever the
+surface offers.
 Rows are as many as fit, then a hard cut — no "+N more" row, per
 docs/vision.md: a row spent saying how much is missing is a row not showing a
 habit. The app's own grid marks the boundary, where there is room to say it.
@@ -683,9 +696,9 @@ intended.
 as marks on weekday columns — the same marks the week draws, decided by
 `MonthGrid` asking `WeekGrid`, so the two surfaces cannot disagree about a
 day. The 1st sits under the weekday it really falls on, so the first and last
-rows are ragged. The habit is chosen per widget. Today's dot is a button
-through `MarkHabitIntent` — no other day is, which is R2 in a third grid —
-and everything else opens This Week. Two readings held deliberately small
+rows are ragged. The habit is chosen per widget. Today's dot is the same
+`SlotToggle` through `MarkHabitIntent` — no other day is tappable, which is R2
+in a third grid — and everything else opens This Week. Two readings held deliberately small
 until decided otherwise (#41): an N×/week habit's empty days are sockets,
 never crosses — the week grid's own rule, not a per-week verdict — and rest
 days get no month-specific treatment beyond what `WeekGrid` already says
