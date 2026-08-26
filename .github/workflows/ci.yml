@@ -53,6 +53,12 @@ jobs:
       - name: The release validator rejects what it claims to reject
         run: python3 Tools/check-release-build.py --self-test
 
+      # #281: the entitlement denylist is a gate whose whole job is a build
+      # that does not exist yet, so only fixtures can watch it fail. The real
+      # check runs inside Tools/generate.sh on the macOS lane.
+      - name: The project validator rejects what it claims to reject
+        run: python3 Tools/check-project.py --self-test
+
   build-and-test:
     name: Build and test
     # Pinned rather than macos-latest: the test suite reads gain-map metadata,

@@ -130,8 +130,17 @@ settled did not go with it.
   the device SDK and `Tools/ship-testflight.sh` runs it on the archive and on
   the exported `.ipa`, so the gate and the release path cannot disagree about
   what "matching" means. What it checks is declared in
-  `Tools/test-inventory.json`. See #133.
+  `Tools/test-inventory.json`. See #133. With `--require-signing` it also
+  rejects the six iCloud/ubiquity entitlement keys and anything outside its
+  entitlement allowlist in what the signature grants — the artifact half of
+  the local-only invariant (#281).
 - **Validate the generated project on its own:** `Tools/check-project.py`
+  (and `--self-test`). Besides App Groups and extension-only API, it rejects
+  iCloud/ubiquity entitlements and any capability or entitlement outside its
+  allowlist — the requested half of the local-only invariant (#281), whose
+  source half is `LocalOnlyContractTests` (`cloudKitDatabase: .none` at every
+  production store, and no network/CloudKit API spellings outside a reviewed
+  allowlist).
 - **Check whether a checkout may ship, without shipping:**
   `Tools/ship-testflight.sh --preflight-only`
 

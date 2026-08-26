@@ -454,7 +454,11 @@ enum StoreMigration {
     static func inventory(of store: URL) -> Inventory? {
         guard FileManager.default.fileExists(atPath: store.path) else { return nil }
         do {
-            let configuration = ModelConfiguration(schema: GlowStore.schema, url: store)
+            // `.none`, like every production store (#281): a migration helper
+            // must not be the one call site that inherits `.automatic`.
+            let configuration = ModelConfiguration(
+                schema: GlowStore.schema, url: store, cloudKitDatabase: .none
+            )
             let container = try ModelContainer(for: GlowStore.schema, configurations: configuration)
             let context = ModelContext(container)
             let habits = try context.fetch(FetchDescriptor<Habit>())
