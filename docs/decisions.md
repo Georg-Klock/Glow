@@ -4339,3 +4339,51 @@ swallow the fade another is owed.
 **Not decided here:** whether a repeat tap on the same habit inside a short
 window should be a no-op rather than a toggle (#272). That is a change to the
 only path that writes history and wants its own decision.
+
+## A mark from a widget sets a state; it does not flip one
+
+**2026-08-25.** `ToggleHabitIntent` flipped whatever the store held. It is now
+`MarkHabitIntent`, it carries the state the tapped mark was asking for, and
+`HabitStore.setCompletion` writes only when the day is not already in it
+(#272, #292).
+
+**Two failures, one complaint.** #272 reported "checking off several habits
+quickly un-does them", and a device trace found two separate mechanisms that a
+toggle turns into the same bug.
+
+*Delivered twice.* On an iPhone 14 Pro a single tap performed the intent twice,
+**13ms apart** — far too fast to be two thumbs. Under a toggle the second
+performance undid the first, so four taps in one flurry netted no change to the
+record at all.
+
+*Stale.* A later flurry on the same phone showed every provider answering in
+42–320ms while the person reported the widgets "did not respond quickly at
+all" — so the lag is between the timeline being handed back and the pixels
+appearing, which nothing in this app controls. During that window the widget
+draws an open ring for a day the store already holds as done. A toggle reads
+the tap as "flip it" and **removes a completion somebody was trying to make**.
+Four of the taps in that flurry came back `undone`.
+
+**The asymmetry is the argument.** The worst a set can do is nothing; the worst
+a toggle can do is silently retract a record of something that happened. #272
+proposed a narrower fix — treat a repeat tap inside a short window as a no-op —
+and it was declined: the window is a guess about human timing, too small to
+catch the stale case and too large to allow a genuine correction. Idempotence
+needs no window and has no tuning.
+
+**`toggleCompletion` stays, and the app keeps it.** The grid redraws in-process
+from the store it just wrote, so it is never the stale caller. A toggle is now
+the degenerate case of a set — read the day, ask for its opposite — so the
+guards live once and the two paths cannot drift on what a rest day means.
+
+**A fourth outcome.** `ToggleOutcome.unchanged` is the idempotent no-op, and it
+is worth naming rather than folding into `.refused`: a caller that animates on
+`.completed` now animates once per real change rather than once per delivery,
+and the widget trace says `already done` where it used to say `done` a second
+time. `WeeklyGridView` handles it beside the refusal and says why it cannot
+arrive there.
+
+**Not done here:** the optimistic-rendering half of #292 — a widget control
+that draws the state it just requested while `perform()` runs. That is what
+would fix the *perceived* latency, and it is a separate change to the view
+rather than to the write path.

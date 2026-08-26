@@ -251,7 +251,7 @@ struct WeekPreferencesTests {
         )
         let habit = try store.addHabit(name: "Run", icon: "🏃", frequency: .daily)
 
-        // This is the write path `ToggleHabitIntent` calls, so the widget
+        // This is the write path `MarkHabitIntent` calls, so the widget
         // process is refused here too — a stale widget can still offer the
         // button, and the store rather than the surface is what says no.
         #expect(try store.toggleCompletion(for: habit, on: today) == .refused)

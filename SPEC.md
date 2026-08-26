@@ -134,10 +134,30 @@ sentence with an exception is two sentences.
   running activity rather than requesting another; the ending belongs to the
   most recent one, so nothing is cut short.
 
+**A mark from a widget sets a state; it does not flip one** (#272, #292).
+`MarkHabitIntent` carries the state the tapped mark was *asking for* — a ring
+means "make this done", a dot means "make it not done" — and
+`HabitStore.setCompletion` writes only if the day is not already in it. Asking
+twice logs once.
+
+The reason is that a widget is the wrong surface for a relative operation, and
+both of its failure modes turn a toggle into the same bug. **It can be
+delivered twice**: a single tap has been measured performing the intent twice,
+13ms apart, on an iPhone 14 Pro. **And it can be stale**: WidgetKit's pixels
+lag the store by seconds, so a tap lands on a ring for a day the store already
+holds as done, and a toggle reads that as "flip" and removes the completion the
+person was making. Both produced the same complaint — checking habits off
+quickly un-does them.
+
+The asymmetry settles it: the worst a set can do is nothing, and the worst a
+toggle can do is silently retract a record of something that happened. **The
+app's own surfaces keep the toggle**, because they redraw in-process from the
+store they just wrote and are never the stale caller this is about.
+
   **It fires from the home screen only** (#103). The Island does not render a
   Live Activity while its own app is in the foreground, so a goal met inside
   the app would spend its two seconds on nobody. `GoalPopCentre` is called from
-  `ToggleHabitIntent` and from nowhere else — it was two intents until #209
+  `MarkHabitIntent` and from nowhere else — it was two intents until #209
   took the ring's away; the app's
   acknowledgement is the one it already had, which is the ring closing and the
   row going quiet.
@@ -377,7 +397,7 @@ reason demo history does: the phone is where this app is tested.
 (`WeekPreferences.restDay`) and handed to the grids as a parameter rather than
 looked up by them (#181), is true rest: its slot is never open, never
 missed, and never writable. Nothing can be logged on it and nothing un-logged
-— `HabitStore.toggleCompletion` refuses the write, which holds in the widget's
+— `HabitStore.setCompletion` refuses the write, which holds in the widget's
 process too, where a stale surface can still offer a button — and the week is
 not made up around it: an unreachable weekly goal on a rest week is stopped,
 not excused. Frequency rows stop with it: on the rest day nothing is open, so
@@ -664,7 +684,7 @@ as marks on weekday columns — the same marks the week draws, decided by
 `MonthGrid` asking `WeekGrid`, so the two surfaces cannot disagree about a
 day. The 1st sits under the weekday it really falls on, so the first and last
 rows are ragged. The habit is chosen per widget. Today's dot is a button
-through `ToggleHabitIntent` — no other day is, which is R2 in a third grid —
+through `MarkHabitIntent` — no other day is, which is R2 in a third grid —
 and everything else opens This Week. Two readings held deliberately small
 until decided otherwise (#41): an N×/week habit's empty days are sockets,
 never crosses — the week grid's own rule, not a per-week verdict — and rest

@@ -369,7 +369,13 @@ private struct WidgetSpan: View {
             habitName: habit.name, state: span.state, actionDay: span.actionDay
         )
         if span.isTappable {
-            Button(intent: ToggleHabitIntent(habitID: habit.id)) { mark }
+            // `done:` is the complement of what this span drew, so the
+            // request is the one the mark was making (#272). A stale surface
+            // or a duplicated delivery then asks for the same state twice
+            // rather than flipping it back.
+            Button(intent: MarkHabitIntent(
+                habitID: habit.id, done: span.state != .filled
+            )) { mark }
                 .buttonStyle(.plain)
                 .accessibilityLabel(label)
                 .accessibilityHint(SlotVoice.hint(isDone: span.state == .filled))
@@ -410,7 +416,9 @@ private struct WidgetSlot: View {
         // of it. Seven dated facts is a row; it is a month and a year of them
         // that get counted into a sentence instead (`HistoryVoice`).
         if slot.isTappable {
-            Button(intent: ToggleHabitIntent(habitID: habitID)) {
+            Button(intent: MarkHabitIntent(
+                habitID: habitID, done: slot.state != .filled
+            )) {
                 shape
             }
             .buttonStyle(.plain)

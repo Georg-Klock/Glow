@@ -173,7 +173,9 @@ private struct MonthCellView: View {
                 // surface edits and nothing more (#116). The same intent as the
                 // week widget's slot, so the store's rules — including a
                 // refusal — cannot differ by surface.
-                Button(intent: ToggleHabitIntent(habitID: habit.id)) { mark }
+                Button(intent: MarkHabitIntent(
+                    habitID: habit.id, done: cell.mark != .doneToday
+                )) { mark }
                     .buttonStyle(.plain)
                     .accessibilityLabel(SlotVoice.label(
                         habitName: habit.name, mark: cell.mark, day: cell.date
