@@ -4922,3 +4922,48 @@ whose `-importPlatform` accepts what its `-exportPath` writes — test it the
 way this was tested, locally, both directions, before trusting it on CI —
 or the lane's download cost stops being acceptable, in which case the
 alternative is a runner image that carries the runtime, not this cache.
+
+## The schema is versioned from today, and history is not invented (#283)
+
+**2026-08-25.** Production opened a plain `Schema([Habit.self,
+Completion.self])` and left compatibility to lightweight inference. It now
+opens through `GlowSchemaV1` — an immutable snapshot of the shape shipping
+today — and `GlowMigrationPlan`, via the one open both processes share,
+`GlowStore.container(at:readOnly:)`. Behaviour is identical by construction:
+V1 lists the same two model types, the plan has one version and no stages,
+and `SchemaContractTests.plannedOpenReadsAPrePlanStore` proves a store
+written the old way reads back unchanged through the new open, writable and
+read-only both.
+
+**The upgrade floor is TestFlight builds, and the issue's offer of
+reconstructed history is declined.** #283 suggested rebuilding materially
+different shipped shapes from tagged commits and checking in historical store
+fixtures. No public release exists; every store in the world was written by a
+TestFlight build whose stored shape is exactly what V1 froze — the earlier
+stored-shape changes were additive-with-default, so those builds' stores
+*are* V1-shaped, with the row backfills owning the contents. Versions
+invented for shapes no surviving store can hold would be history nobody can
+test honestly, so the floor is documented instead: pre-floor stores are
+unsupported, fail to open, and land on `StoreUnavailableView` in the app and
+on the widget's *unavailable* state (#282) — refused, not improvised over,
+and never overwritten.
+
+**What the gate is.** `SchemaContractTests` freezes the metadata as literals
+— entity names, every attribute with its value type, both relationships with
+their delete rules, the version 1.0.0, the plan's contents. A model edit that
+changes stored metadata fails the suite, and the fix is a decision: a
+`GlowSchemaV2` plus a `MigrationStage` in the same change, or an explicit
+finding that the store is unchanged. The literals are the point — an
+expectation derived from the model would move with every edit and gate
+nothing.
+
+**The order of the three migration layers is now written down** (in
+`GlowMigrationPlan`'s comment): file location first (`StoreMigration.run`,
+whole DB/WAL/SHM sets, schema-blind), shape second (this plan, at container
+open), row contents last (`stampDayIdentities`, `DailyHabitMigration`, each
+defined by what is still undone). None marks another complete.
+
+**Not decided here:** what V2 is. The dead columns (`timesPerDay`,
+`accentRaw`) and the CloudKit-shaped optionality stay exactly as they are —
+dropping them is the first real stage's decision, taken when there is a
+reason, against a floor that now exists to upgrade from.
