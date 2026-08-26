@@ -47,7 +47,9 @@ struct HistoryExportTests {
         // `completionCounts` is a dictionary and dictionaries have no order.
         // Without the sort, exporting the same history twice could produce two
         // different files, which is the kind of thing nobody notices until a
-        // diff of two backups is unreadable.
+        // diff of two exports is unreadable. (Exports, not backups: nothing
+        // here restores anything, and the one comment that said "backups" was
+        // the one place in the repository that did. See #285.)
         let habits = [
             habit("Zebra", .daily, [19: 1, 17: 1, 18: 1]),
             habit("Apple", .daily, [18: 1, 17: 1]),
