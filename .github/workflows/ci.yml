@@ -178,3 +178,112 @@ jobs:
           path: Artifacts/
           if-no-files-found: error
           retention-days: 14
+
+  # #286: the project declares iOS 18.0 and the lane above runs on whichever
+  # runtime is newest — which proves nothing about the declared minimum; the
+  # audited green run executed on iOS 26.5. This lane runs the same
+  # authoritative suite on the oldest supported runtime, as its own job so a
+  # compatibility failure is legible as one and the current lane's evidence
+  # stays comparable to a developer machine's. The CI-time cost is accepted;
+  # keeping the 18.0 target and gating it is the decision.
+  build-and-test-min:
+    name: Build and test (iOS 18)
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      # The newest iOS 18 simulator runtime Apple ships. Bump deliberately;
+      # the runtime cache key follows this value.
+      GLOW_MIN_IOS: "18.5"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Cache the pinned XcodeGen
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: Tools/.xcodegen
+          key: xcodegen-${{ hashFiles('Tools/xcodegen.pin') }}
+
+      - name: Install the pinned XcodeGen
+        run: Tools/install-xcodegen.sh
+
+      # The runner image ships only current runtimes. The dmg is gigabytes
+      # from Apple's CDN, so it is cached; `-exportPath` downloads without
+      # installing, and `simctl runtime add` installs from the file — the same
+      # path a cache hit takes, so both are exercised by whichever happens.
+      - name: Cache the iOS 18 simulator runtime
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: Tools/.ios-runtime
+          key: ios-simulator-runtime-${{ env.GLOW_MIN_IOS }}
+
+      - name: Install the iOS 18 simulator runtime
+        run: |
+          if xcrun simctl runtime list | grep -q "iOS ${GLOW_MIN_IOS}"; then
+            echo "iOS ${GLOW_MIN_IOS} runtime already installed"
+          else
+            if ! ls Tools/.ios-runtime/*.dmg >/dev/null 2>&1; then
+              mkdir -p Tools/.ios-runtime
+              xcodebuild -downloadPlatform iOS \
+                -buildVersion "$GLOW_MIN_IOS" \
+                -exportPath Tools/.ios-runtime
+            fi
+            xcrun simctl runtime add Tools/.ios-runtime/*.dmg
+          fi
+          xcrun simctl runtime list
+
+      # The smallest iPhone the declared minimum supports, created explicitly
+      # rather than trusted to exist — the whole lane is about not inheriting
+      # whatever the image happens to have.
+      - name: Create the minimum-iOS iPhone
+        run: |
+          RUNTIME_ID=$(xcrun simctl list runtimes --json | /usr/bin/python3 -c '
+          import json, sys
+          runtimes = [r for r in json.load(sys.stdin)["runtimes"]
+                      if r.get("platform") == "iOS"
+                      and r["version"].startswith("18.")
+                      and r.get("isAvailable")]
+          if not runtimes:
+              raise SystemExit("error: no available iOS 18 runtime after install")
+          print(max(runtimes, key=lambda r: r["version"])["identifier"])
+          ')
+          xcrun simctl create "Glow minimum iPhone" \
+            com.apple.CoreSimulator.SimDeviceType.iPhone-SE-3rd-generation \
+            "$RUNTIME_ID"
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun simctl list runtimes | grep iOS || true
+
+      - name: Generate and validate the project
+        run: Tools/generate.sh
+
+      # GLOW_EXPECTED_RUNTIME_MAJOR restricts selection to iOS 18 and then
+      # asserts the chosen device matches — the lane fails loudly rather than
+      # falling forward to the image's newer runtime, which is exactly the
+      # failure #286 names.
+      - name: Run tests on the minimum iOS
+        env:
+          GLOW_ERASE_SIMULATOR: "1"
+          GLOW_EXPECTED_RUNTIME_MAJOR: "18"
+        run: Tools/test.sh
+
+      - name: Publish the verdict
+        if: always()
+        run: |
+          summary=$(ls Artifacts/*/summary.md 2>/dev/null | head -1 || true)
+          if [ -n "$summary" ]; then
+            cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No summary was written — the run did not reach the validator." \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-run-min-ios-${{ github.run_id }}-${{ github.run_attempt }}
+          path: Artifacts/
+          if-no-files-found: error
+          retention-days: 14

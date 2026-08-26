@@ -4514,3 +4514,49 @@ versioned-migration decision, not a lint fix. The dependency-manifest and
 Mach-O linkage scans from the issue's fuller programme are also not here; the
 zero-third-party baseline currently has nothing to scan, and a `Package.swift`
 arriving would be its own loud review.
+
+## The declared minimum iOS gets a lane, and the suite says where it ran
+
+**2026-08-26.** #286 found the contradiction plainly: `project.yml` declares
+iOS 18.0, `Tools/test.sh` deliberately picks the newest installed runtime, and
+the audited green run executed on iOS 26.5 — so the support promise was
+compiled against, never run against. The decision, made rather than
+relitigated here: **keep the 18.0 deployment target and gate it**, accepting
+the CI-time cost of a second macOS lane. Raising the target is the fallback
+if the lane cannot be kept green, and it is a product decision with a user
+cost, not a CI convenience.
+
+**`Tools/test.sh` keeps its default and gains a contract.** "Newest installed"
+stays right for a developer machine — portability was the point (#221 queues,
+#245 accessibility, all of it unchanged). What was missing is the way to say
+"this run must be iOS 18": `GLOW_EXPECTED_RUNTIME_MAJOR` restricts the
+selection to that major and then *asserts* the chosen device matches,
+including a device pinned by `GLOW_SIMULATOR_UDID` — filtered at selection and
+checked after it, because the failure #286 names is precisely a lane that
+quietly runs on the wrong runtime and reports green. Both rejection paths
+were watched firing on a machine with only iOS 26.5 installed: no matching
+device (names the installed runtimes), and a pinned device on the wrong
+runtime (names the device and both versions). Where a run happened is now
+evidence, not inference: runtime and device go to the console, to
+`<run>/simulator.txt` beside the log — so a crashed run still says which
+phone it died on — and onto the end of `summary.md`, which CI publishes.
+
+**The minimum lane installs its own runtime.** The `macos-26` image ships no
+iOS 18 simulator; the lane downloads the newest iOS 18.x runtime with
+`xcodebuild -downloadPlatform iOS -buildVersion` to an export path, caches the
+dmg (`actions/cache`, keyed by the pinned version — the same argument as the
+XcodeGen cache), installs it with `simctl runtime add`, and creates an iPhone
+SE (3rd generation) on it — the smallest phone the minimum supports, created
+explicitly because the whole lane is about not inheriting what the image
+happens to have. The suite then runs with `GLOW_EXPECTED_RUNTIME_MAJOR=18`
+and its own erase, artifact and verdict, as a separate job so a
+compatibility failure reads as one.
+
+**Not done here, and said on the issue:** the UI/integration smoke target
+#286 proposes (launch, historical store, widget configuration metadata,
+smallest-device accessibility envelope) is real and separate work; the lane
+runs the full existing suite, which is what exists to run. A device fact
+worth recording beside the lane: an iPhone 12 Pro Max on iOS 18.6.2 ran a
+Debug build of `main` on 2026-08-25 — extension registered, widgets placed,
+intents performed, store loaded in 4–10ms. That is a run-there proof, not a
+correctness proof; the lane is what gates the claim from now on.
