@@ -4431,3 +4431,35 @@ the device-only gaps instead of faking them.
 
 **Not decided here:** whether the export grows into a restorable backup.
 That is #285, and it has its own entry.
+
+## The export is a history export, and a backup is declined (#285)
+
+**2026-08-25.** #285 laid out what a restorable backup would take — a
+versioned `.glowbackup` envelope, an import with validation, preview and
+crash-safe replace — and the decision is to not build it. The CSV and JSON
+stay what they are: human-readable projections of the history, made to be
+read in a spreadsheet or parsed, and lossy by construction. CSV has no row
+for a habit never logged; JSON drops IDs, order, spacers, provenance and
+settings. Neither can reconstruct the app, and neither claims to.
+
+**The premise the issue names is accepted, and answered the other way.** A
+person can export, lose the phone, and find the file does not restore what
+they had — which is why the file must never be *called* a backup. History is
+phone-only; there is no recovery promise; losing the phone loses it. The OS
+backup remains whatever the person's own choice covers (see the #284 entry
+above), and Glow neither brands that as recovery nor removes it.
+
+**What the sweep found.** App UI copy, SPEC.md, the docs and the sources were
+searched for "backup", "back up", "restore", "recover" and every
+lose-your-phone phrasing. The product copy was already clean — the feature is
+"Export History", the Settings footer says "Every habit and every day you
+logged it, as a file", and SPEC §"There is one" describes a file handed to a
+share sheet, nothing more. The single offender in the repository was a test
+comment in `HistoryExportTests` that said "a diff of two backups"; it now
+says exports, and says why.
+
+**Declined, not deferred by accident:** the `.glowbackup` format, the import
+path, and any merge semantics. If phone-loss recovery ever becomes part of
+the product it is #285's design — a separate format with its own version,
+limits and crash-safe replace — and reopening this entry is that decision,
+not a rediscovery.
