@@ -150,6 +150,40 @@ but a build. It glows. Measured on an iPhone 14 Pro, iOS 26.
 The lesson is the same one this file already records twice: the assumption was
 load-bearing, cheap to check, and wrong. Check the cheap ones.
 
+## The Dynamic Island does not glow
+
+**Measured on an iPhone 14 Pro, iOS 26.5.2, 2026-08-25** — the glow slider at
+**12**, the app's default, and the pop fired from the Home Screen, which is the
+only place it is visible at all (`GoalPopCentre` records why). Looked at by
+Georg: **it does not glow.**
+
+That closes claim 3 of #101, and it closes it the way the issue asked — "do not
+assume either answer" — because the reasoning available beforehand pointed both
+ways. `GoalPopActivity` uses the same `glowing` modifier and the same PQ tile as
+every other surface in this app, which argued yes. The Island is composited by a
+separate rendering path this app never touches, which argued no. Only looking
+settled it.
+
+**This is the first surface the technique has reached and failed on.** The
+score is now: the app glows, the widget glows — after being written off on
+exactly this reasoning and measured anyway — a browser glows, and the Island
+does not. The pattern in the three successes was that the tile ends up in a
+`View` this app draws and the system composites *unchanged*; the Island is the
+first case where the system re-renders the content into a surface of its own,
+and the headroom does not survive that.
+
+The app icon is the second (#269), which is the same shape of failure through a
+different pipeline: an asset composited by SpringBoard, where a 12x PQ source
+came back with everything above SDR white clamped to 255. Two surfaces, two
+private compositors, the same answer — which is now enough of a pattern to
+state as a prior rather than as a surprise. **Where this app hands a system
+compositor an image and does not draw the final view, expect the headroom to be
+dropped, and measure before believing otherwise.**
+
+What is *not* established is why, and there is no route to it from here: the
+Island's rendering is chronod's and nothing in this app can instrument it. The
+pop still says what it says; it says it in ordinary white.
+
 ## The breathing: built, then removed
 
 The lit slot used to pulse: the glowing layer's opacity eased between 0.85 and
