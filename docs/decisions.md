@@ -4387,3 +4387,47 @@ arrive there.
 that draws the state it just requested while `perform()` runs. That is what
 would fix the *perceived* latency, and it is a separate change to the view
 rather than to the write path.
+
+## Every copy keeps the platform's defaults, and that is the policy (#284)
+
+**2026-08-25.** Glow sets no backup-exclusion and no file-protection
+attribute on anything it writes, and after the audit #284 asked for, that is
+now the decided policy rather than the unexamined default. The inventory —
+every copy, what the OS does with it, and what only a device can measure — is
+`docs/data-inventory.md`; `BackupPolicyTests` holds the code to it.
+
+**No recovery promise, and no prevented recovery either.** History is
+phone-only: losing the phone loses it, and nothing in the app claims
+otherwise. The tempting next step — `isExcludedFromBackup` on the store, so
+the claim becomes airtight — was considered and declined, because it converts
+"Glow does not promise recovery" into "Glow guarantees loss". The OS backup
+carries whatever the person's own backup choice covers, under keys the person
+controls: an unencrypted or password-encrypted local backup, iCloud Backup
+under standard data protection, or under Advanced Data Protection. None of
+that is Glow-managed sync, and Glow neither advertises it nor opts out of it.
+
+**The protection class was never a choice.** The widget reads the store while
+the phone is locked; the only class that permits that is
+`completeUntilFirstUserAuthentication`, which is what the OS grants when no
+`default-data-protection` entitlement is declared — and none is.
+"Hardening" the store past it would present as a privacy improvement and
+ship as a widget that goes blank at the lock screen. The test asserts the
+entitlement's absence for exactly that reason.
+
+**What the audit found**, at current `main`: nine copies, one of them outside
+the backup set — the temporary export, excluded by living in `tmp/` rather
+than by any attribute, which is the right shape for a plaintext file whose
+lifetime is one share sheet. The quarantine copies — potentially the sole
+survivors of some history — sit inside the backup set, which is exactly where
+a copy kept *because deleting it was refused* belongs. Nothing needed
+changing.
+
+**What is honestly unmeasured.** The simulator does not implement per-file
+Data Protection, so no CI test can read the class a phone would enforce, and
+no backup→wipe→restore protocol has been run. The tests assert what is real —
+the absence of the attribute APIs in source, the absence of the entitlement,
+and a meaningful resource-value read on an export — and the inventory names
+the device-only gaps instead of faking them.
+
+**Not decided here:** whether the export grows into a restorable backup.
+That is #285, and it has its own entry.
