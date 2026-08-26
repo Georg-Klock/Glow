@@ -16,6 +16,12 @@ a screen whose entire job is to be read at a glance. The cost is that the glow
 render is cached per colour as well as per size, which is a slightly larger
 cache and nothing else.
 
+> **Superseded** (marked 2026-08-25, #288). The app committed to one glow
+> colour for every habit — see "Two colours, both opaque" (#111, 2026-08-22)
+> further down, and the note on `Habit.accentRaw`, which is retained unread
+> only so the schema does not change. The text above stands as the record of
+> what was decided when the question was first taken.
+
 ## Icon: a curated SF Symbols set
 
 **Question.** Emoji free-text, or a curated SF Symbols set?
@@ -4767,3 +4773,52 @@ wanted), and any `mailto:` path, which cannot carry an attachment and was
 ruled out in the issue. What only hardware can answer — the composer
 presenting over Settings on a phone with a real Mail account — is noted in
 the PR rather than claimed.
+
+## The agent documentation gets an authority order, and a gate to hold it
+
+**2026-08-25.** #288 audited the instruction graph and found high-salience
+statements contradicting the shipped app: `CLAUDE.md` opened with "a one-screen
+iPhone habit tracker" and told agents the code is the backlog wherever
+`docs/vision.md` disagrees; `SPEC.md` said `firstWeekday` is forced to Monday;
+`docs/ARCHITECTURE.md` listed the tabs in the wrong order, gave the week widget
+three families, and said the app is one screen and three sheets; store comments
+called the widget a second writer *process*; and both `CLAUDE.md` and the PR
+template carried literal test counts as the expected form — every numeric
+example ever written into either had gone stale.
+
+**What was believed.** That each document could be written as equally
+authoritative and kept current by the "update the docs in the same session"
+rule. The audit showed the failure mode: the same fact lives in six places,
+five get updated, and the sixth still reads as an instruction — the Widgets tab
+was nearly filed for removal on exactly that reading (#235).
+
+**What was verified.** Every contradiction the audit named was re-checked
+against current `main` rather than the audit's baseline `a03fea9`, eight merges
+stale by tonight. Two had already been fixed on the way here — `SPEC.md` §9
+documents Week-Small's removal (PR #277) and carries `MarkHabitIntent`'s
+set-not-toggle rule (#272, #292) — and the rest still stood. The process claim
+was verified against the type itself: `MarkHabitIntent` is a
+`LiveActivityIntent` and runs in the app's process (#58), on a per-tap
+container of its own, so the second *writer* is a context, not a process; the
+widget extension renders in its own process but writes nothing.
+
+**What was decided.** `CLAUDE.md` now opens with an explicit authority order —
+founder invariants, then current code with SPEC/ARCHITECTURE, then the dated
+vision, then this file (latest superseding entry wins), then closed issues,
+then open issues and PRs as unverified backlog. The confirmed contradictions
+are corrected in place, the numeric `L1 n/n` examples are gone everywhere in
+favour of pasting the script's own output, and `Tools/check-docs.py` — with a
+`--self-test` that mutates fixtures the way the other two gates do — fails CI's
+Linux gate job when a known contradiction is reintroduced into a normative
+document. This file is structurally exempt from that gate: a history is allowed
+to say what used to be true, which is also why the per-habit-accent entry above
+gained a visible superseded marker rather than an edit.
+
+**What was deliberately not decided.** No incident material moved out of
+`CLAUDE.md` into runbooks — each retained entry is the rationale an agent needs
+to apply the rule beside it, and relocation is its own change with its own
+anchor breakage. `docs/vision.md` keeps its own "this document is the target"
+framing, because #235 already litigated how that sentence handles exceptions;
+what changed is that `CLAUDE.md` no longer repeats it without the caveat. And
+the gate stays narrow on purpose: four reintroductions it can name exactly, no
+broad word blacklist, so honest historical discussion stays writable.

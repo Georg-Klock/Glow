@@ -1,9 +1,11 @@
 import Foundation
 
-/// A single Monday-to-Sunday week, as seven midnights.
+/// A single week, as seven midnights, starting on the calendar's own
+/// `firstWeekday` — the Settings choice, Monday by default. See
+/// `WeekPreferences.firstWeekday`.
 struct Week: Equatable, Sendable {
-    /// Seven days, Monday first, each normalized to midnight in the calendar
-    /// that produced them.
+    /// Seven days, the week's first day first, each normalized to midnight in
+    /// the calendar that produced them.
     let days: [Date]
 
     var start: Date { days[0] }
