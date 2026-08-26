@@ -4532,6 +4532,65 @@ names `gh run list --commit <sha>`: "wait" is the usual fix.
 that is repository governance, listed on #287 for Georg with the exact ruleset
 settings, since required CI and blocked force-pushes should not wait on it.
 
+## Local-only stops being a lucky alignment and becomes an invariant
+
+**2026-08-26.** #281's audit found no network client, no third-party
+dependency, no CloudKit entitlement and no direct network linkage — a verified
+strength resting on nothing. The app was local-only because several
+independent facts happened to agree, and not one of them would have failed a
+build when it stopped being true. This change makes each of them a gate.
+
+**The store API said `.automatic` by omission, and now says `.none` by hand.**
+`ModelConfiguration`'s `cloudKitDatabase:` parameter defaults to `.automatic`
+— managed CloudKit, if an entitlement lets SwiftData find a container. All
+three production call sites (the writable store, the widget's read-only store,
+the migration inventory) now pass `.none` explicitly, and the migration helper
+mattered as much as the stores: a helper opening historical files must not be
+the one call site that inherits the default. `TestSupport`'s file-backed
+stores say it too, so a test store is configured the way the store it stands
+in for is. `LocalOnlyContractTests.storesSayNone` walks every production
+source, balances the parentheses of every `ModelConfiguration(` call, and
+fails the one that stops saying it — with a floor of three call sites so the
+scan cannot rot into vacuous passing.
+
+**The entitlement is held closed from both ends, because the two ends have
+already been seen to disagree.** The six iCloud/ubiquity keys are rejected by
+name — plus anything outside an allowlist — in what the generated project
+*requests* (`Tools/check-project.py`, which gained `--self-test`, 11 fixtures,
+run on the Linux gate) and in what the signature actually *grants*
+(`Tools/check-release-build.py --require-signing`, 8 new fixtures, 24 total).
+The release checker's allowlist admits what distribution signing injects
+(`application-identifier`, team id, `get-task-allow`, `beta-reports-active`,
+`keychain-access-groups`) and a fixture holds that a realistic distribution
+signature keeps passing — the gate that fails every real `.ipa` on the
+machine that ships is a gate that gets deleted, not obeyed. The two checkers
+carry the denylist as two copies on purpose: each runs alone on machines the
+other never sees, and each proves its own copy fires.
+
+**The source scan starts with #281's exact spellings** — `import CloudKit`,
+`CKContainer`, `URLSession`, `import Network`, `WKWebView` and the rest — over
+`Glow/` and `GlowWidget/`, comment lines excluded, `Tests/` exempt by
+construction. A match is a *reviewed rejection*: the allowlist is an array of
+(file, spelling, reason) in the test, empty today, and widening it is the
+reviewable event. This is the `TestIsolationTests` pattern — the property is
+the absence of a call, and no runtime assertion can observe an absence.
+
+**What this deliberately does not claim.** The privacy-manifest tests' comment
+used to say the assertion stopped a future dependency changing the product
+statement; it could not — it reads what the manifests *declare*, and code can
+change without touching a manifest. The comment now says which gate does
+which. None of this proves Apple's frameworks never communicate internally;
+it proves that changing *Glow's* surface — a call site, an entitlement, an
+API name — fails a review gate instead of passing silently.
+
+**Not done, on purpose:** the CloudKit-shaped schema comments in
+`Habit.swift` and `Completion.swift` stand. #281 explicitly does not authorize
+a schema rewrite — removing optionality or adding uniqueness constraints is a
+versioned-migration decision, not a lint fix. The dependency-manifest and
+Mach-O linkage scans from the issue's fuller programme are also not here; the
+zero-third-party baseline currently has nothing to scan, and a `Package.swift`
+arriving would be its own loud review.
+
 ## The widget's mark is a Toggle, and it draws the state it asked for
 
 **2026-08-26.** The tappable marks in both widgets were `Button(intent:)`, and
