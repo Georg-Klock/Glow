@@ -342,10 +342,18 @@ if [ "$STATUS" -ne 0 ] || [ "$VALIDATION" -ne 0 ]; then
   echo
   echo "Evidence for this run is in $RUN"
   if grep -q "Render baseline" "$LOG" 2>/dev/null && grep -q "✘.*signature" "$LOG" 2>/dev/null; then
+    # The baseline is per OS major where one is committed (#286): a run on a
+    # runtime that has its own file must approve into that file, not into the
+    # current runtime's.
+    RUNTIME_MAJOR=$(printf '%s' "$RUNTIME_ID" | sed 's/.*iOS-\([0-9][0-9]*\)-.*/\1/')
+    BASELINE="RenderTests/Baselines/render-signatures.json"
+    if [ -f "RenderTests/Baselines/render-signatures-ios${RUNTIME_MAJOR}.json" ]; then
+      BASELINE="RenderTests/Baselines/render-signatures-ios${RUNTIME_MAJOR}.json"
+    fi
     echo
     echo "The render baseline moved. If the change was intended, approve it:"
     echo "  cp $RUN/attachments/named/render-signatures-actual*.json \\"
-    echo "     RenderTests/Baselines/render-signatures.json"
+    echo "     $BASELINE"
     echo "and say in the pull request what moved and why."
   fi
   # Written as an if rather than as `[ … ] && exit`, which under `set -e`

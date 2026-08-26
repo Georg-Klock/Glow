@@ -4626,6 +4626,26 @@ happens to have. The suite then runs with `GLOW_EXPECTED_RUNTIME_MAJOR=18`
 and its own erase, artifact and verdict, as a separate job so a
 compatibility failure reads as one.
 
+**The lane's first full run settled two things by measurement.** First,
+`xcodebuild -downloadPlatform iOS -exportPath` *installs* the runtime as well
+as exporting the dmg — an unconditional `simctl runtime add` on the file it
+had just written failed with `SimDiskImageErrorDomain` code 6 and left an
+Unusable duplicate image, so the add now runs only when no usable iOS 18
+runtime is present, which is the cache-hit path. Second, and the real
+finding: **all 551 unit tests pass on iOS 18.5 unchanged** — logic, store,
+migration, accessibility, the lot — and what fails is exactly the render
+baseline, because a baseline is a picture of one renderer's output and the
+renderer is the OS's. The same commit that moves no cell between two
+simulator *models* moves cells past the tolerance and the ground share by up
+to 7.4 points between iOS 26.5 and iOS 18.5 (`week medium configured`: 84.0%
+pure black against 76.6%). So the baseline is per OS major where a major is
+gated: `render-signatures-ios18.json` sits beside the unsuffixed current
+file, `committedBaseline()` picks by `operatingSystemVersion`, and the iOS 18
+file's contents are the lane's own attached `render-signatures-actual.json` —
+approved from the artifact of the run that measured it, which is the same
+approval flow the current runtime has always used. `Tools/test.sh`'s approval
+hint names the per-major destination when one exists.
+
 **Not done here, and said on the issue:** the UI/integration smoke target
 #286 proposes (launch, historical store, widget configuration metadata,
 smallest-device accessibility envelope) is real and separate work; the lane
