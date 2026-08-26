@@ -25,8 +25,18 @@ silently dropped rather than diagnosed when it is absent.
 The previous check was textual and failed open: it repaired what it recognised
 and said nothing when it recognised nothing. A generator whose output format
 moves is exactly the case where recognising nothing is the likely outcome.
+
+And one thing checked here is the opposite shape: a value the build does *not*
+need, whose arrival would be silent too. Glow's promise is that habit data
+never leaves the device except through an explicit share, and the road
+SwiftData's `.automatic` CloudKit default would take runs through an iCloud
+entitlement. So the entitlements are held to an allowlist — the App Group and
+nothing else — and the six iCloud/ubiquity keys are rejected by name, so that
+enabling sync is a reviewed change to this file rather than a capability
+checkbox nobody diffs. `--self-test` proves each rejection fires. See #281.
 """
 
+import argparse
 import json
 import plistlib
 import subprocess
@@ -37,6 +47,25 @@ PROJECT = Path("Glow.xcodeproj/project.pbxproj")
 
 APP_GROUP = "group.com.georgklock.glow"
 CAPABILITY = "com.apple.ApplicationGroups.iOS"
+
+# The local-only denylist (#281): every route by which managed CloudKit or
+# ubiquity storage reaches a build has one of these keys in front of it.
+FORBIDDEN_ENTITLEMENTS = (
+    "com.apple.developer.icloud-container-identifiers",
+    "com.apple.developer.icloud-container-development-container-identifiers",
+    "com.apple.developer.icloud-container-environment",
+    "com.apple.developer.icloud-services",
+    "com.apple.developer.ubiquity-container-identifiers",
+    "com.apple.developer.ubiquity-kvstore-identifier",
+)
+
+# What a Glow target may ask to be entitled to. Widening this list is the
+# reviewable event.
+ALLOWED_ENTITLEMENT_KEYS = {"com.apple.security.application-groups"}
+
+# Capabilities the generated project may declare per target. The iCloud
+# capability arriving here is the same decision as an entitlement arriving.
+ALLOWED_CAPABILITIES = {CAPABILITY}
 
 # Targets that must carry the App Groups capability and the entitlement.
 GROUPED_TARGETS = ("Glow", "GlowWidget")
@@ -96,6 +125,45 @@ def check_capability(objects: dict, target_attributes: dict, target_id: str, nam
     if str(entry.get("enabled")) != "1":
         fail(f'{name}: "{CAPABILITY}" is present but not enabled ({entry.get("enabled")!r}).')
 
+    for message in capability_policy_failures(capabilities, name):
+        fail(message)
+
+
+def capability_policy_failures(capabilities: dict, name: str) -> list[str]:
+    """Capabilities outside the allowlist, as messages. Pure, for the self-test."""
+    out = []
+    for key, entry in sorted(capabilities.items()):
+        if key in ALLOWED_CAPABILITIES:
+            continue
+        enabled = isinstance(entry, dict) and str(entry.get("enabled")) == "1"
+        state = "enabled" if enabled else f"present ({entry!r})"
+        out.append(
+            f'{name}: SystemCapabilities declares "{key}", {state}. Glow is '
+            "local-only (#281); a new capability is a product decision, and it "
+            "starts by widening the allowlist in Tools/check-project.py."
+        )
+    return out
+
+
+def entitlement_policy_failures(entitlements: dict, label: str) -> list[str]:
+    """Entitlement keys Glow must not request, as messages. Pure, for the self-test."""
+    out = []
+    for key in sorted(entitlements):
+        if key in FORBIDDEN_ENTITLEMENTS:
+            out.append(
+                f"{label}: entitlement {key} is on the iCloud/ubiquity denylist. "
+                "It is the road SwiftData's `.automatic` CloudKit default needs, "
+                "and Glow's local-only promise (#281) closes it here, where a "
+                "capability change becomes a reviewable diff."
+            )
+        elif key not in ALLOWED_ENTITLEMENT_KEYS:
+            out.append(
+                f"{label}: entitlement {key} is outside the reviewed allowlist "
+                f"({sorted(ALLOWED_ENTITLEMENT_KEYS)}). If it is deliberate, widen "
+                "the allowlist in Tools/check-project.py in the same change."
+            )
+    return out
+
 
 def build_settings(objects: dict, target: dict) -> dict[str, dict]:
     """Every configuration name -> build settings, for one target."""
@@ -132,6 +200,9 @@ def check_entitlements(settings: dict[str, dict], name: str) -> None:
         elif APP_GROUP not in groups:
             fail(f"{name} ({config}): {path} does not contain {APP_GROUP} (has {groups}).")
 
+        for message in entitlement_policy_failures(entitlements, f"{name} ({config})"):
+            fail(message)
+
 
 def check_extension_only(settings: dict[str, dict], name: str) -> None:
     for config, values in sorted(settings.items()):
@@ -144,7 +215,68 @@ def check_extension_only(settings: dict[str, dict], name: str) -> None:
             )
 
 
+def self_test() -> int:
+    """Fixtures, each proving a policy rejection fires. See #138 for the shape.
+
+    The App Groups checks are exercised daily by every real generation; the
+    denylist is the part whose whole job is a build that does not exist yet,
+    so a fixture per forbidden key is the only way to watch it fail.
+    """
+    scenarios: list[tuple[str, dict, str | None]] = [
+        ("the App Group alone passes",
+         {"com.apple.security.application-groups": [APP_GROUP]}, None),
+    ]
+    for key in FORBIDDEN_ENTITLEMENTS:
+        scenarios.append((
+            f"{key.rsplit('.', 1)[-1]} is rejected",
+            {"com.apple.security.application-groups": [APP_GROUP], key: ["x"]},
+            "iCloud/ubiquity denylist",
+        ))
+    scenarios.append((
+        "an entitlement outside the allowlist is rejected",
+        {"com.apple.security.application-groups": [APP_GROUP],
+         "aps-environment": "production"},
+        "outside the reviewed allowlist",
+    ))
+
+    bad = 0
+    for name, entitlements, expected in scenarios:
+        messages = entitlement_policy_failures(entitlements, "fixture")
+        ok = (not messages) if expected is None \
+            else any(expected in message for message in messages)
+        detail = "" if ok else f" — got {messages}"
+        print(f"  {'ok  ' if ok else 'FAIL'} {name}{detail}")
+        bad += 0 if ok else 1
+
+    capability_scenarios: list[tuple[str, dict, str | None]] = [
+        ("the App Groups capability alone passes",
+         {CAPABILITY: {"enabled": "1"}}, None),
+        ("the iCloud capability is rejected",
+         {CAPABILITY: {"enabled": "1"}, "com.apple.iCloud": {"enabled": "1"}},
+         "local-only"),
+        ("an unknown capability is rejected even disabled",
+         {CAPABILITY: {"enabled": "1"}, "com.apple.Push": {"enabled": "0"}},
+         "local-only"),
+    ]
+    for name, capabilities, expected in capability_scenarios:
+        messages = capability_policy_failures(capabilities, "fixture")
+        ok = (not messages) if expected is None \
+            else any(expected in message for message in messages)
+        detail = "" if ok else f" — got {messages}"
+        print(f"  {'ok  ' if ok else 'FAIL'} {name}{detail}")
+        bad += 0 if ok else 1
+
+    total = len(scenarios) + len(capability_scenarios)
+    print(f"check-project self-test: {total - bad}/{total} scenarios")
+    return 1 if bad else 0
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--self-test", action="store_true")
+    if parser.parse_args().self_test:
+        return self_test()
+
     data = load()
     objects = data["objects"]
 
@@ -183,7 +315,8 @@ def main() -> int:
         return 1
 
     checked = ", ".join(sorted(set(GROUPED_TARGETS + EXTENSION_TARGETS)))
-    print(f"check-project: App Groups, entitlements and extension-only API verified on {checked}")
+    print(f"check-project: App Groups, entitlements (within the local-only allowlist) "
+          f"and extension-only API verified on {checked}")
     return 0
 
 
