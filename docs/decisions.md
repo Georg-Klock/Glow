@@ -3449,7 +3449,6 @@ column is not empty, and a column is not empty for lots of reasons. Naming the
 tone is what stops the next fixture edit putting a dot back on a sample point
 without anything noticing.
 
-
 ## A fresh install chooses its starting point (#228)
 
 **2026-08-23.** `HabitSeeder` is deleted. A fresh install used to open with
@@ -4025,7 +4024,6 @@ different week, the walk must take exactly one step per week of record, arrive a
 spread across two years including both of Havana's midnight clock changes —
 11,268 steps a zone.
 
-
 ## The pop defaults to everything, for a new install (#185)
 
 **2026-08-24.** #185 asked the question and #119 had already supplied the reasoning without acting on it: the objection frequent pops raise — "twenty of these a day on a screen whose whole argument is that it says one thing" — is about the grid, and a pop was never on the grid. It is two seconds over the Island and leaves nothing behind. Georg's answer: people need encouragement. `PopPreferences.Level.unset.effective` moves from `.goals` to `.everything`.
@@ -4590,6 +4588,72 @@ versioned-migration decision, not a lint fix. The dependency-manifest and
 Mach-O linkage scans from the issue's fuller programme are also not here; the
 zero-third-party baseline currently has nothing to scan, and a `Package.swift`
 arriving would be its own loud review.
+
+## The declared minimum iOS gets a lane, and the suite says where it ran
+
+**2026-08-26.** #286 found the contradiction plainly: `project.yml` declares
+iOS 18.0, `Tools/test.sh` deliberately picks the newest installed runtime, and
+the audited green run executed on iOS 26.5 — so the support promise was
+compiled against, never run against. The decision, made rather than
+relitigated here: **keep the 18.0 deployment target and gate it**, accepting
+the CI-time cost of a second macOS lane. Raising the target is the fallback
+if the lane cannot be kept green, and it is a product decision with a user
+cost, not a CI convenience.
+
+**`Tools/test.sh` keeps its default and gains a contract.** "Newest installed"
+stays right for a developer machine — portability was the point (#221 queues,
+#245 accessibility, all of it unchanged). What was missing is the way to say
+"this run must be iOS 18": `GLOW_EXPECTED_RUNTIME_MAJOR` restricts the
+selection to that major and then *asserts* the chosen device matches,
+including a device pinned by `GLOW_SIMULATOR_UDID` — filtered at selection and
+checked after it, because the failure #286 names is precisely a lane that
+quietly runs on the wrong runtime and reports green. Both rejection paths
+were watched firing on a machine with only iOS 26.5 installed: no matching
+device (names the installed runtimes), and a pinned device on the wrong
+runtime (names the device and both versions). Where a run happened is now
+evidence, not inference: runtime and device go to the console, to
+`<run>/simulator.txt` beside the log — so a crashed run still says which
+phone it died on — and onto the end of `summary.md`, which CI publishes.
+
+**The minimum lane installs its own runtime.** The `macos-26` image ships no
+iOS 18 simulator; the lane downloads the newest iOS 18.x runtime with
+`xcodebuild -downloadPlatform iOS -buildVersion` to an export path, caches the
+dmg (`actions/cache`, keyed by the pinned version — the same argument as the
+XcodeGen cache), installs it with `simctl runtime add`, and creates an iPhone
+SE (3rd generation) on it — the smallest phone the minimum supports, created
+explicitly because the whole lane is about not inheriting what the image
+happens to have. The suite then runs with `GLOW_EXPECTED_RUNTIME_MAJOR=18`
+and its own erase, artifact and verdict, as a separate job so a
+compatibility failure reads as one.
+
+**The lane's first full run settled two things by measurement.** First,
+`xcodebuild -downloadPlatform iOS -exportPath` *installs* the runtime as well
+as exporting the dmg — an unconditional `simctl runtime add` on the file it
+had just written failed with `SimDiskImageErrorDomain` code 6 and left an
+Unusable duplicate image, so the add now runs only when no usable iOS 18
+runtime is present, which is the cache-hit path. Second, and the real
+finding: **all 551 unit tests pass on iOS 18.5 unchanged** — logic, store,
+migration, accessibility, the lot — and what fails is exactly the render
+baseline, because a baseline is a picture of one renderer's output and the
+renderer is the OS's. The same commit that moves no cell between two
+simulator *models* moves cells past the tolerance and the ground share by up
+to 7.4 points between iOS 26.5 and iOS 18.5 (`week medium configured`: 84.0%
+pure black against 76.6%). So the baseline is per OS major where a major is
+gated: `render-signatures-ios18.json` sits beside the unsuffixed current
+file, `committedBaseline()` picks by `operatingSystemVersion`, and the iOS 18
+file's contents are the lane's own attached `render-signatures-actual.json` —
+approved from the artifact of the run that measured it, which is the same
+approval flow the current runtime has always used. `Tools/test.sh`'s approval
+hint names the per-major destination when one exists.
+
+**Not done here, and said on the issue:** the UI/integration smoke target
+#286 proposes (launch, historical store, widget configuration metadata,
+smallest-device accessibility envelope) is real and separate work; the lane
+runs the full existing suite, which is what exists to run. A device fact
+worth recording beside the lane: an iPhone 12 Pro Max on iOS 18.6.2 ran a
+Debug build of `main` on 2026-08-25 — extension registered, widgets placed,
+intents performed, store loaded in 4–10ms. That is a run-there proof, not a
+correctness proof; the lane is what gates the claim from now on.
 
 ## The widget's mark is a Toggle, and it draws the state it asked for
 
