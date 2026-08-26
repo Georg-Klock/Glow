@@ -32,6 +32,13 @@ jobs:
       - name: The release validator rejects what it claims to reject
         run: python3 Tools/check-release-build.py --self-test
 
+      # #288: known documentation contradictions must not come back. The gate
+      # proves itself against mutation fixtures, then checks the working tree.
+      - name: The docs gate rejects what it claims to reject
+        run: |
+          python3 Tools/check-docs.py --self-test
+          python3 Tools/check-docs.py
+
   build-and-test:
     name: Build and test
     # Pinned rather than macos-latest: the test suite reads gain-map metadata,

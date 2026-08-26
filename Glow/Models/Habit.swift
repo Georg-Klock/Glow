@@ -156,8 +156,9 @@ final class Habit {
     /// a calendar is not, because the calendar can change under it.
     ///
     /// This said the identity half was the seam a cache belongs behind. **It is
-    /// not cached** (#135): two processes write this store and only one of them
-    /// says so, so nothing here can know when to let go. What the expensive half
+    /// not cached** (#135): a second context writes this store —
+    /// `MarkHabitIntent`, on a per-tap container of its own — and never says
+    /// so, so nothing here can know when to let go. What the expensive half
     /// got instead is a bound — see `Habit.dayCounts(of:within:in:)`, which is
     /// what a surface drawing a week or a month or a year calls, and which reads
     /// those days rather than all of them.
@@ -223,14 +224,16 @@ final class Habit {
     /// SwiftData rather than a Swift error — nothing here could catch it even
     /// if something were placed to try.
     ///
-    /// The rows go out from under it because **two processes write this store**.
-    /// `MarkHabitIntent` opens its own `ModelContainer`
-    /// against the same App Group file, and nothing tells the app's context to
-    /// re-fetch when the widget's deletes a completion. The app tells the widget
-    /// about every write it makes; the reverse path does not exist.
+    /// The rows go out from under it because **a second context writes this
+    /// store**. `MarkHabitIntent` opens its own `ModelContainer` against the
+    /// same App Group file — in the app's process, since `LiveActivityIntent`
+    /// (#58), which changes nothing here: peer containers do not notify each
+    /// other — and nothing tells the app's live context to re-fetch when the
+    /// intent's deletes a completion. The app tells the widget about every
+    /// write it makes; the reverse path does not exist.
     ///
     /// So this reads through the context instead. A fetch cannot hand back a
-    /// row that is already gone, which sidesteps cross-process invalidation
+    /// row that is already gone, which sidesteps cross-context invalidation
     /// rather than requiring it — that is the more complete fix and it is a
     /// separate question, because whether SwiftData exposes persistent-history
     /// notifications the way Core Data does is not established here.
@@ -372,10 +375,10 @@ final class Habit {
     /// **Per render, not across renders, and that is deliberate** (#135, #145).
     /// The tempting version of this is a cache on the habit, taken once and
     /// invalidated when the app writes. It cannot be made honest here: the
-    /// widget's intents open their own container against the same App Group
-    /// file, the app is never told when they write, and a cache the other
-    /// process cannot invalidate is a wrong number that survives until
-    /// something unrelated redraws. So the pass is shared within one render and
+    /// widget's tap intent opens its own container against the same App Group
+    /// file, the app's live contexts are never told when it writes, and a
+    /// cache the writing context cannot invalidate is a wrong number that
+    /// survives until something unrelated redraws. So the pass is shared within one render and
     /// dropped at the end of it, which is a cost the *number of habits* no
     /// longer multiplies.
     ///

@@ -5,8 +5,11 @@ which in the same session you find it.
 
 ## 1. Concept
 
-A habit tracker whose weekly overview is the whole app: a grid of habits by
-day, filled when done.
+A habit tracker built around one weekly overview: a grid of habits by day,
+filled when done. Two more tabs stand beside it — Widgets, which is how the
+main product gets onto a Home Screen, and Settings — see `docs/vision.md`'s
+three-screen section; the grid is where the work happens and where every
+launch lands.
 
 Today's column physically glows on HDR-capable screens: it is drawn from an
 image encoded in a colour space with real headroom above SDR white, which is
@@ -190,10 +193,14 @@ moment in every zone, so 19 August compared unequal to itself after a flight,
 left the grid, and let the next tap write a second row for a day that already
 had one.
 
-**Week boundary.** Weeks start Monday, matching the M T W T F S S header. All
-"this week" queries filter into `[startOfWeek(Monday), +7 days)` using the
-user's calendar, with `firstWeekday` forced to Monday. Locale would otherwise
-decide, and in the US that means Sunday, silently shifting every column.
+**Week boundary.** A week starts on the weekday Settings says it does:
+`WeekPreferences.firstWeekday`, defaulting to Monday and never to the locale's
+answer — locale would say Sunday in the US and silently shift every column,
+and the week start is not a formatting detail here, because it decides which
+seven days a "week" of habits is and so which completions count toward a
+weekly goal. All "this week" queries filter into `[startOfWeek, +7 days)`
+using the user's calendar with that `firstWeekday` applied, and the weekday
+header rotates to match (`WeekCalendar.weekdayInitials`).
 
 ## 5. Invariants
 
@@ -250,7 +257,8 @@ than trusting it.
 Each habit is one row: icon and name on the left, a fixed-width status track on
 the right.
 
-- **Daily:** 7 equal slots, Monday to Sunday, day-pinned.
+- **Daily:** 7 equal slots, one per weekday in the calendar's own week order,
+  day-pinned.
 - **N per week:** N equal slots, the same height as a daily one, filling the
   same total track width.
 
@@ -397,8 +405,10 @@ reason demo history does: the phone is where this app is tested.
 (`WeekPreferences.restDay`) and handed to the grids as a parameter rather than
 looked up by them (#181), is true rest: its slot is never open, never
 missed, and never writable. Nothing can be logged on it and nothing un-logged
-— `HabitStore.setCompletion` refuses the write, which holds in the widget's
-process too, where a stale surface can still offer a button — and the week is
+— `HabitStore.setCompletion` refuses the write, which holds for the widget's
+taps too, because its surface renders in another process and can still offer a
+stale button (the tap itself arrives through `MarkHabitIntent`, in the app's
+process since #58's `LiveActivityIntent` conformance) — and the week is
 not made up around it: an unreachable weekly goal on a rest week is stopped,
 not excused. Frequency rows stop with it: on the rest day nothing is open, so
 nothing glows.
@@ -499,8 +509,8 @@ delete could land as history on whatever came next. Deleting the row outright
 is what provides that now; it used to be provided by retiring the `id` of the
 blank row left behind. The store also refuses every day-shaped write to a blank
 row or to a habit of the wrong cadence, on the same reasoning as the rest day's
-refusal: the widget runs in a second process and its surface can outlive what it
-draws, so the rule lives on the write path both processes share.
+refusal: the widget's surface renders in a second process and can outlive what
+it draws, so the rule lives on the one write path every surface's tap reaches.
 
 **"Daily" meant two different things, and one of them is gone** (#209). The
 editor had a `Daily` segment meaning *counted within a day* — a ring on Today,
@@ -589,7 +599,8 @@ where the crossfade already was.
 
 ## 8. Acceptance criteria
 
-- [x] A daily habit shows exactly 7 circles for the current Monday-Sunday week.
+- [x] A daily habit shows exactly 7 circles for the current week, in the
+      calendar's own week order.
 - [x] An N-times habit shows exactly N pills, per the width formula, with the
       same margins as a daily row.
 - [x] Tapping today's open slot marks it complete, persists a `Completion`, and

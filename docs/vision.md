@@ -87,8 +87,9 @@ visited one.
 - **The previews are the shipping views**, laid out at the size the family
   really gets and then scaled to fit — not illustrations, and not a fixture. A
   preview of somebody else's week is a mockup with extra steps.
-- **"Added" is per size, not per widget.** The week widget is small, medium and
-  large, each placed independently; having one says nothing about the others.
+- **"Added" is per size, not per widget.** The week widget is medium and large
+  (small shipped as a third and was dropped — PR #277), each placed
+  independently; having one says nothing about the other.
 - **Placed widgets stay on the page**, marked, rather than dropping off it. What
   is already on the Home Screen belongs beside what is not.
 - **The instructions are said once, above everything.** No API places a widget

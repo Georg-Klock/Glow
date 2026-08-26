@@ -1,7 +1,8 @@
 # Glow Up
 
-A one-screen iPhone habit tracker. The one twist is in the name: a mark
-**physically glows** on an HDR-capable screen.
+An iPhone habit tracker: three tabs — Widgets, This Week, Settings — around
+one weekly grid. The one twist is in the name: a mark **physically glows** on
+an HDR-capable screen.
 
 **Light marks the habit; what stays dark is what never happened.** Today's open
 slot glows because it is still actionable, and every completion glows too,
@@ -22,10 +23,35 @@ contradicting §1. See #75 and docs/decisions.md. The ring itself went to
 `feature/daily-habits-2.0` with the rest of the per-day kind (#209); what it
 settled did not go with it.
 
+## What outranks what
+
+When two sources disagree, the higher one on this list is the one to follow —
+and the disagreement is worth fixing in the same session, because a
+contradiction left standing reads as an instruction to whoever finds it next.
+
+1. **Founder invariants** — the settled product and safety rules: local-only,
+   no telemetry, nothing leaves the device unless a person sends it; SPEC §1's
+   light rule; the working rules in this file.
+2. **Current code, with `SPEC.md` and `docs/ARCHITECTURE.md`** — shipped
+   behaviour. Where the code and those two disagree, one of them is a bug; say
+   which.
+3. **`docs/vision.md`** — the dated target. Aspirational unless a section says
+   it shipped; it does not describe what the app does today.
+4. **`docs/decisions.md`** — historical, append-only. The latest entry that
+   explicitly supersedes an earlier one wins; an early entry is what was
+   decided then, not necessarily what is true now.
+5. **Closed issues** — snapshots of the moment they were written.
+6. **Open issues and PRs** — backlog hypotheses. Verify their claims against
+   the current code before acting on them; file:line references and counts in
+   an issue body go stale.
+
 ## Read first
 
-- `docs/vision.md` — **the target.** The product intent as three screens, dated.
-  Where the code disagrees with it, the code is the backlog.
+- `docs/vision.md` — **the dated target.** The product intent as three screens.
+  Where the code disagrees with it, that is backlog to raise, not a licence to
+  move the app back toward the prose — a stale line there once left the Widgets
+  tab one reading away from being filed for removal (#235). The authority order
+  above is the rule.
 - `SPEC.md` — product truth for what exists today.
 - `docs/glow.md` — how the glow actually works, and why PQ rather than gain
   maps. **Read this before touching anything HDR.** Every gain-map encoding came
@@ -134,8 +160,18 @@ settled did not go with it.
 - **Validate the generated project on its own:** `Tools/check-project.py`
 - **Validate a kept result bundle on its own:**
   `Tools/validate-test-result.py --xcresult Artifacts/latest/Glow.xcresult`
-- **Check the gates themselves:** `Tools/validate-test-result.py --self-test`
-  and `Tools/check-release-build.py --self-test`. Both run on every push, on a
+- **Check the documentation for known contradictions:** `Tools/check-docs.py`
+
+  Fails when a contradiction this repository has already paid to remove comes
+  back into a normative document: a literal `L1 n/n` count, the app described
+  as a single screen, the week start described as fixed to one weekday rather
+  than as a setting, or the week widget's dropped small family stated as
+  current. Narrow on purpose — it scans for those reintroductions, not for
+  prose it dislikes, and `docs/decisions.md` is exempt because a history is
+  allowed to say what used to be true. See #288.
+- **Check the gates themselves:** `Tools/validate-test-result.py --self-test`,
+  `Tools/check-release-build.py --self-test` and
+  `Tools/check-docs.py --self-test`. All run on every push, on a
   Linux runner: a checker nobody checks can weaken silently.
 
 CI runs the tests on every pull request and on merges to `main`
@@ -162,8 +198,12 @@ lives has already been seen to differ between platform versions.
   generic "AI". No `Co-Authored-By` trailer when Claude is the author; it would
   name the same party twice. **Commits Georg genuinely wrote stay his** — the
   practice only works if it is accurate in both directions.
-- **Run `Tools/test.sh` before opening a PR and state the count in the body**
-  ("L1 143/143"). A PR that does not state its result has not been tested.
+- **Run `Tools/test.sh` before opening a PR and paste its verdict in the body**
+  — the `L1 <passed>/<ran>` line the script itself printed, verbatim, never a
+  number remembered or copied from an earlier PR. A PR that does not state its
+  result has not been tested. `Tools/check-docs.py` fails on a literal count
+  written into this file or the PR template, because every one that was ever
+  written here went stale.
 - **Tests must exercise the real types** (`@testable import Glow`). Never
   re-implement app logic inside a test file — a mirror copy passes forever while
   the app regresses.

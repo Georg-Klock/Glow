@@ -327,8 +327,9 @@ struct HabitStore {
     /// remembered.
     ///
     /// **A fetch, for the same reason `Habit.liveCompletions` is one** (#145):
-    /// the cached `completions` array can be missing a row the widget's process
-    /// wrote and can be holding one it deleted. On a read that only cost a
+    /// the cached `completions` array can be missing a row another context
+    /// wrote — the widget tap's intent opens a container of its own — and can
+    /// be holding one it deleted. On a read that only cost a
     /// wrong number; here it decides whether a tap creates a row or removes
     /// one, so a stale array is how a day ends up with two completions on it.
     ///
@@ -432,10 +433,11 @@ struct HabitStore {
         }
 
         // A rest day is true rest: nothing can be logged on it and nothing
-        // un-logged. The grid withholds the tap, but the widget runs in a
-        // second process and can hold a surface rendered before the setting
-        // changed — so the rule lives here, on the one write path both
-        // processes share, rather than in trust that no button was offered.
+        // un-logged. The grid withholds the tap, but the widget's surface
+        // renders in a second process and can have been drawn before the
+        // setting changed — its tap still arrives here, through
+        // `MarkHabitIntent` — so the rule lives on the one write path every
+        // surface reaches, rather than in trust that no button was offered.
         // A completion already stored on a rest day stays: records of what
         // happened remain records of what happened.
         guard !WeekPreferences.isRestDay(day, restDay: restDay, calendar: calendar) else {
