@@ -545,6 +545,12 @@ and keeps working; only the widget goes blank. That is deliberate: a missing
 entitlement should not stop the app launching. The migration runs to wherever
 the store now lives, shared or not, because the file name changes either way.
 
+Every file this app writes — the store and its sidecars, the fallback, the
+legacy store, staging, quarantine, the migration record, both defaults
+domains, temporary exports — is inventoried in `docs/data-inventory.md`,
+along with what the OS does with each one: backup eligibility, protection
+class, and why neither is set in code (#284).
+
 ### Moving a store without adopting half of one
 
 A SQLite store is three files — the database, the write-ahead log and the
