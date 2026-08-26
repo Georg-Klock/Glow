@@ -27,6 +27,16 @@
 # in a simulator's App Group defaults by a dying test, and while the private
 # per-process suite now stops a test writing there at all, a CI lane that
 # reuses a runner image should still start from nothing.
+#
+# "Whichever is newest" is the right default for a developer machine and the
+# wrong contract for a lane that exists to test a *specific* runtime (#286).
+# GLOW_EXPECTED_RUNTIME_MAJOR=18 restricts the selection to that iOS major and
+# then *asserts* the chosen device matches — including a device pinned by
+# GLOW_SIMULATOR_UDID — so the minimum-iOS lane fails loudly rather than
+# falling forward to whatever newer runtime the machine happens to have.
+# Unset, nothing changes. What ran is recorded either way: the runtime and
+# device go to the console, into <run>/simulator.txt, and onto the end of the
+# validator's summary.md.
 
 set -euo pipefail
 
@@ -55,8 +65,9 @@ DEVICE_ID="${GLOW_SIMULATOR_UDID:-}"
 [ -n "$DEVICE_ID" ] || DEVICE_ID=$(
   xcrun simctl list devices available --json |
     /usr/bin/python3 -c '
-import json, re, sys
+import json, os, re, sys
 
+expected = os.environ.get("GLOW_EXPECTED_RUNTIME_MAJOR", "")
 data = json.load(sys.stdin)["devices"]
 candidates = []
 for runtime, devices in data.items():
@@ -64,6 +75,10 @@ for runtime, devices in data.items():
         continue
     # "com.apple.CoreSimulator.SimRuntime.iOS-26-5" -> (26, 5)
     version = tuple(int(part) for part in re.findall(r"\d+", runtime.split("iOS-")[-1]))
+    # The minimum lane asks for one major and must not be answered with
+    # another (#286); filtered here, and asserted again below for every path.
+    if expected and version[:1] != (int(expected),):
+        continue
     for device in devices:
         name = device["name"]
         if not device.get("isAvailable") or "iPhone" not in name:
@@ -78,9 +93,63 @@ print(max(candidates)[1] if candidates else "")
 )
 
 if [ -z "$DEVICE_ID" ]; then
-  echo "error: no available iPhone simulator found. Install an iOS runtime in Xcode." >&2
+  if [ -n "${GLOW_EXPECTED_RUNTIME_MAJOR:-}" ]; then
+    echo "error: no available iPhone simulator on an iOS ${GLOW_EXPECTED_RUNTIME_MAJOR}.x runtime." >&2
+    echo "The expectation is the point: this run must not fall forward to a newer" >&2
+    echo "runtime (#286). Install the iOS ${GLOW_EXPECTED_RUNTIME_MAJOR} runtime and create an iPhone on it," >&2
+    echo "or unset GLOW_EXPECTED_RUNTIME_MAJOR. Installed runtimes:" >&2
+    xcrun simctl list runtimes | grep iOS >&2 || true
+  else
+    echo "error: no available iPhone simulator found. Install an iOS runtime in Xcode." >&2
+  fi
   exit 1
 fi
+
+# What phone this actually is, wherever the udid came from — the selection
+# above, a caller's GLOW_SIMULATOR_UDID, either way the evidence and the
+# assertion read the same facts.
+DEVICE_EVIDENCE=$(
+  xcrun simctl list devices --json |
+    GLOW_DEVICE_ID="$DEVICE_ID" /usr/bin/python3 -c '
+import json, os, sys
+
+target = os.environ["GLOW_DEVICE_ID"]
+for runtime, devices in json.load(sys.stdin)["devices"].items():
+    for device in devices:
+        if device["udid"] == target:
+            print(runtime + "|" + device["name"])
+            raise SystemExit
+'
+)
+RUNTIME_ID="${DEVICE_EVIDENCE%%|*}"
+DEVICE_NAME="${DEVICE_EVIDENCE#*|}"
+if [ -z "$RUNTIME_ID" ]; then
+  echo "error: simulator $DEVICE_ID is not in simctl's device list." >&2
+  exit 1
+fi
+
+if [ -n "${GLOW_EXPECTED_RUNTIME_MAJOR:-}" ]; then
+  case "$RUNTIME_ID" in
+    *".iOS-${GLOW_EXPECTED_RUNTIME_MAJOR}-"*) ;;
+    *)
+      echo "error: GLOW_EXPECTED_RUNTIME_MAJOR is ${GLOW_EXPECTED_RUNTIME_MAJOR}, but the chosen simulator is" >&2
+      echo "  $DEVICE_NAME ($DEVICE_ID) on $RUNTIME_ID" >&2
+      echo "A lane that silently runs on a newer runtime than it claims is the" >&2
+      echo "failure #286 names. Fix the expectation or the device, not this check." >&2
+      exit 1
+      ;;
+  esac
+fi
+
+# The run's own record of where it ran, kept beside the log so a crashed run
+# still says which phone it died on.
+{
+  echo "device: $DEVICE_NAME ($DEVICE_ID)"
+  echo "runtime: $RUNTIME_ID"
+  echo "expected runtime major: ${GLOW_EXPECTED_RUNTIME_MAJOR:-unset (newest wins)}"
+  xcodebuild -version | tr '\n' ' '
+  echo
+} > "$RUN/simulator.txt"
 
 # Two runs on one device tear each other apart, and not in ways that read as a
 # device conflict: the host dies during bootstrap, or a bundle reports fewer
@@ -128,7 +197,7 @@ xcrun simctl spawn "$DEVICE_ID" \
 xcrun simctl spawn "$DEVICE_ID" \
   defaults write com.apple.Accessibility ApplicationAccessibilityEnabled -bool true
 
-echo "==> Testing on simulator $DEVICE_ID"
+echo "==> Testing on $DEVICE_NAME ($RUNTIME_ID), simulator $DEVICE_ID"
 echo "==> Evidence: $RUN"
 
 set +e
@@ -259,14 +328,32 @@ set +e
 VALIDATION=$?
 set -e
 
+# The evidence of where the run happened, on the same page as the verdict —
+# CI publishes summary.md, and "passed" without "on what" is the gap #286 is
+# about.
+if [ -f "$RUN/summary.md" ]; then
+  {
+    echo
+    echo "Ran on: $DEVICE_NAME — \`$RUNTIME_ID\`"
+  } >> "$RUN/summary.md"
+fi
+
 if [ "$STATUS" -ne 0 ] || [ "$VALIDATION" -ne 0 ]; then
   echo
   echo "Evidence for this run is in $RUN"
   if grep -q "Render baseline" "$LOG" 2>/dev/null && grep -q "✘.*signature" "$LOG" 2>/dev/null; then
+    # The baseline is per OS major where one is committed (#286): a run on a
+    # runtime that has its own file must approve into that file, not into the
+    # current runtime's.
+    RUNTIME_MAJOR=$(printf '%s' "$RUNTIME_ID" | sed 's/.*iOS-\([0-9][0-9]*\)-.*/\1/')
+    BASELINE="RenderTests/Baselines/render-signatures.json"
+    if [ -f "RenderTests/Baselines/render-signatures-ios${RUNTIME_MAJOR}.json" ]; then
+      BASELINE="RenderTests/Baselines/render-signatures-ios${RUNTIME_MAJOR}.json"
+    fi
     echo
     echo "The render baseline moved. If the change was intended, approve it:"
     echo "  cp $RUN/attachments/named/render-signatures-actual*.json \\"
-    echo "     RenderTests/Baselines/render-signatures.json"
+    echo "     $BASELINE"
     echo "and say in the pull request what moved and why."
   fi
   # Written as an if rather than as `[ … ] && exit`, which under `set -e`
