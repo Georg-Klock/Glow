@@ -4463,3 +4463,71 @@ path, and any merge semantics. If phone-loss recovery ever becomes part of
 the product it is #285's design — a separate format with its own version,
 limits and crash-safe replace — and reopening this entry is that decision,
 not a rediscovery.
+
+## A release is bound to a reviewed commit, and the workflows are the contract they read as
+
+**2026-08-26.** #287 named three provenance gaps and this closes the two that
+need no repository admin: the workflow files' own trustworthiness, and the
+source a TestFlight build ships from. The third — branch protection on `main`,
+an Actions policy requiring SHA pins — is a GitHub settings change and is
+written up as a checklist on the issue rather than half-done from a token that
+cannot do it.
+
+**Every `uses:` is now a full commit SHA, resolved and verified against the
+actions repositories, with the release it came from named beside it:**
+`actions/checkout@3d3c42e…` is v7.0.1, `actions/cache@0057852…` is v4.3.0,
+`actions/upload-artifact@ea165f8…` is v4.6.2 — each tag's SHA read via the
+GitHub API and each SHA confirmed to be a real commit before it went in the
+file. A tag is a pointer its owner can move without a commit here, which for a
+repository that pins its own *project generator* by archive digest was the one
+mutable execution reference left. `permissions: contents: read` is declared at
+the workflow level for the same reason: the read-only default is a repository
+setting, and a setting is not a diff.
+
+**The policy has its own checker because a gate nobody checks weakens
+silently.** `Tools/check-workflows.py` parses the tracked workflows
+line-by-line — stdlib only, no YAML dependency on the gate runner — and fails
+on a tag or branch ref, an abbreviated SHA, a missing or non-version pin
+comment, a missing `permissions:` block, a wholesale `read-all`, or any
+permission outside its allowlist. Thirteen mutation fixtures prove each rule
+fires, in the style of the two validators beside it, and the gate job runs the
+self-test before the check on every push. Widening the permissions allowlist
+is deliberately a change to this checker, in the same diff as the job that
+demonstrates the need.
+
+**`Tools/ship-testflight.sh` now asks "which reviewed commit is this?" before
+it asks anything else.** The existing validators answer whether a bundle is
+internally consistent and correctly signed; a cleanly signed build of a dirty,
+stale or unreviewed tree passes both. The preflight runs before credentials
+are read and requires: a clean tree (`git status --porcelain` empty — tracked
+and untracked non-ignored files alike), `HEAD` exactly equal to freshly
+fetched `origin/main` or to an annotated tag the remote holds at the same
+object, and a CI verdict for that SHA in which every check run completed
+without failing and at least one succeeded — phrased over all check runs
+rather than by job name, so a new lane tightens the gate instead of dodging
+it. What it establishes goes into `private/provenance/<time>-<sha>.json`:
+source SHA, ref, CI verdict, Xcode build, marketing version, build number,
+whether the suite ran, and — written back after `altool` returns — that the
+upload happened. `private/` because the trail should survive `rm -rf build`
+and never become a commit.
+
+**The overrides are the decision.** A dirty tree has none, a wrong ref has
+none: a release that cannot be reproduced from a commit is not a flag away, it
+is a different product promise. The CI verdict has exactly one, the named
+`--allow-unverified-ci`, for the machine that genuinely cannot consult GitHub
+— it prints what it is skipping and the provenance record says `overridden`
+with the reason the verdict was unavailable. There is no `--force`, on
+purpose. `--skip-tests` keeps meaning what it meant — the local suite — and
+has no effect on any preflight check. `--preflight-only` runs the whole
+question and stops before anything costs a minute or reads a credential.
+
+**Measured, not assumed:** the dirty-tree and wrong-ref rejections were each
+watched firing; on a fresh clone of `origin/main` the preflight correctly
+refused a merge whose `Build and test` run was still pending — the honest
+answer minutes after a merge — and passed with `--allow-unverified-ci`
+recording exactly that. The pending case is the reason the failure message
+names `gh run list --commit <sha>`: "wait" is the usual fix.
+
+**Not decided here:** whether one human approval is required on `main` —
+that is repository governance, listed on #287 for Georg with the exact ruleset
+settings, since required CI and blocked force-pushes should not wait on it.
