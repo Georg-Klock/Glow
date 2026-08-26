@@ -87,8 +87,15 @@ enum GlowStore {
     /// to do — and that the two processes cannot disagree about what shape
     /// the store is, because there is exactly one place the shape is named.
     static func container(at url: URL, readOnly: Bool = false) throws -> ModelContainer {
+        // `cloudKitDatabase:` defaults to `.automatic`, which asks SwiftData
+        // to find a CloudKit container on its own. `.none` makes local-only
+        // this call site's own claim rather than a property of the current
+        // signing configuration — and with the opens collapsed into this one
+        // spelling, it is said once. `LocalOnlyContractTests` scans for the
+        // production `ModelConfiguration` that stops saying it. See #281.
         let configuration = ModelConfiguration(
-            schema: schema, url: url, allowsSave: !readOnly
+            schema: schema, url: url, allowsSave: !readOnly,
+            cloudKitDatabase: .none
         )
         return try ModelContainer(
             for: schema, migrationPlan: GlowMigrationPlan.self,
