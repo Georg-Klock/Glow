@@ -734,6 +734,20 @@ surviving type in full.
 
 ## What is deliberately absent
 
+- No network, no sync, no telemetry — **and enforced as an invariant rather
+  than observed as a fact** (#281). Every production `ModelConfiguration`
+  passes `cloudKitDatabase: .none`, because the parameter's default is
+  `.automatic` and only the missing iCloud entitlement was standing between
+  that default and a container. The entitlement itself is held closed from
+  both ends: `Tools/check-project.py` rejects the six iCloud/ubiquity keys
+  (and anything beyond the App Group) in what the generated project *requests*,
+  and `Tools/check-release-build.py --require-signing` rejects the same keys
+  (and anything beyond what distribution signing injects) in what the
+  signature *grants*. `LocalOnlyContractTests` scans the production sources
+  for the CloudKit/network API spellings the audit found absent; a match is a
+  reviewed allowlist entry, not a silent merge. The privacy manifests remain
+  declaration checks — none of this proves what Apple's frameworks do
+  internally, only that changing Glow's own surface fails a gate.
 - No view models. The logic that would live in one is in `Logic/`, and the rest
   is `@Query`.
 - No coordinator or router. There is one screen and three sheets.

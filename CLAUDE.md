@@ -100,6 +100,14 @@ settled did not go with it.
   When the render baseline moves, the script prints the one command that
   approves it. Approving is a decision: say in the pull request what moved.
 
+  It picks the newest installed runtime by default. A lane that exists to test
+  a *specific* one sets `GLOW_EXPECTED_RUNTIME_MAJOR` (e.g. `18`), which
+  restricts the selection to that iOS major and then asserts the chosen device
+  matches — a pinned `GLOW_SIMULATOR_UDID` included — so the minimum-iOS lane
+  fails loudly instead of falling forward to a newer runtime (#286). What ran
+  is recorded either way: runtime and device on the console, in
+  `<run>/simulator.txt`, and at the end of `summary.md`.
+
 - **Regenerate the symbol picker catalog:** `Tools/make-symbol-catalog.py`
 - **Render the website's HDR word images:** `Tools/make-glow-word.swift`
 
@@ -130,8 +138,17 @@ settled did not go with it.
   the device SDK and `Tools/ship-testflight.sh` runs it on the archive and on
   the exported `.ipa`, so the gate and the release path cannot disagree about
   what "matching" means. What it checks is declared in
-  `Tools/test-inventory.json`. See #133.
+  `Tools/test-inventory.json`. See #133. With `--require-signing` it also
+  rejects the six iCloud/ubiquity entitlement keys and anything outside its
+  entitlement allowlist in what the signature grants — the artifact half of
+  the local-only invariant (#281).
 - **Validate the generated project on its own:** `Tools/check-project.py`
+  (and `--self-test`). Besides App Groups and extension-only API, it rejects
+  iCloud/ubiquity entitlements and any capability or entitlement outside its
+  allowlist — the requested half of the local-only invariant (#281), whose
+  source half is `LocalOnlyContractTests` (`cloudKitDatabase: .none` at every
+  production store, and no network/CloudKit API spellings outside a reviewed
+  allowlist).
 - **Check whether a checkout may ship, without shipping:**
   `Tools/ship-testflight.sh --preflight-only`
 
@@ -154,7 +171,11 @@ settled did not go with it.
 CI runs the tests on every pull request and on merges to `main`
 (`.github/workflows/ci.yml`), on a pinned macOS runner — pinned rather than
 `macos-latest` because the suite reads gain-map metadata and where that metadata
-lives has already been seen to differ between platform versions.
+lives has already been seen to differ between platform versions. Two lanes run
+the suite: the current runtime, and the declared minimum — an iOS 18 simulator
+runtime the lane installs and pins with `GLOW_EXPECTED_RUNTIME_MAJOR` so it
+cannot silently fall forward (#286). The deployment target stays 18.0 because
+that lane gates it; raising it is a product decision.
 
 ## Working rules
 

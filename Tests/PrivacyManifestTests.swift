@@ -71,8 +71,12 @@ struct PrivacyManifestTests {
             "\(label) declares \(manifest.reasons.keys.sorted()); the audit found only UserDefaults"
         )
 
-        // The product statement, asserted so a future dependency cannot change
-        // it quietly.
+        // The product statement as *declared*. This is a consistency check on
+        // what the manifests say, not proof of what any code does — a future
+        // dependency could perform network work without touching a manifest.
+        // What notices code changing is the local-only gate (#281):
+        // LocalOnlyContractTests on the source, and the entitlement denylists
+        // in Tools/check-project.py and Tools/check-release-build.py.
         #expect(!manifest.tracking, "\(label) declares tracking")
         #expect(manifest.trackingDomains.isEmpty)
         #expect(manifest.collected.isEmpty, "\(label) declares collected data")

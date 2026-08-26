@@ -3449,7 +3449,6 @@ column is not empty, and a column is not empty for lots of reasons. Naming the
 tone is what stops the next fixture edit putting a dot back on a sample point
 without anything noticing.
 
-
 ## A fresh install chooses its starting point (#228)
 
 **2026-08-23.** `HabitSeeder` is deleted. A fresh install used to open with
@@ -4025,7 +4024,6 @@ different week, the walk must take exactly one step per week of record, arrive a
 spread across two years including both of Havana's midnight clock changes —
 11,268 steps a zone.
 
-
 ## The pop defaults to everything, for a new install (#185)
 
 **2026-08-24.** #185 asked the question and #119 had already supplied the reasoning without acting on it: the objection frequent pops raise — "twenty of these a day on a screen whose whole argument is that it says one thing" — is about the grid, and a pop was never on the grid. It is two seconds over the Island and leaves nothing behind. Georg's answer: people need encouragement. `PopPreferences.Level.unset.effective` moves from `.goals` to `.everything`.
@@ -4531,6 +4529,190 @@ names `gh run list --commit <sha>`: "wait" is the usual fix.
 **Not decided here:** whether one human approval is required on `main` —
 that is repository governance, listed on #287 for Georg with the exact ruleset
 settings, since required CI and blocked force-pushes should not wait on it.
+
+## Local-only stops being a lucky alignment and becomes an invariant
+
+**2026-08-26.** #281's audit found no network client, no third-party
+dependency, no CloudKit entitlement and no direct network linkage — a verified
+strength resting on nothing. The app was local-only because several
+independent facts happened to agree, and not one of them would have failed a
+build when it stopped being true. This change makes each of them a gate.
+
+**The store API said `.automatic` by omission, and now says `.none` by hand.**
+`ModelConfiguration`'s `cloudKitDatabase:` parameter defaults to `.automatic`
+— managed CloudKit, if an entitlement lets SwiftData find a container. All
+three production call sites (the writable store, the widget's read-only store,
+the migration inventory) now pass `.none` explicitly, and the migration helper
+mattered as much as the stores: a helper opening historical files must not be
+the one call site that inherits the default. `TestSupport`'s file-backed
+stores say it too, so a test store is configured the way the store it stands
+in for is. `LocalOnlyContractTests.storesSayNone` walks every production
+source, balances the parentheses of every `ModelConfiguration(` call, and
+fails the one that stops saying it — with a floor of three call sites so the
+scan cannot rot into vacuous passing.
+
+**The entitlement is held closed from both ends, because the two ends have
+already been seen to disagree.** The six iCloud/ubiquity keys are rejected by
+name — plus anything outside an allowlist — in what the generated project
+*requests* (`Tools/check-project.py`, which gained `--self-test`, 11 fixtures,
+run on the Linux gate) and in what the signature actually *grants*
+(`Tools/check-release-build.py --require-signing`, 8 new fixtures, 24 total).
+The release checker's allowlist admits what distribution signing injects
+(`application-identifier`, team id, `get-task-allow`, `beta-reports-active`,
+`keychain-access-groups`) and a fixture holds that a realistic distribution
+signature keeps passing — the gate that fails every real `.ipa` on the
+machine that ships is a gate that gets deleted, not obeyed. The two checkers
+carry the denylist as two copies on purpose: each runs alone on machines the
+other never sees, and each proves its own copy fires.
+
+**The source scan starts with #281's exact spellings** — `import CloudKit`,
+`CKContainer`, `URLSession`, `import Network`, `WKWebView` and the rest — over
+`Glow/` and `GlowWidget/`, comment lines excluded, `Tests/` exempt by
+construction. A match is a *reviewed rejection*: the allowlist is an array of
+(file, spelling, reason) in the test, empty today, and widening it is the
+reviewable event. This is the `TestIsolationTests` pattern — the property is
+the absence of a call, and no runtime assertion can observe an absence.
+
+**What this deliberately does not claim.** The privacy-manifest tests' comment
+used to say the assertion stopped a future dependency changing the product
+statement; it could not — it reads what the manifests *declare*, and code can
+change without touching a manifest. The comment now says which gate does
+which. None of this proves Apple's frameworks never communicate internally;
+it proves that changing *Glow's* surface — a call site, an entitlement, an
+API name — fails a review gate instead of passing silently.
+
+**Not done, on purpose:** the CloudKit-shaped schema comments in
+`Habit.swift` and `Completion.swift` stand. #281 explicitly does not authorize
+a schema rewrite — removing optionality or adding uniqueness constraints is a
+versioned-migration decision, not a lint fix. The dependency-manifest and
+Mach-O linkage scans from the issue's fuller programme are also not here; the
+zero-third-party baseline currently has nothing to scan, and a `Package.swift`
+arriving would be its own loud review.
+
+## The declared minimum iOS gets a lane, and the suite says where it ran
+
+**2026-08-26.** #286 found the contradiction plainly: `project.yml` declares
+iOS 18.0, `Tools/test.sh` deliberately picks the newest installed runtime, and
+the audited green run executed on iOS 26.5 — so the support promise was
+compiled against, never run against. The decision, made rather than
+relitigated here: **keep the 18.0 deployment target and gate it**, accepting
+the CI-time cost of a second macOS lane. Raising the target is the fallback
+if the lane cannot be kept green, and it is a product decision with a user
+cost, not a CI convenience.
+
+**`Tools/test.sh` keeps its default and gains a contract.** "Newest installed"
+stays right for a developer machine — portability was the point (#221 queues,
+#245 accessibility, all of it unchanged). What was missing is the way to say
+"this run must be iOS 18": `GLOW_EXPECTED_RUNTIME_MAJOR` restricts the
+selection to that major and then *asserts* the chosen device matches,
+including a device pinned by `GLOW_SIMULATOR_UDID` — filtered at selection and
+checked after it, because the failure #286 names is precisely a lane that
+quietly runs on the wrong runtime and reports green. Both rejection paths
+were watched firing on a machine with only iOS 26.5 installed: no matching
+device (names the installed runtimes), and a pinned device on the wrong
+runtime (names the device and both versions). Where a run happened is now
+evidence, not inference: runtime and device go to the console, to
+`<run>/simulator.txt` beside the log — so a crashed run still says which
+phone it died on — and onto the end of `summary.md`, which CI publishes.
+
+**The minimum lane installs its own runtime.** The `macos-26` image ships no
+iOS 18 simulator; the lane downloads the newest iOS 18.x runtime with
+`xcodebuild -downloadPlatform iOS -buildVersion` to an export path, caches the
+dmg (`actions/cache`, keyed by the pinned version — the same argument as the
+XcodeGen cache), installs it with `simctl runtime add`, and creates an iPhone
+SE (3rd generation) on it — the smallest phone the minimum supports, created
+explicitly because the whole lane is about not inheriting what the image
+happens to have. The suite then runs with `GLOW_EXPECTED_RUNTIME_MAJOR=18`
+and its own erase, artifact and verdict, as a separate job so a
+compatibility failure reads as one.
+
+**The lane's first full run settled two things by measurement.** First,
+`xcodebuild -downloadPlatform iOS -exportPath` *installs* the runtime as well
+as exporting the dmg — an unconditional `simctl runtime add` on the file it
+had just written failed with `SimDiskImageErrorDomain` code 6 and left an
+Unusable duplicate image, so the add now runs only when no usable iOS 18
+runtime is present, which is the cache-hit path. Second, and the real
+finding: **all 551 unit tests pass on iOS 18.5 unchanged** — logic, store,
+migration, accessibility, the lot — and what fails is exactly the render
+baseline, because a baseline is a picture of one renderer's output and the
+renderer is the OS's. The same commit that moves no cell between two
+simulator *models* moves cells past the tolerance and the ground share by up
+to 7.4 points between iOS 26.5 and iOS 18.5 (`week medium configured`: 84.0%
+pure black against 76.6%). So the baseline is per OS major where a major is
+gated: `render-signatures-ios18.json` sits beside the unsuffixed current
+file, `committedBaseline()` picks by `operatingSystemVersion`, and the iOS 18
+file's contents are the lane's own attached `render-signatures-actual.json` —
+approved from the artifact of the run that measured it, which is the same
+approval flow the current runtime has always used. `Tools/test.sh`'s approval
+hint names the per-major destination when one exists.
+
+**Not done here, and said on the issue:** the UI/integration smoke target
+#286 proposes (launch, historical store, widget configuration metadata,
+smallest-device accessibility envelope) is real and separate work; the lane
+runs the full existing suite, which is what exists to run. A device fact
+worth recording beside the lane: an iPhone 12 Pro Max on iOS 18.6.2 ran a
+Debug build of `main` on 2026-08-25 — extension registered, widgets placed,
+intents performed, store loaded in 4–10ms. That is a run-there proof, not a
+correctness proof; the lane is what gates the claim from now on.
+
+## The widget's mark is a Toggle, and it draws the state it asked for
+
+**2026-08-26.** The tappable marks in both widgets were `Button(intent:)`, and
+a button's pixels are the entry's: however fast `MarkHabitIntent` wrote, the
+mark held its old shape until WidgetKit scheduled the provider and composited
+the result — 431ms and 3.17s measured on a phone (#121), which is the gap
+people filled by tapping again (#272). They are now `Toggle(isOn:intent:)`
+behind one control, `SlotToggle`, whose style renders `configuration.isOn`:
+the one mechanism WidgetKit offers for pixels that change at the tap. This is
+the second half of #292; #295's idempotent set was the first.
+
+**Believed, on Apple's word:** an AppIntent-backed widget `Toggle` updates its
+appearance optimistically while `perform()` runs, *provided* the style draws
+`configuration.isOn` rather than anything captured from the snapshot. That
+proviso is the entire design of `SlotMarkToggleStyle` — both faces are built
+from the entry, but which one shows is the system's bit, so the system can
+flip it before the intent has run.
+
+**Measured, in a simulator (iPhone 17 Pro, iOS 26.5):** all three call sites —
+week slot, week span, month cell — perform through the placed widget, and the
+ordering is visible in `WidgetTrace`. On an undo tap, a screenshot taken
+immediately afterwards showed the mark already mid-flip while the entry-driven
+label still said done; the tap line landed in the trace after that frame, and
+the provider ran 4.2s after the tap. Changed pixels before the provider ran
+can only be the toggle. What a simulator cannot say is how it *feels* on a
+phone — whether the flip lands inside the finger's dwell — and nobody has
+looked yet.
+
+**Decided along the way:**
+
+- **The faces are per call site, the control is not.** A slot's completed face
+  carries the burst cross-fade; a span's faces carry its width and rest
+  window; the month's are plain marks. `SlotToggle` owns the toggle, the
+  style, and the spoken strings; the call sites own what a face looks like,
+  which is exactly the split `SlotMarkView` already draws along.
+- **A span's optimistic frame is its own two states at its own geometry.** Tap
+  an open span and the ask goes quiet — `.openToday` to the same unlit
+  structure a filled span draws (#47). The lit dot on today and the
+  re-division of the row are the store's answers, and they arrive with the
+  reload; the toggle owns its own pixels and nothing beside them.
+- **VoiceOver follows `isOn`.** Label and hint are computed inside the style
+  from the same bit the pixels are drawn from, so the announcement agrees with
+  the optimistic state; the system adds the toggle's on/off value from that
+  bit too. Reduce Motion is untouched: the flip is a state change, not
+  motion, so acknowledgement survives it, and the burst stays the thing
+  Reduce Motion skips.
+- **Which marks are interactive did not move.** Tappability is still
+  `Slot.isTappable`, `SlotSpan.isTappable` and `MonthCell.isTappable`; a mark
+  that takes no tap is a plain `SlotMarkView` with no control trait, exactly
+  as before. `WidgetPlacementTests` now scans `GlowWidget/` for
+  `Button(intent` so the migration cannot quietly regress one call site.
+
+**Not decided here:** the burst's first frame draws the ring at full opacity,
+which is now the second time the dot has been on screen — optimistic dot,
+ring, cross-fade back to dot. Whether the cross-fade still earns its place
+when the acknowledgement it was standing in for happens at the tap is #267's
+question and stays open; nothing about `WidgetBurst`, its window, or the
+intent's write path moved with this change.
 
 ## Emailing the history is the composer presented, and nothing more (#289)
 
