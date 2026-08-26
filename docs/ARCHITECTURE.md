@@ -237,6 +237,17 @@ a column on `Completion` rather than a list of ids beside the store: one write,
 so "what did the demo add" cannot disagree with what is there. Both are in
 decisions.md.
 
+**The stored shape is a declared version** (#283). `GlowSchemaV1` freezes the
+schema shipping today, `GlowMigrationPlan` is the one plan every container
+opens through, and `GlowStore.container(at:readOnly:)` is the one spelling of
+an open — the app's writable container, the widget's read-only one, and the
+tests all call it. The upgrade floor is TestFlight builds only, documented in
+the plan's own comment: earlier shapes are explicitly unsupported and not
+reconstructed. The three migration layers run in a fixed order — file
+location (`StoreMigration.run`), then this plan at container open, then the
+row backfills — and `SchemaContractTests` fails any model edit that changes
+stored metadata without a version decision.
+
 ### Models
 
 SwiftData, shaped for a CloudKit future even though v1 is local-only: every
