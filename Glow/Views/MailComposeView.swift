@@ -39,7 +39,12 @@ struct MailComposeView: UIViewControllerRepresentable {
     /// MessageUI's four results in the app's own words. Total: an unknown
     /// future case reads as `.failed`, which errs toward telling the person
     /// something went wrong rather than silently swallowing it.
-    static func outcome(of result: MFMailComposeResult) -> MailExport.Outcome {
+    ///
+    /// `nonisolated` because the mapping is pure and its caller is not the
+    /// view: MessageUI does not isolate its delegate protocol, so the
+    /// coordinator's callback is synchronous nonisolated code, and a
+    /// main-actor mapping there is an isolation the function does not need.
+    nonisolated static func outcome(of result: MFMailComposeResult) -> MailExport.Outcome {
         switch result {
         case .sent: .sent
         case .saved: .saved

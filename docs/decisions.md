@@ -4463,3 +4463,57 @@ path, and any merge semantics. If phone-loss recovery ever becomes part of
 the product it is #285's design — a separate format with its own version,
 limits and crash-safe replace — and reopening this entry is that decision,
 not a rediscovery.
+
+## Emailing the history is the composer presented, and nothing more (#289)
+
+**2026-08-25.** Settings gains **Email My History** beside Export History:
+the same CSV/JSON chooser, the same file written by `HistoryExport` into
+`ExportStore` at the moment of the tap, handed to Apple's
+`MFMailComposeViewController` instead of the share sheet. The decision #289
+asked for — a dedicated "send it to myself" path without an account, a
+backend, or an inferred address — ships exactly at that boundary: Glow
+prepares the message and stops.
+
+**The privacy line is drawn in constants, not conventions.** The recipient
+list is `MailExport.recipients`, an empty array set explicitly on the
+controller, so "no address is discovered, inferred or prefilled" is a line of
+code a test pins rather than an absence a reviewer has to notice. The subject
+is neutral and dated — "Glow Up history — 2026-08-25", spelled through
+`DayID` so subject and filename name the same civil day — and the body is two
+sentences: what the attachment is, and that pressing Send moves it through
+the person's own provider, whose copies are its own. Nothing the flow says
+suggests safekeeping, and `MailExportTests` holds the #285 sweep over the one
+new user-facing string: this is an export, not a backup, and no recovery
+promise attaches to it.
+
+**Both routes exist on every device, so both are code, not circumstance.**
+`canSendMail()` is read at one call site and routed through
+`MailExport.route(canSendMail:)`; a device Mail cannot send from gets a brief
+explanation and the existing share sheet with the same file — the honest
+fallback, not an error. Without the seam, one of the two arms would exist
+only on phones with a configured Mail account, which no CI simulator is.
+
+**Four ways out, one lifetime rule.** Sent, saved, cancelled and failed all
+release Glow's temporary file — a sent message or a saved draft is Mail's
+copy — and the release rides on the sheet's single dismissal, the same event
+the share sheet already uses, so a composer swiped away without the delegate
+ever firing releases the file too. Only `.failed` shows an error;
+cancellation is a decision, and dressing it as a failure would teach people
+that backing out breaks something. MessageUI's error object is deliberately
+neither surfaced nor logged — it can carry account details, and the reaction
+to failure is the same whatever the reason. An `@unknown` future result maps
+to `.failed`, erring toward saying something went wrong over silence.
+
+**One serializer, one temp-file owner.** The email path calls the same
+`writeExport` the share path does; a second serializer or a second cleanup
+would be a second thing to drift, and #142's sweep already covers the app
+being killed while either sheet is up. The mail row is a plain `Label` like
+its neighbour — the root tint is pure white and has eaten three styled
+prominent controls already.
+
+**Not decided here:** attaching both formats to one message (#289 named it
+and it stays declined — the chooser stands unless research shows both are
+wanted), and any `mailto:` path, which cannot carry an attachment and was
+ruled out in the issue. What only hardware can answer — the composer
+presenting over Settings on a phone with a real Mail account — is noted in
+the PR rather than claimed.

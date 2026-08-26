@@ -81,6 +81,21 @@ sentence with an exception is two sentences.
   temporary directory, and never otherwise. That is a privacy claim true by
   construction rather than by policy. `HistoryExport` is pure and its bytes are
   asserted.
+
+  **Email My History** is the same export, one step closer to "send it to
+  myself" (#289): the same file, written by the same code at the moment of the
+  tap, handed to Apple's mail composer instead of the share sheet — a dated
+  subject, a two-sentence body, the attachment with its exact MIME type, and
+  **no recipient**, because the app does not know an address and does not
+  guess one. Nothing is sent until the person reviews the message and presses
+  Send; the composer is the system's and gives the app no send call. On a
+  device Mail cannot send from, the offer is the existing share sheet with the
+  same file. Glow's temporary copy is released when the composer goes away,
+  whichever of its four ways out it took; a sent message or saved draft is
+  Mail's copy, not Glow's. The file remains an export, not a backup — no
+  recovery promise attaches to it (see the 2026-08-25 entries in
+  docs/decisions.md). `MailExport` is pure and holds the subject, body,
+  recipients, MIME types, routing and outcome handling under test.
 - **No undo — and one action that therefore has to ask twice.** Settings → Data
   → **Reset to Default Habits** deletes every habit and every completion and
   installs `DefaultHabits.all` fresh, which is the way back to the shipped list
