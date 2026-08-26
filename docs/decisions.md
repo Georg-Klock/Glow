@@ -4876,3 +4876,49 @@ process — WidgetKit offers no alert surface, so the trace and the refused
 write remain the whole story there; and any redesign of the app's own
 history surfaces, whose `@Query` reads do not surface failures to catch. Both
 are #282's remainder if they are wanted at all.
+
+## The runtime dmg cache is dead; the minimum lane downloads every run
+
+**2026-08-26.** The minimum-iOS lane's cache-hit path never worked, and green
+runs hid it: `xcrun simctl runtime add` on the dmg that
+`xcodebuild -downloadPlatform iOS -exportPath` writes failed every single
+time it ran — first beside an already-installed runtime (run 32917914973),
+then three consecutive times on a cache-restored copy (run 32963377540,
+blocking PR #307) — always as `SimDiskImageErrorDomain` code 6, "You can't
+save the file 044-89417-100.dmg because the volume 'iOS 18.5 Simulator
+Bundle' is read only". Every lane run that went green had taken the other
+branch: a cache miss, where `-downloadPlatform` installs the runtime itself
+and the add is skipped. The cache made the working path and the broken path
+look like one path, and which one a run took depended on whether an 8 GB
+entry had survived eviction.
+
+**The failure is the toolchain's, not the cache's — established locally, both
+ways.** On the same Xcode 26.6 / macOS 26 pair the runner uses, with no
+cache anywhere near it: a freshly exported 18.5 dmg fed to
+`simctl runtime add` reproduces code 6 exactly, and
+`xcodebuild -importPlatform` — the flag xcodebuild's own usage pairs with
+`-exportPath`, and the obvious better tool — prints `Registered as <UUID>`,
+exits 0, and then abandons the image as `Unusable — Failed to clone …
+Inbox/<UUID>.cxbd`, tried from two locations to rule the path out. The
+restored bytes were never the problem; the cached artifact has no working
+importer. That also settles the "verify the dmg before adding it" idea:
+a checksum can only prove the bytes survived, and these bytes fail when
+they are pristine.
+
+**So the cache is gone rather than repaired.** The install step now
+downloads with plain `xcodebuild -downloadPlatform iOS -buildVersion` —
+which installs directly, no export, no import, no dmg on disk — behind a
+short-circuit for a runtime that is already usable, and in front of the
+lane's own loud assertion that a usable iOS 18 runtime exists. One path,
+the one that has gone green every time it ran, with no fallback because
+there is nothing to fall back from. The download costs a few minutes per
+run; the cache it replaces held an ~8 GB entry against a 10 GB repository
+quota, which made every restore an eviction race on top of a broken import.
+The two stale entries (one scoped to `main`, one to a merged PR ref) are
+deleted so nothing can restore them.
+
+**Reopening this means one of two things changed:** Apple ships a toolchain
+whose `-importPlatform` accepts what its `-exportPath` writes — test it the
+way this was tested, locally, both directions, before trusting it on CI —
+or the lane's download cost stops being acceptable, in which case the
+alternative is a runner image that carries the runtime, not this cache.

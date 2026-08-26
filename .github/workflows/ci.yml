@@ -213,40 +213,31 @@ jobs:
       - name: Install the pinned XcodeGen
         run: Tools/install-xcodegen.sh
 
-      # The runner image ships only current runtimes. The dmg is gigabytes
-      # from Apple's CDN, so it is cached; `-exportPath` downloads without
-      # installing, and `simctl runtime add` installs from the file — the same
-      # path a cache hit takes, so both are exercised by whichever happens.
-      - name: Cache the iOS 18 simulator runtime
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: Tools/.ios-runtime
-          key: ios-simulator-runtime-${{ env.GLOW_MIN_IOS }}
-
+      # The runner image ships only current runtimes, so the lane downloads
+      # iOS 18 fresh on every run — a few minutes, measured. Deliberately NOT
+      # cached: the dmg that `-downloadPlatform -exportPath` writes cannot be
+      # installed by anything on this toolchain. `simctl runtime add` fails
+      # with SimDiskImageErrorDomain code 6 ("the volume 'iOS 18.5 Simulator
+      # Bundle' is read only") and `xcodebuild -importPlatform` registers the
+      # image and abandons it Unusable ("Failed to clone … .cxbd") — both
+      # reproduced locally on the same Xcode 26.6/macOS 26 pair with no cache
+      # involved. Every green run of this lane took the download path; every
+      # cache hit failed (runs 32917914973, 32963377540). An ~8 GB entry in
+      # the 10 GB repository quota was also an eviction race. The dead cache
+      # entries are deleted; the plain download is the one path that works,
+      # and one path needs no fallback. See docs/decisions.md.
       - name: Install the iOS 18 simulator runtime
         run: |
-          installed() {
+          usable() {
             xcrun simctl runtime list | grep "iOS ${GLOW_MIN_IOS}" | grep -v Unusable
           }
-          if installed; then
+          if usable; then
             echo "iOS ${GLOW_MIN_IOS} runtime already installed"
           else
-            if ! ls Tools/.ios-runtime/*.dmg >/dev/null 2>&1; then
-              mkdir -p Tools/.ios-runtime
-              xcodebuild -downloadPlatform iOS \
-                -buildVersion "$GLOW_MIN_IOS" \
-                -exportPath Tools/.ios-runtime
-            fi
-            # Run 32917914973 measured what -exportPath actually does: it
-            # *installs* the runtime and exports the dmg. `runtime add` on the
-            # dmg it had just installed failed with SimDiskImageErrorDomain
-            # code 6 and left an Unusable duplicate image. So add only when
-            # the runtime is still absent — the cache-hit path, where the dmg
-            # is all there is.
-            if ! installed; then
-              xcrun simctl runtime add Tools/.ios-runtime/*.dmg
-            fi
+            xcodebuild -downloadPlatform iOS -buildVersion "$GLOW_MIN_IOS"
           fi
+          # The lane's own assertion, loud: no usable iOS 18 runtime, no lane.
+          usable
           xcrun simctl runtime list
 
       # The smallest iPhone the declared minimum supports, created explicitly
