@@ -83,10 +83,12 @@ struct LocalOnlyContractTests {
                 search = code.index(after: end)
             }
         }
-        // The three known call sites: the writable store, the widget's
-        // read-only store, and the migration inventory. Fewer means the scan
-        // stopped seeing them, which would make this test pass vacuously.
-        #expect(sites >= 3, "only \(sites) ModelConfiguration call sites found")
+        // The two known call sites: `GlowStore.container(at:readOnly:)` —
+        // #283 collapsed the writable and read-only opens into that one
+        // spelling, which is why this floor moved from three — and the
+        // migration inventory. Fewer means the scan stopped seeing them,
+        // which would make this test pass vacuously.
+        #expect(sites >= 2, "only \(sites) ModelConfiguration call sites found")
     }
 
     /// The exact spellings #281 starts the review gate with. A match is not
