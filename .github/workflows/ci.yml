@@ -218,7 +218,10 @@ jobs:
 
       - name: Install the iOS 18 simulator runtime
         run: |
-          if xcrun simctl runtime list | grep -q "iOS ${GLOW_MIN_IOS}"; then
+          installed() {
+            xcrun simctl runtime list | grep "iOS ${GLOW_MIN_IOS}" | grep -v Unusable
+          }
+          if installed; then
             echo "iOS ${GLOW_MIN_IOS} runtime already installed"
           else
             if ! ls Tools/.ios-runtime/*.dmg >/dev/null 2>&1; then
@@ -227,7 +230,15 @@ jobs:
                 -buildVersion "$GLOW_MIN_IOS" \
                 -exportPath Tools/.ios-runtime
             fi
-            xcrun simctl runtime add Tools/.ios-runtime/*.dmg
+            # Run 32917914973 measured what -exportPath actually does: it
+            # *installs* the runtime and exports the dmg. `runtime add` on the
+            # dmg it had just installed failed with SimDiskImageErrorDomain
+            # code 6 and left an Unusable duplicate image. So add only when
+            # the runtime is still absent — the cache-hit path, where the dmg
+            # is all there is.
+            if ! installed; then
+              xcrun simctl runtime add Tools/.ios-runtime/*.dmg
+            fi
           fi
           xcrun simctl runtime list
 
