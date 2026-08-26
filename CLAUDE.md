@@ -132,6 +132,19 @@ settled did not go with it.
   what "matching" means. What it checks is declared in
   `Tools/test-inventory.json`. See #133.
 - **Validate the generated project on its own:** `Tools/check-project.py`
+- **Check whether a checkout may ship, without shipping:**
+  `Tools/ship-testflight.sh --preflight-only`
+
+  The release path refuses a dirty tree, a `HEAD` that is not fetched
+  `origin/main` (or a pushed annotated tag), and a SHA without a successful CI
+  verdict — before credentials are read — and records source SHA, ref, CI
+  verdict, Xcode build and versions into `private/provenance/`. The one narrow
+  override is `--allow-unverified-ci`, for the CI-verdict proof only, and it is
+  recorded. See #287.
+- **Validate the workflows' pinning and permissions policy:**
+  `Tools/check-workflows.py` (and `--self-test`). Every `uses:` in a tracked
+  workflow is a full commit SHA with its release named beside it, and
+  `permissions:` is explicit and no broader than the checker's allowlist.
 - **Validate a kept result bundle on its own:**
   `Tools/validate-test-result.py --xcresult Artifacts/latest/Glow.xcresult`
 - **Check the gates themselves:** `Tools/validate-test-result.py --self-test`
