@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
 
+# Read-only by declaration, not only by the repository default. The default
+# workflow permission is a setting a click can change; this line is a reviewed
+# fact in the same diff as the jobs it governs. Nothing here writes to the
+# repository — the artifact upload uses its own token scope, not contents.
+permissions:
+  contents: read
+
 # A new push to a branch makes the previous run's answer irrelevant, and macOS
 # runners are the expensive kind.
 concurrency:
@@ -21,7 +28,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      # Every third-party ref in this file is a full commit SHA, because a tag
+      # is a pointer its owner can move without a commit here. The comment names
+      # the release the SHA was resolved from; Tools/check-workflows.py fails
+      # the build when either half is missing. Dependabot proposes updates as
+      # SHA diffs, so pinning does not mean freezing.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # First, because everything below trusts what this parses: the workflow
+      # policy — full-SHA pins, version comments, least-privilege permissions —
+      # is itself a gate that can weaken silently.
+      - name: The workflows obey the pinning and permissions policy
+        run: |
+          python3 Tools/check-workflows.py --self-test
+          python3 Tools/check-workflows.py
+
       - name: The validator rejects what it claims to reject
         run: python3 Tools/validate-test-result.py --self-test
 
@@ -41,14 +62,14 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Not `brew install xcodegen`, which resolves whatever is current on the
       # day. The version and the digest of its release archive are pinned in
       # Tools/xcodegen.pin, so this runner and a developer machine generate the
       # project with the same bytes. Cached by that version.
       - name: Cache the pinned XcodeGen
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: Tools/.xcodegen
           key: xcodegen-${{ hashFiles('Tools/xcodegen.pin') }}
@@ -145,7 +166,7 @@ jobs:
       # evidence.
       - name: Keep the evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: test-run-${{ github.run_id }}-${{ github.run_attempt }}
           path: Artifacts/

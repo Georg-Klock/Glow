@@ -26,24 +26,183 @@
 # the same script CI runs on its Release build, so a version mismatch is caught
 # on a pull request rather than by App Store Connect after the fact.
 #
-#     Tools/ship-testflight.sh [--skip-tests]
+#     Tools/ship-testflight.sh [--skip-tests] [--preflight-only] [--allow-unverified-ci]
 #
 # --skip-tests is deliberate and says so on the way past: a build that goes to
-# testers without the suite having run is a decision, not a default.
+# testers without the suite having run is a decision, not a default. It skips
+# the local suite only; the source preflight below does not care about it.
+#
+# --preflight-only answers "would this checkout be allowed to ship?" and stops
+# there — no credentials read, no archive, no upload.
+#
+# --allow-unverified-ci is the one narrow override (#287): it covers exactly
+# the CI-verdict proof, for the machine that cannot reach GitHub or the SHA
+# whose run genuinely cannot be consulted. It is printed loudly and recorded in
+# the provenance file. There is deliberately no override for a dirty tree or a
+# ref that is not origin/main — an unreproducible release is not a flag away.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 RUN_TESTS=1
+PREFLIGHT_ONLY=0
+ALLOW_UNVERIFIED_CI=0
 for argument in "$@"; do
   case "$argument" in
     --skip-tests) RUN_TESTS=0 ;;
+    --preflight-only) PREFLIGHT_ONLY=1 ;;
+    --allow-unverified-ci) ALLOW_UNVERIFIED_CI=1 ;;
     *)
-      echo "error: unknown argument $argument. Usage: Tools/ship-testflight.sh [--skip-tests]" >&2
+      echo "error: unknown argument $argument. Usage: Tools/ship-testflight.sh [--skip-tests] [--preflight-only] [--allow-unverified-ci]" >&2
       exit 1
       ;;
   esac
 done
+
+# ---------------------------------------------------------------- preflight
+#
+# Before credentials, before generation, before anything that costs a minute:
+# the questions below are about *which source* this is, and every one of them
+# is already answered by the time an archive exists. The existing validators
+# ask "is this bundle internally consistent and correctly signed?"; this asks
+# "which reviewed commit produced it?" — and a cleanly signed build of a dirty,
+# stale or unreviewed tree passes the first question perfectly. See #287.
+
+echo "==> Preflight: verifying the source tree"
+
+# The remote's opinion is the one that matters, and it cannot be consulted
+# from a cache. No fetch, no release — offline is a fact, not an emergency.
+if ! git fetch origin --tags 2>/dev/null; then
+  echo "error: could not fetch origin. A release ref is a claim about the" >&2
+  echo "remote, and this machine cannot currently ask it. Get online and" >&2
+  echo "run this again — there is no offline override for the source ref." >&2
+  exit 1
+fi
+
+# A dirty tree has no override. `--porcelain` lists tracked modifications and
+# untracked non-ignored files alike; ignored build products do not appear.
+DIRTY=$(git status --porcelain)
+if [[ -n "$DIRTY" ]]; then
+  echo "error: the working tree is not clean:" >&2
+  printf '%s\n' "$DIRTY" | sed 's/^/  /' >&2
+  echo "A build of a dirty tree cannot be reproduced from any commit." >&2
+  echo "Commit, stash or remove the changes above. There is no override." >&2
+  exit 1
+fi
+
+HEAD_SHA=$(git rev-parse HEAD)
+MAIN_SHA=$(git rev-parse origin/main)
+RELEASE_REF=""
+if [[ "$HEAD_SHA" == "$MAIN_SHA" ]]; then
+  RELEASE_REF="origin/main"
+else
+  # Not main; the only other allowed source is an annotated release tag that
+  # the remote holds, pointing exactly here. A lightweight local tag is a
+  # bookmark, not a release decision.
+  TAG=$(git describe --exact-match --tags HEAD 2>/dev/null || true)
+  if [[ -n "$TAG" ]] && [[ "$(git cat-file -t "refs/tags/$TAG" 2>/dev/null)" == "tag" ]]; then
+    REMOTE_TAG=$(git ls-remote --tags origin "refs/tags/$TAG" | awk '{print $1}' | head -1)
+    LOCAL_TAG_OBJECT=$(git rev-parse "refs/tags/$TAG")
+    if [[ -n "$REMOTE_TAG" && "$REMOTE_TAG" == "$LOCAL_TAG_OBJECT" ]]; then
+      RELEASE_REF="tag $TAG"
+    fi
+  fi
+fi
+
+if [[ -z "$RELEASE_REF" ]]; then
+  echo "error: HEAD ($HEAD_SHA) is not fetched origin/main ($MAIN_SHA)" >&2
+  echo "and no annotated tag on origin points at it. A TestFlight build" >&2
+  echo "comes from the reviewed branch or from a pushed release tag —" >&2
+  echo "not from whatever happened to be checked out. There is no override." >&2
+  exit 1
+fi
+
+# The commit is the right one; now the proof that CI agreed with it. All check
+# runs for the SHA must have completed without failing, and at least one must
+# have succeeded — phrased that way rather than by job name, so adding a lane
+# tightens this gate instead of dodging it.
+CI_VERDICT="unverified"
+set +e
+CHECKS_JSON=$(gh api "repos/{owner}/{repo}/commits/$HEAD_SHA/check-runs?per_page=100" 2>&1)
+CHECKS_STATUS=$?
+set -e
+if [[ $CHECKS_STATUS -eq 0 ]]; then
+  CI_VERDICT=$(printf '%s' "$CHECKS_JSON" | /usr/bin/python3 -c '
+import json, sys
+runs = json.load(sys.stdin).get("check_runs", [])
+if not runs:
+    print("no-runs"); sys.exit(0)
+pending = [r["name"] for r in runs if r.get("status") != "completed"]
+failed = [r["name"] for r in runs
+          if r.get("status") == "completed"
+          and r.get("conclusion") not in ("success", "neutral", "skipped")]
+succeeded = [r["name"] for r in runs if r.get("conclusion") == "success"]
+if failed:
+    print("failed: " + ", ".join(sorted(set(failed))))
+elif pending:
+    print("pending: " + ", ".join(sorted(set(pending))))
+elif not succeeded:
+    print("no-runs")
+else:
+    print("success")
+')
+fi
+
+if [[ "$CI_VERDICT" != "success" ]]; then
+  if [[ $CHECKS_STATUS -ne 0 ]]; then
+    echo "warning: could not ask GitHub for $HEAD_SHA's checks (gh exited $CHECKS_STATUS)." >&2
+  else
+    echo "warning: CI for $HEAD_SHA is not a clean success: $CI_VERDICT" >&2
+  fi
+  if [[ "$ALLOW_UNVERIFIED_CI" -eq 1 ]]; then
+    echo "==> Proceeding WITHOUT a CI verdict for $HEAD_SHA (--allow-unverified-ci)."
+    echo "    This is recorded in the provenance file."
+    CI_VERDICT="overridden: $CI_VERDICT"
+  else
+    echo "error: no successful CI verdict for $HEAD_SHA." >&2
+    echo "Wait for the run to finish (gh run list --commit $HEAD_SHA), fix it," >&2
+    echo "or — if GitHub genuinely cannot be consulted — rerun with" >&2
+    echo "--allow-unverified-ci, which says so in the provenance record." >&2
+    exit 1
+  fi
+fi
+
+BUILD_NUMBER=$(date -u +%Y%m%d%H%M)
+XCODE_VERSION=$(xcodebuild -version | tr '\n' ' ' | sed 's/ $//')
+MARKETING_VERSION=$(sed -n 's/^ *MARKETING_VERSION: *//p' project.yml | head -1 | tr -d '"')
+
+# The record that binds the upload to its source. private/ is the repository's
+# durable-but-not-shipping place, and gitignored, so the trail survives
+# `rm -rf build` without ever becoming a commit. No secrets: the key id, the
+# issuer and every path stay in Tools/local.env where they live.
+PROVENANCE_DIR="private/provenance"
+mkdir -p "$PROVENANCE_DIR"
+PROVENANCE="$PROVENANCE_DIR/$(date -u +%Y%m%d-%H%M%S)-${HEAD_SHA:0:12}.json"
+/usr/bin/python3 - "$PROVENANCE" <<PY
+import json, sys
+json.dump({
+    "sourceSHA": "$HEAD_SHA",
+    "releaseRef": "$RELEASE_REF",
+    "ciVerdict": "$CI_VERDICT",
+    "xcode": "$XCODE_VERSION",
+    "marketingVersion": "$MARKETING_VERSION",
+    "buildNumber": "$BUILD_NUMBER",
+    "testsRun": $([[ "$RUN_TESTS" -eq 1 ]] && echo True || echo False),
+    "recordedAtUTC": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+    "uploaded": False,
+}, open(sys.argv[1], "w"), indent=2)
+PY
+
+echo "==> Preflight passed: $RELEASE_REF at $HEAD_SHA"
+echo "    CI: $CI_VERDICT"
+echo "    Provenance: $PROVENANCE"
+
+if [[ "$PREFLIGHT_ONLY" -eq 1 ]]; then
+  echo "==> --preflight-only: stopping before credentials, build and upload."
+  exit 0
+fi
+
+# ------------------------------------------------------------ credentials
 
 ENV_FILE="Tools/local.env"
 if [[ ! -f "$ENV_FILE" ]]; then
@@ -69,7 +228,8 @@ fi
 BUILD_DIR="build"
 ARCHIVE="$BUILD_DIR/Glow.xcarchive"
 EXPORT_DIR="$BUILD_DIR/export"
-BUILD_NUMBER=$(date -u +%Y%m%d%H%M)
+# BUILD_NUMBER was stamped by the preflight above, so the provenance record
+# and the archive cannot disagree about which build this is.
 
 # Regenerate before archiving, always.
 #
@@ -176,4 +336,17 @@ xcrun altool --upload-app --type ios \
   --apiKey "$ASC_KEY_ID" \
   --apiIssuer "$ASC_ISSUER_ID"
 
-echo "==> Uploaded build $BUILD_NUMBER. TestFlight will process it shortly."
+# The upload happened; the provenance record now says so, next to the SHA it
+# already named. This is the line that turns "a build was made from X" into
+# "the build testers have came from X".
+/usr/bin/python3 - "$PROVENANCE" <<'PY'
+import json, sys
+path = sys.argv[1]
+record = json.load(open(path))
+record["uploaded"] = True
+json.dump(record, open(path, "w"), indent=2)
+PY
+
+echo "==> Uploaded build $BUILD_NUMBER from $RELEASE_REF at $HEAD_SHA."
+echo "    Provenance: $PROVENANCE"
+echo "    TestFlight will process it shortly."

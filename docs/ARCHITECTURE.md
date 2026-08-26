@@ -545,6 +545,12 @@ and keeps working; only the widget goes blank. That is deliberate: a missing
 entitlement should not stop the app launching. The migration runs to wherever
 the store now lives, shared or not, because the file name changes either way.
 
+Every file this app writes — the store and its sidecars, the fallback, the
+legacy store, staging, quarantine, the migration record, both defaults
+domains, temporary exports — is inventoried in `docs/data-inventory.md`,
+along with what the OS does with each one: backup eligibility, protection
+class, and why neither is set in code (#284).
+
 ### Moving a store without adopting half of one
 
 A SQLite store is three files — the database, the write-ahead log and the
@@ -670,6 +676,24 @@ by hand; that is now the last thing that happens before `altool` runs.
 
 The script also runs `Tools/test.sh` before archiving. `--skip-tests` skips it
 and says so on the way past.
+
+**And nothing is archived whose source is not accounted for** (#287). Before
+credentials are even read, the script proves the working tree is clean, that
+`HEAD` equals fetched `origin/main` or a pushed annotated tag, and that CI
+concluded successfully for that exact SHA — then writes a provenance record
+(source SHA, ref, CI verdict, Xcode build, versions, and later the upload
+itself) into the gitignored `private/provenance/`. The bundle validators answer
+"is this build internally consistent?"; the preflight answers "which reviewed
+commit produced it?", which no inspection of the artifact can. A dirty tree and
+a wrong ref have no override; the CI verdict has exactly one, the named
+`--allow-unverified-ci`, which is recorded. `--preflight-only` asks the
+question without building anything.
+
+The workflows themselves are part of the same contract:
+`Tools/check-workflows.py` runs in CI's gate job and fails on a `uses:` that is
+not a full commit SHA with its release named in an adjacent comment, and on a
+`permissions:` declaration that is missing or broader than its allowlist — a
+tag another repository's owner can move is code this repository never reviewed.
 
 ## The widgets
 
