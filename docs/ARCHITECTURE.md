@@ -175,8 +175,10 @@ intents get the strict answer without naming it and only the week view, with dem
 history in, opts out. Tapping twice quickly cannot create a duplicate, because
 the second call finds the first completion and removes it — and it finds it by
 *fetching* the habit's rows for that day rather than reading the cached
-relationship array, so a row the widget's process wrote is not missed and a row
-it deleted is not touched. Every row on the day comes off, not the first one
+relationship array, so a row the widget tap's own context wrote is not missed
+and a row it deleted is not touched — `MarkHabitIntent` runs in the app's
+process (`LiveActivityIntent`, #58) but opens a container of its own per tap,
+and nothing tells any other context what it did. Every row on the day comes off, not the first one
 found: a store written before #130 can hold two rows for one civil day, and
 un-marking a day has to mean the day is not marked.
 It returns a `ToggleOutcome` rather than a Bool, because a third thing can
@@ -273,8 +275,10 @@ half depends on nothing but the store, and the calendar half must not be
 remembered because the calendar can change under it.
 
 That seam was described here as the one a cache belongs behind. **Nothing is
-cached across renders and nothing should be** — the widget's intents write this
-store from their own process and never tell the app, so a cache they cannot
+cached across renders and nothing should be** — the widget's tap intent writes
+this store through a container of its own (in the app's process since its
+`LiveActivityIntent` conformance, #58, but on a context nothing here observes)
+and never tells the app's live contexts, so a cache the writer cannot
 invalidate is a wrong number that survives until something unrelated redraws.
 What #135 did instead was bound the read; the measurement that settled it is in
 decisions.md.
@@ -297,11 +301,15 @@ migration for a store written before it existed — verified against one.
 Mostly layout. The one piece of real behaviour is `SlotView`'s completion
 transition, which is documented in place and in [glow.md](glow.md).
 
-`RootTabView` carries three tabs: This Week, Widgets and Settings. The middle
-one was Today, which drew the per-day habits as rings and is on
-`feature/daily-habits-2.0` with `DayRingView` and the geometry under it (#209);
-the slot was left empty rather than collapsed so that #210 could fill it in the
-same position, and the bar reflowed once rather than twice.
+`RootTabView` carries three tabs: Widgets, This Week and Settings, in that
+order (#238), with This Week as the landing tab — the first tab is what the
+app says it is about, the landing tab is what every launch opens to, and the
+two are held separately on purpose. The Widgets tab began in Today's old slot:
+Today drew the per-day habits as rings and is on `feature/daily-habits-2.0`
+with `DayRingView` and the geometry under it (#209); the slot was left empty
+rather than collapsed so that #210 could fill it in the same position, and the
+bar reflowed once rather than twice. #238 then moved Widgets to the front,
+an order argued on its own terms rather than inherited.
 
 `WidgetsView` is that tab: every widget this bundle ships, previewed by the
 shipping view, with an "Added" mark on the ones already on the Home Screen.
@@ -338,8 +346,8 @@ arrive as a parameter, read from the view's own `@Query` through
 `MonthStore.offered`, so `Logic/` stays pure and the previews and the widget's
 own picker cannot offer different habits. An empty list yields one card with no
 habit, which is `MonthWidgetView`'s own empty state rather than a heading with
-nothing under it. **Week-Small is not varied**: #188 would add a per-widget
-habit order, and until that axis exists a second card would be a duplicate.
+nothing under it. The clause that kept Week-Small to a single card went with
+the family itself (PR #277).
 
 **`WidgetPlacementQuerying` is the seam.** `WidgetCenter` answers for the
 Home Screen of the device it is running on, which a test cannot arrange, so the
@@ -677,12 +685,32 @@ by hand; that is now the last thing that happens before `altool` runs.
 The script also runs `Tools/test.sh` before archiving. `--skip-tests` skips it
 and says so on the way past.
 
+**And nothing is archived whose source is not accounted for** (#287). Before
+credentials are even read, the script proves the working tree is clean, that
+`HEAD` equals fetched `origin/main` or a pushed annotated tag, and that CI
+concluded successfully for that exact SHA — then writes a provenance record
+(source SHA, ref, CI verdict, Xcode build, versions, and later the upload
+itself) into the gitignored `private/provenance/`. The bundle validators answer
+"is this build internally consistent?"; the preflight answers "which reviewed
+commit produced it?", which no inspection of the artifact can. A dirty tree and
+a wrong ref have no override; the CI verdict has exactly one, the named
+`--allow-unverified-ci`, which is recorded. `--preflight-only` asks the
+question without building anything.
+
+The workflows themselves are part of the same contract:
+`Tools/check-workflows.py` runs in CI's gate job and fails on a `uses:` that is
+not a full commit SHA with its release named in an adjacent comment, and on a
+`permissions:` declaration that is missing or broader than its allowlist — a
+tag another repository's owner can move is code this repository never reviewed.
+
 ## The widgets
 
-The week widget: small, medium and large, reading the same store through the
-App Group, with today's slot as an `AppIntent` button. Past days are not
-buttons: the widget passes `SlotEditing.todayOnly`, which is R2's asymmetry
-holding in a second process.
+The week widget: medium and large — small was a third family and PR #277
+dropped it; `GlowWidget` serves the same kind string, so a placed medium or
+large is untouched and a placed small stops being served — reading the same
+store through the App Group, with today's slot as an `AppIntent` button. Past
+days are not buttons: the widget passes `SlotEditing.todayOnly`, which is R2's
+asymmetry holding in a second process.
 
 It renders the same HDR tile as the app, via the same `GlowImageView`, with
 `fillsWidth` set because the widget's slots are distributed by an HStack rather
@@ -716,9 +744,25 @@ surviving type in full.
 
 ## What is deliberately absent
 
+- No network, no sync, no telemetry — **and enforced as an invariant rather
+  than observed as a fact** (#281). Every production `ModelConfiguration`
+  passes `cloudKitDatabase: .none`, because the parameter's default is
+  `.automatic` and only the missing iCloud entitlement was standing between
+  that default and a container. The entitlement itself is held closed from
+  both ends: `Tools/check-project.py` rejects the six iCloud/ubiquity keys
+  (and anything beyond the App Group) in what the generated project *requests*,
+  and `Tools/check-release-build.py --require-signing` rejects the same keys
+  (and anything beyond what distribution signing injects) in what the
+  signature *grants*. `LocalOnlyContractTests` scans the production sources
+  for the CloudKit/network API spellings the audit found absent; a match is a
+  reviewed allowlist entry, not a silent merge. The privacy manifests remain
+  declaration checks — none of this proves what Apple's frameworks do
+  internally, only that changing Glow's own surface fails a gate.
 - No view models. The logic that would live in one is in `Logic/`, and the rest
   is `@Query`.
-- No coordinator or router. There is one screen and three sheets.
+- No coordinator or router. Three tabs on one `TabView`, sheets for what sits
+  above them, and `DeepLink` mapping a widget URL to a tab is all the routing
+  there is.
 - No dependency injection container. The two things needing injection, the
   calendar and the model context, are parameters with defaults.
 - No networking. There is none.

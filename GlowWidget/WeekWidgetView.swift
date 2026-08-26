@@ -380,16 +380,38 @@ private struct WidgetSpan: View {
             habitName: habit.name, state: span.state, actionDay: span.actionDay
         )
         if span.isTappable {
-            // `done:` is the complement of what this span drew, so the
-            // request is the one the mark was making (#272). A stale surface
-            // or a duplicated delivery then asks for the same state twice
-            // rather than flipping it back.
-            Button(intent: MarkHabitIntent(
-                habitID: habit.id, done: span.state != .filled
-            )) { mark }
-                .buttonStyle(.plain)
-                .accessibilityLabel(label)
-                .accessibilityHint(SlotVoice.hint(isDone: span.state == .filled))
+            // A `Toggle`, not a `Button` (#292) — see `WidgetSlot`. The two
+            // faces are what this span's own two tappable states draw: `.open`
+            // is the glowing ask, `.filled` is structure, because a span is
+            // structure and the lit dot on the day it happened is `WeekDots`'
+            // overlay (#47). So the optimistic frame for a completion is the
+            // ask going quiet at this span's own width; the dot, and the
+            // re-division of the row a write causes, arrive with the reload —
+            // the toggle owns its own pixels and nothing beside them.
+            SlotToggle(
+                habitID: habit.id,
+                isDone: span.state == .filled,
+                onLabel: SlotVoice.span(
+                    habitName: habit.name, state: .filled, actionDay: span.actionDay
+                ),
+                offLabel: SlotVoice.span(
+                    habitName: habit.name, state: .open, actionDay: span.actionDay
+                )
+            ) {
+                SlotMarkView(
+                    mark: .upcoming,
+                    size: size,
+                    spansDays: span.dayCount > 1,
+                    restWindow: restWindow
+                )
+            } offMark: {
+                SlotMarkView(
+                    mark: .openToday,
+                    size: size,
+                    spansDays: span.dayCount > 1,
+                    restWindow: restWindow
+                )
+            }
         } else {
             // A span that cannot be tapped is still a share of the week that
             // was drawn, so it is still a share of the week that is said. It
@@ -413,11 +435,11 @@ private struct WidgetSlot: View {
     let burst: Double?
 
     var body: some View {
-        // Only today's slot is a button, and since #116 that is the widget's
-        // own rule rather than the app's: the week view edits any day it shows,
-        // and a widget stays a glance and a single confirmed action. A Button
-        // wrapping an untappable slot would still highlight on touch and
-        // promise something it does not do.
+        // Only today's slot acts, and since #116 that is the widget's own rule
+        // rather than the app's: the week view edits any day it shows, and a
+        // widget stays a glance and a single confirmed action. A control
+        // wrapping an untappable slot would still respond to touch and promise
+        // something it does not do.
         //
         // **Every column speaks, tappable or not** (#137). Only two of them did:
         // today's, and the rest day, which #72 gave a voice because it draws
@@ -427,30 +449,45 @@ private struct WidgetSlot: View {
         // of it. Seven dated facts is a row; it is a month and a year of them
         // that get counted into a sentence instead (`HistoryVoice`).
         if slot.isTappable {
-            Button(intent: MarkHabitIntent(
-                habitID: habitID, done: slot.state != .filled
-            )) {
-                shape
+            // A `Toggle`, not a `Button` (#292): the system draws the state
+            // the tap asked for while the intent runs, instead of holding the
+            // old mark until the provider is next scheduled — which #121
+            // measured at seconds, and which is what made people tap twice
+            // (#272). A tappable slot is today's, so its two faces are today's
+            // two marks.
+            SlotToggle(
+                habitID: habitID,
+                isDone: slot.state == .filled,
+                onLabel: label(for: .doneToday),
+                offLabel: label(for: .openToday)
+            ) {
+                doneShape
+            } offMark: {
+                SlotMarkView(mark: .openToday, size: size)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(label)
-            .accessibilityHint(SlotVoice.hint(isDone: slot.state == .filled))
         } else {
-            // No button trait and no hint: there is nothing to do here.
-            shape
+            // No control trait and no hint: there is nothing to do here.
+            //
+            // The widget glows. Worth stating plainly, because this project
+            // assumed the opposite for a long time and wrote it into the spec as
+            // a non-goal: WidgetKit renders out-of-process and archives the
+            // result, so HDR was supposed to be impossible here. Measured on an
+            // iPhone 14 Pro running the real PQ tile, it is not.
+            SlotMarkView(mark: slot.mark, size: size)
                 .accessibilityElement()
-                .accessibilityLabel(label)
+                .accessibilityLabel(label(for: slot.mark))
         }
     }
 
-    private var label: String {
-        guard let day else { return "\(habitName), \(SlotVoice.state(slot.mark))" }
-        return SlotVoice.label(habitName: habitName, mark: slot.mark, day: day)
+    private func label(for mark: SlotMark) -> String {
+        guard let day else { return "\(habitName), \(SlotVoice.state(mark))" }
+        return SlotVoice.label(habitName: habitName, mark: mark, day: day)
     }
 
+    /// The completed face: the dot, or the tap's cross-fade arriving at it.
     @ViewBuilder
-    private var shape: some View {
-        if let burst, slot.state == .filled {
+    private var doneShape: some View {
+        if let burst {
             // A cross-fade, not the app's closing spring. The app's ring is
             // one shape whose hole shuts; a widget is a handful of stills,
             // and stills sampled off a spring play back at whatever rate
@@ -458,17 +495,17 @@ private struct WidgetSlot: View {
             // out, dot in, still. The two surfaces read as different gestures
             // for the same act, and that is accepted: a gesture that reads
             // wrong is worse than one that reads different.
+            //
+            // Only on the completed face: the burst rides timeline entries the
+            // provider built after a completion, so the slot it describes is
+            // `.filled` — the same guard the old single-shape body spelled as
+            // `slot.state == .filled`.
             ZStack {
                 SlotMarkView(mark: .openToday, size: size).opacity(1 - burst)
-                SlotMarkView(mark: slot.mark, size: size).opacity(burst)
+                SlotMarkView(mark: .doneToday, size: size).opacity(burst)
             }
         } else {
-            // The widget glows. Worth stating plainly, because this project
-            // assumed the opposite for a long time and wrote it into the spec as
-            // a non-goal: WidgetKit renders out-of-process and archives the
-            // result, so HDR was supposed to be impossible here. Measured on an
-            // iPhone 14 Pro running the real PQ tile, it is not.
-            SlotMarkView(mark: slot.mark, size: size)
+            SlotMarkView(mark: .doneToday, size: size)
         }
     }
 

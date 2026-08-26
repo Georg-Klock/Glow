@@ -179,15 +179,24 @@ private struct MonthCellView: View {
                 // `SlotEditing.todayOnly`, so this grid edits what every widget
                 // surface edits and nothing more (#116). The same intent as the
                 // week widget's slot, so the store's rules — including a
-                // refusal — cannot differ by surface.
-                Button(intent: MarkHabitIntent(
-                    habitID: habit.id, done: cell.mark != .doneToday
-                )) { mark }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(SlotVoice.label(
-                        habitName: habit.name, mark: cell.mark, day: cell.date
-                    ))
-                    .accessibilityHint(SlotVoice.hint(isDone: cell.mark == .doneToday))
+                // refusal — cannot differ by surface. And the same control
+                // (#292): a `Toggle` whose faces are today's two marks, so the
+                // tap draws the state it asked for instead of waiting on the
+                // provider.
+                SlotToggle(
+                    habitID: habit.id,
+                    isDone: cell.mark == .doneToday,
+                    onLabel: SlotVoice.label(
+                        habitName: habit.name, mark: .doneToday, day: cell.date
+                    ),
+                    offLabel: SlotVoice.label(
+                        habitName: habit.name, mark: .openToday, day: cell.date
+                    )
+                ) {
+                    SlotMarkView(mark: .doneToday, size: CGSize(width: side, height: side))
+                } offMark: {
+                    SlotMarkView(mark: .openToday, size: CGSize(width: side, height: side))
+                }
             } else {
                 // Still hidden, and now with something saying what they were:
                 // the habit's name carries a count of the whole month, so the

@@ -104,7 +104,12 @@ enum TestStore {
         ModelContext(
             try ModelContainer(
                 for: GlowStore.schema,
-                configurations: ModelConfiguration(schema: GlowStore.schema, url: url)
+                // `.none` for the same reason the production stores say it
+                // (#281): a file-backed test store should be configured the
+                // way the store it stands in for is.
+                configurations: ModelConfiguration(
+                    schema: GlowStore.schema, url: url, cloudKitDatabase: .none
+                )
             )
         )
     }
@@ -115,7 +120,8 @@ enum TestStore {
             try ModelContainer(
                 for: GlowStore.schema,
                 configurations: ModelConfiguration(
-                    schema: GlowStore.schema, url: url, allowsSave: false
+                    schema: GlowStore.schema, url: url, allowsSave: false,
+                    cloudKitDatabase: .none
                 )
             )
         )

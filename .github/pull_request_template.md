@@ -4,9 +4,11 @@
 
 ## Tests
 
-<!-- Paste the result of Tools/test.sh, e.g. "L1 47/47". CI re-runs it on the
-     preview merge, and the stated count is what a reviewer checks against.
-     A PR with no test result has not been tested. -->
+<!-- Paste the exact "L1 <passed>/<ran>" line Tools/test.sh printed for this
+     change — the script's own output, never a number remembered or copied
+     from an earlier PR. CI re-runs it on the preview merge, and the stated
+     count is what a reviewer checks against. A PR with no test result has
+     not been tested. -->
 
 L1 ?/?
 
