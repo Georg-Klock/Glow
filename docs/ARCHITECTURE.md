@@ -685,6 +685,24 @@ by hand; that is now the last thing that happens before `altool` runs.
 The script also runs `Tools/test.sh` before archiving. `--skip-tests` skips it
 and says so on the way past.
 
+**And nothing is archived whose source is not accounted for** (#287). Before
+credentials are even read, the script proves the working tree is clean, that
+`HEAD` equals fetched `origin/main` or a pushed annotated tag, and that CI
+concluded successfully for that exact SHA — then writes a provenance record
+(source SHA, ref, CI verdict, Xcode build, versions, and later the upload
+itself) into the gitignored `private/provenance/`. The bundle validators answer
+"is this build internally consistent?"; the preflight answers "which reviewed
+commit produced it?", which no inspection of the artifact can. A dirty tree and
+a wrong ref have no override; the CI verdict has exactly one, the named
+`--allow-unverified-ci`, which is recorded. `--preflight-only` asks the
+question without building anything.
+
+The workflows themselves are part of the same contract:
+`Tools/check-workflows.py` runs in CI's gate job and fails on a `uses:` that is
+not a full commit SHA with its release named in an adjacent comment, and on a
+`permissions:` declaration that is missing or broader than its allowlist — a
+tag another repository's owner can move is code this repository never reviewed.
+
 ## The widgets
 
 The week widget: medium and large — small was a third family and PR #277
@@ -726,6 +744,20 @@ surviving type in full.
 
 ## What is deliberately absent
 
+- No network, no sync, no telemetry — **and enforced as an invariant rather
+  than observed as a fact** (#281). Every production `ModelConfiguration`
+  passes `cloudKitDatabase: .none`, because the parameter's default is
+  `.automatic` and only the missing iCloud entitlement was standing between
+  that default and a container. The entitlement itself is held closed from
+  both ends: `Tools/check-project.py` rejects the six iCloud/ubiquity keys
+  (and anything beyond the App Group) in what the generated project *requests*,
+  and `Tools/check-release-build.py --require-signing` rejects the same keys
+  (and anything beyond what distribution signing injects) in what the
+  signature *grants*. `LocalOnlyContractTests` scans the production sources
+  for the CloudKit/network API spellings the audit found absent; a match is a
+  reviewed allowlist entry, not a silent merge. The privacy manifests remain
+  declaration checks — none of this proves what Apple's frameworks do
+  internally, only that changing Glow's own surface fails a gate.
 - No view models. The logic that would live in one is in `Logic/`, and the rest
   is `@Query`.
 - No coordinator or router. Three tabs on one `TabView`, sheets for what sits

@@ -75,9 +75,11 @@ import UIKit
 ///
 /// The manifest of what was actually rendered is attached to every run, passing
 /// or failing, as `render-signatures-actual.json`. Approving a deliberate
-/// visual change is copying it over `RenderTests/Baselines/render-signatures.json`
-/// and saying in the pull request what moved. `Tools/test.sh` prints that
-/// command with the run's own path in it.
+/// visual change is copying it over the committed file — `render-signatures.json`
+/// for the current runtime, `render-signatures-ios<major>.json` for an OS major
+/// that carries its own (see `committedBaseline()`) — and saying in the pull
+/// request what moved. `Tools/test.sh` prints that command with the run's own
+/// path and the right destination in it.
 @MainActor
 @Suite("Render baseline")
 struct RenderBaselineTests {
@@ -417,10 +419,23 @@ struct RenderBaselineTests {
 
     // MARK: - The committed file
 
+    /// The baseline for the OS this run is rendering on.
+    ///
+    /// A baseline is a picture of one renderer's output, and the renderer is
+    /// the OS's: the same commit that moves no cell between two simulator
+    /// *models* moves cells by more than the tolerance and the ground share by
+    /// up to 7.4 points between iOS 26.5 and iOS 18.5 — measured on the
+    /// minimum-iOS lane the day it landed (#286). So each gated OS major may
+    /// carry its own file, `render-signatures-ios<major>.json`, and the
+    /// unsuffixed file is the current runtime's. Approving a change on the
+    /// minimum lane means copying that lane's `render-signatures-actual.json`
+    /// over the suffixed file; `Tools/test.sh` names the right destination.
     static func committedBaseline() throws -> RenderBaseline {
+        let bundle = Bundle(for: BaselineBundleToken.self)
+        let major = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
         let url = try #require(
-            Bundle(for: BaselineBundleToken.self)
-                .url(forResource: "render-signatures", withExtension: "json"),
+            bundle.url(forResource: "render-signatures-ios\(major)", withExtension: "json")
+                ?? bundle.url(forResource: "render-signatures", withExtension: "json"),
             """
             RenderTests/Baselines/render-signatures.json is not in the test bundle. \
             It is a committed input, not a generated one — without it there is no gate.

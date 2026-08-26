@@ -39,6 +39,23 @@ struct SettingsView: View {
     @State private var pendingExport: URL?
     @State private var isChoosingFormat = false
 
+    /// The email flow's own states (#289). Its format chooser is a second
+    /// dialog rather than a mode on the first, so each button's tap leads
+    /// where its label said it would.
+    @State private var isChoosingEmailFormat = false
+    /// The message the composer is currently holding, or nil while there is
+    /// none. Its own item, not a reuse of `exportFile`, because the two sheets
+    /// are different ways out and can in principle both be reached from one
+    /// written file — the fallback path hands the same URL from this flow to
+    /// that one.
+    @State private var mailDraft: MailDraft?
+    /// Mail cannot send on this device; the alert explains and offers the
+    /// share sheet with the same file.
+    @State private var isMailUnavailable = false
+    /// The composer reported failure. The only outcome with an error —
+    /// cancellation is a decision, not a failure. See `MailExport.reaction`.
+    @State private var mailFailed = false
+
     /// Mirrors `PopPreferences.level`, so the picker moves on the tap.
     @State private var popLevel = PopPreferences.level
 
@@ -271,6 +288,18 @@ struct SettingsView: View {
                     }
                     .disabled(habits.isEmpty)
 
+                    // The same export, one step closer to "send it to
+                    // myself": Apple's composer, prefilled with the file and
+                    // nothing else (#289). A plain row like its neighbour —
+                    // never a styled prominent control; the root tint is pure
+                    // white and has eaten three of those (see CLAUDE.md).
+                    Button {
+                        isChoosingEmailFormat = true
+                    } label: {
+                        Label("Email My History", systemImage: "envelope")
+                    }
+                    .disabled(habits.isEmpty)
+
                     Toggle("Demo history", isOn: demoBinding)
                         .tint(GlowPalette.controlTint)
 
@@ -317,6 +346,17 @@ struct SettingsView: View {
                 Button("JSON") { export(as: .json) }
                 Button("Cancel", role: .cancel) {}
             }
+            // The same two formats, chosen before any file exists — the email
+            // flow writes at the tap exactly as the share flow does (#289).
+            .confirmationDialog(
+                "Email My History",
+                isPresented: $isChoosingEmailFormat,
+                titleVisibility: .visible
+            ) {
+                Button("CSV") { emailExport(as: .csv) }
+                Button("JSON") { emailExport(as: .json) }
+                Button("Cancel", role: .cancel) {}
+            }
             // The share sheet is the only way out of the app, and it opens on
             // a tap. Nothing here uploads.
             // `onDismiss` covers sharing and cancelling both, because they are
@@ -324,6 +364,51 @@ struct SettingsView: View {
             // them as two is how one of them gets missed.
             .sheet(item: $exportFile, onDismiss: { discardExport() }) { file in
                 ShareSheet(url: file.url)
+            }
+            // The composer, same lifetime rule as the share sheet: the one
+            // dismissal releases the file, whichever of the four ways the
+            // composer came back — and also when it is swiped away without
+            // the delegate ever firing. Mail's own copies (a sent message, a
+            // saved draft) are Mail's; only Glow's temporary source is
+            // released. See `MailExport.reaction`.
+            .sheet(item: $mailDraft, onDismiss: { discardExport() }) { draft in
+                MailComposeView(
+                    data: draft.data,
+                    filename: draft.filename,
+                    mimeType: draft.mimeType,
+                    subject: draft.subject
+                ) { outcome in
+                    mailDraft = nil
+                    if MailExport.reaction(to: outcome).showsError {
+                        mailFailed = true
+                    }
+                }
+            }
+            // The honest fallback, not an error page: a device without Mail
+            // still has the share sheet, and the same file is offered to it.
+            .alert("Mail Isn't Set Up", isPresented: $isMailUnavailable) {
+                Button("Use Share Sheet") {
+                    if let url = pendingExport {
+                        exportFile = HistoryFile(url: url)
+                    }
+                }
+                Button("Cancel", role: .cancel) { discardExport() }
+            } message: {
+                Text(
+                    "This device has no account Mail can send from. The same "
+                        + "file can go out through the share sheet instead."
+                )
+            }
+            // Failure is the one outcome that speaks. No path, no filename,
+            // no habit — the sentence says what happened and what to do.
+            .alert("Email Failed", isPresented: $mailFailed) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(
+                    "Mail reported a failure and nothing was sent. The "
+                        + "prepared file has been discarded — you can try "
+                        + "again, or use Export History."
+                )
             }
             .alert("Reset to Default Habits?", isPresented: $isConfirmingReset) {
                 TextField("Type \(ResetConfirmation.word) to confirm", text: $typedConfirmation)
@@ -450,12 +535,56 @@ struct SettingsView: View {
     enum ExportFormat { case csv, json }
 
     /// Writes the file, then hands it to the share sheet.
+    private func export(as format: ExportFormat) {
+        guard let url = writeExport(as: format) else { return }
+        exportFile = HistoryFile(url: url)
+    }
+
+    /// Writes the file, then hands it to Apple's mail composer — or, on a
+    /// device Mail cannot send from, offers the share sheet with the same
+    /// file (#289).
+    ///
+    /// **An export, not a backup.** The composer opens with no recipient —
+    /// Glow does not know an address and does not guess one — and nothing is
+    /// sent until the person reviews the message and presses Send. What the
+    /// mail provider then keeps is the provider's; what Glow wrote is
+    /// released when the composer goes away.
+    private func emailExport(as format: ExportFormat) {
+        guard let url = writeExport(as: format) else { return }
+        switch MailExport.route(canSendMail: MailComposeView.canSendMail()) {
+        case .composer:
+            guard let data = try? Data(contentsOf: url),
+                  let mime = MailExport.mimeType(forExtension: url.pathExtension)
+            else {
+                // The file cannot be read back or has a type this app does
+                // not write — neither should be reachable, and the share
+                // sheet can still offer whatever was written.
+                exportFile = HistoryFile(url: url)
+                return
+            }
+            mailDraft = MailDraft(
+                url: url,
+                data: data,
+                filename: url.lastPathComponent,
+                mimeType: mime,
+                subject: MailExport.subject(on: Date())
+            )
+        case .shareFallback:
+            isMailUnavailable = true
+        }
+    }
+
+    /// Writes one export and takes ownership of its lifetime.
     ///
     /// Written at the moment of the tap rather than kept ready: a history file
     /// sitting on disk that nobody asked for is exactly the thing this feature
     /// promises not to make. It goes to the app's own temporary directory,
     /// which the system reclaims.
-    private func export(as format: ExportFormat) {
+    ///
+    /// One writer for both ways out — the share sheet and the composer attach
+    /// the same bytes, and a second serializer would be a second thing to
+    /// drift (#289).
+    private func writeExport(as format: ExportFormat) -> URL? {
         let now = Date()
         let snapshots = habits.map { $0.snapshot() }
         do {
@@ -474,9 +603,10 @@ struct SettingsView: View {
             // has to own it. See #142.
             let url = try exportStore.write(text, named: name)
             pendingExport = url
-            exportFile = HistoryFile(url: url)
+            return url
         } catch {
             HabitStore.report(error, operation: "exportHistory")
+            return nil
         }
     }
 
@@ -492,6 +622,18 @@ struct SettingsView: View {
             + "phone only when you send it somewhere — nothing is uploaded."
     }
 
+    /// Says what the email action does and where control ends — the file
+    /// travels through the chosen mail provider, whose copies are its own.
+    /// Deliberately nothing about safekeeping: this is an export, not a
+    /// backup, and copy suggesting it protects anything would be a promise
+    /// this app cannot keep (#289).
+    private var emailFooter: String {
+        "Email My History opens an email with the same file attached and no "
+            + "address filled in — you choose where it goes and press Send "
+            + "yourself. It travels through your mail provider, and any copy "
+            + "the provider keeps is outside Glow's control."
+    }
+
     /// The section's paragraphs, in row order, as one string.
     ///
     /// They stay separate properties because each explains a different control
@@ -499,7 +641,7 @@ struct SettingsView: View {
     /// is the only way a section footer shows more than its first line. See the
     /// note at the call site.
     private var dataFooter: String {
-        [exportFooter, demoFooter, overrideFooter, resetFooter, versionFooter]
+        [exportFooter, emailFooter, demoFooter, overrideFooter, resetFooter, versionFooter]
             .joined(separator: "\n\n")
     }
 
@@ -730,6 +872,20 @@ struct SettingsView: View {
 /// The written file, identified so `sheet(item:)` can present it.
 private struct HistoryFile: Identifiable {
     let url: URL
+    var id: String { url.path }
+}
+
+/// Everything the composer needs, gathered when the file is written (#289).
+///
+/// The bytes ride here rather than being re-read at presentation: the sheet's
+/// content closure can run more than once, and the subject is dated at the
+/// moment of the export, so both are decided exactly once.
+private struct MailDraft: Identifiable {
+    let url: URL
+    let data: Data
+    let filename: String
+    let mimeType: String
+    let subject: String
     var id: String { url.path }
 }
 

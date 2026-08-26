@@ -40,7 +40,15 @@ enum GlowStore {
         if case .failed(let reason) = StoreLocation.migrateIfNeeded() {
             throw StoreMigration.Failure(reason: reason)
         }
-        let configuration = ModelConfiguration(schema: schema, url: StoreLocation.url)
+        // `cloudKitDatabase:` defaults to `.automatic`, which asks SwiftData to
+        // find a CloudKit container on its own. Today no iCloud entitlement
+        // exists for it to find; `.none` makes local-only the call site's own
+        // claim rather than a property of the current signing configuration.
+        // Every production store says it, and LocalOnlyContractTests scans for
+        // the one that stops. See #281.
+        let configuration = ModelConfiguration(
+            schema: schema, url: StoreLocation.url, cloudKitDatabase: .none
+        )
         let container = try ModelContainer(for: schema, configurations: configuration)
         // After the file is in place and before anything reads it, but *not*
         // as a condition of opening: a store whose completions still infer
@@ -60,7 +68,8 @@ enum GlowStore {
         let configuration = ModelConfiguration(
             schema: schema,
             url: StoreLocation.url,
-            allowsSave: false
+            allowsSave: false,
+            cloudKitDatabase: .none
         )
         do {
             return try ModelContainer(for: schema, configurations: configuration)

@@ -68,6 +68,35 @@ from pathlib import Path
 
 DEFAULT_INVENTORY = Path(__file__).resolve().parent / "test-inventory.json"
 
+# The local-only denylist (#281), the same six keys Tools/check-project.py
+# rejects in the *requested* entitlements — here they are rejected in what the
+# signature actually grants, because the entire class of bug this file guards
+# is the two disagreeing. Duplicated rather than imported on purpose: each
+# checker runs alone on machines the other never sees, and each proves its own
+# copy fires in its own self-test.
+FORBIDDEN_ENTITLEMENTS = (
+    "com.apple.developer.icloud-container-identifiers",
+    "com.apple.developer.icloud-container-development-container-identifiers",
+    "com.apple.developer.icloud-container-environment",
+    "com.apple.developer.icloud-services",
+    "com.apple.developer.ubiquity-container-identifiers",
+    "com.apple.developer.ubiquity-kvstore-identifier",
+)
+
+# What a signed Glow bundle's signature may carry: the one entitlement the
+# source requests, plus what App Store distribution signing itself injects.
+# Anything else fails pending review — widening this set is the reviewable
+# event.
+ALLOWED_ENTITLEMENT_KEYS = {
+    "com.apple.security.application-groups",
+    # Injected by distribution signing, not requested by the source:
+    "application-identifier",
+    "com.apple.developer.team-identifier",
+    "get-task-allow",
+    "beta-reports-active",
+    "keychain-access-groups",
+}
+
 # A build setting Xcode never substituted, still sitting in the shipped plist.
 UNEXPANDED = re.compile(r"\$[({]")
 
@@ -328,6 +357,26 @@ def validate(artifact: dict, expectations: dict, *, require_signing: bool, now: 
                         "the app works and the widget shows nothing."
                     )
 
+            # #281: what the signature grants beyond what the repository asks
+            # for. The six iCloud/ubiquity keys are the road managed CloudKit
+            # would take, and anything unlisted is a capability nobody
+            # reviewed — either way, not this build.
+            for key in sorted(entitlements):
+                if key in FORBIDDEN_ENTITLEMENTS:
+                    failures.append(
+                        f"{label}: the signature grants {key}, which is on the "
+                        "iCloud/ubiquity denylist. Glow is local-only (#281); a "
+                        "build that can reach a CloudKit container is a different "
+                        "product promise, and it does not ship by accident."
+                    )
+                elif key not in ALLOWED_ENTITLEMENT_KEYS:
+                    failures.append(
+                        f"{label}: the signature grants {key}, which is outside "
+                        "the reviewed entitlement allowlist. If it is deliberate, "
+                        "widen ALLOWED_ENTITLEMENT_KEYS in Tools/check-release-build.py "
+                        "in the same change."
+                    )
+
             expiry = bundle["profileExpiry"]
             if expiry is None:
                 failures.append(
@@ -472,19 +521,45 @@ def self_test() -> int:
     no_profile = {**signed, "host": {**signed["host"], "profileExpiry": None}}
     only_host = {**expectations, "extensions": {}}
 
-    for name, artifact, expected in [
+    def entitled(extra: dict) -> dict:
+        return {**signed, "host": {**signed["host"],
+                                   "entitlements": {**signed["host"]["entitlements"], **extra}}}
+
+    # A distribution signature as one actually looks: what signing injects
+    # beside what the source asked for. This one must keep passing, or the
+    # allowlist fails every real .ipa on the machine that ships.
+    distribution = entitled({
+        "application-identifier": "TEAM.com.georgklock.glow",
+        "com.apple.developer.team-identifier": "TEAM",
+        "get-task-allow": False,
+        "beta-reports-active": True,
+    })
+
+    signing_scenarios = [
         ("a signed build with the group passes", signed, None),
+        ("a distribution-signed build passes the allowlist", distribution, None),
         ("a stripped App Group entitlement fails", stripped,
          "the signature grants [], not 'group.com.georgklock.glow'"),
         ("an unsigned artifact fails the release path", unsigned, "not signed"),
         ("an expired provisioning profile fails", expired, "expired on 2026-08-21"),
         ("a distribution bundle with no profile fails", no_profile,
          "no readable embedded.mobileprovision"),
-    ]:
+        # #281: each route managed CloudKit or ubiquity storage would take.
+        *[
+            (f"a signature granting {key.rsplit('.', 1)[-1]} fails",
+             entitled({key: ["iCloud.com.georgklock.glow"]}),
+             "iCloud/ubiquity denylist")
+            for key in FORBIDDEN_ENTITLEMENTS
+        ],
+        ("a signature granting an unlisted entitlement fails",
+         entitled({"aps-environment": "production"}),
+         "outside the reviewed entitlement allowlist"),
+    ]
+    for name, artifact, expected in signing_scenarios:
         failures = validate(artifact, only_host, require_signing=True, now=now)
         bad += 0 if report_scenario(name, failures, expected) else 1
 
-    total = len(on_disk) + 6
+    total = len(on_disk) + 1 + len(signing_scenarios)
     print(f"check-release-build self-test: {total - bad}/{total} scenarios")
     return 1 if bad else 0
 

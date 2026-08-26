@@ -3455,7 +3455,6 @@ column is not empty, and a column is not empty for lots of reasons. Naming the
 tone is what stops the next fixture edit putting a dot back on a sample point
 without anything noticing.
 
-
 ## A fresh install chooses its starting point (#228)
 
 **2026-08-23.** `HabitSeeder` is deleted. A fresh install used to open with
@@ -4031,7 +4030,6 @@ different week, the walk must take exactly one step per week of record, arrive a
 spread across two years including both of Havana's midnight clock changes —
 11,268 steps a zone.
 
-
 ## The pop defaults to everything, for a new install (#185)
 
 **2026-08-24.** #185 asked the question and #119 had already supplied the reasoning without acting on it: the objection frequent pops raise — "twenty of these a day on a screen whose whole argument is that it says one thing" — is about the grid, and a pop was never on the grid. It is two seconds over the Island and leaves nothing behind. Georg's answer: people need encouragement. `PopPreferences.Level.unset.effective` moves from `.goals` to `.everything`.
@@ -4469,6 +4467,312 @@ path, and any merge semantics. If phone-loss recovery ever becomes part of
 the product it is #285's design — a separate format with its own version,
 limits and crash-safe replace — and reopening this entry is that decision,
 not a rediscovery.
+
+## A release is bound to a reviewed commit, and the workflows are the contract they read as
+
+**2026-08-26.** #287 named three provenance gaps and this closes the two that
+need no repository admin: the workflow files' own trustworthiness, and the
+source a TestFlight build ships from. The third — branch protection on `main`,
+an Actions policy requiring SHA pins — is a GitHub settings change and is
+written up as a checklist on the issue rather than half-done from a token that
+cannot do it.
+
+**Every `uses:` is now a full commit SHA, resolved and verified against the
+actions repositories, with the release it came from named beside it:**
+`actions/checkout@3d3c42e…` is v7.0.1, `actions/cache@0057852…` is v4.3.0,
+`actions/upload-artifact@ea165f8…` is v4.6.2 — each tag's SHA read via the
+GitHub API and each SHA confirmed to be a real commit before it went in the
+file. A tag is a pointer its owner can move without a commit here, which for a
+repository that pins its own *project generator* by archive digest was the one
+mutable execution reference left. `permissions: contents: read` is declared at
+the workflow level for the same reason: the read-only default is a repository
+setting, and a setting is not a diff.
+
+**The policy has its own checker because a gate nobody checks weakens
+silently.** `Tools/check-workflows.py` parses the tracked workflows
+line-by-line — stdlib only, no YAML dependency on the gate runner — and fails
+on a tag or branch ref, an abbreviated SHA, a missing or non-version pin
+comment, a missing `permissions:` block, a wholesale `read-all`, or any
+permission outside its allowlist. Thirteen mutation fixtures prove each rule
+fires, in the style of the two validators beside it, and the gate job runs the
+self-test before the check on every push. Widening the permissions allowlist
+is deliberately a change to this checker, in the same diff as the job that
+demonstrates the need.
+
+**`Tools/ship-testflight.sh` now asks "which reviewed commit is this?" before
+it asks anything else.** The existing validators answer whether a bundle is
+internally consistent and correctly signed; a cleanly signed build of a dirty,
+stale or unreviewed tree passes both. The preflight runs before credentials
+are read and requires: a clean tree (`git status --porcelain` empty — tracked
+and untracked non-ignored files alike), `HEAD` exactly equal to freshly
+fetched `origin/main` or to an annotated tag the remote holds at the same
+object, and a CI verdict for that SHA in which every check run completed
+without failing and at least one succeeded — phrased over all check runs
+rather than by job name, so a new lane tightens the gate instead of dodging
+it. What it establishes goes into `private/provenance/<time>-<sha>.json`:
+source SHA, ref, CI verdict, Xcode build, marketing version, build number,
+whether the suite ran, and — written back after `altool` returns — that the
+upload happened. `private/` because the trail should survive `rm -rf build`
+and never become a commit.
+
+**The overrides are the decision.** A dirty tree has none, a wrong ref has
+none: a release that cannot be reproduced from a commit is not a flag away, it
+is a different product promise. The CI verdict has exactly one, the named
+`--allow-unverified-ci`, for the machine that genuinely cannot consult GitHub
+— it prints what it is skipping and the provenance record says `overridden`
+with the reason the verdict was unavailable. There is no `--force`, on
+purpose. `--skip-tests` keeps meaning what it meant — the local suite — and
+has no effect on any preflight check. `--preflight-only` runs the whole
+question and stops before anything costs a minute or reads a credential.
+
+**Measured, not assumed:** the dirty-tree and wrong-ref rejections were each
+watched firing; on a fresh clone of `origin/main` the preflight correctly
+refused a merge whose `Build and test` run was still pending — the honest
+answer minutes after a merge — and passed with `--allow-unverified-ci`
+recording exactly that. The pending case is the reason the failure message
+names `gh run list --commit <sha>`: "wait" is the usual fix.
+
+**Not decided here:** whether one human approval is required on `main` —
+that is repository governance, listed on #287 for Georg with the exact ruleset
+settings, since required CI and blocked force-pushes should not wait on it.
+
+## Local-only stops being a lucky alignment and becomes an invariant
+
+**2026-08-26.** #281's audit found no network client, no third-party
+dependency, no CloudKit entitlement and no direct network linkage — a verified
+strength resting on nothing. The app was local-only because several
+independent facts happened to agree, and not one of them would have failed a
+build when it stopped being true. This change makes each of them a gate.
+
+**The store API said `.automatic` by omission, and now says `.none` by hand.**
+`ModelConfiguration`'s `cloudKitDatabase:` parameter defaults to `.automatic`
+— managed CloudKit, if an entitlement lets SwiftData find a container. All
+three production call sites (the writable store, the widget's read-only store,
+the migration inventory) now pass `.none` explicitly, and the migration helper
+mattered as much as the stores: a helper opening historical files must not be
+the one call site that inherits the default. `TestSupport`'s file-backed
+stores say it too, so a test store is configured the way the store it stands
+in for is. `LocalOnlyContractTests.storesSayNone` walks every production
+source, balances the parentheses of every `ModelConfiguration(` call, and
+fails the one that stops saying it — with a floor of three call sites so the
+scan cannot rot into vacuous passing.
+
+**The entitlement is held closed from both ends, because the two ends have
+already been seen to disagree.** The six iCloud/ubiquity keys are rejected by
+name — plus anything outside an allowlist — in what the generated project
+*requests* (`Tools/check-project.py`, which gained `--self-test`, 11 fixtures,
+run on the Linux gate) and in what the signature actually *grants*
+(`Tools/check-release-build.py --require-signing`, 8 new fixtures, 24 total).
+The release checker's allowlist admits what distribution signing injects
+(`application-identifier`, team id, `get-task-allow`, `beta-reports-active`,
+`keychain-access-groups`) and a fixture holds that a realistic distribution
+signature keeps passing — the gate that fails every real `.ipa` on the
+machine that ships is a gate that gets deleted, not obeyed. The two checkers
+carry the denylist as two copies on purpose: each runs alone on machines the
+other never sees, and each proves its own copy fires.
+
+**The source scan starts with #281's exact spellings** — `import CloudKit`,
+`CKContainer`, `URLSession`, `import Network`, `WKWebView` and the rest — over
+`Glow/` and `GlowWidget/`, comment lines excluded, `Tests/` exempt by
+construction. A match is a *reviewed rejection*: the allowlist is an array of
+(file, spelling, reason) in the test, empty today, and widening it is the
+reviewable event. This is the `TestIsolationTests` pattern — the property is
+the absence of a call, and no runtime assertion can observe an absence.
+
+**What this deliberately does not claim.** The privacy-manifest tests' comment
+used to say the assertion stopped a future dependency changing the product
+statement; it could not — it reads what the manifests *declare*, and code can
+change without touching a manifest. The comment now says which gate does
+which. None of this proves Apple's frameworks never communicate internally;
+it proves that changing *Glow's* surface — a call site, an entitlement, an
+API name — fails a review gate instead of passing silently.
+
+**Not done, on purpose:** the CloudKit-shaped schema comments in
+`Habit.swift` and `Completion.swift` stand. #281 explicitly does not authorize
+a schema rewrite — removing optionality or adding uniqueness constraints is a
+versioned-migration decision, not a lint fix. The dependency-manifest and
+Mach-O linkage scans from the issue's fuller programme are also not here; the
+zero-third-party baseline currently has nothing to scan, and a `Package.swift`
+arriving would be its own loud review.
+
+## The declared minimum iOS gets a lane, and the suite says where it ran
+
+**2026-08-26.** #286 found the contradiction plainly: `project.yml` declares
+iOS 18.0, `Tools/test.sh` deliberately picks the newest installed runtime, and
+the audited green run executed on iOS 26.5 — so the support promise was
+compiled against, never run against. The decision, made rather than
+relitigated here: **keep the 18.0 deployment target and gate it**, accepting
+the CI-time cost of a second macOS lane. Raising the target is the fallback
+if the lane cannot be kept green, and it is a product decision with a user
+cost, not a CI convenience.
+
+**`Tools/test.sh` keeps its default and gains a contract.** "Newest installed"
+stays right for a developer machine — portability was the point (#221 queues,
+#245 accessibility, all of it unchanged). What was missing is the way to say
+"this run must be iOS 18": `GLOW_EXPECTED_RUNTIME_MAJOR` restricts the
+selection to that major and then *asserts* the chosen device matches,
+including a device pinned by `GLOW_SIMULATOR_UDID` — filtered at selection and
+checked after it, because the failure #286 names is precisely a lane that
+quietly runs on the wrong runtime and reports green. Both rejection paths
+were watched firing on a machine with only iOS 26.5 installed: no matching
+device (names the installed runtimes), and a pinned device on the wrong
+runtime (names the device and both versions). Where a run happened is now
+evidence, not inference: runtime and device go to the console, to
+`<run>/simulator.txt` beside the log — so a crashed run still says which
+phone it died on — and onto the end of `summary.md`, which CI publishes.
+
+**The minimum lane installs its own runtime.** The `macos-26` image ships no
+iOS 18 simulator; the lane downloads the newest iOS 18.x runtime with
+`xcodebuild -downloadPlatform iOS -buildVersion` to an export path, caches the
+dmg (`actions/cache`, keyed by the pinned version — the same argument as the
+XcodeGen cache), installs it with `simctl runtime add`, and creates an iPhone
+SE (3rd generation) on it — the smallest phone the minimum supports, created
+explicitly because the whole lane is about not inheriting what the image
+happens to have. The suite then runs with `GLOW_EXPECTED_RUNTIME_MAJOR=18`
+and its own erase, artifact and verdict, as a separate job so a
+compatibility failure reads as one.
+
+**The lane's first full run settled two things by measurement.** First,
+`xcodebuild -downloadPlatform iOS -exportPath` *installs* the runtime as well
+as exporting the dmg — an unconditional `simctl runtime add` on the file it
+had just written failed with `SimDiskImageErrorDomain` code 6 and left an
+Unusable duplicate image, so the add now runs only when no usable iOS 18
+runtime is present, which is the cache-hit path. Second, and the real
+finding: **all 551 unit tests pass on iOS 18.5 unchanged** — logic, store,
+migration, accessibility, the lot — and what fails is exactly the render
+baseline, because a baseline is a picture of one renderer's output and the
+renderer is the OS's. The same commit that moves no cell between two
+simulator *models* moves cells past the tolerance and the ground share by up
+to 7.4 points between iOS 26.5 and iOS 18.5 (`week medium configured`: 84.0%
+pure black against 76.6%). So the baseline is per OS major where a major is
+gated: `render-signatures-ios18.json` sits beside the unsuffixed current
+file, `committedBaseline()` picks by `operatingSystemVersion`, and the iOS 18
+file's contents are the lane's own attached `render-signatures-actual.json` —
+approved from the artifact of the run that measured it, which is the same
+approval flow the current runtime has always used. `Tools/test.sh`'s approval
+hint names the per-major destination when one exists.
+
+**Not done here, and said on the issue:** the UI/integration smoke target
+#286 proposes (launch, historical store, widget configuration metadata,
+smallest-device accessibility envelope) is real and separate work; the lane
+runs the full existing suite, which is what exists to run. A device fact
+worth recording beside the lane: an iPhone 12 Pro Max on iOS 18.6.2 ran a
+Debug build of `main` on 2026-08-25 — extension registered, widgets placed,
+intents performed, store loaded in 4–10ms. That is a run-there proof, not a
+correctness proof; the lane is what gates the claim from now on.
+
+## The widget's mark is a Toggle, and it draws the state it asked for
+
+**2026-08-26.** The tappable marks in both widgets were `Button(intent:)`, and
+a button's pixels are the entry's: however fast `MarkHabitIntent` wrote, the
+mark held its old shape until WidgetKit scheduled the provider and composited
+the result — 431ms and 3.17s measured on a phone (#121), which is the gap
+people filled by tapping again (#272). They are now `Toggle(isOn:intent:)`
+behind one control, `SlotToggle`, whose style renders `configuration.isOn`:
+the one mechanism WidgetKit offers for pixels that change at the tap. This is
+the second half of #292; #295's idempotent set was the first.
+
+**Believed, on Apple's word:** an AppIntent-backed widget `Toggle` updates its
+appearance optimistically while `perform()` runs, *provided* the style draws
+`configuration.isOn` rather than anything captured from the snapshot. That
+proviso is the entire design of `SlotMarkToggleStyle` — both faces are built
+from the entry, but which one shows is the system's bit, so the system can
+flip it before the intent has run.
+
+**Measured, in a simulator (iPhone 17 Pro, iOS 26.5):** all three call sites —
+week slot, week span, month cell — perform through the placed widget, and the
+ordering is visible in `WidgetTrace`. On an undo tap, a screenshot taken
+immediately afterwards showed the mark already mid-flip while the entry-driven
+label still said done; the tap line landed in the trace after that frame, and
+the provider ran 4.2s after the tap. Changed pixels before the provider ran
+can only be the toggle. What a simulator cannot say is how it *feels* on a
+phone — whether the flip lands inside the finger's dwell — and nobody has
+looked yet.
+
+**Decided along the way:**
+
+- **The faces are per call site, the control is not.** A slot's completed face
+  carries the burst cross-fade; a span's faces carry its width and rest
+  window; the month's are plain marks. `SlotToggle` owns the toggle, the
+  style, and the spoken strings; the call sites own what a face looks like,
+  which is exactly the split `SlotMarkView` already draws along.
+- **A span's optimistic frame is its own two states at its own geometry.** Tap
+  an open span and the ask goes quiet — `.openToday` to the same unlit
+  structure a filled span draws (#47). The lit dot on today and the
+  re-division of the row are the store's answers, and they arrive with the
+  reload; the toggle owns its own pixels and nothing beside them.
+- **VoiceOver follows `isOn`.** Label and hint are computed inside the style
+  from the same bit the pixels are drawn from, so the announcement agrees with
+  the optimistic state; the system adds the toggle's on/off value from that
+  bit too. Reduce Motion is untouched: the flip is a state change, not
+  motion, so acknowledgement survives it, and the burst stays the thing
+  Reduce Motion skips.
+- **Which marks are interactive did not move.** Tappability is still
+  `Slot.isTappable`, `SlotSpan.isTappable` and `MonthCell.isTappable`; a mark
+  that takes no tap is a plain `SlotMarkView` with no control trait, exactly
+  as before. `WidgetPlacementTests` now scans `GlowWidget/` for
+  `Button(intent` so the migration cannot quietly regress one call site.
+
+**Not decided here:** the burst's first frame draws the ring at full opacity,
+which is now the second time the dot has been on screen — optimistic dot,
+ring, cross-fade back to dot. Whether the cross-fade still earns its place
+when the acknowledgement it was standing in for happens at the tap is #267's
+question and stays open; nothing about `WidgetBurst`, its window, or the
+intent's write path moved with this change.
+
+## Emailing the history is the composer presented, and nothing more (#289)
+
+**2026-08-25.** Settings gains **Email My History** beside Export History:
+the same CSV/JSON chooser, the same file written by `HistoryExport` into
+`ExportStore` at the moment of the tap, handed to Apple's
+`MFMailComposeViewController` instead of the share sheet. The decision #289
+asked for — a dedicated "send it to myself" path without an account, a
+backend, or an inferred address — ships exactly at that boundary: Glow
+prepares the message and stops.
+
+**The privacy line is drawn in constants, not conventions.** The recipient
+list is `MailExport.recipients`, an empty array set explicitly on the
+controller, so "no address is discovered, inferred or prefilled" is a line of
+code a test pins rather than an absence a reviewer has to notice. The subject
+is neutral and dated — "Glow Up history — 2026-08-25", spelled through
+`DayID` so subject and filename name the same civil day — and the body is two
+sentences: what the attachment is, and that pressing Send moves it through
+the person's own provider, whose copies are its own. Nothing the flow says
+suggests safekeeping, and `MailExportTests` holds the #285 sweep over the one
+new user-facing string: this is an export, not a backup, and no recovery
+promise attaches to it.
+
+**Both routes exist on every device, so both are code, not circumstance.**
+`canSendMail()` is read at one call site and routed through
+`MailExport.route(canSendMail:)`; a device Mail cannot send from gets a brief
+explanation and the existing share sheet with the same file — the honest
+fallback, not an error. Without the seam, one of the two arms would exist
+only on phones with a configured Mail account, which no CI simulator is.
+
+**Four ways out, one lifetime rule.** Sent, saved, cancelled and failed all
+release Glow's temporary file — a sent message or a saved draft is Mail's
+copy — and the release rides on the sheet's single dismissal, the same event
+the share sheet already uses, so a composer swiped away without the delegate
+ever firing releases the file too. Only `.failed` shows an error;
+cancellation is a decision, and dressing it as a failure would teach people
+that backing out breaks something. MessageUI's error object is deliberately
+neither surfaced nor logged — it can carry account details, and the reaction
+to failure is the same whatever the reason. An `@unknown` future result maps
+to `.failed`, erring toward saying something went wrong over silence.
+
+**One serializer, one temp-file owner.** The email path calls the same
+`writeExport` the share path does; a second serializer or a second cleanup
+would be a second thing to drift, and #142's sweep already covers the app
+being killed while either sheet is up. The mail row is a plain `Label` like
+its neighbour — the root tint is pure white and has eaten three styled
+prominent controls already.
+
+**Not decided here:** attaching both formats to one message (#289 named it
+and it stays declined — the chooser stands unless research shows both are
+wanted), and any `mailto:` path, which cannot carry an attachment and was
+ruled out in the issue. What only hardware can answer — the composer
+presenting over Settings on a phone with a real Mail account — is noted in
+the PR rather than claimed.
 
 ## The agent documentation gets an authority order, and a gate to hold it
 
