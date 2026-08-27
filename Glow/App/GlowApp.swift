@@ -1,3 +1,4 @@
+import ActivityKit
 import SwiftData
 import SwiftUI
 import WidgetKit
@@ -67,11 +68,46 @@ struct GlowApp: App {
            ProcessInfo.processInfo.arguments.contains("-glow-force-burst") {
             Self.forceBurst(in: container)
         }
+        if ProcessInfo.processInfo.arguments.contains("-glow-debug-pop") {
+            Self.debugPop()
+        }
         if ProcessInfo.processInfo.arguments.contains("-glow-dump-widgets") {
             Self.dumpPlacedWidgets()
         }
         #endif
     }
+
+    #if DEBUG
+    /// Fires the goal pop without a goal, so its presentations can be looked
+    /// at from a tethered Mac — the same reason `-glow-force-burst` exists for
+    /// the widget's burst. The real pop lasts two seconds and only fires when
+    /// a goal is actually met; this one stays up until the activity is ended
+    /// or the system reaps it, because the point is a screenshot, not the
+    /// gesture. It does not go through `GoalPopCentre` on purpose: the centre
+    /// owns *when* a pop is allowed to fire, and a debug affordance that
+    /// taught it a second answer would be the two-callers bug its type comment
+    /// warns about.
+    ///
+    /// The line is the longest one the app writes, so what is being looked at
+    /// is the worst case for truncation and wrap.
+    private static func debugPop() {
+        // Requested immediately, not after a settle delay: a backgrounded app
+        // is suspended, so a sleeping task here never wakes and the request
+        // never fires. Requesting from the foreground works — the Island just
+        // does not *render* it until the app leaves the screen (measured; see
+        // GoalPopCentre) — so the order is launch, request, then background
+        // by hand and look.
+        Task { @MainActor in
+            let content = ActivityContent(
+                state: GoalPopAttributes.ContentState(
+                    habitName: "Early night", line: "that's the week"
+                ),
+                staleDate: nil
+            )
+            _ = try? Activity.request(attributes: GoalPopAttributes(), content: content)
+        }
+    }
+    #endif
 
     private static func open() -> (container: ModelContainer?, failure: String?) {
         do {
