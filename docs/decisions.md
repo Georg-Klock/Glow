@@ -4979,3 +4979,16 @@ defined by what is still undone). None marks another complete.
 `accentRaw`) and the CloudKit-shaped optionality stay exactly as they are —
 dropping them is the first real stage's decision, taken when there is a
 reason, against a floor that now exists to upgrade from.
+
+## The tab bar is icons only, and still speaks its names (#319)
+
+**2026-08-27.** `.labelStyle(.iconOnly)` on `RootTabView`'s `TabView` is the
+whole change: the SwiftUI-native route worked on the first try, so the
+`UITabBarAppearance` fallback the issue sketched was never needed. Checked by
+looking, not assuming — the simulator renders three icons with no text under
+them and a visibly shorter bar. The constraint that came with the ask is held
+by a test rather than by hope: the `Tab` titles stay declared, they remain
+the tabs' accessible names under the icon-only style, and
+`TabBarAccessibilityTests` walks the hosted tree and fails if "Widgets",
+"This Week" or "Settings" ever stops being spoken. Removing the accessible
+name to get the look was the one forbidden shape.
