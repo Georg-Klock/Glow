@@ -31,21 +31,19 @@ struct WidgetPlacement: Hashable, Identifiable, Sendable {
     /// one per habit, where the heading names what the group *is*: several
     /// habits the one widget could be showing, not several widgets.
     var cardName: String {
-        switch kind {
-        case .week: "\(familyName) Week Widget"
-        case .month: "Monthly View per Habit"
+        switch family {
+        case .systemSmall: "Monthly View per Habit"
+        default: "\(familyName) Week Widget"
         }
     }
 
     /// Whether a preview of this placement is a statement about *which* habit,
     /// and therefore worth drawing more than once (#237).
     ///
-    /// A property of the kind, not of the family: what makes the month worth
-    /// previewing several times is `SelectWeeklyHabitIntent`, which is asked
-    /// however the widget is sized. The month is small-only today, so this is
-    /// exactly the Month-Small card — but the rule is the one that stays true
-    /// if that changes.
-    var previewsOneHabit: Bool { kind.isPerHabit }
+    /// A property of the family since #322: the one kind carries both content
+    /// types, and the per-habit axis lives exactly where the month content
+    /// does — at small.
+    var previewsOneHabit: Bool { kind.previewsOneHabit(at: family) }
 }
 
 /// A widget somebody has actually placed, as `WidgetCenter` reports it.

@@ -719,12 +719,16 @@ tag another repository's owner can move is code this repository never reviewed.
 
 ## The widgets
 
-The week widget: medium and large — small was a third family and PR #277
-dropped it; `GlowWidget` serves the same kind string, so a placed medium or
-large is untouched and a placed small stops being served — reading the same
+One widget kind since #322 — `"GlowWidget"`, three families, content decided
+by family: medium and large draw the week, small draws one habit's month
+through the same `MonthWidgetView` the month kind used. `GlowMonthSmall` is
+removed rather than renamed, so a placed Month widget freezes; SPEC.md's
+widgets section records why that was accepted. The week halves read the same
 store through the App Group, with today's slot as an `AppIntent` button. Past
 days are not buttons: the widget passes `SlotEditing.todayOnly`, which is R2's
-asymmetry holding in a second process.
+asymmetry holding in a second process. (Small was the week's third family
+until PR #277 dropped it for drawing unlabeled rows; #322's small is the
+month's content, which names its habit.)
 
 It renders the same HDR tile as the app, via the same `GlowImageView`, with
 `fillsWidth` set because the widget's slots are distributed by an HStack rather
@@ -748,8 +752,9 @@ each kind supports, its gallery name and its one-sentence description, all read
 by the `WidgetConfiguration`s and by the Widgets tab, so the gallery and the
 app cannot describe the same widget differently.
 
-The month widget's configuration intent, its entity and its query live in the
-shared sources (`MonthWidgetConfig.swift`), not the widget target — the app
+The small family's habit entity and query live in the
+shared sources (`MonthWidgetConfig.swift`), not the widget target — bound now
+to the unified `SelectWeekLayoutIntent`'s `habit` parameter (#322) — the app
 exports AppIntents metadata of its own, the system consolidates metadata under
 the app, and with the intent defined only in the extension the stored habit
 choice never resolved when the provider ran. That was established on the Today

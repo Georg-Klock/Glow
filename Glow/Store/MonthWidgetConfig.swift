@@ -43,13 +43,10 @@ struct WeeklyHabitQuery: EntityQuery {
     // behalf.
 }
 
-struct SelectWeeklyHabitIntent: WidgetConfigurationIntent {
-    static let title: LocalizedStringResource = "Choose Habit"
-    static let description = IntentDescription("Which habit this month shows.")
-
-    @Parameter(title: "Habit")
-    var habit: WeeklyHabitEntity?
-}
+// `SelectWeeklyHabitIntent` lived here until #322 collapsed the month kind
+// into `GlowWidget`. The entity and query above stay — the unified
+// `SelectWeekLayoutIntent`'s `habit` parameter binds to them — and so does
+// `MonthStore` below, which the unified provider reads at the small family.
 
 /// One query shared by the month widget's provider and its entity query, so
 /// the picker and the render cannot disagree about what is selectable.

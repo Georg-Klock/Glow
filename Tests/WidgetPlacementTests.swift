@@ -37,15 +37,17 @@ struct WidgetPlacementTests {
         }
     }
 
-    /// The catalog is the gallery's list, so the week's two sizes are two
-    /// entries and not one. **It was three until PR #277 dropped Week-Small.**
-    @Test("The week is two placeable widgets, the month one")
-    func weekIsTwoWidgets() {
-        let week = WidgetCatalog.all.filter { $0.kind == .week }
-        // Large before medium since #312 — the page leads with its largest
-        // card.
-        #expect(week.map(\.family) == [.systemLarge, .systemMedium])
-        #expect(WidgetCatalog.all.filter { $0.kind == .month }.map(\.family) == [.systemSmall])
+    /// One kind since #322, and it is the week's string — the month's
+    /// placements froze with `GlowMonthSmall`, accepted on the issue. Small is
+    /// a family again, with the month's content.
+    @Test("One kind, three sizes, largest first on the page")
+    func oneKindThreeSizes() {
+        #expect(WidgetKind.allCases == [.week])
+        #expect(WidgetKind.week.rawValue == "GlowWidget")
+        #expect(WidgetKind.allNames == ["GlowWidget"])
+        #expect(WidgetKind.week.families == [.systemSmall, .systemMedium, .systemLarge])
+        // Large first since #312 — the page leads with its largest card.
+        #expect(WidgetCatalog.all.map(\.family) == [.systemLarge, .systemMedium, .systemSmall])
     }
 
     // MARK: - Family, not kind (#210)
@@ -70,21 +72,21 @@ struct WidgetPlacementTests {
         let cards = WidgetCatalog.cards(placed: [
             PlacedWidget(kind: .week, family: .systemMedium),
             PlacedWidget(kind: .week, family: .systemLarge),
-            PlacedWidget(kind: .month, family: .systemSmall),
+            PlacedWidget(kind: .week, family: .systemSmall),
         ])
         let placed = Set(cards.filter(\.isPlaced).map(\.placement))
         #expect(placed == [
             WidgetPlacement(kind: .week, family: .systemMedium),
             WidgetPlacement(kind: .week, family: .systemLarge),
-            WidgetPlacement(kind: .month, family: .systemSmall),
+            WidgetPlacement(kind: .week, family: .systemSmall),
         ])
     }
 
     @Test("Two of the same size are still one Added")
     func duplicatesCollapse() {
         let cards = WidgetCatalog.cards(placed: [
-            PlacedWidget(kind: .month, family: .systemSmall),
-            PlacedWidget(kind: .month, family: .systemSmall),
+            PlacedWidget(kind: .week, family: .systemSmall),
+            PlacedWidget(kind: .week, family: .systemSmall),
         ])
         #expect(cards.filter(\.isPlaced).count == 1)
     }
@@ -117,8 +119,6 @@ struct WidgetPlacementTests {
     @Test("A family the kind does not support is dropped")
     func unsupportedFamilyIsIgnored() {
         let cards = WidgetCatalog.cards(placed: [
-            // The month widget is small only.
-            PlacedWidget(kind: .month, family: .systemLarge),
             PlacedWidget(kind: .week, family: .systemExtraLarge),
         ])
         #expect(cards.allSatisfy { !$0.isPlaced })
@@ -130,7 +130,9 @@ struct WidgetPlacementTests {
         let cards = WidgetCatalog.cards(placed: [
             PlacedWidget(kind: "GlowTodayMedium", family: .systemMedium),
             PlacedWidget(kind: .week, family: .systemLarge),
-            PlacedWidget(kind: .month, family: .systemLarge),
+            // The month kind #322 removed, which a Home Screen can still be
+            // holding — the same shape of noise as the Today widgets above.
+            PlacedWidget(kind: "GlowMonthSmall", family: .systemSmall),
         ])
         #expect(cards.filter(\.isPlaced).map(\.placement)
             == [WidgetPlacement(kind: .week, family: .systemLarge)])
@@ -178,20 +180,20 @@ struct WidgetPlacementTests {
     }
 
     private func monthGroup(_ groups: [WidgetCardGroup]) -> WidgetCardGroup {
-        groups.first { $0.placement.kind == .month }!
+        groups.first { $0.placement.family == .systemSmall }!
     }
 
-    /// The axis exists on the month and does not exist on the week. #188 would
-    /// give the week one; until it does, a second Week-Small preview would be
-    /// the first one again.
-    @Test("The month is per-habit, the week is not")
-    func onlyTheMonthVaries() {
-        #expect(WidgetKind.month.isPerHabit)
-        #expect(!WidgetKind.week.isPerHabit)
-        #expect(WidgetPlacement(kind: .month, family: .systemSmall).previewsOneHabit)
-        for family in WidgetKind.week.families {
-            let placement = WidgetPlacement(kind: .week, family: family)
-            #expect(!placement.previewsOneHabit)
+    /// The axis lives at the small family since #322 — where the month
+    /// content is — and nowhere else: medium and large show the whole week,
+    /// and their configuration (which rows, #188) is not an axis a preview
+    /// can vary over.
+    @Test("Small is per-habit, the wide families are not")
+    func onlyTheSmallVaries() {
+        #expect(WidgetKind.week.previewsOneHabit(at: .systemSmall))
+        #expect(WidgetPlacement(kind: .week, family: .systemSmall).previewsOneHabit)
+        for family in [WidgetFamily.systemMedium, .systemLarge] {
+            #expect(!WidgetKind.week.previewsOneHabit(at: family))
+            #expect(!WidgetPlacement(kind: .week, family: family).previewsOneHabit)
         }
     }
 
@@ -243,12 +245,10 @@ struct WidgetPlacementTests {
     @Test("The week is one card per size however many habits there are")
     func theWeekIsUnaffectedByHabits() {
         let groups = WidgetCatalog.groups(placed: [], habits: Self.habitIDs(9))
-        let week = groups.filter { $0.placement.kind == .week }
+        let week = groups.filter { $0.placement.family != .systemSmall }
         let counts = week.map(\.cards.count)
         let previewed: [UUID?] = week.flatMap(\.cards).map(\.habitID)
-        #expect(week.map(\.placement.family) == WidgetKind.week.families.reversed())
-        // Two families since PR #277, not three. Compared against
-        // `WidgetKind.week.families` above, so this pair moves with it.
+        #expect(week.map(\.placement.family) == [.systemLarge, .systemMedium])
         #expect(counts == [1, 1])
         #expect(previewed == [nil, nil])
     }
@@ -259,15 +259,15 @@ struct WidgetPlacementTests {
     @Test("Added stays a fact about the placement, not about a preview")
     func addedIsPerPlacementNotPerCard() {
         let groups = WidgetCatalog.groups(
-            placed: [PlacedWidget(kind: .month, family: .systemSmall)],
+            placed: [PlacedWidget(kind: .week, family: .systemSmall)],
             habits: Self.habitIDs(3)
         )
         let month = monthGroup(groups)
-        let weekPlacement = groups.filter { $0.placement.kind == .week }.map(\.isPlaced)
+        let wide = groups.filter { $0.placement.family != .systemSmall }.map(\.isPlaced)
         #expect(month.isPlaced)
         #expect(month.cards.count == 3)
         #expect(month.cards.map(\.isPlaced) == [true, true, true])
-        #expect(weekPlacement == [false, false])
+        #expect(wide == [false, false])
     }
 
     /// `ForEach` draws one row per id: two cards sharing one is a preview that
@@ -280,7 +280,7 @@ struct WidgetPlacementTests {
         // Identity is the card, not its state — an "Added" that flips must not
         // replace the row.
         let placed = WidgetCatalog.cards(
-            placed: [PlacedWidget(kind: .month, family: .systemSmall)],
+            placed: [PlacedWidget(kind: .week, family: .systemSmall)],
             habits: Self.habitIDs(0)
         )
         let empty = WidgetCatalog.cards(placed: [], habits: Self.habitIDs(0))
@@ -324,14 +324,12 @@ struct WidgetPlacementTests {
             #expect(!kind.families.isEmpty)
         }
         #expect(WidgetKind.week.displayName == "This Week")
-        #expect(WidgetKind.month.displayName == "This Month")
     }
 
     /// The gallery title is the app's name and the kind's, in that order.
     @Test("The gallery title puts the app in front of the kind")
     func galleryNameCarriesTheApp() {
         #expect(WidgetKind.week.galleryName == "Glow Up: This Week")
-        #expect(WidgetKind.month.galleryName == "Glow Up: This Month")
         for kind in WidgetKind.allCases {
             #expect(kind.galleryName.hasSuffix(kind.displayName))
         }
@@ -391,9 +389,10 @@ struct WidgetPlacementTests {
                 }
             }
         }
-        // Both widgets declare both modifiers; if a rename ever makes this scan
-        // match nothing it should fail rather than pass silently.
-        #expect(seen >= 4, "the gallery-string scan matched \(seen) calls, expected 4")
+        // The one widget declares both modifiers (#322 folded the month in);
+        // if a rename ever makes this scan match nothing it should fail
+        // rather than pass silently.
+        #expect(seen >= 2, "the gallery-string scan matched \(seen) calls, expected 2")
     }
 
     /// **A widget mark is a `Toggle`, never a `Button(intent:)`** (#292).
@@ -459,7 +458,7 @@ struct WidgetPlacementTests {
 @Suite("Widget preview layout")
 struct WidgetPreviewLayoutTests {
     private func group(_ family: WidgetFamily, cards: Int) -> WidgetCardGroup {
-        let placement = WidgetPlacement(kind: .month, family: family)
+        let placement = WidgetPlacement(kind: .week, family: family)
         return WidgetCardGroup(
             placement: placement,
             isPlaced: false,

@@ -18,4 +18,9 @@ struct WeekEntry: TimelineEntry {
     /// How far through the completion cross-fade this frame is, 0 through 1:
     /// the dot's opacity, and the ring's complement.
     var progress: Double = 1
+    /// The small family's content (#322): one habit's month, loaded only when
+    /// the provider was asked for `.systemSmall`, nil at every other family.
+    /// The week halves above stay non-optional — the entry's shape does not
+    /// fork by family, only which halves are filled.
+    var month: StoreRead<HabitSnapshot>?
 }

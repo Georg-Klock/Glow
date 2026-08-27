@@ -287,15 +287,16 @@ struct WidgetsView: View {
 
     @ViewBuilder
     private func content(for card: WidgetCard) -> some View {
-        switch card.placement.kind {
-        case .week:
+        // Content follows the family since #322, exactly as the one kind's
+        // provider decides it: small is a habit's month, the rest the week.
+        if card.placement.family == .systemSmall {
+            MonthWidgetView(entry: monthEntry(for: card.habitID))
+        } else {
             // `familyOverride` because `widgetFamily` is read-only outside
             // WidgetKit — a `WeekWidgetView` rendered anywhere else reports
             // medium and silently drops the header. The render harness needs
             // the same door.
             WeekWidgetView(entry: weekEntry, familyOverride: card.placement.family)
-        case .month:
-            MonthWidgetView(entry: monthEntry(for: card.habitID))
         }
     }
 
@@ -318,7 +319,8 @@ struct WidgetsView: View {
     /// The month the month widget would draw for one of the person's habits.
     ///
     /// **Several of these, one per habit** (#237). The month widget asks which
-    /// habit as it is placed (`SelectWeeklyHabitIntent`), so a single preview
+    /// habit as it is placed (the unified intent's `habit` parameter, #322),
+    /// so a single preview
     /// illustrates one arbitrary answer to a question the page is trying to
     /// show you being asked. `WidgetCatalog` decides how many and which;
     /// `MonthStore.offered` decides what is eligible, so the previews and the
