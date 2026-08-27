@@ -64,7 +64,7 @@ struct MonthProvider: AppIntentTimelineProvider {
         let loadStarted = Date()
         let built = entry(for: configuration)
         WidgetTrace.record(
-            "month timeline: habit=\(WidgetTrace.tag(configuration.habit?.id))"
+            "month timeline: family=\(context.family), habit=\(WidgetTrace.tag(configuration.habit?.id))"
                 + ", load \(WidgetTrace.elapsed(since: loadStarted))"
         )
         // One entry, and a refresh at midnight: the open dot is defined as
