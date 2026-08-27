@@ -107,4 +107,28 @@ struct EditModeTests {
             )
         }
     }
+
+    /// #320: the week grid's edit control is the ellipsis menu's own `Button`,
+    /// toggling the `EditMode` state the view owns — not `EditButton`, which
+    /// has no menu-item form and writes to whatever environment it happens to
+    /// sit in. Reintroducing it would put a second writer beside the owned
+    /// state. Comment lines are excluded because the code explains this
+    /// decision by naming the type it declined.
+    @Test("The week grid never constructs EditButton")
+    func theGridDoesNotUseEditButton() throws {
+        let file = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Glow/Views/WeeklyGridView.swift")
+        let text = try String(contentsOf: file, encoding: .utf8)
+
+        let constructions = text.split(separator: "\n").filter { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            return !trimmed.hasPrefix("//") && trimmed.contains("EditButton(")
+        }
+        #expect(
+            constructions.isEmpty,
+            "WeeklyGridView constructs EditButton again: \(constructions)"
+        )
+    }
 }

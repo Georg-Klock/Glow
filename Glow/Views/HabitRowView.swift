@@ -131,7 +131,7 @@ struct HabitRowView: View {
     /// **A view that *builds* the `NavigationStack` cannot make this read, and
     /// the difference is which side of the stack the view sits on.** For a
     /// struct whose own `body` builds the stack, the `editMode` it reads is its
-    /// parent's and never the one the toolbar's `EditButton` toggles, so it has
+    /// parent's and never the one the toolbar's edit control toggles, so it has
     /// to own `@State` and inject it instead. The Today screen was the app's
     /// worked example until #209 removed it; the trap it paid for is in
     /// CLAUDE.md. This row is a plain descendant — `WeeklyGridView` builds the
