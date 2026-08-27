@@ -746,18 +746,21 @@ about them.
 shows every widget this app ships — the week at both its families, the month
 at its one — drawn by `WeekWidgetView` and `MonthWidgetView` themselves rather
 than illustrated, at the point size each family really gets, over the user's
-own habits. Each one says whether it is already on the Home Screen, and
-**"added" means that family**: the week's medium and large are two
-independently placeable widgets, and having one says nothing about the other. `WidgetCenter` is asked fresh whenever the app becomes active, because
-placing a widget happens while the app is not frontmost.
+own habits.
 
-**The page is names, sizes and widgets** (#237). No kind carries an explaining
-sentence under its heading — the gallery does, because there a widget is an
-unfamiliar tile in a list, but here the widget itself is drawn directly below
-over the person's own habits and says the same thing without being read. What
-stays is "This Week" / "This Month", the size beside each preview, "Added", and
-the one paragraph describing the long-press, which is the only thing on the
-page no preview can demonstrate.
+**The page is three named cards and the widgets themselves** (#237,
+restructured by #312): **"Large Week Widget"**, **"Medium Week Widget"**,
+**"Monthly View per Habit"**, in that order, largest first. No card carries an
+explaining sentence under its heading — the gallery does, because there a
+widget is an unfamiliar tile in a list, but here the widget itself is drawn
+directly below over the person's own habits and says the same thing without
+being read. The heading carries the size, so there is no caption beside a
+preview, and the month's heading names the group — its previews are several
+habits one widget could be showing. The one paragraph left is the long-press
+instructions, the only thing on the page no preview can demonstrate. The
+"This Week" / "This Month" section titles, the per-size captions and the
+"Added" checkmarks all went with #312 — and with the checkmarks went the
+page's `WidgetCenter` query, since nothing displayed its answer any more.
 
 **The month is previewed against several habits, up to three.** It is the
 widget that asks *which habit* as it is placed, so one example answers a
@@ -780,24 +783,18 @@ what is left of a Medium's width once two Smalls are in it. A trailing odd
 card is a line of its own, at one widget's size, in the place the next one
 would go. Medium and Large fill the width and are unaffected.
 
-**One picker chooses the Home Screen appearance every preview is drawn under**
-(#273). Under Default the widget keeps the background it declares; under
-Tinted or Clear the system drops it, substitutes glass, and renders the widget
-*accented*, where colour is thrown away and only alpha survives. The previews
-answer that by injecting the rendering mode, so the marks take the same
-alpha-stored grey by the same line of code they take on a Home Screen — the
-content is the real thing, not a drawing of it. The panel behind is not: the
-system composites it out of a wallpaper this app cannot see, so the page draws
-its own neutral plate under SwiftUI's glass and says so.
-
-**Tinted and Clear are one segment, not two.** Both put the widget into
-accented rendering, so the content is identical by construction, and the two
-glass styles measured pixel-identical over the page's plate. Two segments
-drawing the same picture would claim a distinction the page cannot make.
-**And the picker cannot default to the device's own appearance**, because
-nothing reports it: no trait, environment value or WidgetKit call, checked
-against the iOS 26.5 SDK rather than remembered. `widgetRenderingMode` reads
-`.fullColor` inside the app whatever the Home Screen is doing.
+**Every preview sits on glass over black** (#312). Under Tinted or Clear the
+system drops a widget's declared background, substitutes glass composited from
+the wallpaper behind it, and renders the widget *accented*, where colour is
+thrown away and only alpha survives. The previews show exactly that pairing:
+the rendering mode is injected, so the marks take the same alpha-stored grey
+by the same line of code they take on a Home Screen — the content is the real
+thing, not a drawing of it. The panel behind is not: the wallpaper and the
+system's compositing are unreachable from app code, so the page draws SwiftUI's
+own glass over black — the Home Screen the app's aesthetic assumes. #273 put
+an appearance picker over these previews and #312 removed it; the measurements
+that shaped it are kept in decisions.md, because no API reports the device's
+Home Screen appearance and the two glass appearances render identically here.
 
 The previews are of *unconfigured* widgets, which is the same narrowing the
 grid's boundary hairline took (#188). They draw the app's own list because

@@ -323,8 +323,9 @@ bar reflowed once rather than twice. #238 then moved Widgets to the front,
 an order argued on its own terms rather than inherited.
 
 `WidgetsView` is that tab: every widget this bundle ships, previewed by the
-shipping view, with an "Added" mark on the ones already on the Home Screen.
-Four pieces make it what it is.
+shipping view, as three named cards — "Large Week Widget", "Medium Week
+Widget", "Monthly View per Habit", largest first (#312). Four pieces make it
+what it is.
 
 **The previews are the production views.** `GlowWidget/WeekWidgetView.swift`,
 `GlowWidget/MonthWidgetView.swift` and the two entry types are compiled into
@@ -337,12 +338,16 @@ different layout rather than a smaller one. `WeekWidgetView.familyOverride`
 exists for the same reason the render harness needs it — `widgetFamily` is
 read-only outside WidgetKit and reports medium everywhere else.
 
-**"Added" means a family, not a kind.** `WidgetKind.families` declares which
-families each kind supports and `supportedFamilies` is set from it, so the
-page's list and the extension's are one list. `WidgetCatalog` (in `Logic/`,
-pure) diffs that list against what was reported, dropping kinds this build no
-longer serves — a Home Screen can still hold a `GlowTodaySmall` — and families
-outside `supportedFamilies`.
+**The catalog is the extension's own list.** `WidgetKind.families` declares
+which families each kind supports and `supportedFamilies` is set from it, so
+the page's list and the extension's are one list — read largest-first by
+`WidgetCatalog.all`, because the page leads with its Large card (#312).
+`WidgetCatalog` (in `Logic/`, pure) can also diff that list against what
+`WidgetCenter` reported, dropping kinds this build no longer serves — a Home
+Screen can still hold a `GlowTodaySmall` — and families outside
+`supportedFamilies`. "Placed" means a family, not a kind. Nothing displays
+that diff since #312 dropped the "Added" marks, so the view feeds it an empty
+list; the logic and its tests stay for whatever displays it next.
 
 **A per-habit widget is previewed per habit** (#237). `WidgetKind.isPerHabit`
 declares whether a placed widget of that kind draws one habit somebody chose —
@@ -350,9 +355,9 @@ true for the month, whose `SelectWeeklyHabitIntent` asks as it is placed; false
 for the week at every family, which is a `StaticConfiguration` over whatever the
 week holds. `WidgetCatalog.groups(placed:habits:)` turns that into the page:
 one group per placement, and under a per-habit placement one card per habit, up
-to `habitPreviewLimit` (3). The group is what carries the size caption and
-"Added", because those answer for the Home Screen — one small month widget is
-placed or it is not, however many previews of it the page draws. The habit ids
+to `habitPreviewLimit` (3). The group is what carries the card's one heading,
+because a placement is one widget however many previews of it the page draws
+(#312 named the headings and dropped the per-size captions). The habit ids
 arrive as a parameter, read from the view's own `@Query` through
 `MonthStore.offered`, so `Logic/` stays pure and the previews and the widget's
 own picker cannot offer different habits. An empty list yields one card with no
@@ -363,10 +368,12 @@ the family itself (PR #277).
 **`WidgetPlacementQuerying` is the seam.** `WidgetCenter` answers for the
 Home Screen of the device it is running on, which a test cannot arrange, so the
 one call and its mapping live behind a protocol in `Store/`
-(`WidgetCenterPlacements`) and the diff is asserted against fixed lists.
-`currentConfigurations()` is a snapshot, not a subscription — the page asks
-again on `scenePhase == .active`, since placing a widget necessarily happens
-while the app is not frontmost.
+(`WidgetCenterPlacements`) and the diff is asserted against fixed lists. Since
+#312 no view constructs the adapter — the page stopped asking when it stopped
+saying "Added" — but the seam is where the ask goes when something says it
+again. `currentConfigurations()` is a snapshot, not a subscription, so that
+something would ask on `scenePhase == .active`: placing a widget necessarily
+happens while the app is not frontmost.
 
 **No API places a widget**, which is why the page is instructions plus
 previews. `WidgetCenter` invalidates, reloads and reports;
