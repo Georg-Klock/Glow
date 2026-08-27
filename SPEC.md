@@ -652,7 +652,12 @@ where the crossfade already was.
 Each was verified in the simulator and is held by a test.
 
 The glow itself is confirmed on an iPhone 14 Pro: with it on screen the system's
-granted EDR headroom rises from 1.2 to 6.0, matching what the renderer asks for.
+granted EDR headroom rises from 1.2 to 6.0, matching the 6x the renderer asked
+for when it was measured. The ask is a Settings slider now, 2x by default — see
+docs/glow.md — and the mechanism the measurement confirms is unchanged. The
+halo has its own switch beside the slider: **No halo**, off by default, removes
+the light a lit mark spreads onto the ground while the mark's own HDR fill
+stays (#313). Both are stored in the App Group, so the widgets obey them too.
 What no test and no measurement can answer is whether it *reads* as lit in a
 given room, which stays a matter of looking at it.
 

@@ -5078,3 +5078,69 @@ placements or carries the seam parameter; `WidgetCatalog`'s placement diff,
 `WidgetPlacementQuerying` and `WidgetCenterPlacements` stay, pure and tested,
 because the diff is the reusable half — what displays it next is a product
 decision, not a rediscovery.
+
+## The glow opens quiet: 2x default on an 8x ceiling (#315)
+
+**2026-08-26.** `GlowSettings.range` is `1...8` and `GlowSettings.defaultValue`
+is `2`. Both numbers moved together and each has its own reason. The ceiling:
+`potentialEDRHeadroom` on the reference iPhone 14 Pro is 8.0, so the old top
+third of the 1–12 slider was positions the panel could never grant — exactly
+the "control that stops responding halfway" the range's own comment warned
+about, one notch further up. The default: the visuals are being iterated on,
+and a glow that opens at full strength leaves nowhere to go but down. 2x on an
+8x ceiling opens at a quarter strength, on purpose.
+
+**This supersedes #294's top-of-range rule, and the test that held it is
+retired rather than patched.** `GlowDefaultTests.defaultIsTheTop` asserted
+`defaultValue == range.upperBound` as a rule — "the glow is the product; there
+is no reason for it to open at half strength" — and a 2x default deliberately
+reverses that rule, so the test is deleted, `GlowTests`' floor comes down by
+one in the same change, and the doc comment that stated the rule is rewritten.
+`theDocAgrees` stays: it pins docs/glow.md's published default to the code, it
+went red the moment the constant moved, and the doc moving in the same change
+is the point of it.
+
+**The halo calibration was reasoned rather than left.** `haloReference` stands
+at 6: its claim — the halo is drawn in SDR and stops gaining long before the
+encode does — is about rendering, not about the slider, and it has already
+outlived two defaults. `maxHaloScale` is recalibrated from the literal 1.7 to
+the derived `(range.upperBound − 1) / (haloReference − 1)` = 1.4: 1.7 was the
+clamp the old 12x top ran into, no position on an 8x slider gets near it, and
+everything that reserves *room* for a halo (#91) reserves `maxHaloScale` — a
+cap nothing can draw would have reserved dead space and gone stale the next
+time the range moved. Derived, it cannot go stale again. At full slider the
+halo now renders at 1.4x its base radius instead of 1.7x; that is the range
+change, not the recalibration, which changes no rendered pixel.
+
+**The render baseline moves with the default** — it pins the glow to
+`GlowSettings.defaultValue`, so every lit mark's halo shrinks from 1.7x to
+0.2x of its base radius in the committed signatures. That is the change being
+made, approved as such.
+
+## The halo gets a switch, off by default (#313)
+
+**2026-08-27.** Settings' Glow section gains a **No halo** toggle. On, it
+removes the caster's drop shadows in `GlowModifier` — the SDR light a lit mark
+spreads onto the ground — while the HDR tile keeps drawing, so the mark itself
+stays lit. A toggle rather than a code removal, decided on the issue: the
+visuals are being iterated on and both looks need to be comparable live on a
+device, and off-by-default means a fresh install ships the current behaviour
+unchanged. Stored in the App Group (`glowHaloDisabled`) so the widget's halo
+obeys the same switch; absence of the key reads as off, which is what makes
+the fresh install the shipped look.
+
+**The ring's inner shadow pair stays outside the toggle, and it was looked at
+rather than exempted by assumption.** The issue flagged the pair — the same
+`.shadow` API, read differently — as worth seeing without. A build with the
+pair removed rendered today's ring near-identical at slot size in the
+simulator (the pair shades the stroke's own weight at top and bottom; at a
+17.5pt slot the variation is below what the screen resolves). Gating it would
+change the mark's silhouette, not its surroundings, for no visible benefit —
+so the toggle's scope is exactly the light on the ground.
+
+**Measured in the simulator, iPhone 17 Pro, iOS 26.5**: with the toggle on,
+the pill and ring regions lose the bloom around themselves (mean luminance in
+the ring's crop 78.5 → 55.3 at 2x) while the far ground is untouched — the
+halo at the 2x default never reached it. What the simulator cannot say, as
+ever, is how either state reads in HDR on a phone; the toggle exists so that
+comparison can be made by eye.

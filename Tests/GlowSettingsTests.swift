@@ -29,12 +29,33 @@ struct GlowSettingsTests {
         // headroom, and nothing at all in a screenshot.
         #expect(GlowSettings.haloScale(for: GlowSettings.range.lowerBound) == 0)
         // Pinned to 6x, not to the default. The halo is drawn in SDR and stops
-        // gaining anything long before the encode does, so when the default
-        // moved to the top of the range this had to stay where it was — tying
-        // it to the default would have shrunk every halo to a quarter.
+        // gaining anything long before the encode does — a claim about
+        // rendering, not the slider, which is why this reference has stood
+        // still while the default moved to the top of the range and back down
+        // to 2.
         #expect(GlowSettings.haloScale(for: GlowSettings.haloReference) == 1)
-        #expect(GlowSettings.haloScale(for: 12) > 1)
-        #expect(GlowSettings.haloScale(for: GlowSettings.range.upperBound) <= 1.7)
+        // The top of the range is the largest halo anything can draw, and
+        // `maxHaloScale` is exactly that — recalibrated with the 8x ceiling,
+        // because anything reserving room for a halo reserves `maxHaloScale`
+        // and a cap no slider position reaches would reserve dead space (#91).
+        #expect(GlowSettings.haloScale(for: GlowSettings.range.upperBound) > 1)
+        #expect(GlowSettings.haloScale(for: GlowSettings.range.upperBound)
+            == GlowSettings.maxHaloScale)
+        // Out-of-range input clamps to the same ceiling rather than outgrowing
+        // the room reserved for it.
+        #expect(GlowSettings.haloScale(for: 400) == GlowSettings.maxHaloScale)
+    }
+
+    @Test("The halo ships on; the toggle stores its removal")
+    func haloShipsOn() {
+        // Nothing stored is the fresh install, and the fresh install draws
+        // the halo — the toggle's on state is the removal (#313), so absence
+        // must read as false.
+        #expect(GlowSettings.haloDisabled == false)
+        GlowSettings.store.set(true, forKey: GlowSettings.haloDisabledKey)
+        #expect(GlowSettings.haloDisabled)
+        GlowSettings.store.removeObject(forKey: GlowSettings.haloDisabledKey)
+        #expect(GlowSettings.haloDisabled == false)
     }
 
     @Test("Intensity drives the encoded headroom", arguments: [2.0, 4.0, 8.0])
@@ -214,13 +235,13 @@ struct WidgetBurstTests {
 /// not a cosmetic error.
 @Suite("Glow default")
 struct GlowDefaultTests {
-    @Test("The default is the top of the range")
-    func defaultIsTheTop() {
-        // Not a literal 12: the claim is the *rule* — "the glow is the
-        // product; there is no reason for it to open at half strength" — so
-        // moving the ceiling moves the default with it and this still holds.
-        #expect(GlowSettings.defaultValue == GlowSettings.range.upperBound)
-    }
+    // `defaultIsTheTop` lived here from #294 until the default moved to 2 on
+    // an 8x ceiling. It held the rule "the glow is the product; there is no
+    // reason for it to open at half strength", and that rule is what was
+    // reversed — the default now opens quiet on purpose — so the test was
+    // retired rather than rewritten to assert the new number: the number is
+    // an iteration target, not a rule, and `theDocAgrees` below is what keeps
+    // the one published copy of it honest. See docs/decisions.md.
 
     @Test("docs/glow.md publishes the number the code holds")
     func theDocAgrees() throws {

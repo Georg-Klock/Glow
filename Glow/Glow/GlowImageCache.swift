@@ -169,6 +169,17 @@ struct GlowModifier: ViewModifier {
     @AppStorage(GlowSettings.key, store: GlowSettings.store)
     private var peak: Double = GlowSettings.defaultValue
 
+    // The toggle removes the caster's drop shadows and nothing else (#313):
+    // the tile overlay below draws regardless, so a mark keeps its HDR fill
+    // with no light spread onto the ground. The ring's inner shadow pair is
+    // deliberately not behind this — it is baked into the stroke in
+    // `GlowImageView` as the ring's own thickness, light in the tube rather
+    // than light on the ground, and a build with the pair removed rendered a
+    // ring near-identical at slot size, so gating it would change the mark's
+    // silhouette for nothing.
+    @AppStorage(GlowSettings.haloDisabledKey, store: GlowSettings.store)
+    private var haloDisabled: Bool = false
+
     private var haloRadius: CGFloat {
         halo * CGFloat(GlowSettings.haloScale(for: peak))
     }
@@ -176,25 +187,30 @@ struct GlowModifier: ViewModifier {
     @ViewBuilder
     private func caster(_ content: some View) -> some View {
         let base = content.foregroundStyle(GlowPalette.color)
-        switch style {
-        case .plain:
-            base.shadow(color: GlowPalette.color, radius: haloRadius)
-        case .ring:
-            // Two passes offset up and down rather than one centred: it is what
-            // the file specifies, and it reads as a tube of light rather than a
-            // disc behind a hole. The offset is its own number, not a fraction
-            // of the radius: the file pairs a radius of 5 with an offset of
-            // 1.25, so the offset is a quarter of the reach.
-            let offset = haloRadius * GlowPalette.ringHaloOffsetRatio
+        if haloDisabled {
             base
-                .shadow(
-                    color: GlowPalette.color.opacity(GlowPalette.ringHaloOpacity),
-                    radius: haloRadius, y: offset
-                )
-                .shadow(
-                    color: GlowPalette.color.opacity(GlowPalette.ringHaloOpacity),
-                    radius: haloRadius, y: -offset
-                )
+        } else {
+            switch style {
+            case .plain:
+                base.shadow(color: GlowPalette.color, radius: haloRadius)
+            case .ring:
+                // Two passes offset up and down rather than one centred: it is
+                // what the file specifies, and it reads as a tube of light
+                // rather than a disc behind a hole. The offset is its own
+                // number, not a fraction of the radius: the file pairs a
+                // radius of 5 with an offset of 1.25, so the offset is a
+                // quarter of the reach.
+                let offset = haloRadius * GlowPalette.ringHaloOffsetRatio
+                base
+                    .shadow(
+                        color: GlowPalette.color.opacity(GlowPalette.ringHaloOpacity),
+                        radius: haloRadius, y: offset
+                    )
+                    .shadow(
+                        color: GlowPalette.color.opacity(GlowPalette.ringHaloOpacity),
+                        radius: haloRadius, y: -offset
+                    )
+            }
         }
     }
 
