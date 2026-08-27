@@ -57,14 +57,10 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
   reaches the month without a second edit.
 - `SlotVoice` and `HistoryVoice` are what the marks say out loud. A day-pinned
   column names its own date, because the header that carries the dates on
-  screen is a table when it is read aloud and stays hidden; a month or a year
-  of columns is counted into one sentence instead. Both are pure, so the app
-  and the widget cannot disagree about a word and the strings are asserted
-  without a renderer.
-- `YearHistory.fill(for:habits:today:)` is how a day of the long view went —
-  full, partial, empty or still to come. It is the year grid's own rule, out of
-  the view so that the sentence `HistoryVoice` speaks counts what the grid
-  draws rather than counting it a second way.
+  screen is a table when it is read aloud and stays hidden; a month of columns
+  is counted into one sentence instead. Both are pure, so the app and the
+  widget cannot disagree about a word and the strings are asserted without a
+  renderer.
 - `ResetConfirmation` is the gate in front of Reset to Default Habits: the word
   that has to be typed, and what counts as having typed it. Four lines, out of
   the view for the same reason `MotionPolicy` is — it stands in front of the
@@ -89,7 +85,7 @@ module and a call to it from in here would otherwise compile.
 
 **The rest day arrives the same way** (#181). `WeekPreferences` is where the
 stored value lives; nothing else in here reads it. `WeekGrid`, `WeekSpans`,
-`WeekDots`, `MonthGrid`, `SeededHistory`, `YearHistory` and `SlotEditing` all
+`WeekDots`, `MonthGrid`, `SeededHistory` and `SlotEditing` all
 take `restDay: Int?` — the weekday nothing is expected on, or nil for none — and
 the boundaries read it once: a view through `@AppStorage`, so SwiftUI can see
 the dependency; a widget once per render, because it has no live hierarchy to
@@ -114,8 +110,8 @@ accidentally mutate a model while drawing it.
 
 **A surface that draws a bounded stretch of time reads only that stretch**
 (#135). `Habit.snapshots(of:within:calendar:)` takes the days the surface
-actually draws — `week.dayIDs()`, `MonthGrid.dayRange(containing:)`, the year's
-first and last column — and pushes the bound into SQLite on `Completion.dayKey`.
+actually draws — `week.dayIDs()`, `MonthGrid.dayRange(containing:)` — and
+pushes the bound into SQLite on `Completion.dayKey`.
 `habit.snapshot()` with no range still means the whole history and is what the
 export calls.
 
@@ -123,8 +119,8 @@ The snapshot it hands back therefore holds only those days, which is the one
 thing to know before passing one on. Everything week-shaped asks only about days
 inside the week it was given, so a week's worth is all a week's row needs;
 `Tests/HistoryProjectionTests.swift` asserts that against `WeekGrid`,
-`WeekSpans`, `WeekDots`, `GoalMet`, `MonthGrid` and `YearHistory` rather than
-against a reading of them.
+`WeekSpans`, `WeekDots`, `GoalMet` and `MonthGrid` rather than against a
+reading of them.
 
 ### Slots carry their own action
 
@@ -323,8 +319,9 @@ bar reflowed once rather than twice. #238 then moved Widgets to the front,
 an order argued on its own terms rather than inherited.
 
 `WidgetsView` is that tab: every widget this bundle ships, previewed by the
-shipping view, with an "Added" mark on the ones already on the Home Screen.
-Four pieces make it what it is.
+shipping view, as three named cards — "Large Week Widget", "Medium Week
+Widget", "Monthly View per Habit", largest first (#312). Four pieces make it
+what it is.
 
 **The previews are the production views.** `GlowWidget/WeekWidgetView.swift`,
 `GlowWidget/MonthWidgetView.swift` and the two entry types are compiled into
@@ -337,12 +334,16 @@ different layout rather than a smaller one. `WeekWidgetView.familyOverride`
 exists for the same reason the render harness needs it — `widgetFamily` is
 read-only outside WidgetKit and reports medium everywhere else.
 
-**"Added" means a family, not a kind.** `WidgetKind.families` declares which
-families each kind supports and `supportedFamilies` is set from it, so the
-page's list and the extension's are one list. `WidgetCatalog` (in `Logic/`,
-pure) diffs that list against what was reported, dropping kinds this build no
-longer serves — a Home Screen can still hold a `GlowTodaySmall` — and families
-outside `supportedFamilies`.
+**The catalog is the extension's own list.** `WidgetKind.families` declares
+which families each kind supports and `supportedFamilies` is set from it, so
+the page's list and the extension's are one list — read largest-first by
+`WidgetCatalog.all`, because the page leads with its Large card (#312).
+`WidgetCatalog` (in `Logic/`, pure) can also diff that list against what
+`WidgetCenter` reported, dropping kinds this build no longer serves — a Home
+Screen can still hold a `GlowTodaySmall` — and families outside
+`supportedFamilies`. "Placed" means a family, not a kind. Nothing displays
+that diff since #312 dropped the "Added" marks, so the view feeds it an empty
+list; the logic and its tests stay for whatever displays it next.
 
 **A per-habit widget is previewed per habit** (#237). `WidgetKind.isPerHabit`
 declares whether a placed widget of that kind draws one habit somebody chose —
@@ -350,9 +351,9 @@ true for the month, whose `SelectWeeklyHabitIntent` asks as it is placed; false
 for the week at every family, which is a `StaticConfiguration` over whatever the
 week holds. `WidgetCatalog.groups(placed:habits:)` turns that into the page:
 one group per placement, and under a per-habit placement one card per habit, up
-to `habitPreviewLimit` (3). The group is what carries the size caption and
-"Added", because those answer for the Home Screen — one small month widget is
-placed or it is not, however many previews of it the page draws. The habit ids
+to `habitPreviewLimit` (3). The group is what carries the card's one heading,
+because a placement is one widget however many previews of it the page draws
+(#312 named the headings and dropped the per-size captions). The habit ids
 arrive as a parameter, read from the view's own `@Query` through
 `MonthStore.offered`, so `Logic/` stays pure and the previews and the widget's
 own picker cannot offer different habits. An empty list yields one card with no
@@ -363,10 +364,12 @@ the family itself (PR #277).
 **`WidgetPlacementQuerying` is the seam.** `WidgetCenter` answers for the
 Home Screen of the device it is running on, which a test cannot arrange, so the
 one call and its mapping live behind a protocol in `Store/`
-(`WidgetCenterPlacements`) and the diff is asserted against fixed lists.
-`currentConfigurations()` is a snapshot, not a subscription — the page asks
-again on `scenePhase == .active`, since placing a widget necessarily happens
-while the app is not frontmost.
+(`WidgetCenterPlacements`) and the diff is asserted against fixed lists. Since
+#312 no view constructs the adapter — the page stopped asking when it stopped
+saying "Added" — but the seam is where the ask goes when something says it
+again. `currentConfigurations()` is a snapshot, not a subscription, so that
+something would ask on `scenePhase == .active`: placing a widget necessarily
+happens while the app is not frontmost.
 
 **No API places a widget**, which is why the page is instructions plus
 previews. `WidgetCenter` invalidates, reloads and reports;
@@ -466,9 +469,9 @@ each fence exists because the failure it prevents is a write:
    them either, which fails in the safe direction.
 2. **Cleared at launch**, first thing in `GlowApp.init`, before the store is
    opened. The longest a stray override can affect anything is one app session.
-3. **Said out loud.** `DebugTodayBanner` sits on This Week and on History for as
-   long as one is set, and one tap on it clears the override — leaving it on
-   must never be more convenient than turning it off.
+3. **Said out loud.** `DebugTodayBanner` sits on This Week for as long as one
+   is set, and one tap on it clears the override — leaving it on must never be
+   more convenient than turning it off.
 
 It ships in every build, TestFlight included, and deliberately not behind
 `#if DEBUG`: a Release archive is the build that gets installed on the phone

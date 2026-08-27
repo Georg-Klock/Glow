@@ -164,8 +164,12 @@ struct WeekProvider: AppIntentTimelineProvider {
         // device check needs to see, and the same question about the month
         // widget's single entity was only ever settled on hardware — see
         // `MonthWidgetConfig`. Counts and ids only, see `WidgetTrace`.
+        // The family is in the line because #321 needed it and it was not
+        // there: "is any placed week widget being served at Small" cannot be
+        // answered by a trace that never says which family a timeline was
+        // built for.
         WidgetTrace.record(
-            "week timeline: rows=\(configuration.rows.map { "\($0.count)" } ?? "unset")"
+            "week timeline: family=\(context.family), rows=\(configuration.rows.map { "\($0.count)" } ?? "unset")"
         )
 
         // A tap animates. Everything else renders still.

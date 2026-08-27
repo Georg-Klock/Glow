@@ -126,10 +126,10 @@ struct HistoryProjectionTests {
 
     // MARK: - What the surfaces draw
 
-    // The bounded read is only safe because nothing week-, month- or
-    // year-shaped asks about a day outside what it draws. These assert that
-    // against the real drawing rules rather than against a reading of them:
-    // whole history in one side, the bounded read in the other, same output.
+    // The bounded read is only safe because nothing week- or month-shaped
+    // asks about a day outside what it draws. These assert that against the
+    // real drawing rules rather than against a reading of them: whole history
+    // in one side, the bounded read in the other, same output.
 
     @Test("A week's worth draws the same week as the whole history")
     func boundedWeekDrawsTheSame() throws {
@@ -194,40 +194,6 @@ struct HistoryProjectionTests {
                         for: part, today: today, restDay: restDay, calendar: calendar
                     ) == MonthGrid.cells(
                         for: full, today: today, restDay: restDay, calendar: calendar
-                    )
-                )
-            }
-        }
-    }
-
-    @Test("A year's worth fills the same year as the whole history")
-    func boundedYearFillsTheSame() throws {
-        let restDay = WeekPreferences.sunday
-        try TestPreferences.withWeek(firstWeekday: 2) {
-            let (_, habits) = try makeStore(habits: 2, days: 500)
-            let weeks = (0..<52).map { index -> Week in
-                let start = calendar.date(
-                    byAdding: .day, value: -7 * index, to: today
-                ) ?? today
-                return WeekCalendar.week(containing: start, calendar: calendar)
-            }
-            let first = try #require(weeks.last).days[0]
-            let last = try #require(weeks.first).days[6]
-            let whole = habits.map { $0.snapshot(calendar: calendar) }
-            let bounded = Habit.snapshots(
-                of: habits,
-                within: DayID.range(from: first, through: last, calendar: calendar),
-                calendar: calendar
-            )
-
-            for week in weeks {
-                #expect(
-                    YearHistory.fills(
-                        in: week, habits: bounded, today: today,
-                        restDay: restDay, calendar: calendar
-                    ) == YearHistory.fills(
-                        in: week, habits: whole, today: today,
-                        restDay: restDay, calendar: calendar
                     )
                 )
             }

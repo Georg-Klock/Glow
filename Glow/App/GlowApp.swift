@@ -1,3 +1,4 @@
+import ActivityKit
 import SwiftData
 import SwiftUI
 import WidgetKit
@@ -67,8 +68,46 @@ struct GlowApp: App {
            ProcessInfo.processInfo.arguments.contains("-glow-force-burst") {
             Self.forceBurst(in: container)
         }
+        if ProcessInfo.processInfo.arguments.contains("-glow-debug-pop") {
+            Self.debugPop()
+        }
+        if ProcessInfo.processInfo.arguments.contains("-glow-dump-widgets") {
+            Self.dumpPlacedWidgets()
+        }
         #endif
     }
+
+    #if DEBUG
+    /// Fires the goal pop without a goal, so its presentations can be looked
+    /// at from a tethered Mac — the same reason `-glow-force-burst` exists for
+    /// the widget's burst. The real pop lasts two seconds and only fires when
+    /// a goal is actually met; this one stays up until the activity is ended
+    /// or the system reaps it, because the point is a screenshot, not the
+    /// gesture. It does not go through `GoalPopCentre` on purpose: the centre
+    /// owns *when* a pop is allowed to fire, and a debug affordance that
+    /// taught it a second answer would be the two-callers bug its type comment
+    /// warns about.
+    ///
+    /// The line is the longest one the app writes, so what is being looked at
+    /// is the worst case for truncation and wrap.
+    private static func debugPop() {
+        // Requested immediately, not after a settle delay: a backgrounded app
+        // is suspended, so a sleeping task here never wakes and the request
+        // never fires. Requesting from the foreground works — the Island just
+        // does not *render* it until the app leaves the screen (measured; see
+        // GoalPopCentre) — so the order is launch, request, then background
+        // by hand and look.
+        Task { @MainActor in
+            let content = ActivityContent(
+                state: GoalPopAttributes.ContentState(
+                    habitName: "Early night", line: "that's the week"
+                ),
+                staleDate: nil
+            )
+            _ = try? Activity.request(attributes: GoalPopAttributes(), content: content)
+        }
+    }
+    #endif
 
     private static func open() -> (container: ModelContainer?, failure: String?) {
         do {
@@ -126,6 +165,30 @@ struct GlowApp: App {
         WidgetBurst.record(habitID: habit.id, reduceMotion: false)
         WidgetTrace.record("forced burst for \(habit.id.uuidString), reloading")
         WidgetRefresh.invalidate()
+    }
+    /// Records every placed widget's kind and family into the trace, so a
+    /// tethered Mac can see what is actually on a Home Screen without a thumb
+    /// or an eye (#321).
+    ///
+    /// `WidgetCenter.getCurrentConfigurations` is the only public view of
+    /// placements, and it answers the one question the providers' own trace
+    /// lines cannot: an instance that is placed but no longer served builds no
+    /// timeline and therefore leaves no line, so its absence from the trace is
+    /// indistinguishable from its absence from the screen. This lists it
+    /// either way. Kinds and families only — same privacy rule as the rest of
+    /// `WidgetTrace`.
+    private static func dumpPlacedWidgets() {
+        WidgetCenter.shared.getCurrentConfigurations { result in
+            switch result {
+            case .success(let infos):
+                WidgetTrace.record("placed widgets: \(infos.count)")
+                for info in infos {
+                    WidgetTrace.record("placed: kind=\(info.kind), family=\(info.family)")
+                }
+            case .failure(let error):
+                WidgetTrace.record("placed widgets: query failed, \(error)")
+            }
+        }
     }
     #endif
 
