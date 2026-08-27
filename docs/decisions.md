@@ -5078,3 +5078,47 @@ placements or carries the seam parameter; `WidgetCatalog`'s placement diff,
 `WidgetPlacementQuerying` and `WidgetCenterPlacements` stay, pure and tested,
 because the diff is the reusable half — what displays it next is a product
 decision, not a rediscovery.
+
+
+## Week and Month are one kind: three sizes, one content type per size (#322)
+
+**2026-08-27.** `WidgetKind` has one case — `"GlowWidget"`, families small,
+medium, large — and content follows family: medium and large draw the week,
+small draws one habit's month through the same `MonthWidgetView` the month
+kind used. `GlowMonthSmall` is deleted outright: no migration, no
+compatibility shim, no legacy kind serving the old view — decided on the
+issue, where a shim was named for what it would be, dead code protecting
+nobody, and a kept kind would leave the two gallery entries this change
+exists to remove. Every placed Month widget keeps its slot, freezes, and
+never updates again; Apple provides no way to move a placement between
+kinds. **What made that acceptable is arithmetic, not design — the app has
+one user, and he is the one asking.** SPEC.md carries that reasoning beside
+the change so the next kind-change proposal does not read this as precedent
+that kind changes are free.
+
+**The intent kept its type on purpose.** `SelectWeekLayoutIntent` gained a
+`habit` parameter (bound to `MonthWidgetConfig`'s surviving entity and
+query) instead of being replaced by a merged intent type, because changing a
+kind's intent type is what resets its stored configuration — this way an
+already-placed week widget keeps its chosen rows through the merge. Small
+ignores `rows` the way medium and large ignore `habit`; an unset `habit`
+falls back to the first offered habit, exactly as the month kind's
+unconfigured widget always did (`MonthStore.month`). Both choices share one
+sheet, because the system's configuration sheet cannot vary its fields by
+family — accepted as the cost of one kind.
+
+**Small's meaning is new, and #277 is not reopened.** That PR dropped the
+week's small family for drawing unlabeled rows only their owner could read.
+The month content names its habit, so the objection does not transfer; the
+family returns with different content, and a pre-#277 small week placement
+still frozen on a Home Screen starts being served again, now drawing a
+month. #321 — resizing a placed week widget to small breaks it — closes by
+construction: there is no undeclared family left to resize into, and the
+freeze mechanism measured on the issue (the provider is never called at an
+undeclared family) stops being reachable.
+
+**`check-docs.py`'s `week-small-as-current` rule is retired**, not inverted:
+its premise — that a doc enumerating the week widget at three sizes must be
+a reconstruction — became the truth, and there is no wrong phrasing left for
+it to catch. The retirement is commented in place, and the self-test's two
+fixtures for it went with it.

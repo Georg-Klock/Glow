@@ -36,6 +36,20 @@ struct WeekWidgetView: View {
     private var labelGap: CGFloat { showsLabels ? WidgetMetrics.labelGap : 0 }
 
     var body: some View {
+        // **Small is the month** (#322): the one kind's third size draws one
+        // habit's calendar, so the small render is `MonthWidgetView` over the
+        // entry's month half. A small entry whose month half is missing can
+        // only be a provider bug; it wears the unavailable sentence rather
+        // than a plausible emptiness, per #282's rule.
+        if family == .systemSmall {
+            MonthWidgetView(entry: MonthEntry(date: entry.date, habit: entry.month ?? .unavailable))
+        } else {
+            weekBody
+        }
+    }
+
+    @ViewBuilder
+    private var weekBody: some View {
         // The three answers a read can give, kept apart all the way to the
         // pixels (#282): only a store that was *read* and holds nothing may
         // say "No habits yet". A failed read is a different sentence with a

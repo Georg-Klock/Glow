@@ -212,14 +212,15 @@ struct WidgetRefreshTests {
         // instead — each `StaticConfiguration` reads its kind from `WidgetKind`,
         // so there is no second spelling to drift from.
         #expect(WidgetKind.week.rawValue == "GlowWidget")
-        #expect(WidgetKind.month.rawValue == "GlowMonthSmall")
-        // Two — `GlowTodaySmall` and `GlowTodayMedium` — were removed with the
-        // per-day kind (#209). Asserted as an absence as well as a count: a
-        // kind that came back under one of those strings would be serving a
-        // widget WidgetKit still has records of.
+        // Three kinds have been removed rather than renamed — `GlowTodaySmall`
+        // and `GlowTodayMedium` with the per-day kind (#209), `GlowMonthSmall`
+        // when the month folded into the one kind (#322). Asserted as an
+        // absence as well as a count: a kind that came back under one of those
+        // strings would be serving a widget WidgetKit still has records of.
         #expect(!WidgetKind.allNames.contains("GlowTodaySmall"))
         #expect(!WidgetKind.allNames.contains("GlowTodayMedium"))
-        #expect(WidgetKind.allCases.count == 2)
+        #expect(!WidgetKind.allNames.contains("GlowMonthSmall"))
+        #expect(WidgetKind.allCases.count == 1)
         #expect(WidgetRefresh.allKinds == WidgetKind.allNames)
     }
 }

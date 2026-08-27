@@ -21,9 +21,14 @@ import WidgetKit
 /// does, and it is intended here rather than routed around. The strings are not
 /// reusable for anything else — they name the Today widget in WidgetKit's own
 /// records, and 2.0 restoring the feature should restore them exactly.
+/// **`GlowMonthSmall` was here and is gone too** (#322). Week and Month
+/// collapsed into this one kind: three sizes, one content type per size —
+/// Small draws one habit's month, Medium and Large draw the week. The month
+/// kind's placements freeze the way #209's did, and that was accepted on the
+/// issue; see SPEC.md's widgets section for why the arithmetic, not the
+/// mechanism, is what made it acceptable.
 enum WidgetKind: String, CaseIterable, Sendable {
     case week = "GlowWidget"
-    case month = "GlowMonthSmall"
 
     static var allNames: Set<String> { Set(allCases.map(\.rawValue)) }
 
@@ -50,9 +55,14 @@ enum WidgetKind: String, CaseIterable, Sendable {
         // already drops a family a kind does not support — see
         // `unsupportedFamilyIsIgnored` — so the Widgets tab says nothing about
         // one rather than showing a row it cannot explain.
-        case .week: [.systemMedium, .systemLarge]
-        // Small only, deliberately — see `MonthWidget`.
-        case .month: [.systemSmall]
+        //
+        // **Small is back, with a different meaning** (#322). #277's objection
+        // was to a small *week*: rows with the labels dropped, readable only
+        // by someone who knew their own order. At small this kind draws one
+        // habit's month instead — content that names its habit — so the
+        // objection does not transfer. One kind, three sizes, one content
+        // type per size.
+        case .week: [.systemSmall, .systemMedium, .systemLarge]
         }
     }
 
@@ -63,7 +73,6 @@ enum WidgetKind: String, CaseIterable, Sendable {
     var displayName: String {
         switch self {
         case .week: "This Week"
-        case .month: "This Month"
         }
     }
 
@@ -97,28 +106,19 @@ enum WidgetKind: String, CaseIterable, Sendable {
     /// The property stays because the gallery still needs it.
     var summary: String {
         switch self {
-        case .week: "Your habits for the week. Tap today's slot to log it."
-        case .month: "One habit's month. Tap today's dot to log it."
+        case .week: "Your habits for the week — or one habit's month at the small size. Tap today to log it."
         }
     }
 
-    /// Whether a placed widget of this kind draws **one habit somebody chose**.
+    /// Whether this kind at this family draws **one habit somebody chose**.
     ///
-    /// `.month` does: `SelectWeeklyHabitIntent` asks which habit as the widget
-    /// is placed, so "which one" is the real variable in it. That is what makes
-    /// several Month previews several *different* previews rather than one
-    /// picture repeated, and it is the axis the Widgets tab varies over (#237).
-    ///
-    /// `.week` does not, at any family. It is a `StaticConfiguration` over
-    /// whatever habits the week holds; small drops the labels, not the habits,
-    /// so there is no per-habit choice in it to preview. #188 would add one — a
-    /// habit order held per widget — and until that lands, a second Week-Small
-    /// card would be the same rendering twice. This stays `false` rather than
-    /// inventing an axis to fill the space.
-    var isPerHabit: Bool {
-        switch self {
-        case .week: false
-        case .month: true
-        }
+    /// A property of the family now, not of the kind (#322): the one kind
+    /// carries both content types, and the per-habit axis — the thing that
+    /// makes several previews several *different* previews rather than one
+    /// picture repeated (#237) — exists exactly where the month content is,
+    /// at small. Medium and large stay the whole week: their configuration is
+    /// which rows show (#188), which is not an axis a preview can vary over.
+    func previewsOneHabit(at family: WidgetFamily) -> Bool {
+        family == .systemSmall
     }
 }

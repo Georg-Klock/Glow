@@ -90,20 +90,13 @@ RULES = (
             "surfaced in Settings — defaulting to Monday, not forced to it"
         ),
     ),
-    Rule(
-        name="week-small-as-current",
-        files=NORMATIVE,
-        pattern=re.compile(
-            r"\bsmall,\s+medium,?\s+and\s+large\b"
-            r"|\bweek\s+widget\s+is\s+small\b",
-            re.IGNORECASE,
-        ),
-        why=(
-            "the week widget is medium and large; the small family was "
-            "removed by PR #277, and a current-tense enumeration including it "
-            "invites a reconstruction"
-        ),
-    ),
+    # A rule named week-small-as-current lived here from #288 until #322: it
+    # failed any normative doc enumerating the week widget at "small, medium
+    # and large", because #277 had removed the small family and a current-tense
+    # enumeration invited a reconstruction. #322 inverted the premise — the one
+    # kind supports all three families, small drawing a habit's month — so the
+    # enumeration the rule hunted is now the truth, and the rule is retired
+    # rather than inverted: there is no wrong phrasing left for it to catch.
 )
 
 failures: list[str] = []
@@ -153,8 +146,6 @@ MUTATIONS = (
     ("CLAUDE.md", "A one-screen iPhone habit tracker.\n", "one-screen-claim"),
     ("docs/ARCHITECTURE.md", "There is one screen and three sheets.\n", "one-screen-claim"),
     ("SPEC.md", "using the\nuser's calendar, with `firstWeekday` forced to Monday.\n", "forced-monday-claim"),
-    ("docs/ARCHITECTURE.md", "The week widget: small, medium and large, reading the same store.\n", "week-small-as-current"),
-    ("docs/vision.md", "The week widget is small, medium and\nlarge, each placed independently.\n", "week-small-as-current"),
 )
 
 # Phrasings the current documents legitimately use; the gate must accept them

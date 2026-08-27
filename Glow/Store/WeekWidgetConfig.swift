@@ -107,7 +107,9 @@ struct WeekRowQuery: EntityQuery {
 /// carrying one out of it is gesture history rather than a decision.
 struct SelectWeekLayoutIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Choose Habits"
-    static let description = IntentDescription("Which habits this widget shows.")
+    static let description = IntentDescription(
+        "Which habits the week shows — and which habit the small size shows."
+    )
 
     /// Nil until someone opens the sheet, and nil is the answer that keeps
     /// today's behaviour — see `WidgetRows.rows`. It is also what every widget
@@ -115,6 +117,20 @@ struct SelectWeekLayoutIntent: WidgetConfigurationIntent {
     /// makes the change invisible to anyone who does not want it.
     @Parameter(title: "Habits")
     var rows: [WeekRowEntity]?
+
+    /// Which habit the **small** size shows (#322). The small family draws one
+    /// habit's month; medium and large draw the week and ignore this the same
+    /// way small ignores `rows`. One intent for one kind, so both choices sit
+    /// in one sheet — the sheet cannot vary by family. Nil falls back to the
+    /// first offered habit, exactly as the month kind's unconfigured widget
+    /// always has (`MonthStore.month`).
+    ///
+    /// The parameter is *added* rather than the intent replaced, deliberately:
+    /// keeping the type is what lets a placed medium or large widget keep its
+    /// stored `rows` through the merge, since changing a kind's intent type is
+    /// what resets its configuration.
+    @Parameter(title: "Habit (Small size)")
+    var habit: WeeklyHabitEntity?
 }
 
 /// One query shared by the week widget's provider and its entity query, so the

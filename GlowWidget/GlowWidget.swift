@@ -120,6 +120,9 @@ struct WeekProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: SelectWeekLayoutIntent, in context: Context) async -> WeekEntry {
+        if context.family == .systemSmall {
+            return monthEntry(for: configuration)
+        }
         let entry = loadEntry(for: configuration)
         // Traced to answer one question the trace could not: whether the widget
         // gallery's preview is stale because WidgetKit never asks us, or
@@ -153,6 +156,26 @@ struct WeekProvider: AppIntentTimelineProvider {
         // the load it cannot be told apart from when WidgetKit *called* —
         // and those are a slow store and a late reload, which are different
         // problems.
+        // **The small family is the month** (#322): one habit's calendar,
+        // chosen by the intent's `habit` or falling back to the first offered
+        // (`MonthStore.month`). One still entry and the same midnight policy
+        // the month kind always had — no burst frames, because the month's
+        // tap acknowledgement is the dot itself. The trace keeps the month
+        // vocabulary so the lines read continuously across the merge.
+        if context.family == .systemSmall {
+            let loadStarted = Date()
+            let entry = monthEntry(for: configuration)
+            WidgetTrace.record(
+                "month timeline: family=\(context.family), habit=\(WidgetTrace.tag(configuration.habit?.id))"
+                    + ", load \(WidgetTrace.elapsed(since: loadStarted))"
+            )
+            let now = Date()
+            let midnight = WeekCalendar.calendar.date(
+                byAdding: .day, value: 1, to: WeekCalendar.day(now)
+            ) ?? now.addingTimeInterval(3600)
+            return Timeline(entries: [entry], policy: .after(midnight))
+        }
+
         let loadStarted = Date()
         let entry = loadEntry(for: configuration)
         let load = WidgetTrace.elapsed(since: loadStarted)
@@ -240,6 +263,20 @@ struct WeekProvider: AppIntentTimelineProvider {
             habits: WeekWidgetStore.rows(chosen: configuration.rows?.map(\.id), in: week)
         )
     }
+
+    /// The small family's entry: the week halves empty, the month half loaded.
+    /// `today()` rather than `Date()` for the same reason the old month
+    /// provider read it (#204): which month to draw and which dot is open are
+    /// claims about "today", not timestamps.
+    private func monthEntry(for configuration: SelectWeekLayoutIntent) -> WeekEntry {
+        let today = WeekCalendar.today()
+        return WeekEntry(
+            date: today,
+            week: WeekCalendar.week(containing: today),
+            habits: .empty,
+            month: MonthStore.month(of: configuration.habit?.id, containing: today)
+        )
+    }
 }
 
 extension StoreRead where Value == [HabitSnapshot] {
@@ -258,7 +295,6 @@ extension StoreRead where Value == [HabitSnapshot] {
 struct GlowWidgetBundle: WidgetBundle {
     var body: some Widget {
         GlowWidget()
-        MonthWidget()
         // Not a home screen widget: the Dynamic Island's two seconds when a
         // goal is met. A Live Activity is declared in the same bundle. See #58.
         GoalPopActivity()

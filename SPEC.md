@@ -658,18 +658,29 @@ given room, which stays a matter of looking at it.
 
 ## 9. The widgets
 
-Two widgets, reading the same store through an App Group. They were three
-until #209. Three placeable configurations, since the week's two families are
-added independently — which is the unit the Widgets tab counts in. It was four
-until PR #277 dropped Week-Small.
+One widget, reading the store through an App Group: kind `"GlowWidget"`,
+three sizes, one content type per size (#322). Medium and large draw the week;
+small draws one habit's month. They were two kinds — "This Week" and "This
+Month" — until #322 collapsed them, and three until #209.
 
-**The week widget**: two families, medium and large. **Small was one of them
-and is gone** (PR #277) — it drew the same habits with the labels dropped, so it
-said how much of the week was done without saying what of, and a size only
-legible to somebody who already knows their own row order is not a size worth
-offering. Removing a family is not removing a kind (#209): `GlowWidget` serves
-the same kind string, so a placed medium or large is untouched and a placed
-small stops being served. Today's slot is an `AppIntent`-backed toggle
+**`GlowMonthSmall` is removed rather than renamed**, so a placed Month widget
+keeps its slot, freezes, and never updates again — Apple provides no way to
+move a placement from one kind to another. That is what #209's removals cost
+too, and there the loss was the point: the feature was being pulled. Here a
+working widget quietly dies in a reorganisation, and **what makes that
+acceptable is arithmetic, not design: the app has one user, and he is the one
+asking.** A kind change is not free, and the next one proposed should not read
+this entry as precedent that it is — it was the population that made this
+cheap, not the mechanism.
+
+**Small's history**: the week's own small family was dropped by PR #277 — it
+drew the week's rows with the labels off, legible only to somebody who knew
+their own row order. #322 brings the family back with the month's content,
+which names its habit, so #277's objection does not transfer. A pre-#277 small
+week placement that was still frozen on a Home Screen starts being served
+again by this change, now drawing a month (#321 closes with it).
+
+**The week, at medium and large.** Today's slot is an `AppIntent`-backed toggle
 (`SlotToggle`, #292), so a habit can be logged from the home screen without
 launching the app and the mark flips at the tap rather than at the next
 provider run. Past days are not tappable here even though the app's own grid
@@ -682,7 +693,12 @@ docs/vision.md: a row spent saying how much is missing is a row not showing a
 habit. The app's own grid marks the boundary, where there is room to say it.
 
 **Which rows is a per-widget choice; the order is always the app's.** Both
-families offer it. The picker lists every week-shaped row in the app's order —
+wide families offer it; the same sheet also holds the small size's habit
+choice, because one kind carries one intent and the system's sheet cannot vary
+its fields by family. The intent type is unchanged (`SelectWeekLayoutIntent`
+gained a `habit` parameter), which is what lets an already-placed week widget
+keep its stored rows through #322 — changing a kind's intent type is what
+resets its configuration. The picker lists every week-shaped row in the app's order —
 including the blank rows, labelled "Blank Row", which the month widget's
 picker excludes — and the widget draws the chosen ones **in the app's order**,
 whatever order they were chosen in. A widget nobody has configured keeps the
@@ -722,11 +738,13 @@ are removed rather than renamed, so a placed Today widget leaves the Home Screen
 with the extension that drew it. That is what pulling a feature costs, and it is
 intended.
 
-**The month widget**: small only, one weekly-cadence habit's calendar month
+**The month, at small**: one weekly-cadence habit's calendar month
 as marks on weekday columns — the same marks the week draws, decided by
 `MonthGrid` asking `WeekGrid`, so the two surfaces cannot disagree about a
 day. The 1st sits under the weekday it really falls on, so the first and last
-rows are ragged. The habit is chosen per widget. Today's dot is the same
+rows are ragged. The habit is chosen per widget — the intent's `habit`
+parameter, falling back to the first offered habit when unset, exactly as the
+month kind's unconfigured widget always did. Today's dot is the same
 `SlotToggle` through `MarkHabitIntent` — no other day is tappable, which is R2
 in a third grid — and everything else opens This Week. Two readings held deliberately small
 until decided otherwise (#41): an N×/week habit's empty days are sockets,
@@ -735,8 +753,8 @@ days get no month-specific treatment beyond what `WeekGrid` already says
 about them.
 
 **The Widgets tab is where they are found from inside the app** (#210). It
-shows every widget this app ships — the week at both its families, the month
-at its one — drawn by `WeekWidgetView` and `MonthWidgetView` themselves rather
+shows every widget this app ships — the one kind at all three families —
+drawn by `WeekWidgetView` and `MonthWidgetView` themselves rather
 than illustrated, at the point size each family really gets, over the user's
 own habits.
 
