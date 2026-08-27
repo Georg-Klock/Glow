@@ -515,6 +515,18 @@ than loosening a tolerance until both pass.
 background, and #53 records that the substitution cannot be opted out of. That
 is a different question from this one, which is about what Default renders.
 
+## StandBy is not a target, for now
+
+**Question** (#101, split out as #298). Does the widget's black ground survive
+StandBy — the nightstand mode that dims and can tint a widget, reframing it the
+way Tinted and Clear reframe the Home Screen?
+
+**Decision (2026-08-27).** Not measured, and not going to be: StandBy is not a
+surface this app supports right now. The honest close on an unsupported surface
+is saying so, not a device reading that would only be answering a question
+nobody is asking. If that changes, this is a new decision rather than a
+reopening of this one — this entry is "not now," not "no forever."
+
 ## The open ring has no fill
 
 **Question** (#65). `GlowPalette.ringWash` — a 1% white — was declared and never
