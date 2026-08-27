@@ -56,6 +56,14 @@ struct RootTabView: View {
                 SettingsView()
             }
         }
+        // Icons only, no rendered titles (#319). Checked against the iOS 26.5
+        // SDK by looking rather than assuming: `.labelStyle(.iconOnly)` on the
+        // TabView is honoured by the tab bar — three icons, no text — and the
+        // `Tab` titles remain the tabs' accessible names, which
+        // `TabBarAccessibilityTests` holds. The titles stay declared on each
+        // `Tab` above for exactly that reason: the look drops the words, the
+        // screen reader must not.
+        .labelStyle(.iconOnly)
         .tint(GlowPalette.color)
         // A failed operation's one visible surface (#282); the editor sheet
         // carries the same modifier, because an alert attached under an active

@@ -5079,6 +5079,148 @@ placements or carries the seam parameter; `WidgetCatalog`'s placement diff,
 because the diff is the reusable half — what displays it next is a product
 decision, not a rediscovery.
 
+## The glow opens quiet: 2x default on an 8x ceiling (#315)
+
+**2026-08-26.** `GlowSettings.range` is `1...8` and `GlowSettings.defaultValue`
+is `2`. Both numbers moved together and each has its own reason. The ceiling:
+`potentialEDRHeadroom` on the reference iPhone 14 Pro is 8.0, so the old top
+third of the 1–12 slider was positions the panel could never grant — exactly
+the "control that stops responding halfway" the range's own comment warned
+about, one notch further up. The default: the visuals are being iterated on,
+and a glow that opens at full strength leaves nowhere to go but down. 2x on an
+8x ceiling opens at a quarter strength, on purpose.
+
+**This supersedes #294's top-of-range rule, and the test that held it is
+retired rather than patched.** `GlowDefaultTests.defaultIsTheTop` asserted
+`defaultValue == range.upperBound` as a rule — "the glow is the product; there
+is no reason for it to open at half strength" — and a 2x default deliberately
+reverses that rule, so the test is deleted, `GlowTests`' floor comes down by
+one in the same change, and the doc comment that stated the rule is rewritten.
+`theDocAgrees` stays: it pins docs/glow.md's published default to the code, it
+went red the moment the constant moved, and the doc moving in the same change
+is the point of it.
+
+**The halo calibration was reasoned rather than left.** `haloReference` stands
+at 6: its claim — the halo is drawn in SDR and stops gaining long before the
+encode does — is about rendering, not about the slider, and it has already
+outlived two defaults. `maxHaloScale` is recalibrated from the literal 1.7 to
+the derived `(range.upperBound − 1) / (haloReference − 1)` = 1.4: 1.7 was the
+clamp the old 12x top ran into, no position on an 8x slider gets near it, and
+everything that reserves *room* for a halo (#91) reserves `maxHaloScale` — a
+cap nothing can draw would have reserved dead space and gone stale the next
+time the range moved. Derived, it cannot go stale again. At full slider the
+halo now renders at 1.4x its base radius instead of 1.7x; that is the range
+change, not the recalibration, which changes no rendered pixel.
+
+**The render baseline moves with the default** — it pins the glow to
+`GlowSettings.defaultValue`, so every lit mark's halo shrinks from 1.7x to
+0.2x of its base radius in the committed signatures. That is the change being
+made, approved as such.
+
+## The halo gets a switch, off by default (#313)
+
+**2026-08-27.** Settings' Glow section gains a **No halo** toggle. On, it
+removes the caster's drop shadows in `GlowModifier` — the SDR light a lit mark
+spreads onto the ground — while the HDR tile keeps drawing, so the mark itself
+stays lit. A toggle rather than a code removal, decided on the issue: the
+visuals are being iterated on and both looks need to be comparable live on a
+device, and off-by-default means a fresh install ships the current behaviour
+unchanged. Stored in the App Group (`glowHaloDisabled`) so the widget's halo
+obeys the same switch; absence of the key reads as off, which is what makes
+the fresh install the shipped look.
+
+**The ring's inner shadow pair stays outside the toggle, and it was looked at
+rather than exempted by assumption.** The issue flagged the pair — the same
+`.shadow` API, read differently — as worth seeing without. A build with the
+pair removed rendered today's ring near-identical at slot size in the
+simulator (the pair shades the stroke's own weight at top and bottom; at a
+17.5pt slot the variation is below what the screen resolves). Gating it would
+change the mark's silhouette, not its surroundings, for no visible benefit —
+so the toggle's scope is exactly the light on the ground.
+
+**Measured in the simulator, iPhone 17 Pro, iOS 26.5**: with the toggle on,
+the pill and ring regions lose the bloom around themselves (mean luminance in
+the ring's crop 78.5 → 55.3 at 2x) while the far ground is untouched — the
+halo at the 2x default never reached it. What the simulator cannot say, as
+ever, is how either state reads in HDR on a phone; the toggle exists so that
+comparison can be made by eye.
+
+## Edit lives in the ellipsis menu, and the item itself swaps to Done (#320)
+
+**2026-08-26.** The current week's trailing toolbar held two controls: a
+standalone `EditButton` and an add menu behind a `+`. It now holds one — an
+ellipsis menu with **New Habit**, **Blank Row** and **Edit** — and while the
+list is editing, that same item reads **Done**. One control on screen at all
+times, which is the literal ask.
+
+**The asymmetric shape was considered and declined.** The alternative — Edit
+in the menu to enter, a plain always-visible Done in its place once editing
+starts — had the precedent of #207's asymmetric pager and would have kept the
+exit a single tap. The decision on the issue chose the menu-adapts shape over
+it: the symmetry is the point, and entering and leaving edit mode both being
+menu actions is the price of never showing a second control.
+
+**`EditButton`'s automatic Edit/Done label swap is given up deliberately, not
+lost.** The type has no menu-item form, so the menu's item is a plain `Button`
+toggling the `EditMode` state `WeeklyGridView` already owns (#207's binding,
+injected below the stack — the CLAUDE.md trap does not reopen because no new
+environment read was added). The menu rebuilds its content on every open, so
+the hand-rolled label is current by construction. `EditModeTests` gains a scan
+asserting the week grid never reaches for `EditButton` again.
+
+## The pop's line is as large and bold as each presentation carries (#310)
+
+**2026-08-27.** `GoalPopActivity` sizes the line per presentation —
+`PopType`: banner 20, expanded 32, compact 16 — all bold, replacing one
+number used three ways at `.medium` or unweighted. Measured in the simulator
+(iPhone 17 Pro, iOS 26.5) against the longest line the app writes, "that's
+the week": the compact trailing region cannot carry fifteen characters at
+any pushed size — 16 bold truncated to "that's the…" and even 12 bold
+clipped its first glyph — so compact *scales to fit* from 16
+(`minimumScaleFactor(0.6)`): short lines render the full size, the longest
+shrinks and survives whole, which is what "as large as the presentation
+allows" means on a surface that truncates rather than wraps. Expanded fills
+its width at 32 unwrapped, with a scale guard for narrower islands. The
+device look is the final word; the sizes are named so it can move one number.
+
+## The Lock Screen banner inverts; the Island's chrome cannot (#311)
+
+**2026-08-27.** The banner is white ground, black bold type, black mark —
+`activityBackgroundTint(.white)` with the line and dot drawn as ink. The
+scope is exactly what the app controls, checked against the iOS 26.5 SDK's
+`WidgetKit.swiftinterface` rather than memory: `DynamicIsland` exposes
+`widgetURL`, `keylineTint` and `contentMargins` and nothing else, so the
+compact and minimal pill *and the expanded presentation's background* are
+system-owned chrome and keep the system's black. That is the decided
+fallback — invert what is reachable rather than blocking on the pill.
+`activityBackgroundTint` tints the system's banner material rather than
+painting it opaque, so "fully white" arrives as the whitest surface the API
+grants. The banner's mark and line render as ink deliberately: on a light
+ground the mark is not light, and the `glowing` modifier — which draws lit
+white — leaves this one surface. The Island presentations keep it; chronod
+flattens the headroom there (docs/glow.md) but it remains this app's
+spelling for lit white.
+
+## The tab bar is icons only, and still speaks its names (#319)
+
+**2026-08-27.** `.labelStyle(.iconOnly)` on `RootTabView`'s `TabView` is the
+whole change: the SwiftUI-native route worked on the first try, so the
+`UITabBarAppearance` fallback the issue sketched was never needed. Checked by
+looking, not assuming — the simulator renders three icons with no text under
+them and a visibly shorter bar. The constraint that came with the ask is held
+by a test rather than by hope: the `Tab` titles stay declared, they remain
+the tabs' accessible names under the icon-only style — measured by hosting
+`RootTabView` in a real window and walking the accessibility tree, which
+spoke all three names under a bar rendering none of them. The measurement is
+not left running in the suite: a hosted `RootTabView` observes the week
+preferences, the host writes those keys from test threads, and the hosted
+run died on exactly that write — the #179 crash class, of which the one
+hosted suite already in the repository is the measured price (#245, #291).
+`TabBarAccessibilityTests` therefore holds the property as a source scan,
+the `TestHostTests` pattern for claims a test cannot safely watch: the
+style must stay, and every `Tab` must keep its title. Removing the
+accessible name to get the look was the one forbidden shape.
+
 
 ## Week and Month are one kind: three sizes, one content type per size (#322)
 
