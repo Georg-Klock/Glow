@@ -4980,6 +4980,171 @@ defined by what is still undone). None marks another complete.
 dropping them is the first real stage's decision, taken when there is a
 reason, against a floor that now exists to upgrade from.
 
+## History and Email My History leave Settings, and the Data footer goes with them (#316, #317)
+
+**2026-08-26.** The Data section shrinks to four rows — Export History, Demo
+history, the today override, Reset — and keeps no footer. Three removals, each
+outright rather than shelved:
+
+**The History screen is gone, and its whole reachability chain with it**
+(#316). `YearView` was instantiated exactly once, in the Data section's
+`NavigationLink`; removing the row made it unreachable, so the file went too,
+per the standing rule that confirmed-unused code does not stay as a dead file.
+The chain kept going: `YearHistory` was read only by `YearView` and by
+`HistoryVoice.week`, and `HistoryVoice.week`/`weekStart` were spoken only by
+`YearView`'s columns — so `YearHistory.swift` is deleted and `HistoryVoice`
+keeps only `month`, which the month widget still speaks. The long view the
+app keeps is the week pager's uncapped reach (#186). What #137 settled — a
+stretch of days is counted into a sentence, not listed cell by cell — stands,
+and the month widget is now its only counted surface; the fill vocabulary
+(full/partial/empty/future) and the week-column sentence go with the screen
+that drew them, not into a drawer.
+
+**Email My History is removed the day after it landed** (#317, reversing
+#289's feature). The share sheet already lists Mail among its destinations,
+so the row was a second flow to the same place. The seam #289 built —
+`MailExport`, `MailComposeView`, the draft/unavailable/failed states, both
+dialogs and alerts — exists only to serve that row and is deleted in full;
+`writeExport` stays, because Export History was always the other caller of
+the one serializer. What #289 and #285 settled about the copy — an export is
+not a backup, and no recovery promise attaches — is not reopened; the feature
+those words guarded is simply gone, and the sweep still runs over the strings
+that remain.
+
+**The whole Data footer goes, not a trimmed version of it.** Six concatenated
+paragraphs — export, email, demo, override, reset, version — had grown into a
+wall of text under Reset to Default Habits, and the decision, made explicitly
+on #317, is that the section explains itself through its rows: no footer at
+all, not four surviving paragraphs. This supersedes the footer's accumulated
+mechanics where they applied to this section (#193's one-`Text` rule, #200's
+version paragraph): the one-`Text` rule still holds wherever a footer shows
+more than one paragraph — the Week section next door still does it — but the
+Data section no longer has one, and the installed version string currently
+appears nowhere in the app. Putting a version line somewhere is a new
+decision if it is missed, not a revival of this footer.
+
+Nineteen tests went with the deleted surfaces — `MailExportTests` whole, the
+year suites and week-sentence tests in `AccessibilityVoiceTests`, and the
+year arm of `HistoryProjectionTests` — and the `GlowTests` floor moves down
+by the same nineteen in the same change, per the inventory's own rule that
+lowering the floor is the reviewable event.
+
+## The appearance picker leaves the Widgets tab; its measurements stay (#312)
+
+**2026-08-26.** #312 restructures the Widgets tab into three named cards,
+largest first — "Large Week Widget", "Medium Week Widget", "Monthly View per
+Habit" — and removes the page chrome around the previews: the "This Week" /
+"This Month" section titles, the per-size captions, the "Added" checkmarks,
+and the Home Screen appearance picker that #273 added two days earlier. This
+supersedes the *surface* of "The Widgets tab shows two appearances, and Tinted
+and Clear are one of them" (2026-08-25): the picker is gone, `WidgetAppearance`
+went with it, and the page no longer offers Default at all.
+
+**Two findings from that entry outlive the control, and are restated here so
+the feature's removal does not erase them.** Both were checked against the
+iOS 26.5 SDK, not against memory:
+
+- **No API reports the device's Home Screen appearance.** No trait,
+  environment value or WidgetKit call — checked against
+  `SwiftUICore.swiftinterface` and `WidgetKit.swiftinterface`.
+  `widgetRenderingMode` is the nearest thing, and WidgetKit populates it only
+  for a widget WidgetKit is rendering; inside the app it reads `.fullColor`
+  whatever the Home Screen is doing. Any future "just match the device"
+  suggestion runs into this first.
+- **Tinted and Clear render pixel-identical inside a preview card.** Both put
+  a widget into `.accented` rendering, so the content is identical by
+  construction, and SwiftUI's `Glass.regular` against `Glass.clear` over the
+  page's plate measured 0.0% of pixels differing by more than 6/255, maximum
+  difference 1. A card, a segment or a preview per appearance would be the
+  page claiming a distinction it cannot draw.
+
+**Every preview now sits on the glass, composited over black.** The
+"pixel perfect / identical materials" ask cannot mean matching the system's
+own compositing — the wallpaper and the compositing are unreachable from app
+code, which #273 already recorded — so the buildable target is: the same glass
+material, over a black Home Screen specifically, matching the app's own
+aesthetic. `Self.plate` moves from the mid-grey `Color(white: 0.18)` to black.
+The mid-grey existed so a glass card could look different from the Default
+card beside it ("glass over black is black"); the Default card left with the
+picker, so nothing remains for the plate to differ from. The previews inject
+`.accented` unconditionally — the rendering a glass Home Screen actually pairs
+with that panel — and the resolution rule the picker's tests exercised
+(`GlowPalette.grey` to the alpha-stored grey under accented) keeps its test,
+rewritten against `WidgetRenderingMode` directly.
+
+**The "Added" checkmarks were the only display of `WidgetCenter`'s report, so
+the page stopped asking when they went.** `WidgetsView` no longer queries
+placements or carries the seam parameter; `WidgetCatalog`'s placement diff,
+`WidgetPlacementQuerying` and `WidgetCenterPlacements` stay, pure and tested,
+because the diff is the reusable half — what displays it next is a product
+decision, not a rediscovery.
+
+## The glow opens quiet: 2x default on an 8x ceiling (#315)
+
+**2026-08-26.** `GlowSettings.range` is `1...8` and `GlowSettings.defaultValue`
+is `2`. Both numbers moved together and each has its own reason. The ceiling:
+`potentialEDRHeadroom` on the reference iPhone 14 Pro is 8.0, so the old top
+third of the 1–12 slider was positions the panel could never grant — exactly
+the "control that stops responding halfway" the range's own comment warned
+about, one notch further up. The default: the visuals are being iterated on,
+and a glow that opens at full strength leaves nowhere to go but down. 2x on an
+8x ceiling opens at a quarter strength, on purpose.
+
+**This supersedes #294's top-of-range rule, and the test that held it is
+retired rather than patched.** `GlowDefaultTests.defaultIsTheTop` asserted
+`defaultValue == range.upperBound` as a rule — "the glow is the product; there
+is no reason for it to open at half strength" — and a 2x default deliberately
+reverses that rule, so the test is deleted, `GlowTests`' floor comes down by
+one in the same change, and the doc comment that stated the rule is rewritten.
+`theDocAgrees` stays: it pins docs/glow.md's published default to the code, it
+went red the moment the constant moved, and the doc moving in the same change
+is the point of it.
+
+**The halo calibration was reasoned rather than left.** `haloReference` stands
+at 6: its claim — the halo is drawn in SDR and stops gaining long before the
+encode does — is about rendering, not about the slider, and it has already
+outlived two defaults. `maxHaloScale` is recalibrated from the literal 1.7 to
+the derived `(range.upperBound − 1) / (haloReference − 1)` = 1.4: 1.7 was the
+clamp the old 12x top ran into, no position on an 8x slider gets near it, and
+everything that reserves *room* for a halo (#91) reserves `maxHaloScale` — a
+cap nothing can draw would have reserved dead space and gone stale the next
+time the range moved. Derived, it cannot go stale again. At full slider the
+halo now renders at 1.4x its base radius instead of 1.7x; that is the range
+change, not the recalibration, which changes no rendered pixel.
+
+**The render baseline moves with the default** — it pins the glow to
+`GlowSettings.defaultValue`, so every lit mark's halo shrinks from 1.7x to
+0.2x of its base radius in the committed signatures. That is the change being
+made, approved as such.
+
+## The halo gets a switch, off by default (#313)
+
+**2026-08-27.** Settings' Glow section gains a **No halo** toggle. On, it
+removes the caster's drop shadows in `GlowModifier` — the SDR light a lit mark
+spreads onto the ground — while the HDR tile keeps drawing, so the mark itself
+stays lit. A toggle rather than a code removal, decided on the issue: the
+visuals are being iterated on and both looks need to be comparable live on a
+device, and off-by-default means a fresh install ships the current behaviour
+unchanged. Stored in the App Group (`glowHaloDisabled`) so the widget's halo
+obeys the same switch; absence of the key reads as off, which is what makes
+the fresh install the shipped look.
+
+**The ring's inner shadow pair stays outside the toggle, and it was looked at
+rather than exempted by assumption.** The issue flagged the pair — the same
+`.shadow` API, read differently — as worth seeing without. A build with the
+pair removed rendered today's ring near-identical at slot size in the
+simulator (the pair shades the stroke's own weight at top and bottom; at a
+17.5pt slot the variation is below what the screen resolves). Gating it would
+change the mark's silhouette, not its surroundings, for no visible benefit —
+so the toggle's scope is exactly the light on the ground.
+
+**Measured in the simulator, iPhone 17 Pro, iOS 26.5**: with the toggle on,
+the pill and ring regions lose the bloom around themselves (mean luminance in
+the ring's crop 78.5 → 55.3 at 2x) while the far ground is untouched — the
+halo at the 2x default never reached it. What the simulator cannot say, as
+ever, is how either state reads in HDR on a phone; the toggle exists so that
+comparison can be made by eye.
+
 ## Edit lives in the ellipsis menu, and the item itself swaps to Done (#320)
 
 **2026-08-26.** The current week's trailing toolbar held two controls: a

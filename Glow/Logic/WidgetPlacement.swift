@@ -26,8 +26,16 @@ struct WidgetPlacement: Hashable, Identifiable, Sendable {
         }
     }
 
-    /// What to call this one placement — "This Week, Medium".
-    var title: String { "\(kind.displayName), \(familyName)" }
+    /// The card's heading on the Widgets tab (#312) — the size and the kind in
+    /// one line, "Large Week Widget" — except where the previews under it are
+    /// one per habit, where the heading names what the group *is*: several
+    /// habits the one widget could be showing, not several widgets.
+    var cardName: String {
+        switch kind {
+        case .week: "\(familyName) Week Widget"
+        case .month: "Monthly View per Habit"
+        }
+    }
 
     /// Whether a preview of this placement is a statement about *which* habit,
     /// and therefore worth drawing more than once (#237).
@@ -147,12 +155,14 @@ extension WidgetCardGroup {
 /// is `WidgetPlacementQuerying`'s problem.
 enum WidgetCatalog {
     /// Every placeable configuration, in the order the page shows them:
-    /// `WidgetKind.allCases` by `families`. Kinds and families both come from
-    /// `WidgetKind`, so this list cannot offer a widget the bundle does not
-    /// declare.
+    /// `WidgetKind.allCases`, each kind's families **largest first** (#312) —
+    /// the Large Week card leads the page. `families` itself stays smallest to
+    /// largest, which is the gallery's own order; the reversal is this page's.
+    /// Kinds and families both come from `WidgetKind`, so this list cannot
+    /// offer a widget the bundle does not declare.
     static var all: [WidgetPlacement] {
         WidgetKind.allCases.flatMap { kind in
-            kind.families.map { WidgetPlacement(kind: kind, family: $0) }
+            kind.families.reversed().map { WidgetPlacement(kind: kind, family: $0) }
         }
     }
 

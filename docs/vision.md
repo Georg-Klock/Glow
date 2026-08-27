@@ -122,7 +122,7 @@ Stays in the bottom bar, trailing. It holds the app's preferences and the two
 things that are neither a widget nor this week:
 
 - **History.** The long view. The year grid lives in here rather than being a
-  tab of its own.
+  tab of its own. (Landed, then removed outright — #316; see below.)
 - **Export.** Send yourself your history as a CSV or JSON file.
 
 ## The widget is the main product
@@ -169,6 +169,10 @@ is worth being able to see.
 
 The third has since been taken back out of the shipped app and held for 2.0
 (#209). It landed; it is not shipping. See the note at the top.
+
+The first has since gone further than the vision asked: the year grid moved
+into Settings as History and was then removed from the app altogether (#316).
+The long view the app keeps is the week pager's uncapped reach.
 
 The second held through a change of *which* three. Today's slot in the bar was
 left empty rather than collapsed when the screen came out, and the Widgets tab

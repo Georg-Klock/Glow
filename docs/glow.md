@@ -105,19 +105,25 @@ dramatic outdoors and subtle in a dim room.
 ## Tuning
 
 `peakHeadroom` is a user setting now, not a constant: Settings has a slider over
-1x to 12x, stored in the App Group so the widget's halo scales with it too. The
-default is **12x** — the top of the range, because "the glow is the product;
-there is no reason for it to open at half strength" (`GlowSettings`).
+1x to 8x, stored in the App Group so the widget's halo scales with it too. The
+default is **2x** — a quarter strength on purpose, while the visuals are being
+iterated on. That reverses the rule the default carried from 2026-08-25 to
+2026-08-26 — "the glow is the product; there is no reason for it to open at
+half strength", which pinned it to the top of the range — and the reversal is
+recorded in [decisions.md](decisions.md). The ceiling came down from 12 with
+it: `potentialEDRHeadroom` on the reference device is 8.0, so the old top third
+of the slider was positions the panel could never grant.
 
 This paragraph said 6x until 2026-08-25 and the table below said `6.0`. Both
-were left behind when the default moved, and the drift is worth naming because
-of what it cost: a device found running at **1.5** was read against a remembered
-default of 6 and called "a quarter of it", when against the real default it is
-one eighth, and `GlowRenderer.sdrThreshold` is 1.05 — so that phone was one and
-a half notches above the point where the encoder abandons PQ altogether. Every
-perceptual judgement made on it was a judgement about a glow that was very
-nearly off. **A stale default in a document is not a cosmetic error when the
-number is the product.**
+were left behind when the default moved to 12, and the drift is worth naming
+because of what it cost: a device found running at **1.5** was read against a
+remembered default of 6 and called "a quarter of it", when against the default
+of the day it was one eighth, and `GlowRenderer.sdrThreshold` is 1.05 — so that
+phone was one and a half notches above the point where the encoder abandons PQ
+altogether. Every perceptual judgement made on it was a judgement about a glow
+that was very nearly off. **A stale default in a document is not a cosmetic
+error when the number is the product** — which is why `GlowDefaultTests` now
+fails this file the next time the default moves without it.
 
 The 6.0 that remains in the codebase is `GlowRenderer.peakHeadroom`'s own
 property default, which `GlowImageCache` overwrites from the setting on every
@@ -125,9 +131,16 @@ render. It is not what anybody sees.
 
 | Property | Default | Effect |
 | --- | --- | --- |
-| `peakHeadroom` | 12.0, user-set | How far above SDR white the glow peaks |
+| `peakHeadroom` | 2.0, user-set | How far above SDR white the glow peaks |
 | `edgeFalloff` | 0.62 | Edge brightness relative to centre |
 | `tileSize` | 16 | Edge of the uniform tile, in pixels |
+
+The halo has its own switch (#313): Settings' **No halo** toggle, off by
+default, stored in the App Group so the widget obeys it too. On, it removes the
+caster's drop shadows in `GlowModifier` — the SDR light a lit mark spreads onto
+the ground — while the HDR tile keeps drawing, so the mark itself stays lit.
+The ring's inner shadow pair is not behind the switch; it is the ring's own
+drawn thickness, not spread light.
 
 **PQ declares headroom as a property of the container, not of the pixels in
 it.** Encoding a 1x image into PQ still produced a file reporting nearly 5x, so
@@ -153,7 +166,7 @@ load-bearing, cheap to check, and wrong. Check the cheap ones.
 ## The Dynamic Island does not glow
 
 **Measured on an iPhone 14 Pro, iOS 26.5.2, 2026-08-25** — the glow slider at
-**12**, the app's default, and the pop fired from the Home Screen, which is the
+**12**, the app's default that day, and the pop fired from the Home Screen, which is the
 only place it is visible at all (`GoalPopCentre` records why). Looked at by
 Georg: **it does not glow.**
 

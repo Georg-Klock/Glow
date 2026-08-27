@@ -30,7 +30,10 @@ struct WidgetPlacementTests {
         #expect(all.count == WidgetKind.allCases.reduce(0) { $0 + $1.families.count })
         for kind in WidgetKind.allCases {
             let families = all.filter { $0.kind == kind }.map(\.family)
-            #expect(families == kind.families, "\(kind) offers \(families)")
+            // The catalog reads each kind's families largest first — the
+            // page's order (#312) — while `families` keeps the gallery's
+            // smallest-first. Same list, reversed, nothing dropped.
+            #expect(families == kind.families.reversed(), "\(kind) offers \(families)")
         }
     }
 
@@ -39,7 +42,9 @@ struct WidgetPlacementTests {
     @Test("The week is two placeable widgets, the month one")
     func weekIsTwoWidgets() {
         let week = WidgetCatalog.all.filter { $0.kind == .week }
-        #expect(week.map(\.family) == [.systemMedium, .systemLarge])
+        // Large before medium since #312 — the page leads with its largest
+        // card.
+        #expect(week.map(\.family) == [.systemLarge, .systemMedium])
         #expect(WidgetCatalog.all.filter { $0.kind == .month }.map(\.family) == [.systemSmall])
     }
 
@@ -133,14 +138,16 @@ struct WidgetPlacementTests {
 
     // MARK: - The order the page is in
 
-    @Test("The page reads kind by kind, small to large")
+    @Test("The page reads largest first, and the cards carry their names")
     func orderFollowsTheCatalog() {
         let cards = WidgetCatalog.cards(placed: [])
         #expect(cards.map(\.placement) == WidgetCatalog.all)
-        // "This Week, Small" was the first of these until PR #277.
-        #expect(cards.map(\.placement.title) == [
-            "This Week, Medium", "This Week, Large",
-            "This Month, Small",
+        // The three named cards, in the page's order (#312). The week led
+        // with Medium until #312 turned the page largest-first, and "This
+        // Week, Small" was the first of all of these until PR #277.
+        #expect(cards.map(\.placement.cardName) == [
+            "Large Week Widget", "Medium Week Widget",
+            "Monthly View per Habit",
         ])
     }
 
@@ -239,7 +246,7 @@ struct WidgetPlacementTests {
         let week = groups.filter { $0.placement.kind == .week }
         let counts = week.map(\.cards.count)
         let previewed: [UUID?] = week.flatMap(\.cards).map(\.habitID)
-        #expect(week.map(\.placement.family) == WidgetKind.week.families)
+        #expect(week.map(\.placement.family) == WidgetKind.week.families.reversed())
         // Two families since PR #277, not three. Compared against
         // `WidgetKind.week.families` above, so this pair moves with it.
         #expect(counts == [1, 1])
@@ -448,8 +455,7 @@ struct WidgetPlacementTests {
 
 
 /// #274: a Small widget has a neighbour on a real Home Screen, and the page
-/// used to draw it a column. #273: which appearance the previews are drawn
-/// under is a choice, because nothing reports the device's.
+/// used to draw it a column.
 @Suite("Widget preview layout")
 struct WidgetPreviewLayoutTests {
     private func group(_ family: WidgetFamily, cards: Int) -> WidgetCardGroup {
@@ -493,48 +499,23 @@ struct WidgetPreviewLayoutTests {
         #expect(g.rows.flatMap { $0 } == g.cards)
     }
 
-    @Test("Glass renders accented; Default does not")
-    func appearanceDrivesTheRenderingMode() {
-        // This is what makes the previews the real thing rather than a
-        // drawing: `GlowPalette.grey` resolves against this value, so the
-        // accented branch is the one a Home Screen runs.
-        #expect(WidgetAppearance.standard.renderingMode == .fullColor)
-        #expect(WidgetAppearance.glass.renderingMode == .accented)
-    }
-
-    @Test("Two appearances, because Tinted and Clear draw the same picture")
-    func tintedAndClearAreOneCase() {
-        // Measured, not assumed: `Glass.regular` and `Glass.clear` over the
-        // page's plate came out pixel-identical inside a preview card. Two
-        // segments drawing the same thing would claim a distinction the page
-        // cannot make, so the one segment says both names. See
-        // `WidgetAppearance`.
-        #expect(WidgetAppearance.allCases.count == 2)
-        #expect(WidgetAppearance.glass.displayName == "Tinted or Clear")
-    }
-
-    @Test("Only Default keeps the widget's declared background")
-    func onlyDefaultKeepsTheBackground() {
-        // The system drops `containerBackground` under the other appearance
-        // and substitutes glass (#53), which is why the page draws a different
-        // panel rather than tinting the same one.
-        #expect(WidgetAppearance.standard.keepsDeclaredBackground)
-        #expect(!WidgetAppearance.glass.keepsDeclaredBackground)
-    }
-
-    @Test("The grey the marks resolve to follows the appearance")
+    /// The previews render *accented* — the rendering a glass Home Screen puts
+    /// a widget into, and the pairing #312's glass-over-black panel makes.
+    /// `WidgetAppearance` and its picker are gone (#312); the resolution rule
+    /// the picker exercised is not, because the page still puts views into
+    /// that mode. The rest of the grey's behaviour is `WidgetBackgroundTests`.
+    @Test("Accented rendering resolves the grey to the alpha-stored one")
     @MainActor
-    func greyFollowsTheAppearance() {
+    func accentedRenderingKeepsTheHierarchy() {
         // The whole reason `GlowPalette.grey` is a `ShapeStyle` and not a
         // `Color`: under accented the system keeps only alpha, so an opaque
         // grey would come back as a lit mark and the hierarchy would collapse
-        // into one tone. Asserted here because the preview page is now a
-        // second surface that can put a view into that mode.
+        // into one tone.
         var environment = EnvironmentValues()
-        environment.widgetRenderingMode = WidgetAppearance.glass.renderingMode
+        environment.widgetRenderingMode = .accented
         #expect(GlowPalette.grey.resolve(in: environment) == GlowPalette.greyAccented)
 
-        environment.widgetRenderingMode = WidgetAppearance.standard.renderingMode
+        environment.widgetRenderingMode = .fullColor
         #expect(GlowPalette.grey.resolve(in: environment) == GlowPalette.greyOpaque)
     }
 }

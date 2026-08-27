@@ -84,25 +84,17 @@ sentence with an exception is two sentences.
   temporary directory, and never otherwise. That is a privacy claim true by
   construction rather than by policy. `HistoryExport` is pure and its bytes are
   asserted. **And it is all or nothing** (#282): the snapshot read throws, so a
-  fetch failure stops the export before a file exists — no share sheet and no
-  mail composer ever opens over a partial read, no partial file is left behind,
+  fetch failure stops the export before a file exists — no share sheet ever
+  opens over a partial read, no partial file is left behind,
   and the failure is said out loud with a safe retry (an export is a read;
   retrying doubles nothing).
 
-  **Email My History** is the same export, one step closer to "send it to
-  myself" (#289): the same file, written by the same code at the moment of the
-  tap, handed to Apple's mail composer instead of the share sheet — a dated
-  subject, a two-sentence body, the attachment with its exact MIME type, and
-  **no recipient**, because the app does not know an address and does not
-  guess one. Nothing is sent until the person reviews the message and presses
-  Send; the composer is the system's and gives the app no send call. On a
-  device Mail cannot send from, the offer is the existing share sheet with the
-  same file. Glow's temporary copy is released when the composer goes away,
-  whichever of its four ways out it took; a sent message or saved draft is
-  Mail's copy, not Glow's. The file remains an export, not a backup — no
-  recovery promise attaches to it (see the 2026-08-25 entries in
-  docs/decisions.md). `MailExport` is pure and holds the subject, body,
-  recipients, MIME types, routing and outcome handling under test.
+  There was briefly a second way out of the same writer — **Email My History**
+  handed the same file to Apple's mail composer (#289) — and it was removed
+  the day after it landed (#317): the share sheet already lists Mail among its
+  destinations, so the row was a second flow to the same place. The file
+  remains an export, not a backup — no recovery promise attaches to it (see
+  the 2026-08-25 entries in docs/decisions.md).
 - **No undo — and one action that therefore has to ask twice.** Settings → Data
   → **Reset to Default Habits** deletes every habit and every completion and
   installs `DefaultHabits.all` fresh, which is the way back to the shipped list
@@ -385,13 +377,12 @@ share of the week, the dots say when, and the one date it carries is the day a
 tap would act on. Dates come from the calendar's own locale and time zone,
 like the dots' weekday names.
 
-**A month and a year are counted, not listed.** The month widget hangs one
-sentence on the habit's name — "12 days logged this month, 3 days missed, due
-today and 9 days still to come" — and the year makes each week column one stop:
-"Week of 17 August, 4 days complete, 2 days partly done and 1 day with nothing
-logged". Fifty-two sentences is a year somebody can swipe through; 365 stops
-reading "complete" is a wall. Both are counted off the marks the grid actually
-draws, so what is spoken and what is drawn cannot disagree.
+**A month is counted, not listed.** The month widget hangs one sentence on the
+habit's name — "12 days logged this month, 3 days missed, due today and 9 days
+still to come" — because thirty-one stops is a wall when each must be swiped
+through one at a time. It is counted off the marks the grid actually draws, so
+what is spoken and what is drawn cannot disagree. (The year grid was the other
+counted surface, one sentence per week column, until #316 removed it.)
 
 **A weekly row draws exactly N shapes, however late in the week it is.** Each is
 at least one column wide and together they cover all seven with no gaps. A rep
@@ -456,8 +447,8 @@ nothing glows.
 completion, on daily rows in the app and in the widget both. A socket says one
 is coming, and on a rest day none is; drawing one was the grid contradicting
 what the write path already enforced. A completion already on record **still
-counts** — `completedDays` is untouched, weekly totals are untouched, History
-still shows it — and is simply not drawn here. That reverses one clause of the
+counts** — `completedDays` is untouched, weekly totals are untouched — and is
+simply not drawn here. That reverses one clause of the
 original rest-day decision; see docs/decisions.md. The month widget inherits it
 without a second edit, because `MonthGrid` asks `WeekGrid`, so the rest
 weekday's column empties there too. VoiceOver still finds the slot, and it
@@ -594,9 +585,10 @@ decided the other way, and the value that made an uncapped reach unbounded is
 refused where it is read rather than clipped where it is used —
 `Habit.createdAt` defaults to `.distantPast` for rows written before the column
 existed, which means *unknown*, and a habit whose only signal is that default
-starts no record at all. Forward stops at the current week. History is a year
-of days that does not respond to touch on purpose; it is a second view of the
-same record rather than where the week view runs out.
+starts no record at all. Forward stops at the current week. The pager is the
+only long view now: the Settings History screen — a year of days that did not
+respond to touch on purpose — went with #316, so the week view's reach is where
+the record is read.
 
 **The title names the week you are looking at: how long ago, then which days**
 (#190, #207). "This Week", "Last Week", "Two Weeks Ago" — and past the third
@@ -664,7 +656,12 @@ where the crossfade already was.
 Each was verified in the simulator and is held by a test.
 
 The glow itself is confirmed on an iPhone 14 Pro: with it on screen the system's
-granted EDR headroom rises from 1.2 to 6.0, matching what the renderer asks for.
+granted EDR headroom rises from 1.2 to 6.0, matching the 6x the renderer asked
+for when it was measured. The ask is a Settings slider now, 2x by default — see
+docs/glow.md — and the mechanism the measurement confirms is unchanged. The
+halo has its own switch beside the slider: **No halo**, off by default, removes
+the light a lit mark spreads onto the ground while the mark's own HDR fill
+stays (#313). Both are stored in the App Group, so the widgets obey them too.
 What no test and no measurement can answer is whether it *reads* as lit in a
 given room, which stays a matter of looking at it.
 
@@ -750,18 +747,21 @@ about them.
 shows every widget this app ships — the week at both its families, the month
 at its one — drawn by `WeekWidgetView` and `MonthWidgetView` themselves rather
 than illustrated, at the point size each family really gets, over the user's
-own habits. Each one says whether it is already on the Home Screen, and
-**"added" means that family**: the week's medium and large are two
-independently placeable widgets, and having one says nothing about the other. `WidgetCenter` is asked fresh whenever the app becomes active, because
-placing a widget happens while the app is not frontmost.
+own habits.
 
-**The page is names, sizes and widgets** (#237). No kind carries an explaining
-sentence under its heading — the gallery does, because there a widget is an
-unfamiliar tile in a list, but here the widget itself is drawn directly below
-over the person's own habits and says the same thing without being read. What
-stays is "This Week" / "This Month", the size beside each preview, "Added", and
-the one paragraph describing the long-press, which is the only thing on the
-page no preview can demonstrate.
+**The page is three named cards and the widgets themselves** (#237,
+restructured by #312): **"Large Week Widget"**, **"Medium Week Widget"**,
+**"Monthly View per Habit"**, in that order, largest first. No card carries an
+explaining sentence under its heading — the gallery does, because there a
+widget is an unfamiliar tile in a list, but here the widget itself is drawn
+directly below over the person's own habits and says the same thing without
+being read. The heading carries the size, so there is no caption beside a
+preview, and the month's heading names the group — its previews are several
+habits one widget could be showing. The one paragraph left is the long-press
+instructions, the only thing on the page no preview can demonstrate. The
+"This Week" / "This Month" section titles, the per-size captions and the
+"Added" checkmarks all went with #312 — and with the checkmarks went the
+page's `WidgetCenter` query, since nothing displayed its answer any more.
 
 **The month is previewed against several habits, up to three.** It is the
 widget that asks *which habit* as it is placed, so one example answers a
@@ -784,24 +784,18 @@ what is left of a Medium's width once two Smalls are in it. A trailing odd
 card is a line of its own, at one widget's size, in the place the next one
 would go. Medium and Large fill the width and are unaffected.
 
-**One picker chooses the Home Screen appearance every preview is drawn under**
-(#273). Under Default the widget keeps the background it declares; under
-Tinted or Clear the system drops it, substitutes glass, and renders the widget
-*accented*, where colour is thrown away and only alpha survives. The previews
-answer that by injecting the rendering mode, so the marks take the same
-alpha-stored grey by the same line of code they take on a Home Screen — the
-content is the real thing, not a drawing of it. The panel behind is not: the
-system composites it out of a wallpaper this app cannot see, so the page draws
-its own neutral plate under SwiftUI's glass and says so.
-
-**Tinted and Clear are one segment, not two.** Both put the widget into
-accented rendering, so the content is identical by construction, and the two
-glass styles measured pixel-identical over the page's plate. Two segments
-drawing the same picture would claim a distinction the page cannot make.
-**And the picker cannot default to the device's own appearance**, because
-nothing reports it: no trait, environment value or WidgetKit call, checked
-against the iOS 26.5 SDK rather than remembered. `widgetRenderingMode` reads
-`.fullColor` inside the app whatever the Home Screen is doing.
+**Every preview sits on glass over black** (#312). Under Tinted or Clear the
+system drops a widget's declared background, substitutes glass composited from
+the wallpaper behind it, and renders the widget *accented*, where colour is
+thrown away and only alpha survives. The previews show exactly that pairing:
+the rendering mode is injected, so the marks take the same alpha-stored grey
+by the same line of code they take on a Home Screen — the content is the real
+thing, not a drawing of it. The panel behind is not: the wallpaper and the
+system's compositing are unreachable from app code, so the page draws SwiftUI's
+own glass over black — the Home Screen the app's aesthetic assumes. #273 put
+an appearance picker over these previews and #312 removed it; the measurements
+that shaped it are kept in decisions.md, because no API reports the device's
+Home Screen appearance and the two glass appearances render identically here.
 
 The previews are of *unconfigured* widgets, which is the same narrowing the
 grid's boundary hairline took (#188). They draw the app's own list because
