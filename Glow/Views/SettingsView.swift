@@ -9,8 +9,8 @@ import WidgetKit
 /// Glow leads because it is the product rather than a preference about it.
 /// Week holds both controls that decide what a week is — where it starts and
 /// which day the app stops asking about — which were two sections, one of them
-/// headerless. Data holds the long view of what is stored beside the one
-/// control that writes something invented into it, and where the export lives.
+/// headerless. Data holds the export beside the one control that writes
+/// something invented into the same store.
 ///
 /// A tab now rather than a sheet, so there is no Done button and nothing to
 /// dismiss — the changes are live and the way out is the tab bar.
@@ -38,23 +38,6 @@ struct SettingsView: View {
     /// hat.
     @State private var pendingExport: URL?
     @State private var isChoosingFormat = false
-
-    /// The email flow's own states (#289). Its format chooser is a second
-    /// dialog rather than a mode on the first, so each button's tap leads
-    /// where its label said it would.
-    @State private var isChoosingEmailFormat = false
-    /// The message the composer is currently holding, or nil while there is
-    /// none. Its own item, not a reuse of `exportFile`, because the two sheets
-    /// are different ways out and can in principle both be reached from one
-    /// written file — the fallback path hands the same URL from this flow to
-    /// that one.
-    @State private var mailDraft: MailDraft?
-    /// Mail cannot send on this device; the alert explains and offers the
-    /// share sheet with the same file.
-    @State private var isMailUnavailable = false
-    /// The composer reported failure. The only outcome with an error —
-    /// cancellation is a decision, not a failure. See `MailExport.reaction`.
-    @State private var mailFailed = false
 
     /// Mirrors `PopPreferences.level`, so the picker moves on the tap.
     @State private var popLevel = PopPreferences.level
@@ -286,33 +269,13 @@ struct SettingsView: View {
                     Text(weekFooter)
                 }
 
-                // Data last, and History belongs in it: the long view of what
-                // is stored, beside the one control that writes something
-                // invented into the same store. When export arrives it lands
-                // here too, which is the quiet argument for the section.
+                // Data last: the export, beside the one control that writes
+                // something invented into the same store.
                 Section {
-                    NavigationLink {
-                        YearView()
-                    } label: {
-                        Label("History", systemImage: "square.grid.3x3")
-                    }
-
                     Button {
                         isChoosingFormat = true
                     } label: {
                         Label("Export History", systemImage: "square.and.arrow.up")
-                    }
-                    .disabled(habits.isEmpty)
-
-                    // The same export, one step closer to "send it to
-                    // myself": Apple's composer, prefilled with the file and
-                    // nothing else (#289). A plain row like its neighbour —
-                    // never a styled prominent control; the root tint is pure
-                    // white and has eaten three of those (see CLAUDE.md).
-                    Button {
-                        isChoosingEmailFormat = true
-                    } label: {
-                        Label("Email My History", systemImage: "envelope")
                     }
                     .disabled(habits.isEmpty)
 
@@ -338,17 +301,10 @@ struct SettingsView: View {
                     resetRow
                 } header: {
                     Text("Data")
-                } footer: {
-                    // **One `Text`, paragraphs separated by blank lines.** A
-                    // section footer built from several `Text`s renders the
-                    // first one and drops the rest: this footer held two and
-                    // has been showing only the export sentence — screenshotted
-                    // at the bottom of the scroll, where the demo paragraph is
-                    // absent rather than cut off. The Week section next door
-                    // has always done it this way, which is why its two
-                    // paragraphs both arrive.
-                    Text(dataFooter)
                 }
+                // No footer, decided on purpose (#317): the section grew a
+                // six-paragraph wall of explanation under its last row, and
+                // the answer was to remove it rather than trim it.
             }
             .scrollContentBackground(.hidden)
             // A choice of two, rather than a format setting nobody would ever
@@ -362,17 +318,6 @@ struct SettingsView: View {
                 Button("JSON") { export(as: .json) }
                 Button("Cancel", role: .cancel) {}
             }
-            // The same two formats, chosen before any file exists — the email
-            // flow writes at the tap exactly as the share flow does (#289).
-            .confirmationDialog(
-                "Email My History",
-                isPresented: $isChoosingEmailFormat,
-                titleVisibility: .visible
-            ) {
-                Button("CSV") { emailExport(as: .csv) }
-                Button("JSON") { emailExport(as: .json) }
-                Button("Cancel", role: .cancel) {}
-            }
             // The share sheet is the only way out of the app, and it opens on
             // a tap. Nothing here uploads.
             // `onDismiss` covers sharing and cancelling both, because they are
@@ -380,51 +325,6 @@ struct SettingsView: View {
             // them as two is how one of them gets missed.
             .sheet(item: $exportFile, onDismiss: { discardExport() }) { file in
                 ShareSheet(url: file.url)
-            }
-            // The composer, same lifetime rule as the share sheet: the one
-            // dismissal releases the file, whichever of the four ways the
-            // composer came back — and also when it is swiped away without
-            // the delegate ever firing. Mail's own copies (a sent message, a
-            // saved draft) are Mail's; only Glow's temporary source is
-            // released. See `MailExport.reaction`.
-            .sheet(item: $mailDraft, onDismiss: { discardExport() }) { draft in
-                MailComposeView(
-                    data: draft.data,
-                    filename: draft.filename,
-                    mimeType: draft.mimeType,
-                    subject: draft.subject
-                ) { outcome in
-                    mailDraft = nil
-                    if MailExport.reaction(to: outcome).showsError {
-                        mailFailed = true
-                    }
-                }
-            }
-            // The honest fallback, not an error page: a device without Mail
-            // still has the share sheet, and the same file is offered to it.
-            .alert("Mail Isn't Set Up", isPresented: $isMailUnavailable) {
-                Button("Use Share Sheet") {
-                    if let url = pendingExport {
-                        exportFile = HistoryFile(url: url)
-                    }
-                }
-                Button("Cancel", role: .cancel) { discardExport() }
-            } message: {
-                Text(
-                    "This device has no account Mail can send from. The same "
-                        + "file can go out through the share sheet instead."
-                )
-            }
-            // Failure is the one outcome that speaks. No path, no filename,
-            // no habit — the sentence says what happened and what to do.
-            .alert("Email Failed", isPresented: $mailFailed) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(
-                    "Mail reported a failure and nothing was sent. The "
-                        + "prepared file has been discarded — you can try "
-                        + "again, or use Export History."
-                )
             }
             .alert("Reset to Default Habits?", isPresented: $isConfirmingReset) {
                 TextField("Type \(ResetConfirmation.word) to confirm", text: $typedConfirmation)
@@ -557,41 +457,6 @@ struct SettingsView: View {
         exportFile = HistoryFile(url: url)
     }
 
-    /// Writes the file, then hands it to Apple's mail composer — or, on a
-    /// device Mail cannot send from, offers the share sheet with the same
-    /// file (#289).
-    ///
-    /// **An export, not a backup.** The composer opens with no recipient —
-    /// Glow does not know an address and does not guess one — and nothing is
-    /// sent until the person reviews the message and presses Send. What the
-    /// mail provider then keeps is the provider's; what Glow wrote is
-    /// released when the composer goes away.
-    private func emailExport(as format: HistoryExport.Format) {
-        guard let url = writeExport(as: format, retry: { emailExport(as: format) })
-        else { return }
-        switch MailExport.route(canSendMail: MailComposeView.canSendMail()) {
-        case .composer:
-            guard let data = try? Data(contentsOf: url),
-                  let mime = MailExport.mimeType(forExtension: url.pathExtension)
-            else {
-                // The file cannot be read back or has a type this app does
-                // not write — neither should be reachable, and the share
-                // sheet can still offer whatever was written.
-                exportFile = HistoryFile(url: url)
-                return
-            }
-            mailDraft = MailDraft(
-                url: url,
-                data: data,
-                filename: url.lastPathComponent,
-                mimeType: mime,
-                subject: MailExport.subject(on: Date())
-            )
-        case .shareFallback:
-            isMailUnavailable = true
-        }
-    }
-
     /// Writes one export and takes ownership of its lifetime.
     ///
     /// Written at the moment of the tap rather than kept ready: a history file
@@ -599,20 +464,16 @@ struct SettingsView: View {
     /// promises not to make. It goes to the app's own temporary directory,
     /// which the system reclaims.
     ///
-    /// One writer for both ways out — the share sheet and the composer attach
-    /// the same bytes, and a second serializer would be a second thing to
-    /// drift (#289).
-    ///
     /// **All or nothing** (#282). The snapshots used to come from the
     /// non-throwing helpers, which flatten a failed completion fetch into
-    /// empty history — so the one error neither way out must paper over was
-    /// already erased before the `do` block began, and a person could share
-    /// or mail a file silently missing rows. `Habit.fetchedSnapshots` keeps
+    /// empty history — so the one error the share sheet must not paper over
+    /// was already erased before the `do` block began, and a person could
+    /// share a file silently missing rows. `Habit.fetchedSnapshots` keeps
     /// the failure, and `ExportStore.writeHistory` orders the steps so a
-    /// throw anywhere leaves no file: no sheet and no composer opens over a
-    /// partial read, and the failure is said out loud with a safe retry — an
-    /// export is a read, and the caller passes the retry so the way out that
-    /// failed is the way that is retried.
+    /// throw anywhere leaves no file: no sheet opens over a partial read,
+    /// and the failure is said out loud with a safe retry — an export is a
+    /// read, and the caller passes the retry so the way out that failed is
+    /// the way that is retried.
     private func writeExport(
         as format: HistoryExport.Format, retry: @escaping @MainActor () -> Void
     ) -> URL? {
@@ -634,63 +495,6 @@ struct SettingsView: View {
         guard let url = pendingExport else { return }
         exportStore.discard(url)
         pendingExport = nil
-    }
-
-    private var exportFooter: String {
-        "Every habit and every day you logged it, as a file. It leaves this "
-            + "phone only when you send it somewhere — nothing is uploaded."
-    }
-
-    /// Says what the email action does and where control ends — the file
-    /// travels through the chosen mail provider, whose copies are its own.
-    /// Deliberately nothing about safekeeping: this is an export, not a
-    /// backup, and copy suggesting it protects anything would be a promise
-    /// this app cannot keep (#289).
-    private var emailFooter: String {
-        "Email My History opens an email with the same file attached and no "
-            + "address filled in — you choose where it goes and press Send "
-            + "yourself. It travels through your mail provider, and any copy "
-            + "the provider keeps is outside Glow's control."
-    }
-
-    /// The section's paragraphs, in row order, as one string.
-    ///
-    /// They stay separate properties because each explains a different control
-    /// and is worth reading on its own; they arrive as one `Text` because that
-    /// is the only way a section footer shows more than its first line. See the
-    /// note at the call site.
-    private var dataFooter: String {
-        [exportFooter, emailFooter, demoFooter, overrideFooter, resetFooter, versionFooter]
-            .joined(separator: "\n\n")
-    }
-
-    /// What the override actually does, said plainly, because what it does is
-    /// not what a debug switch usually does.
-    private var overrideFooter: String {
-        "Treats another day of this week as today, everywhere — including the "
-            + "widgets. Anything you log while it is on is logged to that day "
-            + "for real. It turns itself off when the app is relaunched, and "
-            + "when the week ends."
-    }
-
-    /// What is installed, in the shape everything else already uses.
-    ///
-    /// `SHORT (BUILD)` — `Glow 0.1 (1)` locally, `Glow 0.1 (202608211900)` from
-    /// a lane that computes the build at archive time — because that is what a
-    /// crash report prints and what `Tools/check-release-build.py` compares, so
-    /// the number in Settings is the one to paste rather than a
-    /// differently-formatted twin of it. The first runtime reader of either key
-    /// in this app; every other check reads them from outside the built product.
-    ///
-    /// **Last paragraph of one `Text`, not a `Text` of its own.** #200's sketch
-    /// added a third `Text` to the footer, which is exactly the bug #193 found
-    /// there: a section footer renders its first `Text` and drops the rest, so
-    /// the version would never have appeared on screen.
-    private var versionFooter: String {
-        let info = Bundle.main.infoDictionary
-        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
-        let build = info?["CFBundleVersion"] as? String ?? "?"
-        return "Glow \(short) (\(build))"
     }
 
     /// Seeds or removes the invented past. Errors leave the toggle where the
@@ -820,14 +624,6 @@ struct SettingsView: View {
         isDemoSeeded = demo.isSeeded
     }
 
-    /// Names the control it explains, because the section holds four rows and
-    /// only one of them throws anything away.
-    private var resetFooter: String {
-        "Reset to Default Habits deletes every habit and every day you logged, "
-            + "then puts the pre-selected set back. There is no undo, so it "
-            + "asks you to type \(ResetConfirmation.word) first."
-    }
-
     /// The toggle turns the sentinel into a real day and back, defaulting to
     /// Sunday because that is the day most people mean by "rest day" — and it
     /// is a default rather than an assumption, since the picker is right there.
@@ -873,15 +669,6 @@ struct SettingsView: View {
             + "Anything already on record still counts."
     }
 
-    /// Names the control it explains, because the section holds two rows and
-    /// only one of them invents anything.
-    private var demoFooter: String {
-        "Demo history fills the past ten weeks with an invented past, so the "
-            + "app can be seen with something in it. Today is never touched, "
-            + "and switching it off removes exactly what it added — nothing "
-            + "you logged yourself."
-    }
-
     /// What the display will grant right now — and "now" is load-bearing.
     ///
     /// `potentialEDRHeadroom` moves with ambient light, display brightness and
@@ -902,20 +689,6 @@ struct SettingsView: View {
 /// The written file, identified so `sheet(item:)` can present it.
 private struct HistoryFile: Identifiable {
     let url: URL
-    var id: String { url.path }
-}
-
-/// Everything the composer needs, gathered when the file is written (#289).
-///
-/// The bytes ride here rather than being re-read at presentation: the sheet's
-/// content closure can run more than once, and the subject is dated at the
-/// moment of the export, so both are decided exactly once.
-private struct MailDraft: Identifiable {
-    let url: URL
-    let data: Data
-    let filename: String
-    let mimeType: String
-    let subject: String
     var id: String { url.path }
 }
 
