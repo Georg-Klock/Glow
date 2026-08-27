@@ -4979,3 +4979,36 @@ defined by what is still undone). None marks another complete.
 `accentRaw`) and the CloudKit-shaped optionality stay exactly as they are —
 dropping them is the first real stage's decision, taken when there is a
 reason, against a floor that now exists to upgrade from.
+
+## The pop's line is as large and bold as each presentation carries (#310)
+
+**2026-08-27.** `GoalPopActivity` sizes the line per presentation —
+`PopType`: banner 20, expanded 32, compact 16 — all bold, replacing one
+number used three ways at `.medium` or unweighted. Measured in the simulator
+(iPhone 17 Pro, iOS 26.5) against the longest line the app writes, "that's
+the week": the compact trailing region cannot carry fifteen characters at
+any pushed size — 16 bold truncated to "that's the…" and even 12 bold
+clipped its first glyph — so compact *scales to fit* from 16
+(`minimumScaleFactor(0.6)`): short lines render the full size, the longest
+shrinks and survives whole, which is what "as large as the presentation
+allows" means on a surface that truncates rather than wraps. Expanded fills
+its width at 32 unwrapped, with a scale guard for narrower islands. The
+device look is the final word; the sizes are named so it can move one number.
+
+## The Lock Screen banner inverts; the Island's chrome cannot (#311)
+
+**2026-08-27.** The banner is white ground, black bold type, black mark —
+`activityBackgroundTint(.white)` with the line and dot drawn as ink. The
+scope is exactly what the app controls, checked against the iOS 26.5 SDK's
+`WidgetKit.swiftinterface` rather than memory: `DynamicIsland` exposes
+`widgetURL`, `keylineTint` and `contentMargins` and nothing else, so the
+compact and minimal pill *and the expanded presentation's background* are
+system-owned chrome and keep the system's black. That is the decided
+fallback — invert what is reachable rather than blocking on the pill.
+`activityBackgroundTint` tints the system's banner material rather than
+painting it opaque, so "fully white" arrives as the whitest surface the API
+grants. The banner's mark and line render as ink deliberately: on a light
+ground the mark is not light, and the `glowing` modifier — which draws lit
+white — leaves this one surface. The Island presentations keep it; chronod
+flattens the headroom there (docs/glow.md) but it remains this app's
+spelling for lit white.
