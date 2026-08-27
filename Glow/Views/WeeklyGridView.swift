@@ -39,9 +39,9 @@ struct WeeklyGridView: View {
     /// Ending it needs a binding this view can write, which the stack's own is
     /// not.
     ///
-    /// Injected below the stack, on the view the toolbar hangs off, so
-    /// `EditButton` and the `List` both see this binding rather than the one
-    /// the stack provides. **This is not the trap in CLAUDE.md** — that is
+    /// Injected below the stack, on the view the toolbar hangs off, so the
+    /// menu's Edit item and the `List` both see this binding rather than the
+    /// one the stack provides. **This is not the trap in CLAUDE.md** — that is
     /// about *reading* `@Environment(\.editMode)` from outside the stack, which
     /// is always inactive, and `EditModeTests` scans for it.
     @State private var editMode: EditMode = .inactive
@@ -182,12 +182,18 @@ struct WeeklyGridView: View {
                 // and in the past the way home is on both sides.
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if isOnCurrentWeek {
-                        if !habits.isEmpty {
-                            EditButton()
-                        }
-                        // A menu rather than a second button: adding a blank row
-                        // is rare next to adding a habit, and two icons in a toolbar
-                        // to distinguish "new thing" from "new gap" is a puzzle.
+                        // One menu rather than a button and a menu (#320): the
+                        // three list actions share the one control, behind an
+                        // ellipsis now that "add" no longer covers them. The
+                        // cost is named in docs/decisions.md — Edit is two taps,
+                        // and so is Done, because the same item swaps to it
+                        // while editing rather than a direct button appearing.
+                        //
+                        // Not `EditButton()`: that type has no menu-item form,
+                        // and its automatic Edit/Done label swap goes with it —
+                        // this button swaps its own label from the state this
+                        // view already owns. The menu rebuilds its content on
+                        // every open, so the label is current by construction.
                         Menu {
                             Button("New Habit", systemImage: "plus") {
                                 isAddingHabit = true
@@ -195,8 +201,21 @@ struct WeeklyGridView: View {
                             Button("Blank Row", systemImage: "rectangle.dashed") {
                                 addSpacer()
                             }
+                            if !habits.isEmpty {
+                                Divider()
+                                Button(
+                                    editMode.isEditing ? "Done" : "Edit",
+                                    systemImage: editMode.isEditing
+                                        ? "checkmark" : "pencil"
+                                ) {
+                                    withAnimation {
+                                        editMode =
+                                            editMode.isEditing ? .inactive : .active
+                                    }
+                                }
+                            }
                         } label: {
-                            Label("Add", systemImage: "plus")
+                            Label("More", systemImage: "ellipsis")
                         }
                     } else {
                         // **Not new editing scope** (#207). Every day of the
@@ -211,8 +230,8 @@ struct WeeklyGridView: View {
                     }
                 }
             }
-            // Below the stack, so `EditButton` above toggles this binding and
-            // the `List` reads the same one. See `editMode`.
+            // Below the stack, so the menu's Edit item above toggles this
+            // binding and the `List` reads the same one. See `editMode`.
             .environment(\.editMode, $editMode)
         }
         .sheet(isPresented: $isAddingHabit) {
@@ -476,9 +495,9 @@ struct WeeklyGridView: View {
         // screen in all four states — current week, one week back, three weeks
         // back, and at the floor — so the readout stays put and only its
         // contents change. The trailing group is narrower now (one Today
-        // button, or Edit and Add, rather than Edit and Add beside a wider
-        // pager), which is the likeliest reason the item stopped being
-        // squeezed.
+        // button, or the one menu — Edit and Add at #207, folded into it by
+        // #320 — rather than two controls beside a wider pager), which is the
+        // likeliest reason the item stopped being squeezed.
         VStack(alignment: .leading, spacing: 0) {
             Text(weekTitle)
                 .font(.headline)
@@ -651,9 +670,9 @@ struct WeeklyGridView: View {
     /// instead would leave the leading slot empty and the reach unmentioned.
     ///
     /// Sharing a shape with the trailing group is the point rather than a
-    /// coincidence: on the current week the bar is `<` … Edit Add, and in the
-    /// past it is `< >` … Today. The way home is on both sides exactly when
-    /// there is a way home.
+    /// coincidence: on the current week the bar is `<` … the ellipsis menu,
+    /// and in the past it is `< >` … Today. The way home is on both sides
+    /// exactly when there is a way home.
     ///
     /// **Two toolbar items, not one item holding two buttons** (#258). The bar
     /// draws one glass platter per *item*, so the `HStack` this used to be —
@@ -711,8 +730,8 @@ struct WeeklyGridView: View {
     /// Puts a week on screen, and ends edit mode on the way out of this one.
     ///
     /// Every path that moves `weekStart` goes through here, because every one
-    /// of them can strand: `EditButton` is only in the toolbar on the current
-    /// week (#207), so paging back while editing would otherwise leave the list
+    /// of them can strand: the menu holding Edit is only in the toolbar on the
+    /// current week (#207), so paging back while editing would otherwise leave the list
     /// in a mode with nothing on screen to leave it by — rows fanned open, the
     /// week track faded (#164), and no Done. Ending the mode is the honest
     /// resolution rather than keeping a button the week does not otherwise
@@ -868,7 +887,7 @@ struct WeekdayHeader: View {
     /// The same read the rows make, for the same reason and with the same
     /// standing: this header is built inside `WeeklyGridView`'s
     /// `NavigationStack`, not by the struct that constructs one, so the value
-    /// the toolbar's `EditButton` toggles is the value it sees. See
+    /// the toolbar menu's Edit item toggles is the value it sees. See
     /// `HabitRowView.isEditing` for the distinction, and CLAUDE.md's entry on
     /// `@Environment(\.editMode)` for the case where it does not hold.
     @Environment(\.editMode) private var editMode

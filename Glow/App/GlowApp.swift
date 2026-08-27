@@ -71,6 +71,9 @@ struct GlowApp: App {
         if ProcessInfo.processInfo.arguments.contains("-glow-debug-pop") {
             Self.debugPop()
         }
+        if ProcessInfo.processInfo.arguments.contains("-glow-dump-widgets") {
+            Self.dumpPlacedWidgets()
+        }
         #endif
     }
 
@@ -162,6 +165,30 @@ struct GlowApp: App {
         WidgetBurst.record(habitID: habit.id, reduceMotion: false)
         WidgetTrace.record("forced burst for \(habit.id.uuidString), reloading")
         WidgetRefresh.invalidate()
+    }
+    /// Records every placed widget's kind and family into the trace, so a
+    /// tethered Mac can see what is actually on a Home Screen without a thumb
+    /// or an eye (#321).
+    ///
+    /// `WidgetCenter.getCurrentConfigurations` is the only public view of
+    /// placements, and it answers the one question the providers' own trace
+    /// lines cannot: an instance that is placed but no longer served builds no
+    /// timeline and therefore leaves no line, so its absence from the trace is
+    /// indistinguishable from its absence from the screen. This lists it
+    /// either way. Kinds and families only — same privacy rule as the rest of
+    /// `WidgetTrace`.
+    private static func dumpPlacedWidgets() {
+        WidgetCenter.shared.getCurrentConfigurations { result in
+            switch result {
+            case .success(let infos):
+                WidgetTrace.record("placed widgets: \(infos.count)")
+                for info in infos {
+                    WidgetTrace.record("placed: kind=\(info.kind), family=\(info.family)")
+                }
+            case .failure(let error):
+                WidgetTrace.record("placed widgets: query failed, \(error)")
+            }
+        }
     }
     #endif
 
