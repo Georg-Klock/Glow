@@ -57,14 +57,10 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
   reaches the month without a second edit.
 - `SlotVoice` and `HistoryVoice` are what the marks say out loud. A day-pinned
   column names its own date, because the header that carries the dates on
-  screen is a table when it is read aloud and stays hidden; a month or a year
-  of columns is counted into one sentence instead. Both are pure, so the app
-  and the widget cannot disagree about a word and the strings are asserted
-  without a renderer.
-- `YearHistory.fill(for:habits:today:)` is how a day of the long view went —
-  full, partial, empty or still to come. It is the year grid's own rule, out of
-  the view so that the sentence `HistoryVoice` speaks counts what the grid
-  draws rather than counting it a second way.
+  screen is a table when it is read aloud and stays hidden; a month of columns
+  is counted into one sentence instead. Both are pure, so the app and the
+  widget cannot disagree about a word and the strings are asserted without a
+  renderer.
 - `ResetConfirmation` is the gate in front of Reset to Default Habits: the word
   that has to be typed, and what counts as having typed it. Four lines, out of
   the view for the same reason `MotionPolicy` is — it stands in front of the
@@ -89,7 +85,7 @@ module and a call to it from in here would otherwise compile.
 
 **The rest day arrives the same way** (#181). `WeekPreferences` is where the
 stored value lives; nothing else in here reads it. `WeekGrid`, `WeekSpans`,
-`WeekDots`, `MonthGrid`, `SeededHistory`, `YearHistory` and `SlotEditing` all
+`WeekDots`, `MonthGrid`, `SeededHistory` and `SlotEditing` all
 take `restDay: Int?` — the weekday nothing is expected on, or nil for none — and
 the boundaries read it once: a view through `@AppStorage`, so SwiftUI can see
 the dependency; a widget once per render, because it has no live hierarchy to
@@ -114,8 +110,8 @@ accidentally mutate a model while drawing it.
 
 **A surface that draws a bounded stretch of time reads only that stretch**
 (#135). `Habit.snapshots(of:within:calendar:)` takes the days the surface
-actually draws — `week.dayIDs()`, `MonthGrid.dayRange(containing:)`, the year's
-first and last column — and pushes the bound into SQLite on `Completion.dayKey`.
+actually draws — `week.dayIDs()`, `MonthGrid.dayRange(containing:)` — and
+pushes the bound into SQLite on `Completion.dayKey`.
 `habit.snapshot()` with no range still means the whole history and is what the
 export calls.
 
@@ -123,8 +119,8 @@ The snapshot it hands back therefore holds only those days, which is the one
 thing to know before passing one on. Everything week-shaped asks only about days
 inside the week it was given, so a week's worth is all a week's row needs;
 `Tests/HistoryProjectionTests.swift` asserts that against `WeekGrid`,
-`WeekSpans`, `WeekDots`, `GoalMet`, `MonthGrid` and `YearHistory` rather than
-against a reading of them.
+`WeekSpans`, `WeekDots`, `GoalMet` and `MonthGrid` rather than against a
+reading of them.
 
 ### Slots carry their own action
 
@@ -473,9 +469,9 @@ each fence exists because the failure it prevents is a write:
    them either, which fails in the safe direction.
 2. **Cleared at launch**, first thing in `GlowApp.init`, before the store is
    opened. The longest a stray override can affect anything is one app session.
-3. **Said out loud.** `DebugTodayBanner` sits on This Week and on History for as
-   long as one is set, and one tap on it clears the override — leaving it on
-   must never be more convenient than turning it off.
+3. **Said out loud.** `DebugTodayBanner` sits on This Week for as long as one
+   is set, and one tap on it clears the override — leaving it on must never be
+   more convenient than turning it off.
 
 It ships in every build, TestFlight included, and deliberately not behind
 `#if DEBUG`: a Release archive is the build that gets installed on the phone

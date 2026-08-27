@@ -4980,6 +4980,55 @@ defined by what is still undone). None marks another complete.
 dropping them is the first real stage's decision, taken when there is a
 reason, against a floor that now exists to upgrade from.
 
+## History and Email My History leave Settings, and the Data footer goes with them (#316, #317)
+
+**2026-08-26.** The Data section shrinks to four rows — Export History, Demo
+history, the today override, Reset — and keeps no footer. Three removals, each
+outright rather than shelved:
+
+**The History screen is gone, and its whole reachability chain with it**
+(#316). `YearView` was instantiated exactly once, in the Data section's
+`NavigationLink`; removing the row made it unreachable, so the file went too,
+per the standing rule that confirmed-unused code does not stay as a dead file.
+The chain kept going: `YearHistory` was read only by `YearView` and by
+`HistoryVoice.week`, and `HistoryVoice.week`/`weekStart` were spoken only by
+`YearView`'s columns — so `YearHistory.swift` is deleted and `HistoryVoice`
+keeps only `month`, which the month widget still speaks. The long view the
+app keeps is the week pager's uncapped reach (#186). What #137 settled — a
+stretch of days is counted into a sentence, not listed cell by cell — stands,
+and the month widget is now its only counted surface; the fill vocabulary
+(full/partial/empty/future) and the week-column sentence go with the screen
+that drew them, not into a drawer.
+
+**Email My History is removed the day after it landed** (#317, reversing
+#289's feature). The share sheet already lists Mail among its destinations,
+so the row was a second flow to the same place. The seam #289 built —
+`MailExport`, `MailComposeView`, the draft/unavailable/failed states, both
+dialogs and alerts — exists only to serve that row and is deleted in full;
+`writeExport` stays, because Export History was always the other caller of
+the one serializer. What #289 and #285 settled about the copy — an export is
+not a backup, and no recovery promise attaches — is not reopened; the feature
+those words guarded is simply gone, and the sweep still runs over the strings
+that remain.
+
+**The whole Data footer goes, not a trimmed version of it.** Six concatenated
+paragraphs — export, email, demo, override, reset, version — had grown into a
+wall of text under Reset to Default Habits, and the decision, made explicitly
+on #317, is that the section explains itself through its rows: no footer at
+all, not four surviving paragraphs. This supersedes the footer's accumulated
+mechanics where they applied to this section (#193's one-`Text` rule, #200's
+version paragraph): the one-`Text` rule still holds wherever a footer shows
+more than one paragraph — the Week section next door still does it — but the
+Data section no longer has one, and the installed version string currently
+appears nowhere in the app. Putting a version line somewhere is a new
+decision if it is missed, not a revival of this footer.
+
+Nineteen tests went with the deleted surfaces — `MailExportTests` whole, the
+year suites and week-sentence tests in `AccessibilityVoiceTests`, and the
+year arm of `HistoryProjectionTests` — and the `GlowTests` floor moves down
+by the same nineteen in the same change, per the inventory's own rule that
+lowering the floor is the reviewable event.
+
 ## The appearance picker leaves the Widgets tab; its measurements stay (#312)
 
 **2026-08-26.** #312 restructures the Widgets tab into three named cards,
