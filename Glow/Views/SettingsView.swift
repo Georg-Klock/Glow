@@ -62,6 +62,13 @@ struct SettingsView: View {
     @AppStorage(GlowSettings.key, store: GlowSettings.store)
     private var peak: Double = GlowSettings.defaultValue
 
+    /// On means off: the toggle stores the halo's *removal*, so a fresh
+    /// install — nothing stored — ships the halo, and flipping the switch on
+    /// is what takes it away (#313). The HDR fill is a separate layer and
+    /// stays either way.
+    @AppStorage(GlowSettings.haloDisabledKey, store: GlowSettings.store)
+    private var haloDisabled: Bool = false
+
     /// Mirrors `DemoHistory.isSeeded`. State rather than a computed binding so
     /// the toggle animates the flip it caused instead of waiting on a re-read.
     @State private var isDemoSeeded = false
@@ -215,10 +222,19 @@ struct SettingsView: View {
                     Text(readout)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+
+                    // "No halo", not "Halo": the row stores the removal, so
+                    // the switch reads on when the halo is off and a fresh
+                    // install shows it off — the shipped look unchanged
+                    // (#313). Explicit `controlTint`, because the root tint
+                    // is pure white and a `Toggle` filled with it disappears
+                    // (#124).
+                    Toggle("No halo", isOn: $haloDisabled)
+                        .tint(GlowPalette.controlTint)
                 } header: {
                     Text("Glow")
                 } footer: {
-                    Text("What the screen grants changes with ambient light, brightness and heat.")
+                    Text("What the screen grants changes with ambient light, brightness and heat. No halo keeps the marks lit and stops them spreading light around themselves.")
                 }
 
                 Section {
@@ -453,7 +469,9 @@ struct SettingsView: View {
     /// **Derived, never typed.** `GlowModifier` casts the halo at
     /// `height * GlowPalette.haloRadius`, multiplied by
     /// `GlowSettings.haloScale(peak)` — which reaches `maxHaloScale` at the
-    /// shipping default. Reserving anything less cuts the light mid-falloff,
+    /// top of the range, well above the shipping default of 2x, and the
+    /// reservation has to fit the slider's largest halo rather than the
+    /// default's. Reserving anything less cuts the light mid-falloff,
     /// and reserving a constant means it drifts the next time `haloRadius`
     /// moves. This is the same expression the halo is drawn from.
     private static let previewSize = CGSize(width: 120, height: 40)

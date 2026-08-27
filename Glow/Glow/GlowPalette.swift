@@ -39,9 +39,10 @@ import WidgetKit
 /// softer. If the ring keeps its offset pair anyway, one radius would do.
 ///
 /// Reading a radius here does not tell you what lands on screen: every drop
-/// shadow is multiplied by `GlowSettings.haloScale(peak)`, which is 1.7 at the
-/// shipping default of 12x. The ring's inner pair are the exception — they are
-/// baked into the stroke in `GlowImageView` and are not scaled.
+/// shadow is multiplied by `GlowSettings.haloScale(peak)` — 0.2 at the shipping
+/// default of 2x, `maxHaloScale` at the top of the range. The ring's inner pair
+/// are the exception — they are baked into the stroke in `GlowImageView` and
+/// are not scaled.
 enum GlowPalette {
     // MARK: - The two colours
 
@@ -170,10 +171,11 @@ enum GlowPalette {
     // shorter tail. Matching a glow by eye in Figma will under-reach the app.
     //
     // What lands on screen is also not the number below. `GlowModifier`
-    // multiplies every drop shadow by `GlowSettings.haloScale(peak)`, which is
-    // 1.7 at the shipping default of 12x — so the dot's halo renders at 15.26
-    // on a 17.455 slot, not 9. `ringInnerRadius` is the exception: it is an
-    // inner shadow inside the stroke and the setting never touches it.
+    // multiplies every drop shadow by `GlowSettings.haloScale(peak)` — 0.2 at
+    // the shipping default of 2x, so the dot's halo renders at 1.8 on a 17.455
+    // slot, not 9, and reaches 12.6 at the top of the range.
+    // `ringInnerRadius` is the exception: it is an inner shadow inside the
+    // stroke and the setting never touches it.
 
     /// The halo around a completion, as a multiple of slot height. 9 on 17.5.
     static let haloRadius: CGFloat = 9.0 / 17.5
@@ -234,9 +236,10 @@ enum GlowPalette {
     /// all and one of these divisions is spurious.
     ///
     /// **Looked at, and it does not** (#101, claim 5). iPhone 14 Pro, iOS
-    /// 26.5.2, 2026-08-25, with `glowPeakHeadroom` at the shipping default of
-    /// 12 — a due habit's name beside its own due mark, the label's halo at
-    /// 0.75pt against the mark's rendered 15.26pt. Georg: the name reads lit.
+    /// 26.5.2, 2026-08-25, with `glowPeakHeadroom` at 12, the shipping default
+    /// that day — a due habit's name beside its own due mark, the label's halo
+    /// at 0.75pt against the mark's rendered 15.26pt. Georg: the name reads
+    /// lit.
     ///
     /// That is the observation this comment asked for, and it is worth being
     /// exact about what it settles. It does **not** prove 0.75 is the number

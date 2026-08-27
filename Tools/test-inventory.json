@@ -45,7 +45,7 @@
     "listed fails, for the same reason an undeclared test bundle does. See #133."
   ],
   "bundles": {
-    "GlowTests": { "minimum": 469 },
+    "GlowTests": { "minimum": 468 },
     "GlowRenderTests": { "minimum": 13 }
   },
   "release": {

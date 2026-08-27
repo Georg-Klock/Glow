@@ -12,7 +12,8 @@ enum GlowSettings {
     /// Multiples of SDR white. 1x is no headroom at all, which is a legitimate
     /// "off": the slot renders as a flat capsule and the app stops glowing.
     ///
-    /// The top is 12, not the 24 the encoding could carry.
+    /// The top is 8, not the 24 the encoding could carry — and no longer the 12
+    /// it shipped at.
     ///
     /// PQ runs to 10,000 nits — about 40x a 250-nit SDR white — so the encode
     /// was never the limit. `UIScreen.potentialEDRHeadroom` is, and it is a
@@ -20,15 +21,25 @@ enum GlowSettings {
     /// display brightness and thermal state. Asking for more than it grants is
     /// not an error, it simply tone-maps back down — which makes the top of
     /// the range a slider position that does nothing, and a control that stops
-    /// responding halfway is worse than one with a lower ceiling.
+    /// responding halfway is worse than one with a lower ceiling. 8 is what
+    /// `potentialEDRHeadroom` reports on the reference device (docs/glow.md),
+    /// so the ceiling now sits where the panel's does instead of a third above
+    /// it.
     ///
     /// Settings shows both numbers, so the gap is visible rather than argued
     /// about.
-    static let range: ClosedRange<Double> = 1...12
+    static let range: ClosedRange<Double> = 1...8
 
-    /// The top of the range. The glow is the product; there is no reason for it
-    /// to open at half strength.
-    static let defaultValue: Double = 12
+    /// 2x on an 8x ceiling: the glow opens at a quarter strength, on purpose.
+    ///
+    /// This reverses the rule the default used to carry — "the glow is the
+    /// product; there is no reason for it to open at half strength", which
+    /// pinned it to the top of the range and had a test holding it there. The
+    /// visuals are being iterated on and full strength turned out to be the
+    /// wrong opening statement: the default is now a quiet glow, and the top of
+    /// the range is a slider position rather than the first impression. See
+    /// docs/decisions.md.
+    static let defaultValue: Double = 2
 
     /// The App Group's defaults, so app and widget agree. Falls back to the
     /// app's own when the entitlement is unavailable, exactly as the store does.
@@ -96,6 +107,21 @@ enum GlowSettings {
         return clamp(stored ?? defaultValue)
     }
 
+    /// Whether the SDR halo — the soft shadow a lit mark spreads onto the
+    /// ground around itself — is switched off (#313).
+    ///
+    /// Off by default, and off means the shipped behaviour is unchanged: the
+    /// halo draws. Turning the toggle on is what disables it; the HDR tile is
+    /// a separate layer and keeps its headroom either way, so the mark's own
+    /// silhouette stays lit. In the App Group for the same reason the headroom
+    /// is: the widget draws the same halo, and the two surfaces must not
+    /// disagree about whether this app spreads light.
+    static let haloDisabledKey = "glowHaloDisabled"
+
+    static var haloDisabled: Bool {
+        store.bool(forKey: haloDisabledKey)
+    }
+
     static func clamp(_ value: Double) -> Double {
         min(max(value, range.lowerBound), range.upperBound)
     }
@@ -107,18 +133,28 @@ enum GlowSettings {
     /// all in a screenshot.
     ///
     /// Pinned to 6 rather than to `defaultValue`: the halo is drawn in SDR, so
-    /// it stops gaining anything long before the encode does, and tying it to a
-    /// default that has since moved to 24 would have shrunk every halo to a
-    /// quarter of itself.
+    /// it stops gaining anything long before the encode does. That is a claim
+    /// about rendering, not about the slider, which is why 6 has stood still
+    /// while the default has been 6, 12 and now 2 around it — tied to the
+    /// default, the halos would have doubled and then shrunk to a fifth with
+    /// no change in what the screen can draw.
     static let haloReference: Double = 6
 
-    /// The most a halo is ever multiplied by, which is what it reaches at the
-    /// shipping default of 12x.
+    /// The most a halo is ever multiplied by, which is what `haloScale` reaches
+    /// at the top of the range: (8 − 1) / (6 − 1).
+    ///
+    /// Recalibrated from 1.7 when the ceiling moved from 12x to 8x. 1.7 was the
+    /// clamp the old top ran into — `(12 − 1) / 5 = 2.2`, capped — and with an
+    /// 8x ceiling no slider position gets near it, so keeping it would have
+    /// made this the size of a halo nothing can draw. Now it is exactly the
+    /// largest one the range can ask for, and the clamp in `haloScale` guards
+    /// only out-of-range input.
     ///
     /// Named rather than a literal inside `haloScale` because anything
     /// reserving *room* for a halo has to reserve the largest one — Settings'
     /// preview does, and a hand-typed 22 there is what clipped it (#91).
-    static let maxHaloScale: Double = 1.7
+    static let maxHaloScale: Double = (range.upperBound - range.lowerBound)
+        / (haloReference - range.lowerBound)
 
     static func haloScale(for peak: Double) -> Double {
         let normalised = (clamp(peak) - range.lowerBound) / (haloReference - range.lowerBound)
