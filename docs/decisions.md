@@ -5144,3 +5144,26 @@ the ring's crop 78.5 → 55.3 at 2x) while the far ground is untouched — the
 halo at the 2x default never reached it. What the simulator cannot say, as
 ever, is how either state reads in HDR on a phone; the toggle exists so that
 comparison can be made by eye.
+
+## Edit lives in the ellipsis menu, and the item itself swaps to Done (#320)
+
+**2026-08-26.** The current week's trailing toolbar held two controls: a
+standalone `EditButton` and an add menu behind a `+`. It now holds one — an
+ellipsis menu with **New Habit**, **Blank Row** and **Edit** — and while the
+list is editing, that same item reads **Done**. One control on screen at all
+times, which is the literal ask.
+
+**The asymmetric shape was considered and declined.** The alternative — Edit
+in the menu to enter, a plain always-visible Done in its place once editing
+starts — had the precedent of #207's asymmetric pager and would have kept the
+exit a single tap. The decision on the issue chose the menu-adapts shape over
+it: the symmetry is the point, and entering and leaving edit mode both being
+menu actions is the price of never showing a second control.
+
+**`EditButton`'s automatic Edit/Done label swap is given up deliberately, not
+lost.** The type has no menu-item form, so the menu's item is a plain `Button`
+toggling the `EditMode` state `WeeklyGridView` already owns (#207's binding,
+injected below the stack — the CLAUDE.md trap does not reopen because no new
+environment read was added). The menu rebuilds its content on every open, so
+the hand-rolled label is current by construction. `EditModeTests` gains a scan
+asserting the week grid never reaches for `EditButton` again.

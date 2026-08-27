@@ -513,8 +513,11 @@ scheduled in between: a shorter animation is still an animation. `MotionPolicy`
 holds the rule; the widget's own completion carries it too, recorded at the tap
 and spent on a timeline of one still entry.
 
-**This Week creates and edits its habits through one editor.** It carries the
-trailing pair — Edit, then add — and the pair belongs to the current week only
+**This Week creates and edits its habits through one editor.** It carries one
+trailing control: an ellipsis menu holding **New Habit**, **Blank Row** and
+**Edit** (#320) — the Edit item itself reads **Done** while editing, so leaving
+edit mode is the same two-tap menu action as entering it, and there is one
+control on screen at all times. The menu belongs to the current week only
 (#207): paged back, the trailing slot holds **Today** instead, because
 reordering, deleting and adding are properties of the list and mean nothing
 more three weeks ago than they mean now. The editor opened on the adding
@@ -598,9 +601,10 @@ the title is the dates. On the current week the title stands alone. The dates
 under the weekday letters say the rest, and on a week with no today in it no
 column is lit.
 
-**Edit mode ends when you leave this week** (#207). Its button is on the current
-week only, so paging back while editing would leave the list fanned open with no
-Done on screen. The mode goes with the week rather than the exit going missing.
+**Edit mode ends when you leave this week** (#207). The menu that holds its
+entry and exit is on the current week only, so paging back while editing would
+leave the list fanned open with no Done on screen. The mode goes with the week
+rather than the exit going missing.
 
 A span row resolves the tap to **the column under the finger** rather than to
 the span's nominal day, so a habit due N times a week records the weekday it
