@@ -2,13 +2,13 @@ import Foundation
 
 /// History, counted and said in one sentence.
 ///
-/// **A week of columns speaks; a month or a year of them counts** (#137). The
-/// line is drawn where a person could plausibly want to land on a single day:
-/// seven dated marks is a row, and a row is what the app is, so every column of
-/// it says its own date and state (`SlotVoice`). Thirty-one of them is a
-/// picture of a month and 365 is a picture of a year — swiping through those
-/// one cell at a time is not navigation, it is a wall — so those surfaces say
-/// what the picture is instead.
+/// **A week of columns speaks; a month of them counts** (#137). The line is
+/// drawn where a person could plausibly want to land on a single day: seven
+/// dated marks is a row, and a row is what the app is, so every column of it
+/// says its own date and state (`SlotVoice`). Thirty-one of them is a picture
+/// of a month — swiping through it one cell at a time is not navigation, it is
+/// a wall — so that surface says what the picture is instead. (The year grid
+/// was the other counted surface until #316 removed it.)
 ///
 /// It is the same rule #104 settled for the dots: prefer one element that reads
 /// like a sentence over many that read like a table.
@@ -45,47 +45,6 @@ enum HistoryVoice {
         if dueToday { parts.append("due today") }
         if upcoming > 0 { parts.append("\(days(upcoming)) still to come") }
         return sentence(parts, calendar: calendar)
-    }
-
-    /// One column of the year grid: which week it is, and how its seven days
-    /// went.
-    ///
-    /// The column is the unit because the column is the drawing — "a vertical
-    /// band is a good week", which is what `YearView` is for. Fifty-two stops
-    /// is a year a person can swipe through; 365 is not.
-    static func week(
-        startingOn start: Date,
-        fills: [YearHistory.DayFill],
-        calendar: Calendar = WeekCalendar.calendar
-    ) -> String {
-        let full = fills.count { $0 == .full }
-        let partial = fills.count { $0 == .partial }
-        let empty = fills.count { $0 == .empty }
-        let future = fills.count { $0 == .future }
-
-        var parts: [String] = []
-        if full > 0 { parts.append("\(days(full)) complete") }
-        if partial > 0 { parts.append("\(days(partial)) partly done") }
-        if empty > 0 { parts.append("\(days(empty)) with nothing logged") }
-        if future > 0 { parts.append("\(days(future)) still to come") }
-        // A week with no days at all cannot happen — the grid builds its
-        // columns from seven — but a caller handing over an empty column should
-        // get the date rather than a dangling comma.
-        guard !parts.isEmpty else { return weekStart(start, calendar: calendar) }
-        return "\(weekStart(start, calendar: calendar)), \(sentence(parts, calendar: calendar))"
-    }
-
-    /// "Week of 17 August", in the calendar's own locale and time zone. No
-    /// weekday: the column *is* the week, and its first day names it.
-    static func weekStart(_ start: Date, calendar: Calendar = WeekCalendar.calendar) -> String {
-        let style = Date.FormatStyle(
-            locale: calendar.locale ?? .current,
-            calendar: calendar,
-            timeZone: calendar.timeZone
-        )
-        .day()
-        .month(.wide)
-        return "Week of \(start.formatted(style))"
     }
 
     /// One day, or several.

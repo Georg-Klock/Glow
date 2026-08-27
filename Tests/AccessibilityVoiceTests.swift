@@ -196,7 +196,7 @@ struct SlotVoiceTests {
     }
 }
 
-/// A month and a year, counted rather than listed.
+/// A month, counted rather than listed.
 @Suite("The voice of a stretch of days")
 struct HistoryVoiceTests {
     private let calendar = TestCalendar.monday
@@ -256,111 +256,5 @@ struct HistoryVoiceTests {
         // A spacer has no month. nil rather than an empty string, so the view
         // drops the value instead of announcing nothing.
         #expect(HistoryVoice.month([], calendar: calendar) == nil)
-    }
-
-    // MARK: - The year
-
-    @Test("A year column says which week it is and how it went")
-    func weekColumn() {
-        let fills: [YearHistory.DayFill] = [.full, .full, .partial, .empty, .future, .future, .future]
-        #expect(
-            HistoryVoice.week(startingOn: week.start, fills: fills, calendar: calendar)
-                == "Week of 17 August, 2 days complete, 1 day partly done, 1 day with nothing logged and 3 days still to come"
-        )
-    }
-
-    @Test("A week still to come says only that")
-    func futureWeek() {
-        let fills = [YearHistory.DayFill](repeating: .future, count: 7)
-        #expect(
-            HistoryVoice.week(startingOn: week.start, fills: fills, calendar: calendar)
-                == "Week of 17 August, 7 days still to come"
-        )
-    }
-
-    @Test("The week's date is the calendar's, in its own locale")
-    func weekDateIsLocalized() {
-        var american = calendar
-        american.locale = Locale(identifier: "en_US")
-        #expect(HistoryVoice.weekStart(week.start, calendar: american) == "Week of August 17")
-        #expect(HistoryVoice.weekStart(week.start, calendar: calendar) == "Week of 17 August")
-    }
-}
-
-/// The verdict the year grid draws, and now speaks, from one place.
-@Suite("A year of days")
-struct YearHistoryTests {
-    private let calendar = TestCalendar.monday
-    private let today = TestCalendar.date(2026, 8, 19)
-    private var week: Week { WeekCalendar.week(containing: today, calendar: calendar) }
-
-    private func day(_ index: Int) -> Date { week.days[index] }
-
-    @Test("A day everything was done on is full; some of it is partial")
-    func fullAndPartial() {
-        let read = HabitSnapshot.fixture(name: "Read", completedDays: [day(0)])
-        let walk = HabitSnapshot.fixture(name: "Walk", completedDays: [day(0), day(1)])
-        #expect(YearHistory.fill(
-            for: day(0), habits: [read, walk], today: today,
-            restDay: nil, calendar: calendar
-        ) == .full)
-        #expect(YearHistory.fill(
-            for: day(1), habits: [read, walk], today: today,
-            restDay: nil, calendar: calendar
-        ) == .partial)
-        #expect(YearHistory.fill(
-            for: day(2), habits: [read, walk], today: today,
-            restDay: nil, calendar: calendar
-        ) == .empty)
-    }
-
-    @Test("A day that has not arrived is not a day that went badly")
-    func futureIsNotEmpty() {
-        #expect(YearHistory.fill(
-            for: day(3), habits: [.fixture()], today: today,
-            restDay: nil, calendar: calendar
-        ) == .future)
-    }
-
-    @Test("Nothing expected is not a failure")
-    func nothingExpected() {
-        // A weekly-cadence habit has no opinion about a given weekday, so a
-        // day with only those on it expects nothing and is empty rather
-        // than missed.
-        let weekly = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
-        #expect(YearHistory.fill(
-            for: day(0), habits: [weekly], today: today,
-            restDay: nil, calendar: calendar
-        ) == .empty)
-        // And a spacer is a position in a list, never a habit.
-        #expect(YearHistory.fill(
-            for: day(0), habits: [.fixture(isSpacer: true)], today: today,
-            restDay: nil, calendar: calendar
-        ) == .empty)
-    }
-
-    @Test("A rest day expects nothing, and a completion on one still counts")
-    func restDay() {
-        // #72 stopped the week grid *drawing* a rest-day completion. It never
-        // stopped it counting, and the year is where it still shows.
-        let monday = TestPreferences.weekday(ofColumn: 0, in: week, calendar: calendar)
-        let habit = HabitSnapshot.fixture(completedDays: [day(0)])
-        #expect(YearHistory.fill(
-            for: day(0), habits: [habit], today: today,
-            restDay: monday, calendar: calendar
-        ) == .full)
-        #expect(YearHistory.fill(
-            for: day(0), habits: [.fixture()], today: today,
-            restDay: monday, calendar: calendar
-        ) == .empty)
-    }
-
-    @Test("A column is seven verdicts in the calendar's own day order")
-    func columnIsAWeek() {
-        let habit = HabitSnapshot.fixture(completedDays: [day(0)])
-        let fills = YearHistory.fills(
-            in: week, habits: [habit], today: today, restDay: nil, calendar: calendar
-        )
-        #expect(fills == [.full, .empty, .empty, .future, .future, .future, .future])
     }
 }
