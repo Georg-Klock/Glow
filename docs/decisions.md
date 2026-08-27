@@ -4988,7 +4988,14 @@ whole change: the SwiftUI-native route worked on the first try, so the
 looking, not assuming — the simulator renders three icons with no text under
 them and a visibly shorter bar. The constraint that came with the ask is held
 by a test rather than by hope: the `Tab` titles stay declared, they remain
-the tabs' accessible names under the icon-only style, and
-`TabBarAccessibilityTests` walks the hosted tree and fails if "Widgets",
-"This Week" or "Settings" ever stops being spoken. Removing the accessible
-name to get the look was the one forbidden shape.
+the tabs' accessible names under the icon-only style — measured by hosting
+`RootTabView` in a real window and walking the accessibility tree, which
+spoke all three names under a bar rendering none of them. The measurement is
+not left running in the suite: a hosted `RootTabView` observes the week
+preferences, the host writes those keys from test threads, and the hosted
+run died on exactly that write — the #179 crash class, of which the one
+hosted suite already in the repository is the measured price (#245, #291).
+`TabBarAccessibilityTests` therefore holds the property as a source scan,
+the `TestHostTests` pattern for claims a test cannot safely watch: the
+style must stay, and every `Tab` must keep its title. Removing the
+accessible name to get the look was the one forbidden shape.
