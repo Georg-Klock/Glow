@@ -5028,3 +5028,53 @@ year suites and week-sentence tests in `AccessibilityVoiceTests`, and the
 year arm of `HistoryProjectionTests` — and the `GlowTests` floor moves down
 by the same nineteen in the same change, per the inventory's own rule that
 lowering the floor is the reviewable event.
+
+## The appearance picker leaves the Widgets tab; its measurements stay (#312)
+
+**2026-08-26.** #312 restructures the Widgets tab into three named cards,
+largest first — "Large Week Widget", "Medium Week Widget", "Monthly View per
+Habit" — and removes the page chrome around the previews: the "This Week" /
+"This Month" section titles, the per-size captions, the "Added" checkmarks,
+and the Home Screen appearance picker that #273 added two days earlier. This
+supersedes the *surface* of "The Widgets tab shows two appearances, and Tinted
+and Clear are one of them" (2026-08-25): the picker is gone, `WidgetAppearance`
+went with it, and the page no longer offers Default at all.
+
+**Two findings from that entry outlive the control, and are restated here so
+the feature's removal does not erase them.** Both were checked against the
+iOS 26.5 SDK, not against memory:
+
+- **No API reports the device's Home Screen appearance.** No trait,
+  environment value or WidgetKit call — checked against
+  `SwiftUICore.swiftinterface` and `WidgetKit.swiftinterface`.
+  `widgetRenderingMode` is the nearest thing, and WidgetKit populates it only
+  for a widget WidgetKit is rendering; inside the app it reads `.fullColor`
+  whatever the Home Screen is doing. Any future "just match the device"
+  suggestion runs into this first.
+- **Tinted and Clear render pixel-identical inside a preview card.** Both put
+  a widget into `.accented` rendering, so the content is identical by
+  construction, and SwiftUI's `Glass.regular` against `Glass.clear` over the
+  page's plate measured 0.0% of pixels differing by more than 6/255, maximum
+  difference 1. A card, a segment or a preview per appearance would be the
+  page claiming a distinction it cannot draw.
+
+**Every preview now sits on the glass, composited over black.** The
+"pixel perfect / identical materials" ask cannot mean matching the system's
+own compositing — the wallpaper and the compositing are unreachable from app
+code, which #273 already recorded — so the buildable target is: the same glass
+material, over a black Home Screen specifically, matching the app's own
+aesthetic. `Self.plate` moves from the mid-grey `Color(white: 0.18)` to black.
+The mid-grey existed so a glass card could look different from the Default
+card beside it ("glass over black is black"); the Default card left with the
+picker, so nothing remains for the plate to differ from. The previews inject
+`.accented` unconditionally — the rendering a glass Home Screen actually pairs
+with that panel — and the resolution rule the picker's tests exercised
+(`GlowPalette.grey` to the alpha-stored grey under accented) keeps its test,
+rewritten against `WidgetRenderingMode` directly.
+
+**The "Added" checkmarks were the only display of `WidgetCenter`'s report, so
+the page stopped asking when they went.** `WidgetsView` no longer queries
+placements or carries the seam parameter; `WidgetCatalog`'s placement diff,
+`WidgetPlacementQuerying` and `WidgetCenterPlacements` stay, pure and tested,
+because the diff is the reusable half — what displays it next is a product
+decision, not a rediscovery.

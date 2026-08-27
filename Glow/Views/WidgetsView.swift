@@ -2,19 +2,27 @@ import SwiftData
 import SwiftUI
 import WidgetKit
 
-/// Every widget this app ships, drawn by the code that ships them, and which
-/// of them are already on the Home Screen.
+/// Every widget this app ships, drawn by the code that ships them: three named
+/// cards, largest first — Large Week Widget, Medium Week Widget, Monthly View
+/// per Habit (#312).
 ///
-/// **There is no way to put one there from here** (#210). No public API opens
-/// the widget gallery, scrolls it to an app, or places a widget: `WidgetCenter`
-/// can invalidate, reload and *report*, and nothing else. The one capability
-/// that reads like it might is `promptsForUserConfiguration()`, and it is a
-/// modifier on a `WidgetConfiguration` that asks for the widget's *settings*
-/// straight after somebody has already added it by hand — it is not a call an
-/// app can make, and it does not add anything. Checked against the iOS 26.5
-/// SDK's `WidgetKit.swiftinterface`, not against memory. So this page is built
-/// around a long-press the person performs, which is why the instructions are
-/// the loudest thing on it.
+/// **There is no way to put one on a Home Screen from here** (#210). No public
+/// API opens the widget gallery, scrolls it to an app, or places a widget:
+/// `WidgetCenter` can invalidate, reload and *report*, and nothing else. The
+/// one capability that reads like it might is `promptsForUserConfiguration()`,
+/// and it is a modifier on a `WidgetConfiguration` that asks for the widget's
+/// *settings* straight after somebody has already added it by hand — it is not
+/// a call an app can make, and it does not add anything. Checked against the
+/// iOS 26.5 SDK's `WidgetKit.swiftinterface`, not against memory. So this page
+/// is built around a long-press the person performs, which is why the
+/// instructions are the loudest thing on it.
+///
+/// **The page does not ask what is already placed** (#312). It used to: the
+/// "Added" checkmarks were the one thing `WidgetCenter`'s report fed, and they
+/// went with the rest of the page chrome. `WidgetCatalog`'s diff and the
+/// `WidgetPlacementQuerying` seam stay, pure and tested, for whatever displays
+/// the fact next; this view feeds the catalog an empty Home Screen because it
+/// prints nothing either answer would change.
 ///
 /// **The previews are the shipping views.** `WeekWidgetView` and
 /// `MonthWidgetView` are compiled into the app as well as into the extension,
@@ -43,41 +51,10 @@ struct WidgetsView: View {
 
     @Environment(\.scenePhase) private var scenePhase
 
-    /// What `WidgetCenter` last said is on the Home Screen. Empty until the
-    /// first answer arrives, which is also what a person with no widgets has —
-    /// the page reads the same either way, and it says "Added" only about
-    /// something it has been told about.
-    @State private var placed: [PlacedWidget] = []
-
     /// The day the previews are drawn for. Same reason `WeeklyGridView` holds
     /// one: the open slot is defined as today, so today has to be re-read when
     /// the app comes back.
     @State private var today = WeekCalendar.day(Date())
-
-    /// Which Home Screen appearance the previews are drawn under (#273).
-    ///
-    /// State rather than a stored preference: it is a way of looking at the
-    /// page, not a setting about the app, and nothing outside this page reads
-    /// it. It cannot be read *from* the device either — `WidgetAppearance`
-    /// records why — so the page starts on Default, which is what most Home
-    /// Screens are and what every preview used to be unconditionally.
-    @State private var appearance: WidgetAppearance
-
-    /// Where "already placed" comes from. A property so a preview or a test can
-    /// hand in a fixed answer; the app never passes anything.
-    var placements: any WidgetPlacementQuerying = WidgetCenterPlacements()
-
-    /// Both seams have defaults, so the app writes `WidgetsView()` and nothing
-    /// else does. The appearance is a `@State` seed rather than a plain
-    /// property because the picker moves it afterwards — a test or a preview
-    /// says where it starts, not where it stays.
-    init(
-        placements: any WidgetPlacementQuerying = WidgetCenterPlacements(),
-        appearance: WidgetAppearance = .standard
-    ) {
-        self.placements = placements
-        _appearance = State(initialValue: appearance)
-    }
 
     /// The week's first day, observed — the previews are widgets, and a widget
     /// draws seven columns from this. Read here for the same reason
@@ -91,8 +68,10 @@ struct WidgetsView: View {
     /// and the widget's own habit picker cannot offer different lists.
     private var previewHabits: [Habit] { MonthStore.offered(among: habits) }
 
+    /// The catalog is fed an empty Home Screen deliberately — see the type's
+    /// note: nothing on the page displays what a queried one would change.
     private var groups: [WidgetCardGroup] {
-        WidgetCatalog.groups(placed: placed, habits: previewHabits.map(\.id))
+        WidgetCatalog.groups(placed: [], habits: previewHabits.map(\.id))
     }
 
     var body: some View {
@@ -105,9 +84,8 @@ struct WidgetsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 32) {
                         instructions
-                        appearancePicker
-                        ForEach(WidgetKind.allCases, id: \.self) { kind in
-                            section(for: kind, width: width)
+                        ForEach(groups) { group in
+                            card(group, width: width)
                         }
                     }
                     .padding(.horizontal, Self.margin)
@@ -116,8 +94,8 @@ struct WidgetsView: View {
                 }
             }
             .background(Color.black)
-            // Four lit previews scroll up this page, so it has Settings'
-            // problem four times over: screenshotted before this was added, a
+            // Lit previews scroll up this page, so it has Settings' problem
+            // several times over: screenshotted before this was added, a
             // medium widget's marks were visible through the navigation bar
             // behind the title. `TopFade` is the measured answer, and the bar
             // is declared visible for the same reason it is there — without it
@@ -126,16 +104,11 @@ struct WidgetsView: View {
             .navigationTitle("Widgets")
             .toolbarBackground(.visible, for: .navigationBar)
         }
-        .task { await refresh() }
-        // `getCurrentConfigurations` answers for the moment it is asked, and
-        // the moment somebody places a widget is a moment this app is not
-        // frontmost — so the fact this page states is exactly the kind that
-        // goes stale while nothing here is running. Same trigger `WeeklyGridView`
-        // uses for the day rolling over, and the day is re-read here too.
+        // The open slot is defined as today, and "today" goes stale while
+        // nothing here is running. Same trigger `WeeklyGridView` uses.
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             today = WeekCalendar.day(Date())
-            Task { await refresh() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
             today = WeekCalendar.day(Date())
@@ -147,8 +120,8 @@ struct WidgetsView: View {
     private static let margin: CGFloat = 20
 
     /// Said once, above everything, because the steps are identical for all
-    /// four widgets and repeating them per card would be the same paragraph
-    /// four times.
+    /// the widgets and repeating them per card would be the same paragraph
+    /// three times.
     private var instructions: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Adding a widget")
@@ -167,93 +140,22 @@ struct WidgetsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Which Home Screen appearance every preview below is drawn under (#273).
+    /// One named card: the heading, and every preview under it.
     ///
-    /// **One control for the page rather than a card per appearance.** The
-    /// alternative multiplies a page that already carries a card per family
-    /// and a card per habit — the month widget alone would have doubled from
-    /// three previews to six. Appearance is a property of the Home Screen, not
-    /// of any one widget, so it is asked once and every preview answers
-    /// together.
-    ///
-    /// It cannot default to the device's own appearance, because nothing
-    /// reports it — see `WidgetAppearance`.
-    private var appearancePicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Picker("Home Screen appearance", selection: $appearance) {
-                ForEach(WidgetAppearance.allCases) { option in
-                    Text(option.displayName).tag(option)
-                }
-            }
-            .pickerStyle(.segmented)
-            Text(appearance.keepsDeclaredBackground
-                 ? "Your Home Screen's widget appearance. Default keeps the widget's own background."
-                 : "Tinted and Clear drop the background and keep only the marks. Both render the same; the glass behind is the system's, and approximated here.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// One kind: what it is, and each family it can be placed in.
-    ///
-    /// Grouped by kind rather than one flat list of previews, because the name
-    /// is a property of the kind — three copies of "This Week" over the week's
-    /// three sizes would read as three different widgets.
-    ///
-    /// **The heading is all the prose there is** (#237). Under it there used to
-    /// be a sentence saying what the widget does; the widget is drawn directly
-    /// below, over the person's own habits, which says the same thing without
-    /// being read. The name and the size stay: they identify, and without the
-    /// size two Week cards would be indistinguishable at a glance. The one
-    /// paragraph left on the page is `instructions`, which describes a
-    /// long-press no preview can demonstrate.
-    private func section(for kind: WidgetKind, width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(kind.displayName)
+    /// **The heading is all the prose there is** (#237, restructured by #312).
+    /// Under it there used to be a sentence saying what the widget does, then
+    /// a size caption and an "Added" checkmark; the widget is drawn directly
+    /// below, over the person's own habits, and the name carries the size —
+    /// "Large Week Widget" — so the extra rows said what the heading and the
+    /// preview already say. The month's heading names the group instead,
+    /// because its several previews are several habits one widget could be
+    /// showing, not several widgets (#237). The one paragraph left on the page
+    /// is `instructions`, which describes a long-press no preview can
+    /// demonstrate.
+    private func card(_ group: WidgetCardGroup, width: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(group.placement.cardName)
                 .font(.headline)
-            ForEach(groups.filter { $0.placement.kind == kind }) { group in
-                self.group(group, width: width)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// One placeable widget: the row naming it, and every preview of it.
-    ///
-    /// The row is drawn once for the group, not once per preview. "Added" is a
-    /// fact about the Home Screen — one small month widget is there or it is
-    /// not — and the several previews under it are several habits that same
-    /// widget could be showing, so repeating the row would count one widget
-    /// three times.
-    private func group(_ group: WidgetCardGroup, width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Above the preview, not below it. Under it, a caption sits
-            // between two previews and belongs to neither — screenshotted,
-            // "Small" read as the heading of the medium widget below it.
-            HStack(spacing: 6) {
-                Text(group.placement.familyName)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                if group.isPlaced {
-                    // Placed widgets stay on the page rather than being
-                    // dropped: what is already on the Home Screen belongs
-                    // beside what is not.
-                    Label("Added", systemImage: "checkmark.circle.fill")
-                        .font(.subheadline)
-                        .labelStyle(.titleAndIcon)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            // The size and its state are one fact about one widget, so they are
-            // one stop rather than two — and the previews below carry no label
-            // of their own.
-            .accessibilityElement(children: .combine)
-            // Closer to each other than groups are to each other (16), so
-            // several previews of one widget read as one block rather than as
-            // several widgets whose captions went missing.
-            //
             // Rows, not a flat stack (#274): a Small widget has a neighbour on
             // a real Home Screen and this page used to draw it a column. How
             // many fit is `WidgetMetrics.perRow`, and the split is
@@ -276,20 +178,20 @@ struct WidgetsView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// The production view, at the size the family really gets, scaled to fit.
     ///
-    /// Everything outside the view itself is what the `WidgetConfiguration`
-    /// does: the same asymmetric padding, because `contentMarginsDisabled()`
-    /// means the widget applies its own, and `GlowPalette.widgetBackground`,
-    /// because that is what `containerBackground` resolves to under the Default
-    /// appearance. The rounded corner is drawn here because the system is not
-    /// here to mask it.
+    /// Everything outside the view itself is what the system does on a glass
+    /// Home Screen: the same asymmetric padding, because
+    /// `contentMarginsDisabled()` means the widget applies its own, and the
+    /// substituted panel `panel` draws. The rounded corner is drawn here
+    /// because the system is not here to mask it.
     ///
-    /// Not interactive. The marks are `Button(intent:)`s in the real widget and
-    /// still are here, so hit testing is switched off rather than left to
-    /// surprise somebody: tapping a picture of a widget should not log a habit.
+    /// Not interactive. The marks are intents in the real widget and still are
+    /// here, so hit testing is switched off rather than left to surprise
+    /// somebody: tapping a picture of a widget should not log a habit.
     private func preview(_ card: WidgetCard, width: CGFloat) -> some View {
         let size = WidgetMetrics.size(of: card.placement.family)
         let scale = size.width > 0 ? min(1, width / size.width) : 1
@@ -298,21 +200,23 @@ struct WidgetsView: View {
             .padding(.trailing, WidgetMetrics.padTrailing)
             .padding(.vertical, WidgetMetrics.padVertical)
             .frame(width: size.width, height: size.height)
-            // The appearance the page is set to, injected rather than
-            // imitated (#273). `GlowPalette.grey` is a `ShapeStyle` resolving
-            // against exactly this value, so under Tinted or Clear the marks
+            // The rendering a glass Home Screen puts a widget into, injected
+            // rather than imitated (#273, kept through #312): the panel below
+            // is the Tinted/Clear substitution, and accented is the rendering
+            // that appearance pairs with it. `GlowPalette.grey` is a
+            // `ShapeStyle` resolving against exactly this value, so the marks
             // take the alpha-stored grey by the same line of code that runs on
             // a Home Screen — the content of these previews is the real
             // accented rendering, not a drawing of it.
-            .environment(\.widgetRenderingMode, appearance.renderingMode)
+            .environment(\.widgetRenderingMode, .accented)
             .background { panel }
             .clipShape(RoundedRectangle(cornerRadius: Self.corner, style: .continuous))
             // The widget's own edge, because nothing else here draws one: the
-            // background is black and so is the page, so an unstroked preview
-            // is marks floating in the void with no widget around them.
-            // Screenshotted before adding it. The unlit grey and the barbell's
-            // thickness, both from the palette — this page introduces no
-            // colour and no weight of its own.
+            // panel is glass over black and so is the page, so an unstroked
+            // preview is marks floating in the void with no widget around
+            // them. Screenshotted before adding it. The unlit grey and the
+            // barbell's thickness, both from the palette — this page
+            // introduces no colour and no weight of its own.
             .overlay {
                 RoundedRectangle(cornerRadius: Self.corner, style: .continuous)
                     .strokeBorder(GlowPalette.grey, lineWidth: GlowShape.barThickness)
@@ -324,68 +228,51 @@ struct WidgetsView: View {
             .frame(width: size.width * scale, height: size.height * scale)
             .allowsHitTesting(false)
             // One stop, not forty. Every mark inside carries the label it
-            // carries on the Home Screen, and a preview is a picture: the row
-            // under it says which widget this is and whether it is added.
+            // carries on the Home Screen, and a preview is a picture: the
+            // heading above says which widget this is.
             .accessibilityHidden(true)
     }
 
-    /// What sits behind a preview: the widget's own background, or the glass
-    /// the system substitutes for it.
+    /// What sits behind a preview: the glass the system substitutes for the
+    /// widget's declared background, composited over a black Home Screen.
     ///
-    /// **The honest half and the approximated half are different halves**
-    /// (#273). Under Default the widget declares its background and this draws
-    /// exactly that — `GlowPalette.widgetBackground`, what `containerBackground`
-    /// resolves to. Under Tinted and Clear the system *removes* the declared
-    /// background and puts its own panel there, and that panel is composited by
-    /// the system out of the wallpaper behind it. Neither the wallpaper nor the
-    /// system's compositing is available here, so this is openly a stand-in:
-    /// SwiftUI's own `glassEffect`, over a neutral plate because glass over the
-    /// page's black is indistinguishable from black.
+    /// **The material is real, the wallpaper is chosen** (#273, #312). Under
+    /// Tinted and Clear the system removes the declared background and
+    /// composites its own glass out of the wallpaper behind it; neither the
+    /// wallpaper nor the system's compositing is reachable from app code —
+    /// `GlowWidget.swift` records the same limit for the real widget — so the
+    /// glass here is SwiftUI's own, and what it sits on is this page's choice.
+    /// #312 settles the choice: black, the Home Screen this app's aesthetic
+    /// assumes, replacing the mid-grey stand-in the appearance picker needed.
+    /// That plate existed so the glass card could look different from the
+    /// Default card beside it, and the Default card left with the picker.
     ///
-    /// `GlowWidget.swift` records that the *real* widget cannot approximate
-    /// this, and that finding is about the real widget, which has no say over
-    /// what replaces its background. This page draws its own background by
-    /// hand — it already draws its own corner and its own border for the same
-    /// reason — so an inexact approximation is available here and is better
-    /// than showing a Default Home Screen to everybody.
+    /// **The plate is opaque, and that is not a detail.** Rendered
+    /// translucent, the glass samples what is behind it — which here is the
+    /// page, not a wallpaper — and the caption above each preview appeared
+    /// ghosted inside the widget. Screenshotted, not reasoned about. An opaque
+    /// plate gives the effect a defined backdrop and the ghost goes.
+    ///
+    /// `glassEffect` is iOS 26, and this app deploys to 18. The fallback is a
+    /// `Material`, which is the same approximation one generation blunter —
+    /// and the half of the preview that actually carries the information, the
+    /// accented content, is identical under both.
     @ViewBuilder
     private var panel: some View {
         let shape = RoundedRectangle(cornerRadius: Self.corner, style: .continuous)
-        if appearance.keepsDeclaredBackground {
-            GlowPalette.widgetBackground
+        if #available(iOS 26.0, *) {
+            // `.regular` rather than `.clear`: the two measured
+            // pixel-identical over a preview's plate — see docs/decisions.md,
+            // 2026-08-25 and 2026-08-26.
+            Self.plate.glassEffect(.regular, in: shape)
         } else {
-            // The plate is what makes translucency visible at all, and it is
-            // deliberately a flat neutral rather than a picture: a preview
-            // carrying somebody else's wallpaper would be claiming to know
-            // something this app cannot read.
-            //
-            // **Opaque, and that is not a detail.** Rendered translucent, the
-            // glass samples what is behind it — which here is the page, not a
-            // wallpaper — and the caption above each preview appeared ghosted
-            // inside the widget. Screenshotted, not reasoned about. An opaque
-            // plate gives the effect a defined backdrop and the ghost goes.
-            //
-            // `glassEffect` is iOS 26, and this app deploys to 18. The
-            // fallback is a `Material`, which is the same approximation one
-            // generation blunter — and the half of the preview that actually
-            // carries the information, the accented content, is identical
-            // under both.
-            if #available(iOS 26.0, *) {
-                // `.regular` rather than `.clear`: the two measured
-                // pixel-identical over this plate, and `WidgetAppearance`
-                // records why that collapsed the two segments into one.
-                Self.plate.glassEffect(.regular, in: shape)
-            } else {
-                Self.plate.overlay(.regularMaterial)
-            }
+            Self.plate.overlay(.regularMaterial)
         }
     }
 
-    /// The neutral a glass preview is composited over, standing in for the
-    /// wallpaper the system has and this page does not. Mid-dark rather than
-    /// black, because glass over black is black and the preview would then say
-    /// nothing that Default does not.
-    private static let plate = Color(white: 0.18)
+    /// The Home Screen a preview's glass is composited over (#312): black,
+    /// matching the app's own surfaces and the aesthetic the design assumes.
+    private static let plate = Color.black
 
     /// The space between two widgets sitting side by side, from the sizes
     /// themselves: what is left of a Medium's width once two Smalls are in it.
@@ -449,14 +336,5 @@ struct WidgetsView: View {
               let snapshot = Habit.snapshots(of: [chosen], within: days).first
         else { return MonthEntry(date: today, habit: .empty) }
         return MonthEntry(date: today, habit: .loaded(snapshot))
-    }
-
-    /// Asks again. A failure leaves the last answer standing rather than
-    /// clearing it: "we could not ask" is not "you have no widgets", and
-    /// showing the second for the first is the one wrong thing this page can
-    /// say.
-    private func refresh() async {
-        guard let reported = try? await placements.placedWidgets() else { return }
-        placed = reported
     }
 }
