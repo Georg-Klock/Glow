@@ -316,12 +316,13 @@ dailySlotWidth = (W - 6 * G) / 7
 slotWidth(N)   = (W - (N - 1) * G) / N
 ```
 
-**Spans are not pinned to weekdays; the dots on them are.** A span fills left to
-right in the order the week is divided, independent of which weekday anything
-fell on — it is the *how much*. A lit dot sits on each weekday a completion
-actually landed on, at the same column centre a daily row uses — it is the
-*when*. The two jobs used to be one mark doing neither well: the row said how
-much was left and nothing about when (#47).
+**A span's own edge carries the when now, not a separate dot** (#344). A mark
+anchors on the day it happened — reaching back over any blank day since the
+previous mark, rather than filling the track left to right blind to the
+calendar — so where a mark's boundary falls *is* the record of when. The two
+jobs used to be one mark doing neither well: the row said how much was left and
+nothing about when (#47); #344 folded when back into the mark itself instead of
+drawing a second layer for it. See `docs/week-marks.md` §1 for the exact rule.
 
 ## 7. Slot states
 
