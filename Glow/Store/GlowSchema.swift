@@ -19,10 +19,33 @@ import SwiftData
 /// a `GlowSchemaV2` and a `MigrationStage`, or an explicit choice to reuse V1
 /// for a change that provably does not alter the store.
 ///
-/// **A shipped version is never edited.** Once a build carrying V1 is on
-/// anyone's phone, this declaration is a compatibility contract with the
-/// stores that build wrote; the next shape is a new version in the plan, not
-/// a revision here.
+/// **V1 is still being written, and that is the honest description** (#343,
+/// 2026-08-28). This used to say a shipped version is never edited. That is the
+/// right rule for a shipped app and the wrong one for this one: there is no
+/// public release, every store in the world is a TestFlight build's on Georg's
+/// own phone, and its contents are disposable until launch. A rule that forbids
+/// the ordinary pre-1.0 act of adding a column buys a guarantee nobody needs,
+/// paid for in a duplicated copy of every model type per version.
+///
+/// So the schema **evolves in place until the App Store build**, which is what
+/// Apple's own guidance describes: `VersionedSchema` exists for changes that
+/// reach a store you do not control, and additive-with-a-default columns are
+/// exactly what lightweight migration is for. Every stored-shape change this
+/// project has made so far already worked that way.
+///
+/// **Versioning starts being real at launch.** At that point V1 freezes for
+/// good, and freezing it properly means the Apple shape: the model types are
+/// *copied into* the version enum — `GlowSchemaV1.Habit` — so the declaration
+/// stops moving with today's source, and the live types become V2's with a
+/// `MigrationStage` between them. `models` listing `Habit.self` is what makes
+/// the current V1 a description of the present rather than a snapshot of the
+/// past, and that is fine right up until someone else's store depends on it.
+///
+/// **The guardrail did not go, it changed shape.** `SchemaContractTests` still
+/// holds the code to a written-out list of every attribute and relationship, so
+/// a stored-shape change still fails loudly and still has to be answered in the
+/// same diff. What it means today is "say so deliberately"; what it will mean
+/// after launch is "add a version".
 enum GlowSchemaV1: VersionedSchema {
     static let versionIdentifier = Schema.Version(1, 0, 0)
 
@@ -34,7 +57,8 @@ enum GlowSchemaV1: VersionedSchema {
 /// The one migration plan both containers open through.
 ///
 /// **The upgrade floor is TestFlight builds only, and that is documented
-/// rather than papered over.** No public release of Glow exists; every store
+/// rather than papered over** — the same fact that lets V1 keep moving until
+/// launch, above. No public release of Glow exists; every store
 /// in the world was written by a TestFlight build whose stored shape is what
 /// V1 freezes — the earlier stored-shape changes (`dayKey`, the per-day
 /// residue) were additive-with-default and are read by V1 exactly as the

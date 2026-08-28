@@ -54,6 +54,27 @@ final class Habit {
     /// Ask `hasKnownCreation` rather than comparing against `.distantPast` at
     /// the call site.
     var createdAt: Date = Date.distantPast
+
+    /// The weekly target this habit was made with, or nil when that was never
+    /// recorded.
+    ///
+    /// **Credit is frozen at creation and can only shrink** (#343). A habit made
+    /// on a Friday has not failed the Monday it did not exist for, so it is
+    /// granted the minimum credit that avoids a ✕ — and an *upward* target edit
+    /// must not enlarge that grant, because an edit gets no amnesty. Deciding
+    /// that needs the target as it was, which the current one cannot answer
+    /// once it has moved.
+    ///
+    /// **Optional rather than a sentinel, deliberately** (#186). `createdAt`
+    /// carries `Date.distantPast` for *unknown* and that cost a bug: a `min()`
+    /// over creation dates picked the year 1 and the week pager ran to
+    /// antiquity. `nil` cannot be mistaken for a target of zero — the compiler
+    /// makes every reader say what absence means, and here it means *no credit
+    /// claim*, which is the honest answer for a row written before this column
+    /// existed. It is also what SwiftData adds by lightweight migration and
+    /// what CloudKit's optional-or-defaulted rule accepts, so the stored shape
+    /// stays sync-ready the way the note above the type asks.
+    var targetAtCreation: Int?
     var sortOrder: Int = 0
 
     /// What `createdAt` holds when the row has no creation date on record.
@@ -103,6 +124,9 @@ final class Habit {
         self.isSpacer = isSpacer
         self.completions = []
         self.frequency = frequency
+        // Recorded here rather than at each call site, so a habit cannot be
+        // made without it. A spacer has no cadence to freeze.
+        self.targetAtCreation = isSpacer ? nil : frequency.weeklyTarget
     }
 
     /// The cadence, read off the two columns that store it.
@@ -283,7 +307,8 @@ final class Habit {
             // `earliestRecordedDay`: a default `createdAt` means *unknown*, and
             // a row that does not know when it began must not claim to.
             createdDay: hasKnownCreation
-                ? WeekCalendar.day(createdAt, calendar: calendar) : nil
+                ? WeekCalendar.day(createdAt, calendar: calendar) : nil,
+            targetAtCreation: targetAtCreation
         )
     }
 
