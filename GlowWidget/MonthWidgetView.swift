@@ -69,8 +69,12 @@ struct MonthWidgetView: View {
             .accessibilityValue(summary ?? "")
 
         return GeometryReader { proxy in
-            let side = SlotLayout.slotHeight(trackWidth: proxy.size.width)
-            let gap = SlotLayout.gap(trackWidth: proxy.size.width)
+            // The month's own ratio, not the week's (`SlotLayout.monthGapRatio`).
+            // Seven 16pt cells on a 19pt pitch fill 130 of track exactly; the
+            // week's 8-on-24 gave 15.33pt cells 5.11pt apart in the same frame
+            // — 4% small and 70% too far apart. Node `234:11216`.
+            let side = SlotLayout.monthCell(trackWidth: proxy.size.width)
+            let gap = SlotLayout.monthGap(trackWidth: proxy.size.width)
             // Vertical spacing gives way before the cells do: a six-row month
             // tightens rather than overflowing the frame, and a four-row one
             // does not spread to fill it.

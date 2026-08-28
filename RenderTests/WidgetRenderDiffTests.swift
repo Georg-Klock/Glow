@@ -73,7 +73,13 @@ struct WidgetRenderDiffTests {
             else if (106...112).contains(value) { grey += 1 }
         }
         #expect(lit > 500, "no lit marks in the render")
-        #expect(grey > 500, "nothing unlit in the render: \(grey) pixels at the grey")
+        // **250, down from 500.** An upcoming slot used to be *filled* at the
+        // resting grey, and filled sockets were most of this count. §8.3 says
+        // the socket has no fill at all and its upcoming row gives `Inner:
+        // none`, so what is left carrying this grey is the text, the weekday
+        // letters and the ✕ — measured at 343. The floor is lowered in the same
+        // change as the deletion that lowered it, which is the rule.
+        #expect(grey > 250, "nothing unlit in the render: \(grey) pixels at the grey")
 
         let out = save(image, as: "widget-render@2x.png")
         print("render-diff: render written to \(out.path)")
@@ -522,7 +528,17 @@ struct WidgetRenderDiffTests {
             // Column 5 is past the open mark, which ends on today (column 4),
             // so it is upcoming track and nothing has been asked of it.
             let value = brightest(atColumn: columnCentre(5), in: pixels)
-            #expect(value > Self.lineFloor, "the upcoming track is missing")
+            // **`ground`, not `lineFloor`.** `lineFloor` asks whether a *grey
+            // line* is drawn there, and an upcoming slot is no longer one: it
+            // is a socket with no fill, drawn entirely by its bevel (§8.3).
+            // What is still true, and still worth asserting, is that the bevel
+            // paints *something* — it measures 45 against a ground of 31 — so
+            // the socket has not silently vanished.
+            //
+            // An empty slot is deliberately not held to a legibility floor. It
+            // is the ground the lit marks are read against, and being hard to
+            // see is its job.
+            #expect(value > Self.ground, "the upcoming socket draws nothing")
             #expect(value < Self.litFloor, "an untouched row is lit at column 5 (\(value))")
         }
     }

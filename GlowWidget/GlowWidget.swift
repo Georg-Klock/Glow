@@ -35,11 +35,7 @@ struct GlowWidget: Widget {
             intent: SelectWeekLayoutIntent.self,
             provider: WeekProvider()
         ) { entry in
-            WeekWidgetView(entry: entry)
-                .padding(.leading, WidgetMetrics.padLeading)
-                .padding(.trailing, WidgetMetrics.padTrailing)
-                .padding(.top, WidgetMetrics.padTop)
-                .padding(.bottom, WidgetMetrics.padBottom)
+            WidgetContentInset { WeekWidgetView(entry: entry) }
                 // Declared with `containerBackground`, never `.background`, and
                 // left removable. That is the whole contract: a widget does not
                 // choose whether it has a background — the person does, by
@@ -334,5 +330,26 @@ struct GlowWidgetBundle: WidgetBundle {
         // Not a home screen widget: the Dynamic Island's two seconds when a
         // goal is met. A Live Activity is declared in the same bundle. See #58.
         GoalPopActivity()
+    }
+}
+
+/// The content inset, applied where the family is known.
+///
+/// A `WidgetConfiguration`'s content closure cannot read `\.widgetFamily`
+/// itself, and the inset is not one number any more: the small family is inset
+/// evenly because the month is a centred block of cells, where the week's 6/14
+/// is an optical adjustment for a row that starts with a label column (#331,
+/// and node `234:11216`). So the read happens in a view that has an
+/// environment to read it from.
+private struct WidgetContentInset<Content: View>: View {
+    @Environment(\.widgetFamily) private var family
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .padding(.leading, WidgetMetrics.padLeading(for: family))
+            .padding(.trailing, WidgetMetrics.padTrailing(for: family))
+            .padding(.top, WidgetMetrics.padTop)
+            .padding(.bottom, WidgetMetrics.padBottom)
     }
 }
