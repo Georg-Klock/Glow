@@ -341,23 +341,26 @@ its contents — see §8.4.
 
 ### 8.3 Marks
 
-Every mark is a **socket**, optionally with a **lit fill** inside it. The socket
-has no fill at all — it is drawn entirely by its bevel. The lit fill is the
-socket inset 1pt on all four sides with its radius reduced by 1. No exceptions.
+Every mark is a **socket**, optionally with an **inner shape** inside it. The
+socket has no fill at all — it is drawn entirely by its bevel. The inner shape
+is the socket inset 1pt on all four sides with its radius reduced by 1, and it
+is what carries the state: filled for a completion, stroked for an open slot.
+Pill widths are always `32n − 8`.
 
-| | Socket | Lit fill |
+| | Socket | Inner |
 | --- | --- | --- |
 | Circle | 24 × 24, r 12 | 22 × 22, r 11 |
-| Pill | h **12**, r 6, width `32n − 8` | h 10, r 5 |
+| Pill — done or open | h **14**, r 7 | h **12**, r 6 |
+| Pill — upcoming | h **12**, r 6 | none |
 
-A pill is exactly half the height of a circle, centred in the 24pt row.
+Every mark is centred in the 24pt row. **A pill that is asked for something is
+2pt taller than one that is not**, and its inner is exactly the size of the
+upcoming track it replaces — so the light fills the track, and the socket grows
+around it to hold the bevel.
 
 ### 8.4 Effects
 
-Three recipes, and nothing else in the frame — no drop shadows, no outer glows,
-no blurs, no blend modes. The HDR halo is a code-side effect scaled by
-`GlowSettings` and cannot appear in Figma at all, so its absence there says
-nothing.
+Four recipes, and nothing else in the frame — no blurs, no blend modes.
 
 ```
 Socket          inner  0 / −1.5  blur 1.5  #FFFFFF @ 13%
@@ -366,8 +369,16 @@ Socket          inner  0 / −1.5  blur 1.5  #FFFFFF @ 13%
 Lit fill        inner  0 / +1    blur 1    #FFFFFF @ 100%
                 inner  0 / −1    blur 1    #000000 @ 30%
 
+Emitting        drop   0 / 0     blur 1                #FFFFFF @ 100%
+                inner  0 / 0     blur 1   spread −1    #FFFFFF @ 100%
+
 Track container inner  0 / +6    blur 6    #000000 @ 25%
 ```
+
+The emitting pair is a tight white bloom either side of a 1pt stroke — Figma's
+stand-in for the real thing. **The HDR halo is a code-side effect scaled by
+`GlowSettings`** and cannot be drawn in Figma at all, so the 1pt blur is a
+placeholder for its shape, not a specification of its size.
 
 Socket and lit fill invert each other's light direction: a socket is pressed in,
 a lit mark stands proud. **The socket bevel was drawn against a 7–10% white
@@ -389,7 +400,7 @@ Colour is one hex and three steps of it, and it says what is still asked of you:
 
 | | Weekday letter | Habit label |
 | --- | --- | --- |
-| Emitting | today, any habit open | this habit open today |
+| `#FFFFFF` + emitting glow | today, any habit open | this habit open today |
 | `#D9D9D9` @ 100% | today, everything closed | handled today |
 | `#D9D9D9` @ 50% | any other day | at rest |
 
@@ -403,19 +414,35 @@ Six deviations from an otherwise regular system, taken as slips:
 
 | Found in the file | Corrected to |
 | --- | --- |
-| Four 2-column lit pill sockets at h 14 / r 7 | h 12 / r 6, like every other pill |
+| Two long done pills drawn socket 12 / inner 10 (rows 2x and 1x) | socket 14 / inner 12, like every other done pill |
 | Weekday letter cells 17.455 wide — the *old* slot — on a 32pt pitch, landing 0.27 left of centre | 24 wide, on the column |
 | Name max width 84.5, derived from the old 15pt label gap, overrunning the track by 11 | 73.5 |
 | Socket fill `#D9D9D9 @ 1%` | no fill; the socket is its bevel |
 | Icon pure white beside a `#D9D9D9` name | icon takes the name's value |
 | Four zero-size boolean nodes; one fully authored but hidden row | file detritus, dropped |
 
-### 8.7 Not yet specified
+### 8.7 The open mark
 
-The **emitting tier has no appearance yet** — not the open mark, not the letter
-at `#FFFFFF`, not the label at `#FFFFFF`. The fixture contains no white text and
-no open mark, so this is **one gap rather than three**: it draws the whole
-non-emitting world and stops.
+From Figma `228:11106` — a 2-column open pill. It is the done mark's
+construction with the fill swapped for a ring, so §8.3 carries the geometry and
+this adds only what the ring is:
+
+| | |
+| --- | --- |
+| Socket | 56 × 14, r 7 — unchanged, the standard bevel |
+| Ring | 54 × 12, r 6, at +1/+1 — no fill |
+| Stroke | **1pt, inside-aligned, `#FFFFFF`** — outer edge flush with the 54 × 12 box |
+| Glow | the emitting pair of §8.4 |
+
+The mark is hollow: the socket's bevel shows through the middle.
+
+**Two things are inferred rather than measured**, and are the last of the gap:
+
+- **An open circle** should be the same rule one step up — socket 24 × 24, ring
+  at 22 × 22 r 11, 1pt inside stroke, same glow. No example exists.
+- **The glow on emitting text** — today's letter, an open habit's icon and name
+  — is presumably the outer half of the pair alone, since a glyph has no
+  interior to line. No example exists.
 
 ### 8.8 What this moves in the code
 
