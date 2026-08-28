@@ -359,15 +359,26 @@ private struct WidgetRow: View {
         let text = HStack(spacing: WidgetMetrics.iconGap) {
             HabitIconView(icon: habit.icon, size: WidgetMetrics.iconSize)
                 .frame(width: WidgetMetrics.iconWidth)
-            // Never shrunk. A name longer than the label column runs on into the
-            // gap before the track, which is what the design does: seven of its
-            // eight labels clip and the eighth — the only one long enough to
-            // need it — does not, so "Watch Sunset" simply overflows and stops
-            // short of the grid. Text at 12pt that quietly becomes 9pt is worse
-            // than text that uses the space next to it.
+            // **Truncated at the track, never shrunk.** Still never shrunk —
+            // text at 12pt that quietly becomes 9pt is worse than text that
+            // ends in an ellipsis — but it no longer *overflows* either.
+            //
+            // `fixedSize(horizontal:)` used to sit here, which makes the text
+            // take its full ideal width and ignore the frame below. That was
+            // right when it was written: the gap before the track was 15 and a
+            // mark was a 3pt dot centred in a 17.455pt slot, so a long name ran
+            // into ~22pt of air and, as the old comment put it, "stops short of
+            // the grid". #331 took the gap to 4 and #332 made a mark fill its
+            // slot, so the air is gone and "Watch Sunset" ran *under the first
+            // circle* — measured on a device build.
+            //
+            // The design file has said truncate all along: its Habit Label
+            // component reads "the name ... truncates at 84.5, which is exactly
+            // where the track begins", and the frame's width is derived to land
+            // exactly there. Dropping `fixedSize` is what lets it.
             Text(habit.name)
                 .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
+                .truncationMode(.tail)
                 .frame(maxWidth: WidgetMetrics.nameMaxWidth, alignment: .leading)
             Spacer(minLength: 0)
         }
