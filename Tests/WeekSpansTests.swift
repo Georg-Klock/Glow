@@ -1180,6 +1180,47 @@ struct MarkInvariantsTests {
         }
     }
 
+    @Test("A ✕ never outnumbers the days one could have been pinned to")
+    func everyCrossHasADayOfItsOwn() {
+        everyRow { row in
+            // **No mark carries two ✕** (invariant 6). A dead rep pins to a
+            // blank past day of its own, so the row cannot draw more crosses
+            // than it has such days — if it ever did, two would be sharing a
+            // mark and one of them would be invisible.
+            let blankPast = (0...6).count {
+                $0 < row.todayColumn && $0 != row.restColumn && !row.done.contains($0)
+            }
+            let crosses = row.spans.count { $0.state == .missed }
+            #expect(crosses <= blankPast, "more ✕ than blank past days — \(row.what)")
+        }
+    }
+
+    @Test("Backfilling a day never adds a ✕")
+    func backfillingNeverAddsACross() {
+        everyRow { row in
+            // A ✕ is a rep that ran out of days. Logging a day can only remove
+            // reps from the owed count, never add one, so correcting the past
+            // must never make the row accuse more than it did — the property
+            // that makes a ✕ safe to leave tappable in the week view (#116).
+            let before = row.spans.count { $0.state == .missed }
+            let week = self.week
+            for day in 0...row.todayColumn
+            where !row.done.contains(day) && day != row.restColumn {
+                let after = WeekSpans.spans(
+                    for: .fixture(
+                        frequency: .timesPerWeek(row.target),
+                        completedDays: Set((row.done + [day]).map { week.days[$0] })
+                    ),
+                    in: week, today: week.days[row.todayColumn], target: row.target,
+                    editing: .week(allowingFuture: false),
+                    restDay: row.restColumn.map { TestPreferences.weekday(ofColumn: $0, in: week) },
+                    calendar: calendar
+                ).count { $0.state == .missed }
+                #expect(after <= before, "logging day \(day) added a ✕ — \(row.what)")
+            }
+        }
+    }
+
     @Test("A completion the row has room for ends its own mark")
     func completionsAnchorOnTheirDay() {
         everyRow { row in
