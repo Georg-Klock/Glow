@@ -5307,3 +5307,45 @@ carry it too, which is what closes the contradiction #334 filed. The rendering
 that implements it — a completed habit's icon and name going dark, today's
 letter lighting — is deliberately not in this change: this entry settles what
 is true, and the surfaces move behind it.
+
+
+## A completed mark is lit, which reverses "a span is structure" (#344)
+
+**2026-08-27.** `SlotSpan.mark` maps `.filled` to `.donePast`. A weekly row's
+completed marks are lit, like every completion on every other surface.
+
+**This supersedes #47.** That decision made an achieved span draw the same unlit
+line an upcoming one draws, and it had a real argument: a span said how the week
+was *divided*, and a division does not change when a share of it is achieved.
+What said a rep happened was the lit dot `WeekDots` placed on the real weekday,
+so the row "stops being a progress bar and becomes a record of when".
+
+**What changed underneath it was #339.** A mark now ends on its own anchor day
+and reaches back over the blank days before it. That moves *when* into the
+mark's own left edge — which is the job the dots were doing — and it makes the
+old arrangement actively wrong rather than merely redundant: an unlit track with
+a lit dot inside it leaves the swallowed day visible as a gap, and removing that
+gap is the entire purpose of the mark model. #47's premise, a span that floats
+and pins nothing, is no longer true.
+
+**The cost is real and was accepted, not overlooked.** The row becomes a
+progress bar again. A mark that has reached back over a blank day no longer says
+which of its columns the rep landed on — Monday-and-Wednesday on a 6x row draws
+`[█][█ █]`, and nothing in the picture distinguishes it from Tuesday-and-
+Wednesday. The mark's left edge carries when, coarsely; the row's job is *how
+much is left*; and the alternative reintroduces the gap. Weighed on #344 and
+taken.
+
+**The dots go; `spokenDays` stays, and matters more.** The lit dots were
+redundant the moment the marks lit — the same light in the same places, drawn
+twice. `WeekDots.spokenDays` is not redundant: it is the only way VoiceOver
+reaches *which* days a weekly row carried, and it becomes more valuable exactly
+because the picture has stopped saying it. Both surfaces keep the element and
+draw nothing in it. `WeekDots.columns` survives as what `spokenDays` is derived
+from.
+
+**It is not #75, and it is not the two tiers loosening.** A completed mark draws
+`donePast` — lit, not emitting — so the ceiling #334 established holds: the glow
+stays reserved for what is still actionable. What this changes is the floor. A
+completion was drawing *dark*, which was the one place on the weekly row where
+SPEC §1's rule did not hold, and #47 is the reason it did not.

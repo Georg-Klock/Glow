@@ -280,15 +280,6 @@ struct HabitRowView: View {
         }
     }
 
-    /// Which weekdays this row was logged on, for the dots over the spans.
-    private var dotColumns: [Int] {
-        // The rest day is passed in rather than looked up, which also settles
-        // what used to need a bare `_ = restDayStorage` here: the value is now
-        // read in `body` because it is an argument, so moving the rest day
-        // redraws a row whose spans did not change.
-        WeekDots.columns(for: snapshot, in: week, restDay: restDay)
-    }
-
     @ViewBuilder
     private var track: some View {
         HStack(spacing: SlotLayout.gap(trackWidth: geometry.trackWidth)) {
@@ -353,46 +344,41 @@ struct HabitRowView: View {
         .overlay(alignment: .leading) { dots }
     }
 
-    /// A lit dot on each weekday a span row was actually logged on.
+    /// Which days this row was logged on, spoken.
     ///
-    /// Drawn over the spans rather than inside them: a span is one shape covering
-    /// several columns and knows nothing about which of them carried a completion,
-    /// which is the whole reason `WeekDots` exists. See #47.
+    /// **The dots are gone and this is not** (#344). Their visual job went to
+    /// the marks — a completed mark is lit now, so a lit dot on top of it says
+    /// the same thing twice — but nothing else tells a screen reader *which*
+    /// days a weekly row carried, and the marks say it less well than they
+    /// look: one covers several columns. So the string becomes more valuable
+    /// as the picture stops carrying it.
     ///
-    /// The same `.dot` mark the daily rows use, at the same column centres, so a
-    /// weekly row and a daily row put their light in exactly the same places.
-    /// The dots' voice: one element saying which days, or none at all.
-    ///
-    /// The spans announce how much is left and the dots say when — so a row
-    /// with nothing lit adds no stop to a swipe-through, and a row with three
-    /// lit adds one rather than three. See `WeekDots.spokenDays` and #104.
+    /// The marks announce how much is left and this says when — so a row with
+    /// nothing lit adds no stop to a swipe-through, and a row with three lit
+    /// adds one rather than three. See `WeekDots.spokenDays` and #104.
     private var dotVoice: String? {
         WeekDots.spokenDays(for: snapshot, in: week, restDay: restDay)
     }
 
+    /// The days a weekly row was logged on, as one spoken element and nothing
+    /// drawn.
+    ///
+    /// It used to draw a lit dot per logged weekday over the spans (#47). #344
+    /// lights the marks themselves, which makes the dots redundant with what is
+    /// underneath them — so what is left is the element that was always the
+    /// only way VoiceOver reached the days at all.
+    ///
+    /// `children: .ignore` on the stack rather than a label per day: the days
+    /// are one fact. It takes no size, so it sits at the start of the track
+    /// instead of covering it and swallowing the marks' own elements.
     @ViewBuilder
     private var dots: some View {
         if !spans.isEmpty {
-            ZStack(alignment: .leading) {
-                ForEach(dotColumns, id: \.self) { column in
-                    GlowImageView(
-                        size: CGSize(width: slotHeight, height: slotHeight),
-                        shape: .dot
-                    )
-                    .offset(
-                        x: SlotLayout.columnCentre(
-                            trackWidth: geometry.trackWidth, index: column
-                        ) - slotHeight / 2
-                    )
-                }
-            }
-            // `children: .ignore` on the stack rather than a label per dot: the
-            // days are one fact. The stack takes one slot's size — `offset`
-            // does not grow a layout — so the element sits at the start of the
-            // track instead of covering it and swallowing the spans' own.
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(dotVoice.map { "\(snapshot.name), \($0)" } ?? "")
-            .accessibilityHidden(dotVoice == nil)
+            Color.clear
+                .frame(width: 0, height: 0)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(dotVoice.map { "\(snapshot.name), \($0)" } ?? "")
+                .accessibilityHidden(dotVoice == nil)
         }
     }
 
