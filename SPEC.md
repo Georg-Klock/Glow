@@ -15,11 +15,23 @@ Today's column physically glows on HDR-capable screens: it is drawn from an
 image encoded in a colour space with real headroom above SDR white, which is
 what makes HDR photos look brighter than white in Photos.
 
-**Light means something happened.** Every completion glows, whatever day of the
-week it fell on, and so does today's open slot. What does not glow is anything
-merely absent: a missed day and a day still to come are both flat. So a good
-week is a row of lights and a bad one is nearly dark, which is the whole product
-in one sentence.
+**Light means something happened.** Every completion is lit, whatever day of the
+week it fell on, and so is today's open slot. What stays dark is anything merely
+absent: a missed day and a day still to come are both flat. So a good week is a
+row of lights and a bad one is nearly dark, which is the whole product in one
+sentence.
+
+**Light has two tiers** (#334). The HDR emission — the physical glow of the
+opening paragraph — is reserved for what is still actionable: today's weekday
+letter while any habit is still open, the icon and name of a habit open today,
+and the open mark. A completion is lit but does not emit; it reads as an object
+catching light rather than as a source of it. The sentence above is unchanged by
+this — every completion is still lit, and absence is still dark — what the
+second tier adds is a *ceiling* a completion does not reach.
+
+That is not #75 reversing. #75 refused to paint a completion grey and still
+does; a completion is bright on every surface. #75's reasoning was written when
+there was one tier, so it is re-read rather than cited.
 
 **A span is structure, not a mark, and structure is never lit.** A habit due N
 times a week is drawn as N shapes dividing the week; those shapes say how the

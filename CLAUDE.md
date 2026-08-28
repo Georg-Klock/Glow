@@ -5,14 +5,26 @@ one weekly grid. The one twist is in the name: a mark **physically glows** on
 an HDR-capable screen.
 
 **Light marks the habit; what stays dark is what never happened.** Today's open
-slot glows because it is still actionable, and every completion glows too,
-whatever day it fell on — SPEC §1 has said so from the start. What does not glow
-is absence: a missed day, a day still to come, a rep that ran out of days.
+slot is lit because it is still actionable, and every completion is lit too,
+whatever day it fell on — SPEC §1 has said so from the start. What stays dark is
+absence: a missed day, a day still to come, a rep that ran out of days.
 
-That single rule decides more than it looks like it does, and the corollary is
-that **light cannot also be what separates open from done** — so shape carries
-that instead. A slot open today is a ring and a completion is a dot: both lit,
-different silhouettes.
+**Light has two tiers, and the top one is reserved for what is still
+actionable** (#334, 2026-08-27). The HDR emission — the physical glow — goes to
+today's weekday letter while any habit is still open, to the icon and name of a
+habit open today, and to the open mark itself. A completion is *lit but does not
+emit*: an object catching light rather than a source of it.
+
+That reverses the corollary this paragraph used to draw. It read that **light
+cannot also be what separates open from done** — so shape carried that instead,
+a ring for open and a dot for done, both lit. Under two tiers light is exactly
+what separates them, and shape keeps the job as well: the two say the same thing
+twice rather than one of them carrying it alone.
+
+**This is not #75 returning.** Nothing here paints a completion grey; a
+completion is bright, on every surface. What moved is the *ceiling* — a
+completion no longer reaches the emitting tier — and #75's reasoning was written
+against a one-tier world, so it needs re-reading rather than citing.
 
 The rule was settled on a surface that is no longer here. This paragraph used to
 say the glow was "not a reward for finishing", and the Today ring was built to
