@@ -33,9 +33,34 @@ enum SlotLayout {
     /// pitch, which is 216 of track.
     static let gapRatio: CGFloat = 8.0 / 24.0
 
+    /// The month grid's own ratio, which is **not** the week's.
+    ///
+    /// A week row and a month cell are different grids that happen to share a
+    /// column count, and the design file gives them different rhythms: the week
+    /// is seven 24pt slots on a 32pt pitch (8 on 24), the month is seven 16pt
+    /// cells on a 19pt pitch (3 on 16). Node `234:11216`, `Frame 14` at
+    /// 130 × 111 — `7 * 16 + 6 * 3 = 130`, exactly.
+    ///
+    /// It reads much tighter than the week's, and that is the point: a month is
+    /// thirty-odd marks in a small widget's frame, so the air between them has
+    /// to give before the marks do. Deriving it from `gapRatio` spread the
+    /// cells 70% further apart than the file and shrank them by 4%.
+    static let monthGapRatio: CGFloat = 3.0 / 16.0
+
     /// The gap for a given track, shared by every row so the columns line up.
     static func gap(trackWidth: CGFloat) -> CGFloat {
         gapRatio * dailySlot(trackWidth: trackWidth)
+    }
+
+    /// One month cell: seven of them and six gaps fill the track exactly, by
+    /// the same algebra as `dailySlot` at the month's own ratio.
+    static func monthCell(trackWidth: CGFloat) -> CGFloat {
+        max(0, trackWidth / (7 + 6 * monthGapRatio))
+    }
+
+    /// The gap between month cells.
+    static func monthGap(trackWidth: CGFloat) -> CGFloat {
+        monthGapRatio * monthCell(trackWidth: trackWidth)
     }
 
     /// One daily slot: seven of them and six gaps fill the track exactly.
