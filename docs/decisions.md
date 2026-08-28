@@ -5522,3 +5522,60 @@ ground silently moves what a resting mark renders as.
 drawn against a 7–10% white ground. The glass is darker and blurred, so that
 edge will read heavier than the file shows — and the simulator cannot answer it,
 because what it can check is geometry and what is in question is depth.
+
+
+## Type takes all three steps, and the track is a recess (#332, #335, completing)
+
+**2026-08-28.** Two pieces of already-decided scope that the PRs closing them
+did not carry.
+
+**The track's inner shadow.** `0 / +6, blur 6, #000000 @ 25%`, laid over the
+grid's contents — the fourth of `docs/week-marks.md` §8.4's four effect recipes,
+and the only one belonging to the container rather than to a mark. It was
+missing from #332. It wraps the row stack rather than the frame: the header
+stays outside it and the recess ends with the last habit, because drawn over the
+whole frame a widget showing fewer than ten rows put an empty box under the last
+one. Looked at, which is how that was caught.
+
+**The middle step, attached.** #335 declared `#D9D9D9` at full strength and left
+it on marks only; §8.5's table wants it on type as well, and `TypeTier` in
+`Glow/Logic/` is that table:
+
+| | Weekday letter | Habit label |
+| --- | --- | --- |
+| emitting | today, any habit open | this habit open today |
+| lit | today, everything closed | handled today |
+| resting | any other day | at rest |
+
+**Today's letter stops glowing unconditionally**, which is the visible
+consequence and follows from #334: if emission is reserved for what is still
+actionable, a letter that glows all day says *this is today* rather than *this
+wants you*. It steps down once every habit is handled — still plainly today, no
+longer asking.
+
+**"Handled today" means logged today, not goal met.** A 2x habit finished on
+Monday and Tuesday, read on Friday, rests: nothing was asked of it today and
+nothing was done. The easy reading would leave it lit all week and make the
+middle step mean something §8.5 does not say.
+
+The rule lives in `Logic/` because two surfaces draw this row — the app's grid
+and the widget's — and a rule written twice drifts. The views turn a tier into a
+style and decide nothing.
+
+**What the measurements said, including where the first answer was wrong.**
+
+- The render matches §8 exactly: frame 338 × 354, inner mark 22.0, inner pill
+  12.0, pitch 32.0 on both axes, inner-to-inner gap 10.0, track 109 → 323, first
+  row top 29.0. Every one-point difference from the spec's figures is the
+  specified 1pt inner inset.
+- **The track shadow contributes nothing to the render signature** — two runs,
+  one with the shadow at 25% and one at 0%, produced identical tone counts. The
+  first explanation offered for the baseline movement was that the shadow shaded
+  marks off their tones; that was wrong, and measuring it was what said so.
+- **The signature's `tones` is a spike detector, not a pixel count**:
+  `histogram[level] − (histogram[level−1] + histogram[level+1]) / 2`. So the
+  middle step raised the raw count at 217 (5,772 → 7,057) while *lowering* the
+  signature's excess there (8,892 → 4,899) — type is mostly antialiased edges,
+  and those populate the neighbouring levels the detector subtracts. Both
+  numbers are right; they measure different things, and confusing them is how a
+  baseline gets approved for the wrong reason.
