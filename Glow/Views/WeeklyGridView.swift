@@ -397,7 +397,7 @@ struct WeeklyGridView: View {
                     .onMove(perform: move)
                     .onDelete(perform: deleteAt)
                 } header: {
-                    WeekdayHeader(geometry: geometry, week: week, today: today)
+                    WeekdayHeader(geometry: geometry, week: week, today: today, snapshots: snapshots)
                         .listRowInsets(EdgeInsets(
                             top: 0, leading: geometry.horizontalPadding,
                             // The widget's header stands further from the first
@@ -883,6 +883,20 @@ struct WeekdayHeader: View {
     let geometry: RowGeometry
     let week: Week
     let today: Date
+    /// The week's rows, for the one question a weekday letter asks that is not
+    /// about itself: is anything still open today (#335, §8.5).
+    let snapshots: [HabitSnapshot]
+
+    /// The rest day, read here for the same reason `HabitRowView` reads it —
+    /// the header has to redraw when Settings moves the day, and only a value
+    /// SwiftUI can see does that. See that file for the measurement.
+    @AppStorage(WeekPreferences.restDayKey, store: GlowSettings.store)
+    private var restDayStorage: Int = 0
+    private var restDay: Int? { WeekPreferences.restDay(stored: restDayStorage) }
+
+    private var anyOpen: Bool {
+        TypeTier.anyOpen(in: snapshots, week: week, today: today, restDay: restDay)
+    }
 
     /// The same read the rows make, for the same reason and with the same
     /// standing: this header is built inside `WeeklyGridView`'s
@@ -918,12 +932,14 @@ struct WeekdayHeader: View {
                     }
 
                     Group {
-                        // Today is white with a drop shadow in the design, so it
-                        // is a glow and not just a brighter grey.
-                        if isToday {
-                            column.glowing(halo: GlowPalette.headerHalo)
-                        } else {
-                            column.foregroundStyle(GlowPalette.grey)
+                        // Three steps, not two (#335, §8.5). Today emits only
+                        // while something is still open; once every habit is
+                        // handled it steps down to the lit tier — still plainly
+                        // today, no longer asking.
+                        switch TypeTier.weekday(isToday: isToday, anyHabitOpen: anyOpen) {
+                        case .emitting: column.glowing(halo: GlowPalette.headerHalo)
+                        case .lit: column.foregroundStyle(GlowPalette.lit)
+                        case .resting: column.foregroundStyle(GlowPalette.grey)
                         }
                     }
                     .frame(

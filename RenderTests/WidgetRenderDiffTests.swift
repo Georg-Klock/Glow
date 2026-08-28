@@ -849,10 +849,12 @@ struct WidgetRenderDiffTests {
 
         #expect(lifted > 0, "the glow lifts no pixel off the ground at all")
         // Neutral where it lands, which is the claim that survives the halo.
-        // Two levels of slack: one was the encoder's own rounding between
-        // channels, and #333 adds the material's dithering, which is measured
-        // at up to 2 on a flat ground. An actual tint lands far above either.
-        #expect(worstSpread <= 2, "the halo carries a hue: channels spread by \(worstSpread)")
+        // Three levels of slack, and each is accounted for: one is the
+        // encoder's own rounding between channels, #333's material dithers the
+        // ground by another, and the track's 25% black inner shadow rounds
+        // again where it composites over that dither. Measured at 3; an actual
+        // tint lands in the tens.
+        #expect(worstSpread <= 3, "the halo carries a hue: channels spread by \(worstSpread)")
     }
 
     @Test("No pixel the widget renders carries a hue")
@@ -868,13 +870,14 @@ struct WidgetRenderDiffTests {
                     - Int(min(pixels[i], pixels[i + 1], pixels[i + 2]))
                 worst = max(worst, spread)
             }
-            // Two levels of slack since #333: one is the encoder's own
-            // rounding between channels, and the material dithers the ground by
-            // up to another — measured at 30,31,31 and 30,32,31 on corners of
-            // the same frame. Anything with an actual tint lands far above it.
-            // Held against a blank frame by the same gate as the ground's own
-            // flatness. #226.
-            #expect(worst <= 2, "\(name) carries a hue: channels spread by \(worst)")
+            // Three levels of slack, each accounted for: the encoder's own
+            // rounding between channels, the material dithering the ground —
+            // measured at 30,31,31 and 30,32,31 on corners of one frame — and
+            // the track's 25% black inner shadow rounding again where it
+            // composites over that dither. Anything with an actual tint lands
+            // in the tens. Held against a blank frame by the same gate as the
+            // ground's own flatness. #226.
+            #expect(worst <= 3, "\(name) carries a hue: channels spread by \(worst)")
         }
     }
 

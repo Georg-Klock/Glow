@@ -389,7 +389,13 @@ struct HabitRowView: View {
     /// tracks "needs you now", not "went well" — a perfect week reads quieter
     /// than a single empty slot, which is the point.
     private var isDue: Bool {
-        slots.contains { $0.state == .open }
+        slots.contains { $0.state == .open } || spans.contains { $0.state == .open }
+    }
+
+    /// Handled today: something was asked of this habit today and it was done.
+    /// The middle step of §8.5 — a finished row goes quiet rather than dark.
+    private var isHandled: Bool {
+        TypeTier.isHandled(snapshot, today: today, restDay: restDay)
     }
 
     /// How lit the label is, 1 through 0. Driven by `isDue` on the same spring
@@ -444,7 +450,20 @@ struct HabitRowView: View {
             if isEditing {
                 text.foregroundStyle(GlowPalette.color)
             } else {
-                text.foregroundStyle(GlowPalette.grey)
+                // The resting or lit step underneath, with the emitting one
+                // crossfaded over it (#335, §8.5). `lit` is the spring that
+                // already ran this label; the step below it is what the
+                // crossfade lands *on*, and it is the middle tier once the
+                // habit has been handled today rather than the resting one.
+                //
+                // The whole label takes the tier, name and icon together: §8.5
+                // is explicit that the two carry the same value in every state,
+                // and a glowing name beside a resting icon reads as two facts.
+                if isHandled {
+                    text.foregroundStyle(GlowPalette.lit)
+                } else {
+                    text.foregroundStyle(GlowPalette.grey)
+                }
                 text.glowing(halo: GlowPalette.labelHalo).opacity(lit)
             }
         }
