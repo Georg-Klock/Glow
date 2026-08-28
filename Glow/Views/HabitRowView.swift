@@ -406,13 +406,26 @@ struct HabitRowView: View {
         let text = HStack(spacing: geometry.iconGap) {
             HabitIconView(icon: snapshot.icon, size: geometry.iconSize)
                 .frame(width: geometry.iconWidth)
-            // Never shrunk — the widget's rule, adopted. A long name runs on
-            // into the gap before the track and truncates only where the grid
-            // begins; text that quietly becomes smaller text is worse than
-            // text that uses the space beside it.
+            // **Truncated at the track, never shrunk.** Still never shrunk —
+            // text at 12pt that quietly becomes 9pt is worse than text that
+            // ends in an ellipsis — but it no longer *overflows* either.
+            //
+            // `fixedSize(horizontal:)` used to sit here, which makes the text
+            // take its full ideal width and ignore the frame below. That was
+            // right when it was written: the gap before the track was 15 and a
+            // mark was a 3pt dot centred in a 17.455pt slot, so a long name ran
+            // into ~22pt of air and, as the old comment put it, "stops short of
+            // the grid". #331 took the gap to 4 and #332 made a mark fill its
+            // slot, so the air is gone and "Watch Sunset" ran *under the first
+            // circle* — measured on a device build.
+            //
+            // The design file has said truncate all along: its Habit Label
+            // component reads "the name ... truncates at 84.5, which is exactly
+            // where the track begins", and the frame's width is derived to land
+            // exactly there. Dropping `fixedSize` is what lets it.
             Text(snapshot.name)
                 .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
+                .truncationMode(.tail)
                 .frame(maxWidth: geometry.nameMaxWidth, alignment: .leading)
             // The spacer and the column width below are what hold the name at
             // the leading edge, so editing drops both: a label still filling a
