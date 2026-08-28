@@ -258,7 +258,8 @@ A build that violates one of these is broken regardless of what else works.
   zone, crossing a DST transition or relaunching does not move it, and a
   completion the app can see is a completion the app can un-log.
 - **R5.** A daily row draws exactly 7 slots; an N-times row draws exactly N
-  spans — plus one lit dot per completion, on the weekday it happened.
+  spans — met, behind or finished, however late in the week it is — plus one lit
+  dot per completion, on the weekday it happened.
 - **R6.** Every row spans the same track width, whatever its slot count.
 - **R7.** Weeks reset clean. A frequency habit's unmet goal does not carry over.
 - **R8.** The glow is encoded in a colour space with headroom above SDR white.
@@ -358,8 +359,31 @@ it always did — the record is simply now something the app can correct.
 
 A habit due a number of times a week is not day-pinned, so it is not drawn as
 seven columns at all: `WeekSpans` divides the week into N shapes that stretch
-across it, with the open one always containing today. **That rule is inferred
-from the design rather than specified** — see the note on the type.
+across it, with the open one always containing today.
+
+> **A mark spans from the end of the previous mark through its own anchor day**
+> (#339).
+
+That sentence is the whole layout, and it is also the forgiveness mechanism: a
+day that goes by unused has no mark of its own, so it is swallowed by whatever
+mark comes next rather than left as a hole. A completion anchors on the day it
+was logged, a rep that ran out of days on the day it ran out (#341), and the
+open mark on today. Marks with no anchor — reps still to come — divide what the
+anchored ones leave, **as evenly as whole days allow with the remainder to the
+right** (#340), so the near days are single columns and the slack collects at
+the end of the week. The last mark always ends on the final column, because
+there is nothing after it to divide.
+
+**A met goal keeps every completion on its day** (#342). It used to collapse to
+one shape across all seven columns, which forgot every day it had just
+recorded; now the last mark runs to the end and the earlier ones stay where the
+reps happened. Completions past the target get no mark of their own and fall
+inside the last one, so a 3x row logged four times looks exactly like a 3x row
+logged three times — the record keeps the fourth, the row has nothing left to
+say about it.
+
+The rule used to be **inferred from the design rather than specified**; it is
+specified now, in `docs/week-marks.md` §4.
 
 **An achieved span draws the same unlit line as one still to come**, because
 they are the same thing: a share of the week with no ask left in it. What tells
@@ -407,15 +431,20 @@ the arithmetic re-runs and the ✕ goes. The mark never changes on its own — o
 the record can move it. **A finished week is where this is sharpest** (#117):
 every rep it still owed has run out of days, so the row is a completed block and
 a ✕ for each of the rest, and every one of those columns is a day the pager can
-now reach and correct. **A lost rep never
-occupies the rest day's column alone**: `RestWindow` subtracts that column from
-whatever shape crosses it, so a span exactly its width would be removed
-entirely, and the ✕ would be drawn and invisible. Such a span takes the next
-column with it and the mark sits in what is left. The reps still reachable
-keep glowing beside it, because a partially lost week is not a finished one.
-This used to produce *fewer* than N shapes, and it did so exactly when the goal
-was running out of room. The rest day enters only through which days count as
-actionable, which brings the squeeze forward by one.
+now reach and correct. **A ✕ lands on the day the week broke on** (#341): the blank past day after
+which the goal became unreachable, derived from the record rather than logged,
+so a backfill recomputes it away. It used to be parked immediately left of the
+open span, which surfaced a missed Monday on a Thursday. **A lost rep never
+occupies the rest day's column alone**, which matters because `RestWindow`
+subtracts that column from whatever shape crosses it and a span exactly its
+width would be drawn and invisible (#100). That now holds by construction: a
+rep never dies on the rest day — nothing is expected there — so a ✕ is never
+anchored on it, and a mark reaching back from a later anchor is wider than one
+column. The reps still reachable keep glowing beside it, because a partially
+lost week is not a finished one. This used to produce *fewer* than N shapes,
+and it did so exactly when the goal was running out of room. The rest day
+enters only through which days count as actionable, which brings the squeeze
+forward by one.
 
 **A lost week shows in the month too.** `MonthGrid` asks `WeekSpans` how many
 reps a week lost and crosses that week's unlogged past days — the week row
@@ -468,9 +497,9 @@ announces "rest day" with no button trait, because otherwise the hole in the
 row would have nothing explaining it.
 
 **A span never shows in it either.** A habit due a number of times a week is
-drawn as shapes stretching across the week, and a met goal is one shape across
-all seven — so without this a met week drew a single lit bar straight through
-the day nothing can happen in. The *arithmetic* is unchanged: `WeekSpans` keeps
+drawn as shapes stretching across the week, and a met goal's last mark runs to
+the end of it — so without this a met week drew a lit bar straight through the
+day nothing can happen in. The *arithmetic* is unchanged: `WeekSpans` keeps
 its seven-column division, its span count and its packing rule, and the shape
 is drawn with the rest column subtracted from it (`RestWindow`). The window is
 that column's slot plus the gap on each side, so its edges land on the

@@ -87,7 +87,7 @@ struct RestWindowTests {
 
     // MARK: - The arithmetic is untouched
 
-    @Test("A met goal is still one span across all seven columns with a rest day")
+    @Test("A met goal still covers all seven columns with a rest day")
     func metGoalStillSpansTheWeek() {
         // The point of subtracting a window from the *shape* rather than
         // re-dividing six columns: `WeekSpans` does not learn about rest days
@@ -107,10 +107,12 @@ struct RestWindowTests {
             )
         }
 
+        // Two marks, one per completion: a met goal keeps every completion on
+        // its day and lets the last mark run to the end (#342).
         let withoutRest = spans(restDay: nil)
-        #expect(withoutRest.count == 1)
-        #expect(withoutRest[0].firstDay == 0)
-        #expect(withoutRest[0].lastDay == 6)
+        #expect(withoutRest.count == 2)
+        #expect(withoutRest[0].firstDay == 0 && withoutRest[0].lastDay == 0)
+        #expect(withoutRest[1].firstDay == 1 && withoutRest[1].lastDay == 6)
 
         // Sunday resting changes nothing about the division.
         let sunday = calendar.component(.weekday, from: week.days[6])
