@@ -20,13 +20,47 @@ struct SlotMarkView: View {
     var restWindow: ClosedRange<CGFloat>?
 
     var body: some View {
+        content.background { socketForMark }
+    }
+
+    /// The socket sits behind every mark that has one. A rest day has none —
+    /// nothing is coming, so there is nothing for a socket to say (#72) — and
+    /// a ✕ has none either: it is a claim about a day, not a slot waiting on
+    /// one.
+    @ViewBuilder
+    private var socketForMark: some View {
+        switch mark {
+        case .rest, .missed:
+            EmptyView()
+        case .upcoming:
+            // The upcoming pill *is* the socket, at 12pt with no inner shape,
+            // so it draws its own bevel at its own height rather than taking
+            // the 14pt one a lit mark grows into.
+            sized(socket(size.height * GlowShape.upcomingPillHeight, circle: !spansDays))
+                .restWindowRemoved(restWindow)
+        case .openToday, .doneToday, .donePast:
+            sized(socket(size.height * GlowShape.litPillHeight, circle: !spansDays))
+                .restWindowRemoved(restWindow)
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         switch mark {
         case .openToday:
             glow(.ring)
         case .doneToday, .donePast:
             // The same mark either way. A completion does not fade with age:
             // the row is a record of what happened, and Monday happened.
-            glow(spansDays ? .bar : .dot)
+            //
+            // **Lit, not emitting** (#334, #332). This used to go through
+            // `GlowImageView` and take the HDR tile, which is the emitting
+            // tier. Under two tiers a completion is an object catching light
+            // rather than a source of it, so it is a flat `#D9D9D9` fill with
+            // the lit bevel — and §8.4 says the same thing from the other end:
+            // it gives "lit fill" and "emitting" separate recipes, and the
+            // emitting one is the open ring's.
+            doneMark
         case .missed:
             missedMark.offset(x: restOffset(fillsSpan: false))
         case .upcoming:
@@ -49,14 +83,95 @@ struct SlotMarkView: View {
         )
     }
 
+    /// A completion: the socket's inner shape, filled at the reflecting tier.
+    ///
+    /// §8.4's **lit fill** recipe — an inner white above and an inner black
+    /// below, which is the socket's bevel inverted. A socket is pressed in; a
+    /// completion stands proud of it.
+    @ViewBuilder
+    private var doneMark: some View {
+        let fill = GlowPalette.lit
+            .shadow(.inner(color: .white, radius: 1, y: 1))
+            .shadow(.inner(color: .black.opacity(0.3), radius: 1, y: -1))
+        if spansDays {
+            sized(
+                Capsule(style: .continuous)
+                    .fill(fill)
+                    .frame(
+                        height: size.height * GlowShape.litPillHeight
+                            - GlowShape.socketInset * 2
+                    )
+            )
+            .restWindowRemoved(restWindow)
+        } else {
+            sized(Circle().fill(fill).padding(GlowShape.socketInset))
+        }
+    }
+
+    /// The socket every mark sits in: **no fill at all, drawn entirely by its
+    /// bevel** (#332, §8.3–8.4).
+    ///
+    /// An inner white above at 13% and an inner black below at full strength,
+    /// which reads as a shape pressed into the surface. The design file gave it
+    /// a `#D9D9D9 @ 1%` fill and §8.6 drops that as a slip — a socket is its
+    /// bevel and nothing else.
+    ///
+    /// **`.shadow(.inner(_:))` cannot draw this, and that is measured.** An
+    /// inner shadow on a `ShapeStyle` is modulated by the fill it decorates, so
+    /// over `Color.clear` it paints nothing — probed by setting the light half
+    /// to full-strength red and rendering, which produced no red pixel
+    /// anywhere. Hence the older recipe below: a blurred stroke pushed
+    /// off-centre and clipped to the shape, so only the part falling inside its
+    /// edge survives.
+    ///
+    /// **Its weight is a device question.** The bevel was drawn against a 7–10%
+    /// white ground, and #333 replaces that with a dark glass material, so the
+    /// black half will read heavier than the file shows. Against today's pure
+    /// black ground it is nearly invisible — the black half by definition, the
+    /// white half at 13% — which is expected and is not evidence that it works.
+    /// The simulator can say the geometry is right; it cannot say the depth is.
+    @ViewBuilder
+    private func socket(_ height: CGFloat, circle: Bool) -> some View {
+        let shape = circle ? AnyShape(Circle()) : AnyShape(Capsule(style: .continuous))
+        let bevel = ZStack {
+            bevelEdge(shape, color: .white.opacity(0.13), y: -1.5)
+            bevelEdge(shape, color: .black, y: 1.5)
+        }
+        if circle {
+            bevel
+        } else {
+            bevel.frame(height: height)
+        }
+    }
+
+    /// One half of a bevel: a stroke twice the blur radius wide, blurred,
+    /// offset, and clipped back to the shape.
+    private func bevelEdge(_ shape: AnyShape, color: Color, y: CGFloat) -> some View {
+        shape
+            .stroke(color, lineWidth: 3)
+            .blur(radius: 1.5)
+            .offset(y: y)
+            .clipShape(shape)
+    }
+
+    /// A day, or a run of days, with nothing asked of it yet.
+    ///
+    /// **The socket's own shape, filled at the resting step** (#332). It was a
+    /// 3pt dot and a 2pt line floating in the slot; it is a 22pt disc and a
+    /// 12pt track now, so an upcoming day occupies its column instead of
+    /// marking a point in it.
+    ///
+    /// An upcoming pill has **no inner shape** — the 12pt track *is* the
+    /// socket, where a lit or open pill is a 14pt socket holding a 12pt inner.
+    /// That is what makes a lit pill 2pt taller than the one it replaces: the
+    /// light fills the track and the socket grows around it to hold the bevel.
     @ViewBuilder
     private var upcomingMark: some View {
         if spansDays {
             sized(
                 Capsule(style: .continuous)
                     .fill(GlowPalette.grey)
-                    .frame(height: GlowShape.upcomingThickness)
-                    .padding(.horizontal, (size.height - GlowShape.upcomingDiameter) / 2)
+                    .frame(height: size.height * GlowShape.upcomingPillHeight)
             )
             // Safe to mask out here rather than inside the shape: nothing
             // unlit casts a halo, so there is none to cut. The lit marks go
@@ -67,10 +182,7 @@ struct SlotMarkView: View {
             sized(
                 Circle()
                     .fill(GlowPalette.grey)
-                    .frame(
-                        width: GlowShape.upcomingDiameter,
-                        height: GlowShape.upcomingDiameter
-                    )
+                    .padding(GlowShape.socketInset)
             )
         }
     }

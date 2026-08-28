@@ -70,27 +70,58 @@ enum GlowShape: Equatable {
     // Proportions of the slot's height, measured from the design rather than
     // guessed, so the whole grid scales from one number.
 
-    /// Stroke width of `.ring`. 3pt on a 35pt slot in the design file.
-    static let ringWeight: CGFloat = 3.0 / 35.0
-    /// Diameter of `.dot`, in points.
+    /// Stroke width of `.ring`: **1pt, flat** (#332, #336).
     ///
-    /// Fixed rather than a fraction of the slot: a day is a day, and the mark
-    /// for one should not grow because the grid it sits in got wider. The slot
-    /// still sets the pitch and the ring; only the marks inside it are absolute.
-    static let dotDiameter: CGFloat = 3
-    /// Thickness of `.bar`, in points. A run of days is a line, not a lozenge.
-    static let barThickness: CGFloat = 2
+    /// Not a fraction of the slot any more. It was `3 / 35`, and the design
+    /// file measured at `228:11107` draws the same weight around a 12pt pill
+    /// and a 22pt circle — a constant, not a proportion. That `3 / 35 × 12`
+    /// lands on 1.03 is a coincidence, and reading a rule out of it would have
+    /// given the circle a 2pt stroke it does not have.
+    ///
+    /// Inside-aligned, so the outer edge is flush with the ring's box.
+    static let ringWeight: CGFloat = 1
+
+    /// **A mark is a socket with an inner shape** (#332, §8.3).
+    ///
+    /// The socket has no fill at all — it is drawn entirely by its bevel. The
+    /// inner shape is the socket inset by this on all four sides with its
+    /// radius reduced by the same, and it is what carries the state: filled for
+    /// a completion, stroked for an open slot, absent for an upcoming pill.
+    static let socketInset: CGFloat = 1
+
+    /// Socket heights, as fractions of the slot.
+    ///
+    /// **A pill that is asked for something is 2pt taller than one that is
+    /// not**, and its inner is exactly the size of the upcoming track it
+    /// replaces — so the light fills the track and the socket grows around it
+    /// to hold the bevel. That is where 14 and 12 come from.
+    static let litPillHeight: CGFloat = 14.0 / 24.0
+    static let upcomingPillHeight: CGFloat = 12.0 / 24.0
 
     /// The missed ✕: 1pt bars with 9pt arms, crossed. Not a glyph — see
     /// SlotMarkView.
     static let missedThickness: CGFloat = 1.0 / 17.5
     static let missedArm: CGFloat = 9.0 / 17.5
 
-    /// The upcoming day, and an upcoming run of them. The same shapes as a
-    /// completion, so the only difference between a day that happened and a day
-    /// that has not is whether it is lit.
-    static let upcomingDiameter: CGFloat = 3
-    static let upcomingThickness: CGFloat = 2
+    /// **No longer the grid's marks** (#332). Both were: a completion was a 3pt
+    /// dot and a run of them a 2pt line, floating in a 17.455pt socket. A
+    /// completion fills its slot now.
+    ///
+    /// They survive because they were doing a second job all along, and only
+    /// that job is left:
+    ///
+    ///  - `barThickness` is the weight of a *hairline* — the rest day's cut
+    ///    down a column, and the border on the Widgets tab's preview cards.
+    ///    Those are not marks and never scaled with the slot.
+    ///  - `dotDiameter` is the pop's own dot, in the Island and in the app's
+    ///    acknowledgement, and the size `SlotView` animates a closing
+    ///    completion down to.
+    ///
+    /// Kept under their old names rather than renamed, because renaming them
+    /// would touch nine call sites to say the same thing; what changed is what
+    /// they are *not* used for.
+    static let dotDiameter: CGFloat = 3
+    static let barThickness: CGFloat = 2
 }
 
 /// The HDR tile itself, sized by whatever it is put inside.
@@ -346,26 +377,23 @@ struct GlowImageView: View {
             // The stroke carries an inner pair as well as the outer one: white
             // at full strength, offset up and down, which is what gives the ring
             // its thickness at top and bottom rather than a flat hairline.
-            let inner = size.height * GlowPalette.ringInnerRadius
-            let innerOffset = size.height * GlowPalette.ringHaloOffset
+            // **1pt, inside-aligned** (#332). The inner pair that used to
+            // thicken it is gone with the fraction it was scaled by: a
+            // constant-weight ring needs no help reading at the small end,
+            // because it no longer gets thinner there.
             Capsule(style: .continuous)
-                .strokeBorder(
-                    GlowPalette.color
-                        .shadow(.inner(color: GlowPalette.color, radius: inner, y: innerOffset))
-                        .shadow(.inner(color: GlowPalette.color, radius: inner, y: -innerOffset)),
-                    lineWidth: ringLineWidth ?? (size.height * GlowShape.ringWeight)
-                )
+                .strokeBorder(GlowPalette.color, lineWidth: ringLineWidth ?? GlowShape.ringWeight)
+                .padding(GlowShape.socketInset)
         case .dot:
-            // Centred rather than inset, so a dot sits on the column's centre
-            // line whatever the slot around it is doing.
-            Circle().frame(width: GlowShape.dotDiameter, height: GlowShape.dotDiameter)
+            // **The socket's inner shape, filled** (#332). It was a 3pt dot
+            // floating in the slot; it is the slot inset by 1 on every side, so
+            // a completion fills its day rather than marking a point in it.
+            Circle().padding(GlowShape.socketInset)
         case .bar:
-            // Inset to the dot's own margin at each end, so a bar starts where
-            // the first day's dot would start and ends where the last one's
-            // would — a run of completions, not a shape covering the columns.
+            // The same shape stretched: a lit pill's inner, which is exactly
+            // the size of the upcoming track it replaces.
             Capsule(style: .continuous)
-                .frame(height: GlowShape.barThickness)
-                .padding(.horizontal, (size.height - GlowShape.dotDiameter) / 2)
+                .frame(height: size.height * GlowShape.litPillHeight - GlowShape.socketInset * 2)
         }
     }
 

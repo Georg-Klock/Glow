@@ -205,7 +205,7 @@ struct WidgetRenderDiffTests {
         // Eight habits under a header, all in points, derived rather than
         // measured off the render this is checking.
         let side = SlotLayout.slotHeight(trackWidth: track)
-        let headerBottom = WidgetMetrics.padVertical + WidgetMetrics.headerHeight
+        let headerBottom = WidgetMetrics.padTop + WidgetMetrics.headerHeight
         let firstRowTop = headerBottom + WidgetMetrics.headerGap
         let lastRowBottom = firstRowTop + 8 * side + 7 * WidgetMetrics.rowGap
 
@@ -265,7 +265,7 @@ struct WidgetRenderDiffTests {
     private func brightest(atColumn centre: CGFloat, row: Int = 0, in pixels: [UInt8]) -> Int {
         let width = Int(Self.size.width * Self.scale)
         let side = SlotLayout.slotHeight(trackWidth: track)
-        let top = WidgetMetrics.padVertical + WidgetMetrics.headerHeight + WidgetMetrics.headerGap
+        let top = WidgetMetrics.padTop + WidgetMetrics.headerHeight + WidgetMetrics.headerGap
             + CGFloat(row) * (side + WidgetMetrics.rowGap)
         let x = Int((centre * Self.scale).rounded())
         var best = 0
@@ -633,12 +633,14 @@ struct WidgetRenderDiffTests {
     /// Renders one view at a widget's own size, over the declared background,
     /// exactly as the configurations do.
     private func renderFamily(
-        _ view: some View, size: CGSize, vertical: CGFloat = WidgetMetrics.padVertical
+        _ view: some View, size: CGSize,
+        top: CGFloat = WidgetMetrics.padTop, bottom: CGFloat = WidgetMetrics.padBottom
     ) throws -> CGImage {
         let framed = view
             .padding(.leading, WidgetMetrics.padLeading)
             .padding(.trailing, WidgetMetrics.padTrailing)
-            .padding(.vertical, vertical)
+            .padding(.top, top)
+            .padding(.bottom, bottom)
             .frame(width: size.width, height: size.height)
             .background(GlowPalette.widgetBackground)
             .environment(\.colorScheme, .dark)
@@ -727,11 +729,25 @@ struct WidgetRenderDiffTests {
             }
             let share = Double(exact) * 100 / Double(w * h)
             print("bg-audit: \(name) exact-black \(String(format: "%.1f", share))%")
-            // 95-98% measured across the six families this had before #209
-            // took two of them out. A gradient, a tint or a material
-            // would lift every one of these off the floor at once, which a
-            // corner sample alone could miss if it were subtle at the edges.
-            #expect(share > 90, "\(name): only \(Int(share))% of the frame is pure black")
+            // **The floor is 70, and it was 90** (#332). What it guards has not
+            // changed — a gradient, a tint or a material lifts *every* pixel off
+            // zero at once, which a corner sample could miss if it were subtle
+            // at the edges — but what a full frame looks like has. The old
+            // number described a grid of 3pt dots and 2pt lines in 17.455pt
+            // slots, which left 95–98% of the frame untouched. The marks fill
+            // their slots now, and the same four frames measure:
+            //
+            //     week small 97.3   month small 90.6   week large 79.0   week medium 77.0
+            //
+            // 70 keeps a real margin under the lowest of those while staying far
+            // below anything a lifted ground could produce — a material over the
+            // whole frame takes this to zero, not to sixty.
+            //
+            // **#333 will overturn this test rather than move it again**: a dark
+            // glass material behind the grid is exactly the thing this bound
+            // exists to catch, and it is deliberate. The corner samples above
+            // are the part that survives as an invariant.
+            #expect(share > 70, "\(name): only \(Int(share))% of the frame is pure black")
 
             // **And 100 is what a frame with nothing in it reads.** #226
             // catalogued this bound and `noHueAnywhere` beside the two that
@@ -858,7 +874,8 @@ struct WidgetRenderDiffTests {
         let view = WeekWidgetView(entry: entry ?? self.entry(), familyOverride: .systemLarge)
             .padding(.leading, WidgetMetrics.padLeading)
             .padding(.trailing, WidgetMetrics.padTrailing)
-            .padding(.vertical, WidgetMetrics.padVertical)
+            .padding(.top, WidgetMetrics.padTop)
+                .padding(.bottom, WidgetMetrics.padBottom)
             .frame(width: Self.size.width, height: Self.size.height)
             .background(GlowPalette.widgetBackground)
             .environment(\.colorScheme, .dark)

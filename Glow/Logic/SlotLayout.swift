@@ -8,15 +8,30 @@ import CoreGraphics
 enum SlotLayout {
     /// The gap between slots, as a fraction of one daily slot.
     ///
-    /// Derived rather than fixed, because the grid is mostly air by design: at
-    /// this ratio the marks read as a constellation rather than a progress bar,
-    /// and a fixed gap in points loses that the moment the track width changes
-    /// between the phone and a large widget.
+    /// Derived rather than fixed, so a fixed gap in points cannot lose the
+    /// proportion the moment the track width changes between the phone and a
+    /// large widget. That much is unchanged.
     ///
-    /// The design file lays a large widget out as seven 35pt slots on a 59pt
-    /// pitch, so the gap is 24 on 35. Taken from the frame's own numbers rather
-    /// than measured off a render, which is where an earlier 0.735 came from.
-    static let gapRatio: CGFloat = 24.0 / 35.0
+    /// **The proportion itself is not** (#331). It was 24 on 35 — the old
+    /// file's seven 35pt slots on a 59pt pitch — and the reasoning attached to
+    /// it was that the grid is mostly air by design, so the marks read as a
+    /// constellation rather than a progress bar.
+    ///
+    /// **The air did not go; the marks grew into it** (#332). This ratio alone
+    /// makes the grid *sparser*, not denser — the pitch goes from 29.4 to 32,
+    /// so a 3pt dot in a 24pt slot sits further from its neighbour than it did
+    /// in a 17.455pt one. Looked at on a render, and it is the opposite of what
+    /// the numbers suggest at a glance. What changes the reading is the mark
+    /// filling its slot: a 22pt disc where a 3pt dot was.
+    ///
+    /// So the constellation argument is the one that gave way, and it gave way
+    /// to #332 rather than to this number. Recorded rather than silently
+    /// replaced, because it was a real argument and someone will wonder where
+    /// it went.
+    ///
+    /// 8 / 24 = 1/3, from `docs/week-marks.md` §8.2: seven 24pt slots on a 32pt
+    /// pitch, which is 216 of track.
+    static let gapRatio: CGFloat = 8.0 / 24.0
 
     /// The gap for a given track, shared by every row so the columns line up.
     static func gap(trackWidth: CGFloat) -> CGFloat {
