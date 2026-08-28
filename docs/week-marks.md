@@ -375,8 +375,9 @@ Emitting        drop   0 / 0     blur 1                #FFFFFF @ 100%
 Track container inner  0 / +6    blur 6    #000000 @ 25%
 ```
 
-The emitting pair is a tight white bloom either side of a 1pt stroke — Figma's
-stand-in for the real thing. **The HDR halo is a code-side effect scaled by
+The emitting pair is a tight white bloom either side of a 1pt stroke, and it is
+for **marks only** — emitting text takes none of it (§8.5). Figma's stand-in for
+the real thing. **The HDR halo is a code-side effect scaled by
 `GlowSettings`** and cannot be drawn in Figma at all, so the 1pt blur is a
 placeholder for its shape, not a specification of its size.
 
@@ -408,6 +409,12 @@ The icon carries the **same value as its name** in every state; the two dim
 together. A done mark is `#D9D9D9` under the lit bevel of §8.4 — lit, but not
 emitting, per §2.
 
+**Emitting text carries no drawn effect at all** — no drop shadow, no inner
+shadow. It is `#FFFFFF` and nothing else, and what makes it emit is the HDR
+headroom behind that white rather than a bloom painted around it. The emitting
+pair in §8.4 belongs to marks: its inner half has a −1 spread, which lines the
+inside of a 1pt ring and would erode a 12pt glyph to nothing.
+
 ### 8.6 Corrected on the way in
 
 Six deviations from an otherwise regular system, taken as slips:
@@ -423,26 +430,29 @@ Six deviations from an otherwise regular system, taken as slips:
 
 ### 8.7 The open mark
 
-From Figma `228:11106` — a 2-column open pill. It is the done mark's
-construction with the fill swapped for a ring, so §8.3 carries the geometry and
-this adds only what the ring is:
+From Figma `228:11106` (pill) and `228:11107` (circle, drawn beside a done one).
+An open mark is the done mark's construction with the fill swapped for a ring,
+so §8.3 carries the geometry and this adds only what the ring is:
+
+| | Socket | Ring |
+| --- | --- | --- |
+| Pill, 2 col | 56 × 14, r 7 | 54 × 12, r 6 |
+| Circle | 24 × 24, r 12 | 22 × 22, r 11 |
 
 | | |
 | --- | --- |
-| Socket | 56 × 14, r 7 — unchanged, the standard bevel |
-| Ring | 54 × 12, r 6, at +1/+1 — no fill |
-| Stroke | **1pt, inside-aligned, `#FFFFFF`** — outer edge flush with the 54 × 12 box |
+| Stroke | **1pt, inside-aligned, `#FFFFFF`** — outer edge flush with the ring box |
+| Fill | none; the socket's bevel shows through the middle |
 | Glow | the emitting pair of §8.4 |
 
-The mark is hollow: the socket's bevel shows through the middle.
+**The stroke is 1pt at both sizes.** It is a constant, not a fraction of the
+mark — the same weight rings a 12pt pill and a 22pt circle, so `ringWeight`'s
+`3 / 35` goes. That `3 / 35 × 12` lands on 1.03 is a coincidence and reading a
+rule out of it would have given the circle a 2pt stroke it does not have.
 
-**Two things are inferred rather than measured**, and are the last of the gap:
-
-- **An open circle** should be the same rule one step up — socket 24 × 24, ring
-  at 22 × 22 r 11, 1pt inside stroke, same glow. No example exists.
-- **The glow on emitting text** — today's letter, an open habit's icon and name
-  — is presumably the outer half of the pair alone, since a glyph has no
-  interior to line. No example exists.
+Since a one-column mark is a circle at every frequency (§4.3), this is also the
+open mark for a weekly row whose open slot happens to be one column wide, not
+only for a daily row's today.
 
 ### 8.8 What this moves in the code
 
