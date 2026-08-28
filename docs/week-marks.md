@@ -51,13 +51,23 @@ Mark states:
 
 | State | Light | Shape |
 | --- | --- | --- |
-| **done** | lit | filled |
-| **open** | lit | outline — at most one per row, today only |
+| **done** | lit, but not emitting | filled |
+| **open** | emitting | at most one per row, today only |
 | **upcoming** | unlit | outline |
 | **dead** | unlit | outline, with a ✕ glyph on its anchor column |
 
-Light means *done, or open today*. Nothing else in a row is lit. Shape, not
-brightness, separates open from done — the rule `CLAUDE.md` opens with.
+**Light comes in two tiers, and that is new** (2026-08-27). The HDR glow is
+reserved for what is still actionable — today's weekday letter while any habit
+is open, the icon and name of a habit open today, and the open mark itself. A
+completion is *lit* but does not emit: an object catching light rather than a
+source of it.
+
+That reverses the corollary `CLAUDE.md` opens with — "light cannot also be what
+separates open from done — so shape carries that instead" — because under two
+tiers it is exactly what separates them. It is not #75 returning: a completion
+is bright, and nothing here paints one grey. What changed is that brightness now
+has a top step a completion does not reach. `CLAUDE.md` and `SPEC.md` still
+carry the one-tier rule and are the contradiction to settle next.
 
 ---
 
@@ -83,7 +93,7 @@ Notation for the worked states below — one character per column, brackets are
 mark boundaries:
 
 ```
-█ done (lit, filled)    ○ open today (lit, outline)
+█ done (lit, filled)    ○ open today (emitting)
 · upcoming (unlit)      ✕ dead rep, drawn on its anchor column
 ```
 
@@ -350,8 +360,11 @@ Consequences to carry with it:
   Keep the accessibility string; drop the dots.
 - **`docs/decisions.md` needs an entry that explicitly supersedes #47**, per the
   authority order in `CLAUDE.md`. A reversal left unrecorded reads as drift.
-- **The Today-ring precedent (#75) still holds.** Nothing here paints a
-  completion grey. Every completed mark is lit, on every surface.
+- **The Today-ring precedent (#75) is not what this touches.** Nothing here
+  paints a completion grey; every completed mark is lit, on every surface. What
+  the two tiers above change is the *ceiling* — a completion no longer reaches
+  the glow — and #75's reasoning was written against a one-tier world, so it
+  needs re-reading rather than citing.
 
 ## Risks
 
