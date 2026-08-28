@@ -431,52 +431,76 @@ struct WidgetRenderDiffTests {
             // window either side of Wednesday's centre reads **0**, which is
             // emptiness rather than a line that stops. See #226.
             let restLine = brightestAtRestLine(2, in: pixels)
-            // The two logged days, a column outside each piece's sample point,
-            // as the lit level to judge the unlit ones against.
-            let dots = min(
+            // The lit level to judge the rest line against. Both columns sit
+            // inside a completed mark, which #344 lights — they used to be the
+            // *dots*, and the dots are gone.
+            let lit = min(
                 brightest(atColumn: columnCentre(0), in: pixels),
                 brightest(atColumn: columnCentre(4), in: pixels)
             )
 
             #expect(restLine > Self.lineFloor,
                     "nothing is drawn in Wednesday's column at all (\(restLine))")
-            #expect(isUnlit(restLine, beside: dots),
-                    "Wednesday's line is lit (\(restLine), against the dots at \(dots))")
+            // **The rest line stays unlit, and it is now the only thing in this
+            // row that is.** It is the cut, not a mark: absence, which does not
+            // glow (#72). That it is measured against a *lit* neighbour rather
+            // than a lit dot is the whole of what #344 changed here.
+            #expect(isUnlit(restLine, beside: lit),
+                    "Wednesday's line is lit (\(restLine), against the marks at \(lit))")
             #expect(wednesday < Self.clear, "the line crosses the rest day (\(wednesday))")
 
-            // **Both pieces are there, and both are the line.** A floor alone
-            // says a column is not empty, and a column is not empty for lots of
+            // **Both pieces are there, and both are lit.** A floor alone says a
+            // column is not empty, and a column is not empty for lots of
             // reasons — a completion dot in it being the one that cost #230.
-            // Each piece is sampled where this fixture puts no dot, so both read
-            // the grey line at 43 against dots at 255, and both go to nothing
-            // when the piece they name is not drawn.
+            // Each piece is sampled at a column its own mark covers, so both
+            // read the lit mark and both go to nothing when the piece they name
+            // is not drawn.
+            //
+            // This assertion is inverted from what it was. It read `isUnlit`,
+            // which was #47 in pixels: a met span drew the same grey line an
+            // upcoming one draws. #344 reverses that, and this is where the
+            // reversal is measured rather than argued.
             #expect(tuesday > Self.lineFloor, "the left piece is missing (\(tuesday))")
-            #expect(isUnlit(tuesday, beside: dots),
-                    "the left piece is a mark, not a line (\(tuesday), against the dots at \(dots))")
+            #expect(!isUnlit(tuesday, beside: lit),
+                    "the left piece is unlit (\(tuesday), against the marks at \(lit))")
             #expect(thursday > Self.lineFloor, "the right piece is missing (\(thursday))")
-            #expect(isUnlit(thursday, beside: dots),
-                    "the right piece is a mark, not a line (\(thursday), against the dots at \(dots))")
+            #expect(!isUnlit(thursday, beside: lit),
+                    "the right piece is unlit (\(thursday), against the marks at \(lit))")
         }
     }
 
-    @Test("The days carry the light, and the span does not")
-    func daysCarryTheLight() throws {
-        // #47 in one render. Two a week with Monday and Tuesday logged: the
-        // span across the week is an unlit line, and the two days it happened
-        // on are lit dots on it.
-        let entry = oneHabit(.timesPerWeek(2), done: [0, 1], todayColumn: 4)
-        try withRestColumn(6, of: entry.week) {
-            let pixels = try rgba(of: try render(entry))
-            for logged in [0, 1] {
-                #expect(brightest(atColumn: columnCentre(logged), in: pixels) > 150,
-                        "no lit dot on the day it was logged (column \(logged))")
+    @Test("A met row is lit across the week, and an unmet one is not")
+    func metRowIsLit() throws {
+        // **#344 in one render, and it used to be #47 in one render.** It read
+        // "the days carry the light, and the span does not": two a week with
+        // Monday and Tuesday logged drew an unlit line across the week with a
+        // lit dot on each of the two days it happened on.
+        //
+        // Both halves of that moved. The dots are gone, and the marks are lit —
+        // so a met row is lit *everywhere*, including the Wednesday and
+        // Thursday that this test used to require be dark. The rep the mark
+        // stands for happened; the mark reaching back over a blank day is the
+        // forgiveness the model exists for, not a claim about that day.
+        let met = oneHabit(.timesPerWeek(2), done: [0, 1], todayColumn: 4)
+        try withRestColumn(6, of: met.week) {
+            let pixels = try rgba(of: try render(met))
+            for column in [0, 1, 2, 3] {
+                #expect(brightest(atColumn: columnCentre(column), in: pixels) > 150,
+                        "a met row is dark at column \(column)")
             }
-            // Wednesday and Thursday were not logged: line, no light.
-            for quiet in [2, 3] {
-                let value = brightest(atColumn: columnCentre(quiet), in: pixels)
-                #expect(value > Self.lineFloor, "the line is missing at column \(quiet)")
-                #expect(value < 150, "column \(quiet) is lit and nothing happened on it")
-            }
+        }
+
+        // The control the old test had built into it and this one would lose:
+        // the same row, same target, nothing logged. If a met row were lit
+        // because *every* row is lit, this would pass too.
+        let untouched = oneHabit(.timesPerWeek(2), done: [], todayColumn: 4)
+        try withRestColumn(6, of: untouched.week) {
+            let pixels = try rgba(of: try render(untouched))
+            // Column 5 is past the open mark, which ends on today (column 4),
+            // so it is upcoming track and nothing has been asked of it.
+            let value = brightest(atColumn: columnCentre(5), in: pixels)
+            #expect(value > Self.lineFloor, "the upcoming track is missing")
+            #expect(value < 150, "an untouched row is lit at column 5 (\(value))")
         }
     }
 

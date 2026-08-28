@@ -910,17 +910,33 @@ struct WeekDotsTests {
         )
     }
 
-    @Test("An achieved span draws the same line as one still to come")
-    func achievedSpansAreStructure() {
-        // The other half of #47. A met goal and an untouched week are the same
-        // marks, and the dots are what tell them apart.
+    @Test("An achieved span is lit, and a met week is not an untouched one")
+    func achievedSpansAreLit() {
+        // **The reversal of #47** (#344). This test used to assert the
+        // opposite — that a met goal and an untouched week draw the same marks,
+        // with the dots the only thing telling them apart. They must not: a
+        // completion is lit on every surface (SPEC §1), and once a mark ends on
+        // its own day (#339) the dots were saying what the mark already said.
         let met = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2), completedDays: [day(0), day(1)]),
             in: week, today: day(4), target: 2,
             editing: .todayOnly, restDay: nil, calendar: calendar
         )
-        #expect(met.allSatisfy { $0.mark == .upcoming })
-        // And the two that are still marks keep their own.
+        // `donePast`, not `doneToday`: a span covers a run of days rather than
+        // one, and under the two tiers (#334) a completion is lit but does not
+        // emit.
+        #expect(met.allSatisfy { $0.mark == .donePast })
+
+        // The week that asked for the same two reps and got none of them is
+        // the picture a met row must not be confusable with.
+        let untouched = WeekSpans.spans(
+            for: .fixture(frequency: .timesPerWeek(2)),
+            in: week, today: day(4), target: 2,
+            editing: .todayOnly, restDay: nil, calendar: calendar
+        )
+        #expect(untouched.allSatisfy { $0.mark != .donePast })
+
+        // And the two that were always marks keep their own.
         let partial = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2)),
             in: week, today: day(6), target: 2,

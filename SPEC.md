@@ -33,13 +33,16 @@ That is not #75 reversing. #75 refused to paint a completion grey and still
 does; a completion is bright on every surface. #75's reasoning was written when
 there was one tier, so it is re-read rather than cited.
 
-**A span is structure, not a mark, and structure is never lit.** A habit due N
-times a week is drawn as N shapes dividing the week; those shapes say how the
-week was *divided*, which is not something that happened. They are unlit
-whether their share has been achieved or not, and the lit dots sitting on them
-say which days it happened on. Without this the sentence above has an exception
-in it — an achieved span was lit while saying nothing about when — and one
-sentence with an exception is two sentences.
+**A completed mark is lit, on every surface** (#344). A habit due N times a week
+is drawn as N shapes dividing the week, and a shape whose rep happened is lit
+like any other completion — §1 above has no exception in it. This reverses #47,
+which had those shapes draw the same unlit line whether their share was achieved
+or not, with a lit dot on the real weekday carrying *when*. What made that
+premise false is #339: a mark now ends on its own day, so its left edge carries
+when, and an unlit track with a lit dot inside it leaves the swallowed day
+visible as a gap — the thing the mark model exists to remove. The cost is that a
+mark reaching back over a blank day no longer says which of its columns the rep
+landed on; that was weighed and taken. See docs/decisions.md.
 
 ## 2. Goals
 
@@ -258,8 +261,8 @@ A build that violates one of these is broken regardless of what else works.
   zone, crossing a DST transition or relaunching does not move it, and a
   completion the app can see is a completion the app can un-log.
 - **R5.** A daily row draws exactly 7 slots; an N-times row draws exactly N
-  spans — met, behind or finished, however late in the week it is — plus one lit
-  dot per completion, on the weekday it happened.
+  spans — met, behind or finished, however late in the week it is — and a span
+  whose rep happened is lit (#344).
 - **R6.** Every row spans the same track width, whatever its slot count.
 - **R7.** Weeks reset clean. A frequency habit's unmet goal does not carry over.
 - **R8.** The glow is encoded in a colour space with headroom above SDR white.
@@ -385,15 +388,16 @@ say about it.
 The rule used to be **inferred from the design rather than specified**; it is
 specified now, in `docs/week-marks.md` §4.
 
-**An achieved span draws the same unlit line as one still to come**, because
-they are the same thing: a share of the week with no ask left in it. What tells
-them apart is the lit dot on the day it happened, which `WeekDots` places. Two
-spans keep their light and their shape: the open one, which is the one thing
-outstanding, and the ✕, which is a rep that can no longer happen. A completion
-past the goal still lights its day — it has no span, and the row is a record of
-what happened rather than of what was owed.
+**An achieved span is lit** (#344), drawing `donePast` — lit but not emitting,
+which is the two-tier rule of §1: the glow stays reserved for what is still
+actionable, and the open mark is what has it. A completion past the goal has no
+mark of its own and falls inside the last one, which is lit anyway.
 
-**The dots are spoken as one fact.** `WeekDots.spokenDays` names the weekdays
+**The days are spoken as one fact, and the speaking outlived the drawing**
+(#344). The lit dots went when the marks lit — the same light in the same
+places, drawn twice — and the string did not, because it is the only way
+VoiceOver reaches which days a weekly row carried. Both surfaces keep the
+element and draw nothing in it. `WeekDots.spokenDays` names the weekdays
 that are lit — "Workout, logged Tuesday and Friday" — as a single element with
 no button trait, in the app and the widget both. One stop rather than up to
 six, because a list of days is one answer to one question, and the spans beside

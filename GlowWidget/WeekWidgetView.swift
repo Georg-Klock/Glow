@@ -290,25 +290,17 @@ private struct WidgetRow: View {
                     }
                 }
             }
-            // A lit dot on each weekday this row was actually logged on, over
-            // the spans rather than inside them — a span covers several columns
-            // and knows nothing about which of them carried a completion. Same
-            // mark and same column centres as a daily row, so the two put their
-            // light in exactly the same places. See #47.
+            // **The dots are gone; their voice is not** (#344). A completed
+            // mark is lit now, so a lit dot drawn on top of one said the same
+            // thing twice — but the string is still the only way a screen
+            // reader reaches *which* days a weekly row carried, and a mark
+            // covering several columns says that less well than it looks. So
+            // what is left of the overlay is the element, drawing nothing.
             .overlay(alignment: .leading) {
                 let voice = WeekDots.spokenDays(for: habit, in: week, restDay: restDay)
-                ZStack(alignment: .leading) {
-                    ForEach(
-                        WeekDots.columns(for: habit, in: week, restDay: restDay), id: \.self
-                    ) { column in
-                        SlotMarkView(mark: .donePast, size: CGSize(width: side, height: side))
-                            .offset(
-                                x: SlotLayout.columnCentre(trackWidth: track, index: column)
-                                    - side / 2
-                            )
-                    }
-                }
-                // One element for the run, no button trait: the dots are a
+                Color.clear
+                    .frame(width: 0, height: 0)
+                // One element for the run, no button trait: the days are a
                 // record, and a past day is not tappable here. The app row does
                 // the same from the same string. See #104.
                 .accessibilityElement(children: .ignore)
@@ -395,13 +387,12 @@ private struct WidgetSpan: View {
         )
         if span.isTappable {
             // A `Toggle`, not a `Button` (#292) — see `WidgetSlot`. The two
-            // faces are what this span's own two tappable states draw: `.open`
-            // is the glowing ask, `.filled` is structure, because a span is
-            // structure and the lit dot on the day it happened is `WeekDots`'
-            // overlay (#47). So the optimistic frame for a completion is the
-            // ask going quiet at this span's own width; the dot, and the
-            // re-division of the row a write causes, arrive with the reload —
-            // the toggle owns its own pixels and nothing beside them.
+            // faces are what this span's own two tappable states draw:
+            // `.open` is the emitting ask, `.filled` is the lit mark it
+            // becomes (#344). So the optimistic frame for a completion is the
+            // ring filling at this span's own width; the re-division of the
+            // row a write causes arrives with the reload — the toggle owns its
+            // own pixels and nothing beside them.
             SlotToggle(
                 habitID: habit.id,
                 isDone: span.state == .filled,
@@ -412,8 +403,12 @@ private struct WidgetSpan: View {
                     habitName: habit.name, state: .open, actionDay: span.actionDay
                 )
             ) {
+                // **The done face is lit** (#344). It was `.upcoming` — #47's
+                // rule written straight into the view rather than read off
+                // `span.mark`, which is why lighting the mark alone left this
+                // one face dark and only the pixel tests said so.
                 SlotMarkView(
-                    mark: .upcoming,
+                    mark: .donePast,
                     size: size,
                     spansDays: span.dayCount > 1,
                     restWindow: restWindow

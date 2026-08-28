@@ -57,24 +57,30 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
     var dayCount: Int { lastDay - firstDay + 1 }
     var isTappable: Bool { actionDay != nil }
 
-    /// **A span is structure, not a mark** (#47).
+    /// **A mark is a mark, and a completed one is lit** (#344, reversing #47).
     ///
-    /// An achieved span and one still to come draw the same unlit line, and
-    /// that is the change rather than an oversight: a span says how the week
-    /// was *divided*, and the division does not change when a share of it is
-    /// achieved. What says a share was achieved is the lit dot on the weekday
-    /// it happened, which `WeekDots` places — so the row stops being a progress
-    /// bar and becomes a record of when.
+    /// #47 made an achieved span draw the same unlit line an upcoming one
+    /// draws, on the grounds that a span said how the week was *divided* and a
+    /// division does not change when a share of it is achieved — with the lit
+    /// dot `WeekDots` placed on the real weekday carrying *when*. That was
+    /// coherent while a span floated. It stopped being so when a mark started
+    /// ending on its own day (#339): the mark's left edge carries when, and an
+    /// unlit track with a lit dot inside it leaves the swallowed day visible as
+    /// a gap, which is the thing the mark model exists to remove.
     ///
-    /// The two spans that are still marks keep their light and their shape. The
-    /// open one is the one thing outstanding, and the ✕ is a rep that can no
-    /// longer happen.
+    /// So a completion is lit here, as SPEC §1 says it is everywhere else. The
+    /// row becomes a progress bar again, and that cost was weighed rather than
+    /// missed — see `docs/decisions.md`.
+    ///
+    /// **`donePast`, never `doneToday`.** A span covers a run of days, so it is
+    /// not the single day `doneToday` means; and under the two tiers (#334) a
+    /// completion is lit but does not emit, which is exactly the difference
+    /// between the two marks.
     var mark: SlotMark {
         switch state {
         case .open: .openToday
-        // Structure. The same line an upcoming span draws, because it is the
-        // same thing: a share of the week with no ask left in it.
-        case .filled: .upcoming
+        // A rep that happened. Lit, whatever day of the week it fell on.
+        case .filled: .donePast
         // A rep that can no longer happen. Reachable only through #81's `lost`,
         // and only once the miss is unavoidable — never as a warning.
         case .missed: .missed
