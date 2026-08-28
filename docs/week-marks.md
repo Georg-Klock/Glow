@@ -1,15 +1,22 @@
 # Week marks
 
-Dated 2026-08-27. **This is a target, not shipped behaviour.** It supersedes
-nothing until it lands; while it is unbuilt, `SPEC.md` and the code are what the
-app does. Landing any part of it requires the `docs/decisions.md` entry named
-under "Decisions this reopens".
+Dated 2026-08-27, status updated 2026-08-28. It specifies two things: **what a
+weekly habit's row draws** — the pills, the circles and the ✕ (§1–§7) — and, in
+§8, **the large widget's visual geometry**, read off Figma node `228:10690` and
+reconciled against the code.
 
-It specifies two things: **what a weekly habit's row draws** — the pills, the
-circles and the ✕ — and, in §8, **the large widget's visual geometry**, read off
-Figma node `228:10690` and reconciled against the code. Emission is settled here
-too (§2); what is still open is the appearance of the open-today mark and of the
-two states that emit, which §8 marks and does not guess at.
+**§1–§5 and §7 have shipped.** #339–#342, #344 and #345 landed as #350–#354; the
+behaviour those sections describe is `main`, not a target, and `SPEC.md` should
+be read alongside them rather than in place of them. §6 (creation credit, #343)
+is open as PR #355, CI in flight. §8 is unbuilt in full — #331, #332, #333 and
+#335 are open issues, tracked under #338 — and remains **a target, not shipped
+behaviour**: while it is unbuilt, the code's existing dot-and-bar marks are what
+the widget draws. Landing any part of §8 still requires the `docs/decisions.md`
+entry named under "Decisions this reopens" in the same change.
+
+Emission is fully settled (§2, §8.5, §8.7) — both the open mark's construction
+and the appearance of emitting text were resolved against Figma nodes `228:11106`
+and `228:11107` and are no longer open questions, only unbuilt ones.
 
 ---
 
