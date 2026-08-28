@@ -5,10 +5,11 @@ nothing until it lands; while it is unbuilt, `SPEC.md` and the code are what the
 app does. Landing any part of it requires the `docs/decisions.md` entry named
 under "Decisions this reopens".
 
-It specifies one thing: **what a weekly habit's row draws** — the pills, the
-circles and the ✕. It does not cover the glow work queued behind it (a completed
-habit's icon and name going dark, today's weekday letter lighting), which is
-separate and later.
+It specifies two things: **what a weekly habit's row draws** — the pills, the
+circles and the ✕ — and, in §8, **the large widget's visual geometry**, read off
+Figma node `228:10690` and reconciled against the code. Emission is settled here
+too (§2); what is still open is the appearance of the open-today mark and of the
+two states that emit, which §8 marks and does not guess at.
 
 ---
 
@@ -299,6 +300,148 @@ a day it is no longer actionable, which is the one thing SPEC §1 says light mus
 never do.
 
 ---
+
+---
+
+## 8. The large widget, visually
+
+Measured from Figma `228:10690` — "Week Widget — Large — harness fixture
+(Tuesday)" — with the deviations named in §8.6 corrected. Every number is
+authored at 1x, in points.
+
+**This section is temporary.** When it lands, these values belong in
+`WidgetMetrics`, `SlotLayout`, `GlowShape` and `GlowPalette`, each beside the
+reasoning those files already carry, and this section goes. There is no
+design-system document in this repository on purpose, and this is not the start
+of one.
+
+### 8.1 Frame and insets
+
+| | |
+| --- | --- |
+| Size | 338 × 354 |
+| Corner radius | 24, uniform, clipped |
+| Fill | **dark glass material** — `.ultraThinMaterial` at the 18.0 deployment target; Liquid Glass is iOS 26 and unavailable |
+| Insets | left **6**, right **14**, top **10**, bottom **14** |
+
+The insets are a deliberate optical adjustment, not derived: neither axis is
+centred, and 6/10/14 sit outside the 8/4 spacing the rest of the frame uses.
+Recorded so they are not "corrected" later.
+
+### 8.2 Columns and rows
+
+The track is 216 × 312 at (108, 28). No fill; it carries one inner shadow over
+its contents — see §8.4.
+
+- **Columns** — 7 × slot **24**, gap **8**, pitch **32**. `x = 108 + 32i`.
+- **Rows** — 10 × height **24**, gap **8**, pitch **32**. `y = 28 + 32j`.
+  `9 × 32 + 24 = 312` exactly.
+- **Span width** for *n* columns — `32n − 8`: 56, 88, 120, 152, 184, 216.
+- Label column → track: **4**. Weekday row → track: **4**.
+
+### 8.3 Marks
+
+Every mark is a **socket**, optionally with a **lit fill** inside it. The socket
+has no fill at all — it is drawn entirely by its bevel. The lit fill is the
+socket inset 1pt on all four sides with its radius reduced by 1. No exceptions.
+
+| | Socket | Lit fill |
+| --- | --- | --- |
+| Circle | 24 × 24, r 12 | 22 × 22, r 11 |
+| Pill | h **12**, r 6, width `32n − 8` | h 10, r 5 |
+
+A pill is exactly half the height of a circle, centred in the 24pt row.
+
+### 8.4 Effects
+
+Three recipes, and nothing else in the frame — no drop shadows, no outer glows,
+no blurs, no blend modes. The HDR halo is a code-side effect scaled by
+`GlowSettings` and cannot appear in Figma at all, so its absence there says
+nothing.
+
+```
+Socket          inner  0 / −1.5  blur 1.5  #FFFFFF @ 13%
+                inner  0 / +1.5  blur 1.5  #000000 @ 100%
+
+Lit fill        inner  0 / +1    blur 1    #FFFFFF @ 100%
+                inner  0 / −1    blur 1    #000000 @ 30%
+
+Track container inner  0 / +6    blur 6    #000000 @ 25%
+```
+
+Socket and lit fill invert each other's light direction: a socket is pressed in,
+a lit mark stands proud. **The socket bevel was drawn against a 7–10% white
+ground**, which the glass material replaces — `#000000 @ 100%` will read heavier
+against it than Figma shows, and wants checking on a device.
+
+### 8.5 Type, colour and emission
+
+One face throughout: **SF Pro Regular, 12pt**, `wdth 100`, line-height normal,
+single line, truncating with an ellipsis.
+
+- **Habit label** — 98 × 18, vertically centred on its row. Icon column 24 wide
+  at x 0; glyph 14.98 × 17.08 centred (SF Symbol at 14pt). Name at x 28.5,
+  max width **73.5** — `(98 + 4) − 24 − 4.5`, which is exactly where the track
+  begins, so a name can never reach the grid.
+- **Weekday letter** — cell 24 × 14 at the column's own x, text centred.
+
+Colour is one hex and three steps of it, and it says what is still asked of you:
+
+| | Weekday letter | Habit label |
+| --- | --- | --- |
+| Emitting | today, any habit open | this habit open today |
+| `#D9D9D9` @ 100% | today, everything closed | handled today |
+| `#D9D9D9` @ 50% | any other day | at rest |
+
+The icon carries the **same value as its name** in every state; the two dim
+together. A done mark is `#D9D9D9` under the lit bevel of §8.4 — lit, but not
+emitting, per §2.
+
+### 8.6 Corrected on the way in
+
+Six deviations from an otherwise regular system, taken as slips:
+
+| Found in the file | Corrected to |
+| --- | --- |
+| Four 2-column lit pill sockets at h 14 / r 7 | h 12 / r 6, like every other pill |
+| Weekday letter cells 17.455 wide — the *old* slot — on a 32pt pitch, landing 0.27 left of centre | 24 wide, on the column |
+| Name max width 84.5, derived from the old 15pt label gap, overrunning the track by 11 | 73.5 |
+| Socket fill `#D9D9D9 @ 1%` | no fill; the socket is its bevel |
+| Icon pure white beside a `#D9D9D9` name | icon takes the name's value |
+| Four zero-size boolean nodes; one fully authored but hidden row | file detritus, dropped |
+
+### 8.7 Not yet specified
+
+The **emitting tier has no appearance yet** — not the open mark, not the letter
+at `#FFFFFF`, not the label at `#FFFFFF`. The fixture contains no white text and
+no open mark, so this is **one gap rather than three**: it draws the whole
+non-emitting world and stops.
+
+### 8.8 What this moves in the code
+
+Visual only; §"Seven changes" below covers the behavioural half.
+
+| | Now | Target |
+| --- | --- | --- |
+| Slot / gap / pitch | 17.455 / 11.969 / 29.424 | **24 / 8 / 32** |
+| gap ÷ slot | 0.686 (24 ⁄ 35) | **0.333** |
+| Track | 194 | **216** |
+| Insets | 15 / 16 / 15 | **6 / 14 / 10 / 14** |
+| Label → track | 15 | **4** |
+| Header → track | 13 | **4** |
+| Rows | 11 | **10** |
+| Unlit day | 3pt dot in the socket | **22pt disc** |
+| Unlit span | 2pt line | **10pt pill** |
+| Background | none, removed deliberately | **dark glass material** |
+| Resting grey | `#8D8D8D`, opaque | **`#D9D9D9` @ 50%** |
+
+Two of those carry a cost worth stating. `nameMaxWidth` is derived from the
+label gap and must be re-derived with it, or a long name runs under the grid.
+And the resting grey becoming translucent reverses what #111, #194 and #240
+settled: accented rendering discards colour and keeps alpha, so a weekday letter
+that was opaque on a Clear or Tinted home screen will now render at half
+strength there.
+
 
 # PRD
 
