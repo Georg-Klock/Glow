@@ -202,9 +202,17 @@ struct WeekProvider: AppIntentTimelineProvider {
         // the value is read where it is safe to read. See `WidgetBurst.record`.
         guard let burst = WidgetBurst.pending(now: now), !WidgetBurst.reduceMotion else {
             let why = WidgetBurst.pending(now: now) == nil ? "none pending" : "suppressed by reduce motion"
-            GlowLog.widget.notice("timeline: 1 entry, still (burst \(why, privacy: .public))")
-            WidgetTrace.record("timeline: 1 entry, still (burst \(why), load \(load))")
-            return Timeline(entries: [entry], policy: .after(midnight))
+            // Now *and* the next midnight, so the row re-flows on the day
+            // turning over whether or not WidgetKit has obliged the reload
+            // (#345).
+            let still = [entry] + (nextMidnightEntry(after: entry).map { [$0] } ?? [])
+            GlowLog.widget.notice(
+                "timeline: \(still.count, privacy: .public) entries, still (burst \(why, privacy: .public))"
+            )
+            WidgetTrace.record(
+                "timeline: \(still.count) entries, still (burst \(why), load \(load))"
+            )
+            return Timeline(entries: still, policy: .after(midnight))
         }
 
         // The cross-fade's few stills and the settle, dated from *this moment*
@@ -230,7 +238,7 @@ struct WeekProvider: AppIntentTimelineProvider {
                 burstHabit: step.progress == nil ? nil : burst.habitID,
                 progress: step.progress ?? 1
             )
-        }
+        } + (nextMidnightEntry(after: entry).map { [$0] } ?? [])
         // The lag is no longer subtracted from the fade, so this line is now
         // purely a measurement — and the one #121 is about. Every tap reports
         // how long WidgetKit took to ask.
@@ -261,6 +269,33 @@ struct WeekProvider: AppIntentTimelineProvider {
             // and stays typed, so a failed container renders "unavailable"
             // rather than the new-user empty state.
             habits: WeekWidgetStore.rows(chosen: configuration.rows?.map(\.id), in: week)
+        )
+    }
+
+    /// The same row, dated at the next local midnight (#345).
+    ///
+    /// **A reload policy is a request; an entry is a guarantee.** The timeline
+    /// already asked to be rebuilt `.after(midnight)`, and that stays — but
+    /// WidgetKit decides when it obliges, and until it does the Home Screen
+    /// keeps rendering the last entry it was given. That entry says today is
+    /// yesterday, so the row draws yesterday's open ring on a day it is no
+    /// longer actionable, which is the one thing SPEC §1 says light must never
+    /// do. A second entry costs nothing and needs no reload to be right.
+    ///
+    /// The record does not change at midnight; *today* does. `WeekSpans` is a
+    /// function of both, so the same habits at a later date re-flow on their
+    /// own: the division moves and any newly dead rep appears. The week is
+    /// recomputed rather than carried over, because a midnight that crosses the
+    /// week start is exactly the case where reusing it would draw the new day
+    /// against the old seven columns.
+    private func nextMidnightEntry(after entry: WeekEntry) -> WeekEntry? {
+        guard let midnight = WeekCalendar.calendar.date(
+            byAdding: .day, value: 1, to: WeekCalendar.day(entry.date)
+        ) else { return nil }
+        return WeekEntry(
+            date: midnight,
+            week: WeekCalendar.week(containing: midnight),
+            habits: entry.habits
         )
     }
 
