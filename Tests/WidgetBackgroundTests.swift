@@ -31,11 +31,11 @@ struct WidgetBackgroundTests {
     @Test("Every colour the widget draws is neutral")
     @MainActor
     func nothingCarriesAHue() {
-        // Two colours, and there is no third: white is anything lit, #8D8D8D is
-        // anything that is not. A hue anywhere would also break the widget's
-        // accented rendering, where the system keeps alpha and discards colour.
+        // One hex at three steps and white above them (#335): a hue anywhere
+        // would also break the widget's accented rendering, where the system
+        // keeps alpha and discards colour.
         let neutral: [Color] = [
-            GlowPalette.color, GlowPalette.greyOpaque,
+            GlowPalette.color, GlowPalette.lit, GlowPalette.greyResting,
             GlowPalette.greyIncreasedContrast, GlowPalette.greyAccented,
             GlowPalette.controlTint, GlowPalette.widgetBackground,
         ]
@@ -92,11 +92,16 @@ struct TwoColoursTests {
         // test that says what the value *is*, so reading it from `GlowPalette`
         // would make it a test that cannot fail. 141 is `#8D8D8D`, the value
         // `greyOpaque` and `greyIncreasedContrast` now share (2026-08-24).
-        let grey = components(GlowPalette.greyOpaque)
-        #expect((grey.r * 255).rounded() == 141)
-        #expect((grey.g * 255).rounded() == 141)
-        #expect((grey.b * 255).rounded() == 141)
-        #expect(grey.a == 1, "the grey carries alpha: \(grey.a)")
+        let grey = components(GlowPalette.greyResting)
+        #expect((grey.r * 255).rounded() == 217)
+        #expect((grey.g * 255).rounded() == 217)
+        #expect((grey.b * 255).rounded() == 217)
+        #expect(abs(Double(grey.a) - 0.5) < 0.001, "the resting step is not half: \(grey.a)")
+
+        // The step above it: the same hex, opaque (#335).
+        let litStep = components(GlowPalette.lit)
+        #expect((litStep.r * 255).rounded() == 217)
+        #expect(litStep.a == 1, "the lit step carries alpha: \(litStep.a)")
 
         // And white is still white, still opaque.
         let white = components(GlowPalette.color)
@@ -122,20 +127,32 @@ struct TwoColoursTests {
         // move: 23 cleared 15 arithmetically and still read as almost nothing
         // on a real screen, and so did 36 and 43. 141 clears it by a wide
         // margin, which was never the risk on this side of the guardrail.
-        let level = (components(GlowPalette.greyOpaque).r * 255).rounded()
-        #expect(level > 15, "the unlit grey is at \(level); the render scans floor at 15")
+        // **Composited, not the declared component.** The resting step is
+        // translucent since #335, so what those scans see is its level on the
+        // widget's black ground — 217 at half is 108.5 — and reading `r` alone
+        // would answer 217 for a level that never lands.
+        let resting = components(GlowPalette.greyResting)
+        let level = (Double(resting.r) * Double(resting.a) * 255).rounded()
+        #expect(level > 15, "the resting grey lands at \(level); the render scans floor at 15")
+        // The other half of that coupling: it must still read as *unlit* beside
+        // a lit mark. `WidgetRenderDiffTests.isUnlit` asks whether a tone times
+        // 1.5 stays under the lit one.
+        let litLevel = Double(components(GlowPalette.lit).r) * 255
+        #expect(level * 1.5 < litLevel,
+                "the resting grey no longer reads as unlit beside \(litLevel)")
     }
 
-    @Test("The default grey and Increase Contrast's are the same value now")
+    @Test("Increase Contrast is the way out, and the steps stay ordered")
     @MainActor
-    func increasedContrastIsTheOldGrey() {
-        // #8D8D8D: what `white.opacity(0.553)` composited to on black, and so
-        // not a number invented for the setting. It clears 4.5:1 on black,
-        // comfortably past what body text asks for.
+    func increasedContrastIsTheLitStep() {
+        // `#D9D9D9` opaque — the `lit` step, which is what the setting now
+        // resolves to (#335). Not a number invented for the setting: it is the
+        // reflecting tier at full strength, the same value a completion draws.
+        // 14.9:1 on black, against the 6.3:1 this used to give.
         let lifted = components(GlowPalette.greyIncreasedContrast)
-        #expect((lifted.r * 255).rounded() == 141)
+        #expect((lifted.r * 255).rounded() == 217)
         #expect(lifted.a == 1)
-        #expect(Self.contrastOnBlack(141 / 255.0) > 4.5,
+        #expect(Self.contrastOnBlack(217 / 255.0) > 4.5,
                 "the lifted grey no longer clears 4.5:1")
 
         // **This used to be a ceiling.** `< 1.2` defended `#171717`, then
@@ -147,11 +164,28 @@ struct TwoColoursTests {
         // ceiling on how bright `greyOpaque` may get — it is an equality, and
         // it fails if the two values are ever allowed to drift apart without
         // that drift being a decision either.
-        let shipping = components(GlowPalette.greyOpaque)
-        #expect(shipping.r == lifted.r && shipping.g == lifted.g && shipping.b == lifted.b,
-                "greyOpaque and greyIncreasedContrast no longer agree")
-        #expect(Self.contrastOnBlack(Double(shipping.r)) > 4.5,
-                "the default grey no longer clears legible body text")
+        // **The third shape of this guardrail** (#335, 2026-08-28). It was a
+        // ceiling (`< 1.2`, then `< 1.5`) defending a deliberately dim default
+        // while legibility was the setting's job; then an equality, when
+        // 2026-08-24 collapsed the two because a setting arguing "the default
+        // should be this bright" is an argument for moving the default.
+        //
+        // Now a floor *on the setting*, plus an ordering. The default is dim
+        // again but for a reason it never had before: it is the third of three
+        // steps rather than the only one, and the two above it carry
+        // everything live. What must not come back is a reader with no way
+        // out — so the assertion that matters is on `greyIncreasedContrast`,
+        // and it now describes 14.9:1 rather than the 6.3:1 it used to.
+        #expect(Self.contrastOnBlack(Double(lifted.r)) > 4.5,
+                "Increase Contrast no longer clears legible body text")
+
+        // The steps stay ordered, so "dimmest of three" keeps meaning
+        // something. Composited, because the resting step is translucent.
+        let resting = components(GlowPalette.greyResting)
+        #expect(Double(resting.r) * Double(resting.a) < Double(components(GlowPalette.lit).r),
+                "the resting step is not below the lit one")
+        #expect(Double(components(GlowPalette.lit).r) < 1.0,
+                "the lit step reached white, which is the emitting tier")
     }
 
     @Test("The two greys that still carry alpha are the two the app does not paint")
@@ -172,14 +206,15 @@ struct TwoColoursTests {
         }
     }
 
-    @Test("Outside accented rendering and Increase Contrast, the grey resolves to #8D8D8D")
+    @Test("Outside accented rendering and Increase Contrast, the grey resolves to the resting step")
     @MainActor
-    func defaultEnvironmentResolvesToTheOpaqueGrey() {
+    func defaultEnvironmentResolvesToTheRestingStep() {
         // The default environment is what every app surface draws in: no widget
         // rendering mode, standard contrast.
         let resolved = GlowGrey().resolve(in: EnvironmentValues())
-        #expect((components(resolved).r * 255).rounded() == 141)
-        #expect(components(resolved).a == 1)
+        #expect((components(resolved).r * 255).rounded() == 217)
+        #expect(abs(Double(components(resolved).a) - 0.5) < 0.001,
+                "the default resolution is not the resting step")
     }
 
     /// WCAG relative contrast of a neutral sRGB value against pure black.

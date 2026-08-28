@@ -3,10 +3,23 @@ import WidgetKit
 
 /// Every colour and every effect in the grid.
 ///
-/// **Two colours, both opaque.** White is anything lit; `#8D8D8D` is everything
-/// else. There is no third, and there is no scale between them — a slot is
-/// identified by whether there is light in it and by its silhouette, never by
-/// how far down a grey ramp it sits (#111).
+/// **One hex at three steps, and white above them** (#335, 2026-08-28). Light
+/// has two tiers (#334): `#FFFFFF` with an HDR halo *emits*, and everything
+/// below it reflects. The reflecting tier is `#D9D9D9`, at two strengths —
+/// full for what is done or handled, half for what is at rest.
+///
+/// | | |
+/// | --- | --- |
+/// | `#FFFFFF` + halo | emitting: still actionable |
+/// | `#D9D9D9` @ 100% | lit, not emitting: a completion, today handled |
+/// | `#D9D9D9` @ 50% | at rest: the rest of the week |
+///
+/// **This is not the grey ramp #111 collapsed.** That ramp was four names for
+/// one distinction, stacking opacities until the grid read as a grey scale
+/// while the whole premise was that brightness means one thing. These three are
+/// three different claims — *do this now*, *this happened*, *nothing is asked
+/// here* — and the middle one only exists because #334 gave light a ceiling a
+/// completion does not reach.
 ///
 /// It used to sit on a ramp: one grey at 55.3% white, which composites to 141
 /// on black, and two more stacked on top of it at 71 and 23. Four names, three
@@ -16,13 +29,11 @@ import WidgetKit
 ///
 /// #111 collapsed that ramp onto the socket's own value, `#171717`, and #194
 /// and #240 each nudged it brighter while holding to one rule: the default grey
-/// stays *findable*, never *legible* — that was `greyIncreasedContrast`'s job,
-/// behind a setting, so the reading "what stays dark is what never happened"
-/// held for everyone who had not asked otherwise. **That rule is retired**
-/// (2026-08-24): the default is now `#8D8D8D`, the same value
-/// `greyIncreasedContrast` already was — not a fourth nudge, a decision that
-/// the two tiers should read the same. See the full reasoning where
-/// `greyOpaque` is declared.
+/// stays *findable*, never *legible*. 2026-08-24 retired that rule and moved
+/// the default to `#8D8D8D`, the value Increase Contrast already used, so the
+/// two read the same. **2026-08-28 moves again**, and it is worth being exact
+/// about what it does and does not reopen — see where `greyResting` is
+/// declared.
 ///
 /// **Two values below still carry alpha, and neither is a colour the app
 /// draws.** `greyAccented` is what the system is handed once it has already
@@ -44,7 +55,7 @@ import WidgetKit
 /// are the exception — they are baked into the stroke in `GlowImageView` and
 /// are not scaled.
 enum GlowPalette {
-    // MARK: - The two colours
+    // MARK: - The colours
 
     /// sRGB components, shared by the SwiftUI colour and the Core Image render
     /// so the solid shape and the HDR shape are the same colour.
@@ -62,61 +73,77 @@ enum GlowPalette {
         opacity: 1
     )
 
-    /// Everything that is not lit: the resting habit name, the weekday letter
-    /// that is not today, the ✕ on a day that went unlogged, the rest day's cut,
-    /// and the socket on a day still to come. One name, because they are one
-    /// colour — five names for one value would only be a record of what they
-    /// used to differ by.
+    /// Everything at rest: the resting habit name, the weekday letter that is
+    /// not today, the ✕ on a day that went unlogged, the rest day's cut, and
+    /// the socket on a day still to come. One name, because they are one claim
+    /// — nothing is asked here.
     ///
     /// **A style rather than a `Color`, and that is the whole of the accented
     /// problem.** `resolve(in:)` reads the environment the mark is drawn in, so
     /// the one name answers three questions in one place. What the app draws is
-    /// `greyOpaque`; see `GlowGrey`.
+    /// `greyResting`; see `GlowGrey`.
     static let grey = GlowGrey()
 
-    /// The second colour, as declared. `#8D8D8D`, opaque.
+    /// **`#D9D9D9` at 50%** — the resting step, and what the app draws by
+    /// default (#335, 2026-08-28).
     ///
-    /// **The guardrail this used to respect was retired on purpose, not
-    /// exceeded by accident** (2026-08-24). Three nudges — #111's `#171717`,
-    /// #194's `#242424`, #240's `#2B2B2B` — all held one rule: stay under 1.5:1
-    /// on black, unmistakably not-lit, because legible body text was
-    /// `greyIncreasedContrast`'s job behind a setting, not the default's. #240
-    /// said explicitly that the next report of "still unreadable" would be
-    /// asking to move that rule rather than nudge inside it, and that is what
-    /// this is: judged against a reference screenshot of ordinary dark-mode
-    /// body text, not a fourth guess.
+    /// It composites to 108.5 on black, **4.0:1**. The value it replaces,
+    /// `#8D8D8D`, was 6.3:1, so this is a step *down* in contrast and that is
+    /// the part worth being careful about — 2026-08-24 moved the default up to
+    /// exactly that value because the grey had been reported unreadable, and
+    /// retired the two-tier "dim by default, legible on request" model to do
+    /// it.
     ///
-    /// **The value is `greyIncreasedContrast`'s, not a new one.** Rather than
-    /// pick a fresh point on the scale, this asks the same question #111 asked
-    /// when it first collapsed the ramp: is there already a number in this file
-    /// that means what is wanted here? There was — the app's own pre-#111 grey,
-    /// already measured at 6.3:1, comfortably clearing the 4.5:1 body text
-    /// asks for. So the default and Increase Contrast now read the same, and
-    /// the two-tier model — dark by default, legible on request — is gone.
-    /// `Tests/WidgetBackgroundTests.swift` asserts the equality directly, so a
-    /// future edit to one without the other fails loudly rather than drifting.
-    static let greyOpaque = greyIncreasedContrast
+    /// **What makes that not a reversal is that there are three steps now, not
+    /// two.** 2026-08-24's problem was a single resting grey that had to carry
+    /// everything and was too dim to read. Here the resting step is genuinely
+    /// the dimmest of three: `color` emits, `lit` is a full-strength `#D9D9D9`
+    /// at 14.9:1 for what is done or handled, and this is what is left over.
+    /// A reader is not being asked to read the app at 4:1 — they are being
+    /// asked to read *the part of it that is asking nothing* at 4:1, with
+    /// everything live above it.
+    ///
+    /// **And the setting still answers.** `greyIncreasedContrast` is `lit`, so
+    /// anyone who found the old grey hard to read gets 14.9:1 rather than the
+    /// 6.3:1 they used to get. The tier that retired was *dim by default,
+    /// legible on request*; what is here is *quiet by default, loud on
+    /// request*, and the loud end is brighter than anything this palette has
+    /// offered before.
+    ///
+    /// Translucent rather than a flat `#6D6D6D`, because the design draws it as
+    /// one hex at two strengths and because the alpha is what accented
+    /// rendering can still see — see `greyAccented`.
+    static let greyResting = lit.opacity(restingAlpha)
 
-    /// The grey Increase Contrast asks for — and, since 2026-08-24, the grey
-    /// everyone gets.
+    /// How far down the resting step sits. Half, from the design file.
+    static let restingAlpha: Double = 0.5
+
+    /// **`#D9D9D9` at full strength** — lit, but not emitting (#334).
     ///
-    /// Kept under its own name for what it used to be the answer to: for #111
-    /// through #240, the default grey stayed deliberately dim — "what stays
-    /// dark is what never happened," carried through to type — and this was
-    /// the honouring of the setting for people who found that too dim to read.
-    /// That distinction is what retired; the number did not need to.
+    /// A completion, today's weekday letter once everything is closed, the name
+    /// of a habit already handled today. The second tier of light: an object
+    /// catching it rather than a source of it, which is why it is not `color`.
     ///
-    /// `#8D8D8D` is not a number invented for this: it is what `grey` composited
-    /// to before #111, so Increase Contrast gets the app's own previous grey.
-    /// It measures 6.3:1 on black, comfortably past the 4.5:1 asked of body text.
-    ///
-    /// **`greyOpaque` now equals this exactly** (2026-08-24) — declared as its
-    /// own named constant still, because the setting and the default answer
-    /// different questions even on the day their values happen to agree, and a
-    /// future change to one is not implicitly a change to both.
-    static let greyIncreasedContrast = Color(
-        .sRGB, red: 141 / 255, green: 141 / 255, blue: 141 / 255, opacity: 1
+    /// 14.9:1 on black, so it is also what Increase Contrast resolves to.
+    static let lit = Color(
+        .sRGB, red: 217 / 255, green: 217 / 255, blue: 217 / 255, opacity: 1
     )
+
+    /// The grey Increase Contrast asks for: the `lit` step, at full strength.
+    ///
+    /// **The setting's job came back, with a better answer than it ever had**
+    /// (#335). For #111 through #240 this was the escape hatch from a
+    /// deliberately dim default, at `#8D8D8D` and 6.3:1. 2026-08-24 collapsed
+    /// it into the default, because a setting whose whole argument is "the
+    /// default should have been this bright" is an argument for changing the
+    /// default. #335 gives the resting step a *reason* to be dim — it is one of
+    /// three, and the two above it carry everything live — so the escape hatch
+    /// is worth having again, and it now lands on 14.9:1 rather than 6.3:1.
+    ///
+    /// Declared as its own name rather than used inline, because the setting
+    /// and the `lit` step answer different questions even while they share a
+    /// value, and a future change to one is not implicitly a change to both.
+    static let greyIncreasedContrast = lit
 
     /// The grey under *accented* rendering, which is what a Home Screen set to
     /// Clear or Tinted puts a widget into.
@@ -140,15 +167,13 @@ enum GlowPalette {
 
     /// A system switch's ON track.
     ///
-    /// Not `greyOpaque`, and the reason is measured. #124 gave the Settings
+    /// Not a grid colour, and the reason is measured. #124 gave the Settings
     /// toggles an explicit tint because white is what this app reserves for lit
     /// and a switch track is not lit; the ON track landed at 181,181,183 against
-    /// an untouched system OFF track at 90,90,94. `greyOpaque` at 141 no longer
-    /// falls *below* the OFF track the way `#171717` and `#2B2B2B` did — the
-    /// 2026-08-24 move to `#8D8D8D` happens to clear it — but 141 is still well
-    /// short of the ON track's measured 181, so borrowing it would still be a
-    /// visibly dimmer switch than the one that was actually measured, not the
-    /// inverted one earlier values risked.
+    /// an untouched system OFF track at 90,90,94. The resting grey composites
+    /// to 108 and would fall *below* the OFF track, which is the inversion
+    /// #124 was fixing; `lit` at 217 overshoots the measured 181 the other way.
+    /// Neither is the number that was measured, so the switch keeps its own.
     ///
     /// A `Toggle` in a `Form` is one of iOS's own components on a support
     /// screen, which is the boundary #111 draws its own scope at. So it keeps
@@ -303,6 +328,6 @@ struct GlowGrey: ShapeStyle {
         if environment.colorSchemeContrast == .increased {
             return GlowPalette.greyIncreasedContrast
         }
-        return GlowPalette.greyOpaque
+        return GlowPalette.greyResting
     }
 }

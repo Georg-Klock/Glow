@@ -330,21 +330,24 @@ actual bug. Every line here is something that already happened.
 - **The glow modifier uses `.overlay`, not `ZStack`.** The HDR tile is
   `resizable()`, and inside a `ZStack` it expands and centres — which renders as
   glowing text in the wrong place. There is a comment saying so; believe it.
-- **Two colours, both opaque: glow white and `#8D8D8D`** (#111, moved by #194,
-  #240, and again on 2026-08-24 — see the "guardrail retired" entry in
-  `docs/decisions.md`, since that move overturned rather than nudged the rule
-  the first three followed).
-  Not a grey
-  ramp — the palette used to stack opacities into four steps and the grid read
-  as a grey scale. `GlowPalette` is the single source, and `GlowPalette.grey` is
-  a `ShapeStyle`, not a `Color`, because two of its three answers are the
-  system's: **accented widget rendering (Clear/Tinted) strips the background
-  and keeps only alpha**, where an opaque grey comes back as a lit mark and the
-  hierarchy collapses into one tone — that is why the alpha-stored grey still
-  exists — and Increase Contrast, which as of 2026-08-24 asks for the same
-  value the default already draws, so `greyIncreasedContrast` and `greyOpaque`
-  are declared separately but read identically. Reached through `resolve(in:)`
-  rather than at the call site either way.
+- **One hex at three steps, and white above them** (#335, 2026-08-28; before it
+  #111, #194, #240 and the 2026-08-24 retirement — all in `docs/decisions.md`).
+  `#FFFFFF` with a halo emits, `#D9D9D9` at 100% is lit but not emitting, and
+  `#D9D9D9` at 50% is at rest.
+  **Not a grey ramp** — the palette used to stack opacities into four steps for
+  one distinction and the grid read as a grey scale. These are three different
+  claims: *do this now*, *this happened*, *nothing is asked here*. The middle
+  one exists only because #334 gave light a ceiling a completion does not reach.
+  `GlowPalette` is the single source, and `GlowPalette.grey` is a `ShapeStyle`,
+  not a `Color`, because two of its three answers are the system's: **accented
+  widget rendering (Clear/Tinted) strips the background and keeps only alpha**,
+  where an opaque grey comes back as a lit mark and the hierarchy collapses into
+  one tone, and Increase Contrast, which since #335 resolves to the `lit` step
+  at 14.9:1. Reached through `resolve(in:)` rather than at the call site either
+  way. **The resting step is 4.0:1 on purpose** — dimmer than the default was on
+  2026-08-24, which is only defensible because it is now the third of three
+  rather than the only one; that reasoning is the decisions entry, and moving
+  either end of the scale without it is how this gets undone by accident.
 - **A widget's background can be removed by the user.** The measurement that
   said otherwise held for `fullColor` rendering only. Handle
   `widgetRenderingMode`.

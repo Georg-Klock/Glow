@@ -5349,3 +5349,54 @@ from.
 stays reserved for what is still actionable. What this changes is the floor. A
 completion was drawing *dark*, which was the one place on the weekly row where
 SPEC §1's rule did not hold, and #47 is the reason it did not.
+
+
+## The resting grey becomes `#D9D9D9` at half, because there are three steps now (#335)
+
+**2026-08-28.** `GlowPalette` holds one hex at three steps and white above them:
+`#FFFFFF` with a halo emits, `#D9D9D9` at 100% is lit-but-not-emitting, and
+`#D9D9D9` at 50% is at rest. `greyIncreasedContrast` becomes the middle step.
+
+**This looks like it reverses 2026-08-24, and the difference is the reason it
+does not.** Four days ago the default grey moved *up* to `#8D8D8D` (6.3:1)
+because it had been reported unreadable, and the two-tier model — dim by
+default, legible on request — was retired on the grounds that a setting arguing
+"the default should have been this bright" is an argument for moving the
+default. The resting step here is **4.0:1**, dimmer than what that entry
+installed. Taken alone, that is the same mistake again.
+
+What makes it not the same is that the resting grey has stopped being *the*
+grey. 2026-08-24's problem was one value carrying every non-lit thing in the
+app: a habit name, a weekday letter, a ✕, an unlit socket, all at one strength,
+and at 1.5:1 the reading ones were unreadable. #334 gave light a ceiling, and
+#335 gives the reflecting tier two strengths under it. A reader is no longer
+asked to read the app at 4:1 — they are asked to read *the part asking nothing
+of them* at 4:1, with everything live sitting above it at 14.9:1.
+
+**And the setting is a better answer than it ever was.** Increase Contrast now
+resolves to the `lit` step, 14.9:1, against the 6.3:1 it used to give. What
+2026-08-24 retired was *dim by default, legible on request*; what this installs
+is *quiet by default, loud on request*, and the loud end is brighter than
+anything this palette has offered. Anyone who found the old grey hard to read is
+strictly better served.
+
+**The guardrail took its third shape rather than being deleted.** It was a
+ceiling (`< 1.2`, then `< 1.5`) while the default was deliberately dim; it
+became an equality when the two collapsed; it is now a floor on
+`greyIncreasedContrast` plus an ordering assertion, so "the dimmest of three"
+keeps meaning something and cannot quietly become "the dimmest of one" again.
+`Tests/WidgetBackgroundTests.swift` carries all three shapes in its comments,
+because the number alone never explains itself.
+
+**What #111 settled is untouched.** That decision collapsed a four-name grey
+*ramp* — opacities stacked until the grid read as a grey scale while the whole
+premise was that brightness means one thing. These three steps are three
+distinct claims — *do this now*, *this happened*, *nothing is asked here* — and
+the middle one exists only because #334 gave a completion a ceiling. A ramp is
+one meaning at several strengths; this is several meanings.
+
+**The cost, stated.** Accented rendering keeps alpha and discards colour, so a
+resting mark on a Clear or Tinted Home Screen now arrives at half strength where
+an opaque grey survived intact. `greyAccented` keeps its existing 0.553 alpha —
+deliberately unanswered here rather than guessed at, since what a resting letter
+is worth once the system has thrown the colour away is its own question.
