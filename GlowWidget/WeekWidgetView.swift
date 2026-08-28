@@ -107,28 +107,58 @@ struct WeekWidgetView: View {
                         today: entry.date,
                         track: track,
                         labelWidth: labelWidth,
-                        labelGap: labelGap
+                        labelGap: labelGap,
+                        anyOpen: TypeTier.anyOpen(
+                            in: habits, week: entry.week, today: entry.date, restDay: restDay
+                        )
                     )
                     // The header stands further from the first row than the
                     // rows stand from each other.
                     .padding(.bottom, WidgetMetrics.headerGap - WidgetMetrics.rowGap)
                 }
-                ForEach(Array(shown.enumerated()), id: \.element.id) { index, habit in
-                    WidgetRow(
-                        habit: habit,
-                        week: entry.week,
-                        today: entry.date,
-                        track: track,
-                        side: side,
-                        labelWidth: labelWidth,
-                        labelGap: labelGap,
-                        showsLabel: showsLabels,
-                        index: index,
-                        cut: cut,
-                        restIndex: restIndex,
-                        restDay: restDay,
-                        burst: entry.burstHabit == habit.id ? entry.progress : nil
+                VStack(alignment: .leading, spacing: WidgetMetrics.rowGap) {
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { index, habit in
+                        WidgetRow(
+                            habit: habit,
+                            week: entry.week,
+                            today: entry.date,
+                            track: track,
+                            side: side,
+                            labelWidth: labelWidth,
+                            labelGap: labelGap,
+                            showsLabel: showsLabels,
+                            index: index,
+                            cut: cut,
+                            restIndex: restIndex,
+                            restDay: restDay,
+                            burst: entry.burstHabit == habit.id ? entry.progress : nil
+                        )
+                    }
+                }
+                // **The track's own inner shadow** (#332, #333, §8.2 and
+                // §8.4): `0 / +6, blur 6, #000000 @ 25%`, laid over the
+                // contents rather than behind them. It is the fourth of the
+                // file's four effect recipes and the only one belonging to the
+                // container rather than to a mark — the grid sits *in*
+                // something, and this is the edge of it.
+                //
+                // **Around the rows, not the frame.** Trailing-aligned at the
+                // track's own width so it covers the marks and not the label
+                // column — a row is `[label | track]` and the labels lead — and
+                // wrapped around the row stack alone, so the header stays
+                // outside it and the recess ends with the last habit. §8.2
+                // measures the track at 216 × 312, which is ten rows against a
+                // fixture that has ten; drawn over the whole frame instead, a
+                // widget showing fewer put an empty box under the last row.
+                // Looked at, which is how that was caught.
+                .overlay(alignment: .trailing) {
+                    InnerShadow(
+                        shape: AnyShape(Rectangle()),
+                        color: .black.opacity(0.25),
+                        radius: 6,
+                        y: 6
                     )
+                    .frame(width: track)
                 }
                 Spacer(minLength: 0)
             }
@@ -142,6 +172,9 @@ private struct WidgetHeader: View {
     let track: CGFloat
     let labelWidth: CGFloat
     let labelGap: CGFloat
+    /// Whether anything in the week still wants doing today — the one piece of
+    /// state a weekday letter needs that is not its own.
+    let anyOpen: Bool
 
     private var initials: [String] { WeekCalendar.weekdayInitials() }
 
@@ -155,12 +188,15 @@ private struct WidgetHeader: View {
                         .font(.system(size: WidgetMetrics.textSize))
 
                     Group {
-                        // Today's letter is white with a drop shadow in the
-                        // design, so it is a glow and not a brighter grey.
-                        if isToday {
-                            letter.glowing(halo: GlowPalette.headerHalo)
-                        } else {
-                            letter.foregroundStyle(GlowPalette.grey)
+                        // Three steps, not two (#335, §8.5). Today's letter
+                        // emits only while something is still open; once every
+                        // habit is handled it steps down to the lit tier — the
+                        // day is still today and still reads as today, it has
+                        // simply stopped asking.
+                        switch TypeTier.weekday(isToday: isToday, anyHabitOpen: anyOpen) {
+                        case .emitting: letter.glowing(halo: GlowPalette.headerHalo)
+                        case .lit: letter.foregroundStyle(GlowPalette.lit)
+                        case .resting: letter.foregroundStyle(GlowPalette.grey)
                         }
                     }
                     .frame(width: SlotLayout.slotWidth(trackWidth: track, slotCount: 7))
@@ -217,6 +253,13 @@ private struct WidgetRow: View {
     /// Still waiting on today. The label follows the slot, same rule as the app.
     private var isDue: Bool {
         slots.contains { $0.state == .open } || spans.contains { $0.state == .open }
+    }
+
+    /// Handled today: something was asked of this habit today and it was done.
+    /// The middle step of §8.5, and the reason a finished row is quieter than
+    /// an untouched one rather than identical to it.
+    private var isHandled: Bool {
+        TypeTier.isHandled(habit, today: today, restDay: restDay)
     }
 
     var body: some View {
@@ -331,12 +374,14 @@ private struct WidgetRow: View {
         .font(.system(size: WidgetMetrics.textSize))
 
         Group {
-            // Full white with a drop shadow in the design means a real glow, the
-            // same rule the marks follow.
-            if isDue {
-                text.glowing(halo: GlowPalette.labelHalo)
-            } else {
-                text.foregroundStyle(GlowPalette.grey)
+            // Three steps (#335, §8.5), and the whole label takes the tier —
+            // §8.5 is explicit that the icon carries the same value as its name
+            // in every state, so `text` is styled as one thing rather than a
+            // glyph and a string styled apart.
+            switch TypeTier.label(isOpenToday: isDue, isHandledToday: isHandled) {
+            case .emitting: text.glowing(halo: GlowPalette.labelHalo)
+            case .lit: text.foregroundStyle(GlowPalette.lit)
+            case .resting: text.foregroundStyle(GlowPalette.grey)
             }
         }
         .frame(width: labelWidth, alignment: .leading)

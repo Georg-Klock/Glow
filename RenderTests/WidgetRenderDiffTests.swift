@@ -354,12 +354,19 @@ struct WidgetRenderDiffTests {
         try body()
     }
 
-    /// A span's own line, unlit. Since #47 an achieved span is structure rather
-    /// than a mark, so "is the span there" is a question about the grey line,
-    /// not about light — `GlowPalette.grey` composites to 141 on black
-    /// (2026-08-24; it was 43 before the default and Increase Contrast became
-    /// one value).
-    private static let lineFloor = 15
+    /// **The widget's ground, measured** (#333). It was 0,0,0 and it is a dark
+    /// glass material now, which reads at 30–31 across every family.
+    ///
+    /// Every threshold below used to be a level against black. They are levels
+    /// against *this* — because "nothing is drawn here" stopped meaning "this
+    /// pixel is zero" the moment the surface stopped being zero, and a test
+    /// that kept comparing against zero would report the background as content.
+    private static let ground = 31
+
+    /// A span's own line, unlit — "is the span there" is a question about the
+    /// resting grey, not about light. `GlowPalette.grey` composites to 109 on
+    /// black and to about 123 over the glass.
+    private static let lineFloor = ground + 15
 
     /// Nothing drawn here at all — not "unlit", which is a different claim.
     ///
@@ -370,7 +377,20 @@ struct WidgetRenderDiffTests {
     /// ground rather than against the palette, which is why it does not move
     /// when the palette does — and why `lineFloor` sits above it: between them
     /// is the band nothing is ever painted in.
-    private static let clear = 10
+    ///
+    /// **Relative to the ground since #333**, for the reason given there: a
+    /// cleared column measures 32 against a ground of 31, and against the old
+    /// absolute 10 that read as content.
+    private static let clear = ground + 6
+
+    /// Where *lit* starts, as distinct from unlit-with-a-bevel.
+    ///
+    /// **The socket's highlight moved this** (#332, #333). An unlit mark used
+    /// to top out at the resting grey; it now carries the bevel's white edge at
+    /// 13%, which over a 123-level disc peaks around 157. The lit step is 217
+    /// and the emitting one 255, so the boundary sits between — where the old
+    /// absolute 150 now lands *inside* what an unlit mark can reach.
+    private static let litFloor = 185
 
     @Test("A met goal with Sunday resting stops at Saturday")
     func metGoalStopsBeforeSunday() throws {
@@ -488,7 +508,7 @@ struct WidgetRenderDiffTests {
         try withRestColumn(6, of: met.week) {
             let pixels = try rgba(of: try render(met))
             for column in [0, 1, 2, 3] {
-                #expect(brightest(atColumn: columnCentre(column), in: pixels) > 150,
+                #expect(brightest(atColumn: columnCentre(column), in: pixels) > Self.litFloor,
                         "a met row is dark at column \(column)")
             }
         }
@@ -503,7 +523,7 @@ struct WidgetRenderDiffTests {
             // so it is upcoming track and nothing has been asked of it.
             let value = brightest(atColumn: columnCentre(5), in: pixels)
             #expect(value > Self.lineFloor, "the upcoming track is missing")
-            #expect(value < 150, "an untouched row is lit at column 5 (\(value))")
+            #expect(value < Self.litFloor, "an untouched row is lit at column 5 (\(value))")
         }
     }
 
@@ -535,8 +555,8 @@ struct WidgetRenderDiffTests {
             let window = brightestInRestColumn(2, in: pixels)
             let arcs = min(before, after)
 
-            #expect(before > 150, "the left arc is missing (\(before))")
-            #expect(after > 150, "the right arc is missing (\(after))")
+            #expect(before > Self.litFloor, "the left arc is missing (\(before))")
+            #expect(after > Self.litFloor, "the right arc is missing (\(after))")
 
             // **The rest day's column was drawn.** This is the half #219 was
             // filed for. The claim here is that the open span crosses the rest
@@ -604,13 +624,13 @@ struct WidgetRenderDiffTests {
             try withoutHalo {
                 let pixels = try rgba(of: try render(entry))
 
-                #expect(brightest(atColumn: columnCentre(2), row: 0, in: pixels) > 150,
+                #expect(brightest(atColumn: columnCentre(2), row: 0, in: pixels) > Self.litFloor,
                         "row 0 is not Beta: nothing lit on Wednesday")
-                #expect(brightest(atColumn: columnCentre(0), row: 0, in: pixels) < 150,
+                #expect(brightest(atColumn: columnCentre(0), row: 0, in: pixels) < Self.litFloor,
                         "row 0 is lit on Monday — the tap order reached the render")
-                #expect(brightest(atColumn: columnCentre(0), row: 2, in: pixels) > 150,
+                #expect(brightest(atColumn: columnCentre(0), row: 2, in: pixels) > Self.litFloor,
                         "row 2 is not Alpha: nothing lit on Monday")
-                #expect(brightest(atColumn: columnCentre(2), row: 2, in: pixels) < 150,
+                #expect(brightest(atColumn: columnCentre(2), row: 2, in: pixels) < Self.litFloor,
                         "row 2 is lit on Wednesday — the tap order reached the render")
 
                 // The blank row draws nothing — no socket, no cross, no dot —
@@ -642,7 +662,7 @@ struct WidgetRenderDiffTests {
             .padding(.top, top)
             .padding(.bottom, bottom)
             .frame(width: size.width, height: size.height)
-            .background(GlowPalette.widgetBackground)
+            .background { GlowPalette.widgetSurface }
             .environment(\.colorScheme, .dark)
         let renderer = ImageRenderer(content: framed)
         renderer.scale = Self.scale
@@ -701,53 +721,68 @@ struct WidgetRenderDiffTests {
         return try body()
     }
 
-    @Test("The ground is 0,0,0 in every family, exactly")
-    func groundIsPureBlack() throws {
+    @Test("The ground is one flat dark tone in every family")
+    func groundIsFlatGlass() throws {
         try withoutHalo {
-        // The corners, which no halo reaches. Exactly zero, not a tolerance
-        // band: the claim is pure black, and "nearly" is the thing being
-        // ruled out — the design file's own container is a ~13-level gradient,
-        // and that is exactly the difference this refuses.
+        // **#87's claim was that the ground is 0,0,0, and #333 replaces it.**
+        // The widget's surface is a dark glass material now, so pure black is
+        // no longer the truth and asserting it would only assert that #333 had
+        // not happened.
+        //
+        // What #87 was actually defending survives, and it is the part worth
+        // keeping: the design file's own container is a ~13-level *gradient*,
+        // and a gradient is what this refuses. A material is flat. So the
+        // claims become uniform, neutral and dark — each of which a gradient,
+        // a tint or a light panel breaks, and none of which "nearly black"
+        // was ever really about.
         for (name, view, size) in families() {
             let image = try renderFamily(view, size: size)
             let pixels = try rgba(of: image)
             let w = image.width, h = image.height
-            for (x, y) in [(1, 1), (w - 2, 1), (1, h - 2), (w - 2, h - 2)] {
+
+            let corners = [(1, 1), (w - 2, 1), (1, h - 2), (w - 2, h - 2)].map { x, y in
                 let i = (y * w + x) * 4
-                #expect(pixels[i] == 0 && pixels[i + 1] == 0 && pixels[i + 2] == 0,
-                        "\(name) corner (\(x),\(y)) is \(pixels[i]),\(pixels[i+1]),\(pixels[i+2])")
+                return (r: Int(pixels[i]), g: Int(pixels[i + 1]), b: Int(pixels[i + 2]))
             }
 
-            // And most of the frame is exactly zero. A gradient, a tint or a
-            // material would lift every one of these off the floor at once,
-            // which a corner sample alone could miss if it were subtle at the
-            // edges.
-            var exact = 0
-            for i in stride(from: 0, to: pixels.count, by: 4)
-            where pixels[i] == 0 && pixels[i + 1] == 0 && pixels[i + 2] == 0 {
-                exact += 1
+            // **Uniform.** Every corner the same tone, within the dithering the
+            // material itself produces — measured at 30...32 across the three
+            // families. A gradient across the frame cannot pass this: the
+            // file's own is thirteen levels top to bottom.
+            let levels = corners.flatMap { [$0.r, $0.g, $0.b] }
+            let spread = (levels.max() ?? 0) - (levels.min() ?? 0)
+            #expect(spread <= 4, "\(name): the ground is not flat, corners span \(spread) levels")
+
+            // **Neutral.** Still true and still worth saying: accented
+            // rendering keeps alpha and throws colour away, so a hue here would
+            // be invisible in the one mode that would suffer from it.
+            for corner in corners {
+                #expect(max(corner.r, corner.g, corner.b) - min(corner.r, corner.g, corner.b) <= 3,
+                        "\(name): a hue in the ground — \(corner)")
             }
-            let share = Double(exact) * 100 / Double(w * h)
-            print("bg-audit: \(name) exact-black \(String(format: "%.1f", share))%")
-            // **The floor is 70, and it was 90** (#332). What it guards has not
-            // changed — a gradient, a tint or a material lifts *every* pixel off
-            // zero at once, which a corner sample could miss if it were subtle
-            // at the edges — but what a full frame looks like has. The old
-            // number described a grid of 3pt dots and 2pt lines in 17.455pt
-            // slots, which left 95–98% of the frame untouched. The marks fill
-            // their slots now, and the same four frames measure:
-            //
-            //     week small 97.3   month small 90.6   week large 79.0   week medium 77.0
-            //
-            // 70 keeps a real margin under the lowest of those while staying far
-            // below anything a lifted ground could produce — a material over the
-            // whole frame takes this to zero, not to sixty.
-            //
-            // **#333 will overturn this test rather than move it again**: a dark
-            // glass material behind the grid is exactly the thing this bound
-            // exists to catch, and it is deliberate. The corner samples above
-            // are the part that survives as an invariant.
-            #expect(share > 70, "\(name): only \(Int(share))% of the frame is pure black")
+
+            // **Dark.** The glass is a surface for sockets to be pressed into,
+            // not a panel. Measured at 31; the bound is where "dark glass"
+            // stops being a fair description.
+            let ground = levels.reduce(0, +) / levels.count
+            #expect(ground > 8 && ground < 60,
+                    "\(name): the ground is at \(ground), which is not dark glass")
+
+            // **And most of the frame is that same tone.** A corner sample
+            // alone could miss a gradient that is subtle at the edges; this is
+            // the whole-frame half of the claim, and the number it replaces is
+            // the exact-black share #332 had already lowered from 90 to 70.
+            var atGround = 0
+            for i in stride(from: 0, to: pixels.count, by: 4)
+            where abs(Int(pixels[i]) - ground) <= 3
+                && abs(Int(pixels[i + 1]) - ground) <= 3
+                && abs(Int(pixels[i + 2]) - ground) <= 3 {
+                atGround += 1
+            }
+            let share = Double(atGround) * 100 / Double(w * h)
+            print("bg-audit: \(name) ground \(ground), flat share \(String(format: "%.1f", share))%")
+            #expect(share > 40,
+                    "\(name): only \(Int(share))% of the frame sits at the ground tone")
 
             // **And 100 is what a frame with nothing in it reads.** #226
             // catalogued this bound and `noHueAnywhere` beside the two that
@@ -793,10 +828,17 @@ struct WidgetRenderDiffTests {
             let dark = try withoutHalo { try rgba(of: try renderFamily(view, size: size)) }
             #expect(lit.count == dark.count, "\(name) rendered two different sizes")
 
+            // **At the ground, not at zero** (#333). This used to select
+            // pixels the unlit render left at 0,0,0 and ask whether the lit one
+            // raised them. The ground is a glass material now and sits at ~31,
+            // so nothing is ever 0 and the selector matched nothing at all —
+            // the test passed its hue clause vacuously and failed its "the glow
+            // lifts something" clause, which is exactly the pair #226 warns
+            // about.
             for i in stride(from: 0, to: min(lit.count, dark.count), by: 4)
-            where dark[i] == 0 && dark[i + 1] == 0 && dark[i + 2] == 0 {
+            where Int(max(dark[i], dark[i + 1], dark[i + 2])) <= Self.clear {
                 let high = Int(max(lit[i], lit[i + 1], lit[i + 2]))
-                guard high > 0 else { continue }
+                guard high > Self.clear else { continue }
                 lifted += 1
                 worstSpread = max(
                     worstSpread, high - Int(min(lit[i], lit[i + 1], lit[i + 2]))
@@ -807,8 +849,12 @@ struct WidgetRenderDiffTests {
 
         #expect(lifted > 0, "the glow lifts no pixel off the ground at all")
         // Neutral where it lands, which is the claim that survives the halo.
-        // One level of slack for the encoder's own rounding between channels.
-        #expect(worstSpread <= 1, "the halo carries a hue: channels spread by \(worstSpread)")
+        // Three levels of slack, and each is accounted for: one is the
+        // encoder's own rounding between channels, #333's material dithers the
+        // ground by another, and the track's 25% black inner shadow rounds
+        // again where it composites over that dither. Measured at 3; an actual
+        // tint lands in the tens.
+        #expect(worstSpread <= 3, "the halo carries a hue: channels spread by \(worstSpread)")
     }
 
     @Test("No pixel the widget renders carries a hue")
@@ -824,11 +870,14 @@ struct WidgetRenderDiffTests {
                     - Int(min(pixels[i], pixels[i + 1], pixels[i + 2]))
                 worst = max(worst, spread)
             }
-            // One level of slack for the encoder's own rounding between
-            // channels; anything with an actual tint lands far above it.
-            // Zero on a blank frame, as `groundIsPureBlack`'s share is 100 on
-            // one — and held for the same reason and by the same gate. #226.
-            #expect(worst <= 1, "\(name) carries a hue: channels spread by \(worst)")
+            // Three levels of slack, each accounted for: the encoder's own
+            // rounding between channels, the material dithering the ground —
+            // measured at 30,31,31 and 30,32,31 on corners of one frame — and
+            // the track's 25% black inner shadow rounding again where it
+            // composites over that dither. Anything with an actual tint lands
+            // in the tens. Held against a blank frame by the same gate as the
+            // ground's own flatness. #226.
+            #expect(worst <= 3, "\(name) carries a hue: channels spread by \(worst)")
         }
     }
 
@@ -877,7 +926,7 @@ struct WidgetRenderDiffTests {
             .padding(.top, WidgetMetrics.padTop)
                 .padding(.bottom, WidgetMetrics.padBottom)
             .frame(width: Self.size.width, height: Self.size.height)
-            .background(GlowPalette.widgetBackground)
+            .background { GlowPalette.widgetSurface }
             .environment(\.colorScheme, .dark)
 
         let renderer = ImageRenderer(content: view)

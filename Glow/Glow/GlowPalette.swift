@@ -290,13 +290,40 @@ enum GlowPalette {
 
     // MARK: - Outside the grid
 
-    /// The widget's background under Default appearance: true black, declared
+    /// The ground the widget's surface resolves against: true black, declared
     /// explicitly rather than as `Color.black`, which is a system colour and
     /// free to be something other than 0,0,0.
     ///
-    /// Under Tinted or Clear this is removed and replaced with glass, so it is
-    /// only ever what Default sees.
+    /// Under Default appearance the container background is composited into the
+    /// snapshot opaquely and every alpha lands on this. Under Tinted or Clear
+    /// the system drops it and substitutes its own glass.
     static let widgetBackground = Color(.sRGB, red: 0, green: 0, blue: 0, opacity: 1)
+
+    /// **The widget's surface: dark glass over black** (#333).
+    ///
+    /// `WidgetMetrics` used to end with a note explaining why there were no
+    /// background constants — the design drew a gradient container, the widget
+    /// followed it for a while, and on a real Home Screen it read as a panel
+    /// sitting on the wallpaper rather than marks floating on it. **That
+    /// measurement was real and this is a decision on top of it, not a finding
+    /// that it was wrong.** What changed is what the marks are: sockets pressed
+    /// into a surface (#332) need a surface to be pressed into, and a panel is
+    /// the point rather than the problem.
+    ///
+    /// `.ultraThinMaterial` is the spelling available at the 18.0 deployment
+    /// target — Liquid Glass is iOS 26 and out of reach. The design draws the
+    /// fill as `#FFFFFF 10% → 7%`, which is Figma's stand-in for a material
+    /// rather than the value to type in.
+    ///
+    /// Declared here as one view so the widget and the render harness cannot
+    /// disagree about what the surface is: a baseline rendered over a different
+    /// ground than the widget ships is a baseline of nothing.
+    static var widgetSurface: some View {
+        ZStack {
+            widgetBackground
+            Rectangle().fill(.ultraThinMaterial)
+        }
+    }
 
     /// Amber, and the only colour in the app that is not white or grey. Used for
     /// exactly one thing: saying that the glow is unavailable. A warning in the

@@ -144,14 +144,9 @@ struct SlotMarkView: View {
         }
     }
 
-    /// One half of a bevel: a stroke twice the blur radius wide, blurred,
-    /// offset, and clipped back to the shape.
+    /// One half of a bevel, through the shared recipe below.
     private func bevelEdge(_ shape: AnyShape, color: Color, y: CGFloat) -> some View {
-        shape
-            .stroke(color, lineWidth: 3)
-            .blur(radius: 1.5)
-            .offset(y: y)
-            .clipShape(shape)
+        InnerShadow(shape: shape, color: color, radius: 1.5, y: y)
     }
 
     /// A day, or a run of days, with nothing asked of it yet.
@@ -244,5 +239,38 @@ struct SlotMarkView: View {
         guard max(leftRoom, rightRoom) > 0 else { return 0 }
         let centre = leftRoom >= rightRoom ? leftRoom / 2 : high + rightRoom / 2
         return centre - size.width / 2
+    }
+}
+
+
+/// An inner shadow, drawn the only way that works here.
+///
+/// **`.shadow(.inner(_:))` is not an option, and that is measured** (#332). An
+/// inner shadow on a `ShapeStyle` is modulated by the fill it decorates, so
+/// over a shape with no fill — which is what both callers have — it paints
+/// nothing at all. Probed by setting a socket's light half to full-strength red
+/// and rendering: zero red pixels, against 11,458 for this.
+///
+/// So: a stroke twice the blur radius wide, blurred, pushed off-centre, and
+/// clipped back to the shape, leaving only the part that falls inside its edge.
+///
+/// Two callers, one recipe. `SlotMarkView` presses a socket into the surface
+/// with a pair of these; `WeekWidgetView` lays one over the track. They are the
+/// same effect at different scales, and a second implementation would be a
+/// second thing to keep in step.
+struct InnerShadow: View {
+    let shape: AnyShape
+    let color: Color
+    let radius: CGFloat
+    var x: CGFloat = 0
+    var y: CGFloat = 0
+
+    var body: some View {
+        shape
+            .stroke(color, lineWidth: radius * 2)
+            .blur(radius: radius)
+            .offset(x: x, y: y)
+            .clipShape(shape)
+            .allowsHitTesting(false)
     }
 }

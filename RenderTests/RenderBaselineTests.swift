@@ -391,7 +391,7 @@ struct RenderBaselineTests {
             .padding(.top, WidgetMetrics.padTop)
                 .padding(.bottom, WidgetMetrics.padBottom)
             .frame(width: frame.size.width, height: frame.size.height)
-            .background(GlowPalette.widgetBackground)
+            .background { GlowPalette.widgetSurface }
             .environment(\.colorScheme, .dark)
         let renderer = ImageRenderer(content: framed)
         renderer.scale = scale
@@ -522,7 +522,20 @@ struct RenderSignature: Codable, Equatable {
     /// `flatTonesAreReal` is what keeps this honest — a level nothing is
     /// painted at gates nothing, so the list cannot silently outlive the
     /// palette. That test is what caught the 141 → 109 move.
-    static let flatTones = [109, 217, 255]
+    /// **109 became 124 with #333, and the reason is worth more than the
+    /// number.** The resting step is `#D9D9D9` at 50%, so what it *renders* as
+    /// is a composite of the palette and whatever is behind it — 109 over the
+    /// old pure-black ground, and 124 over the glass material, which measures
+    /// 31. It is the one level in this list that is not a palette constant, and
+    /// it moves whenever the ground does.
+    ///
+    /// Measured rather than derived, twice over: `0.5 × 217 + 0.5 × 31` is
+    /// 124, and the probe found the count split 4063/364 across 124 and 125
+    /// because the material dithers. 124 carries the bulk in every family.
+    ///
+    /// 217 and 255 are opaque and did not move at all, which is the other half
+    /// of the same point.
+    static let flatTones = [124, 217, 255]
 
     var width: Int
     var height: Int

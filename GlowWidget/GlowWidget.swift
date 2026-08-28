@@ -87,7 +87,7 @@ struct GlowWidget: Widget {
                 //    its own continuous-corner squircle regardless. The file's
                 //    *interior* corners are plain circular arcs and those are
                 //    reproduced.
-                .containerBackground(GlowPalette.widgetBackground, for: .widget)
+                .containerBackground(for: .widget) { GlowPalette.widgetSurface }
                 // The marks act in place through their intents; everything
                 // else opens the app on this widget's own screen.
                 .widgetURL(DeepLink.week)

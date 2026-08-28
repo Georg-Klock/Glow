@@ -5461,3 +5461,121 @@ point bought the medium family its fifth row at a 17.455pt slot. At 24 a fifth
 row needs 152 of 134, so nothing an inset can do reaches it: medium holds four,
 the insets are the design's own numbers, and the large family's ten rows now
 fill the track exactly with no slack at all.
+
+
+## The widget's ground is dark glass, and #87's "0,0,0" goes with it (#333)
+
+**2026-08-28.** `GlowPalette.widgetSurface` is `.ultraThinMaterial` over black,
+declared once so the widget and the render harness cannot disagree about what
+the surface is. The design draws the fill as `#FFFFFF 10% → 7%`, which is
+Figma's stand-in for a material rather than a value to type in; Liquid Glass is
+iOS 26 and out of reach at the 18.0 deployment target.
+
+**The note this replaces was right and is kept.** `WidgetMetrics` ended with a
+measurement: the design drew a gradient container, the widget followed it for a
+while, and on a real Home Screen it read as a panel sitting on the wallpaper
+rather than marks floating on it. That was seen on hardware. #333 is a decision
+on top of it, not a finding that it was wrong — the marks became sockets pressed
+into a surface (#332), and a socket needs a surface, so the panel is the point
+now rather than the problem. The note stays where it was so that if the glass
+ever reads as a panel again, the record says that outcome was seen once already.
+
+**#87's invariant is superseded, deliberately.** "The ground is 0,0,0 in every
+family, exactly" cannot survive a material, and asserting it would only assert
+that #333 had not happened. What #87 was *defending* survives and is what the
+test now says: the design file's own container is a ~13-level gradient, and a
+gradient is what the claim refuses. A material is flat. So the assertions became
+**uniform, neutral and dark** — each broken by a gradient, a tint or a light
+panel — plus a whole-frame share at the ground's own tone, which is the half a
+corner sample could miss.
+
+**The ground was load-bearing for the whole render suite, which nobody knew.**
+Six tests encoded "dark means near zero" and broke at once. They are expressed
+against a measured `ground = 31` now rather than against zero:
+
+- a cleared column reads 32, which against the old absolute `clear = 10` read as
+  *content*;
+- `lineFloor` moved because the resting grey composites to ~123 over glass
+  rather than 109 on black;
+- a new `litFloor` of 185, because the socket's 13% white highlight lifts an
+  *unlit* mark's brightest pixel to about 157 — inside the old 150 boundary;
+- the hue tolerance went from 1 to 2, because the material dithers the ground
+  (30,31,31 and 30,32,31 on corners of one frame).
+
+**One of those six was failing dangerously.** The halo test selected pixels the
+unlit render left at exactly `0,0,0` and asked whether the lit render raised
+them. Over glass nothing is ever zero, so the selector matched **nothing**: its
+hue clause passed vacuously while its "the glow lifts something" clause failed.
+That is the #226 class — a whole-frame claim a blank render satisfies — and the
+tempting fix was to loosen the half that was complaining.
+
+**The resting step's rendered level is not a palette constant.** `#D9D9D9` at
+50% composites against whatever is behind it: 109 over black, **124** over the
+glass. `flatTones` moved with it, measured twice — `0.5 × 217 + 0.5 × 31 = 124`,
+and a probe found the count split 4063/364 across 124 and 125 because the
+material dithers. The opaque tones, 217 and 255, did not move at all on either
+runtime. That difference is the maintenance cost #335's translucency introduced,
+and it is recorded where `flatTones` is declared: any future change to the
+ground silently moves what a resting mark renders as.
+
+**Still open, and it needs hardware.** The socket bevel's `#000000 @ 100%` was
+drawn against a 7–10% white ground. The glass is darker and blurred, so that
+edge will read heavier than the file shows — and the simulator cannot answer it,
+because what it can check is geometry and what is in question is depth.
+
+
+## Type takes all three steps, and the track is a recess (#332, #335, completing)
+
+**2026-08-28.** Two pieces of already-decided scope that the PRs closing them
+did not carry.
+
+**The track's inner shadow.** `0 / +6, blur 6, #000000 @ 25%`, laid over the
+grid's contents — the fourth of `docs/week-marks.md` §8.4's four effect recipes,
+and the only one belonging to the container rather than to a mark. It was
+missing from #332. It wraps the row stack rather than the frame: the header
+stays outside it and the recess ends with the last habit, because drawn over the
+whole frame a widget showing fewer than ten rows put an empty box under the last
+one. Looked at, which is how that was caught.
+
+**The middle step, attached.** #335 declared `#D9D9D9` at full strength and left
+it on marks only; §8.5's table wants it on type as well, and `TypeTier` in
+`Glow/Logic/` is that table:
+
+| | Weekday letter | Habit label |
+| --- | --- | --- |
+| emitting | today, any habit open | this habit open today |
+| lit | today, everything closed | handled today |
+| resting | any other day | at rest |
+
+**Today's letter stops glowing unconditionally**, which is the visible
+consequence and follows from #334: if emission is reserved for what is still
+actionable, a letter that glows all day says *this is today* rather than *this
+wants you*. It steps down once every habit is handled — still plainly today, no
+longer asking.
+
+**"Handled today" means logged today, not goal met.** A 2x habit finished on
+Monday and Tuesday, read on Friday, rests: nothing was asked of it today and
+nothing was done. The easy reading would leave it lit all week and make the
+middle step mean something §8.5 does not say.
+
+The rule lives in `Logic/` because two surfaces draw this row — the app's grid
+and the widget's — and a rule written twice drifts. The views turn a tier into a
+style and decide nothing.
+
+**What the measurements said, including where the first answer was wrong.**
+
+- The render matches §8 exactly: frame 338 × 354, inner mark 22.0, inner pill
+  12.0, pitch 32.0 on both axes, inner-to-inner gap 10.0, track 109 → 323, first
+  row top 29.0. Every one-point difference from the spec's figures is the
+  specified 1pt inner inset.
+- **The track shadow contributes nothing to the render signature** — two runs,
+  one with the shadow at 25% and one at 0%, produced identical tone counts. The
+  first explanation offered for the baseline movement was that the shadow shaded
+  marks off their tones; that was wrong, and measuring it was what said so.
+- **The signature's `tones` is a spike detector, not a pixel count**:
+  `histogram[level] − (histogram[level−1] + histogram[level+1]) / 2`. So the
+  middle step raised the raw count at 217 (5,772 → 7,057) while *lowering* the
+  signature's excess there (8,892 → 4,899) — type is mostly antialiased edges,
+  and those populate the neighbouring levels the detector subtracts. Both
+  numbers are right; they measure different things, and confusing them is how a
+  baseline gets approved for the wrong reason.
