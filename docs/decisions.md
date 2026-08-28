@@ -5264,3 +5264,46 @@ its premise — that a doc enumerating the week widget at three sizes must be
 a reconstruction — became the truth, and there is no wrong phrasing left for
 it to catch. The retirement is commented in place, and the self-test's two
 fixtures for it went with it.
+
+
+## Light has two tiers, and emission is reserved for the actionable (#334)
+
+**2026-08-27.** The HDR emission — the physical glow the app is named for —
+goes only to what is still actionable: today's weekday letter while any habit
+is still open, the icon and name of a habit open today, and the open mark. A
+completion is **lit but does not emit**: `#D9D9D9` under a white bevel, an
+object catching light rather than a source of it.
+
+**What this supersedes.** `CLAUDE.md` opened, from the start, with a corollary
+drawn from SPEC §1: *"light cannot also be what separates open from done — so
+shape carries that instead."* That corollary is withdrawn. Under two tiers,
+light is exactly what separates them. Shape keeps the job too — a ring for
+open, a filled mark for done — so the distinction is now carried twice rather
+than by shape alone, which is a redundancy the row can afford and the reason
+this is a smaller change than it reads as.
+
+**What it does not supersede.** SPEC §1's rule itself is untouched: every
+completion is lit, whatever day it fell on, and what stays dark is absence. The
+second tier adds a ceiling above *lit*, not a floor below it.
+
+**It is not #75 returning, and #75 is not the precedent to cite.** #75 is the
+Today ring painting a logged repetition grey — the one surface in the app where
+a completion went dark, and a contradiction of §1. Nothing here paints a
+completion grey; every completed mark is bright on every surface. But #75's
+reasoning was written against a world with one tier in it, where "not the
+brightest thing on screen" and "dark" were the same claim. It needs re-reading
+before it is used against anything, rather than quoting.
+
+**Why reserve the top tier at all.** The glow is the app's one signal and it
+was carrying two meanings — *this happened* and *this is still yours to do*.
+Reserving emission for the actionable gives the scarce signal one job, and
+leaves the abundant one (lit vs dark) saying what it always said. The cost is
+that a finished row is quieter than it used to be, which is a perceptual claim
+and is checkable only on a device with headroom; the simulator cannot answer
+it.
+
+`docs/week-marks.md` §2 carries the same rule; `CLAUDE.md` and `SPEC.md` §1 now
+carry it too, which is what closes the contradiction #334 filed. The rendering
+that implements it — a completed habit's icon and name going dark, today's
+letter lighting — is deliberately not in this change: this entry settles what
+is true, and the surfaces move behind it.
