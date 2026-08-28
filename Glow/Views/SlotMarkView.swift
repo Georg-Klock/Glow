@@ -90,9 +90,17 @@ struct SlotMarkView: View {
     /// completion stands proud of it.
     @ViewBuilder
     private var doneMark: some View {
+        // The lit fill's own pair does *not* scale — the file draws it at 1 on
+        // the 24pt slot and at 1 on the 16pt cell both — but the track's shade
+        // does, and it lands on a completion exactly as it lands on a socket.
         let fill = GlowPalette.lit
             .shadow(.inner(color: .white, radius: 1, y: 1))
             .shadow(.inner(color: .black.opacity(0.3), radius: 1, y: -1))
+            .shadow(.inner(
+                color: .black.opacity(0.25),
+                radius: Self.well(size.height),
+                y: Self.well(size.height)
+            ))
         if spansDays {
             sized(
                 Capsule(style: .continuous)
@@ -134,8 +142,9 @@ struct SlotMarkView: View {
     private func socket(_ height: CGFloat, circle: Bool) -> some View {
         let shape = circle ? AnyShape(Circle()) : AnyShape(Capsule(style: .continuous))
         let bevel = ZStack {
-            bevelEdge(shape, color: .white.opacity(0.13), y: -1.5)
-            bevelEdge(shape, color: .black, y: 1.5)
+            bevelEdge(shape, color: .white.opacity(0.13), y: -Self.bevel(size.height))
+            bevelEdge(shape, color: .black, y: Self.bevel(size.height))
+            wellShadow(shape)
         }
         if circle {
             bevel
@@ -144,10 +153,41 @@ struct SlotMarkView: View {
         }
     }
 
-    /// One half of a bevel, through the shared recipe below.
+    /// One half of a bevel, at the size the slot asks for.
     private func bevelEdge(_ shape: AnyShape, color: Color, y: CGFloat) -> some View {
-        InnerShadow(shape: shape, color: color, radius: 1.5, y: y)
+        InnerShadow(shape: shape, color: color, radius: Self.bevel(size.height), y: y)
     }
+
+    /// **The grid's own shade, on the mark rather than behind it.**
+    ///
+    /// §8.4's fourth recipe belongs to `Frame 14`, the track — and in the
+    /// design file that frame has *no fill*, so its inner shadow falls on the
+    /// union of the marks' own alpha and not on a panel. The small widget's
+    /// export is where that is unambiguous: every socket and every lit fill
+    /// carries `inset 0 4px 4px rgba(0,0,0,0.25)` of its own, which is this
+    /// shadow already composited onto each shape.
+    ///
+    /// It shipped as a `Rectangle` overlaid across the track, which is a shape
+    /// the file does not contain and read as a box drawn around the grid.
+    private func wellShadow(_ shape: AnyShape) -> some View {
+        InnerShadow(
+            shape: shape,
+            color: .black.opacity(0.25),
+            radius: Self.well(size.height),
+            y: Self.well(size.height)
+        )
+    }
+
+    /// The bevel's offset and blur, as a fraction of the slot.
+    ///
+    /// 1.5 on the week grid's 24pt slot and 1.0 on the month's 16pt cell —
+    /// nodes `228:10690` and `234:11216` — which is one sixteenth of the slot
+    /// at both. It shipped hard-coded at 1.5, so the month's cells wore the
+    /// week's bevel at 150% of the size the file draws.
+    static func bevel(_ slot: CGFloat) -> CGFloat { slot / 16 }
+
+    /// The track's shade, likewise: 6 on 24 and 4 on 16, a quarter of the slot.
+    static func well(_ slot: CGFloat) -> CGFloat { slot / 4 }
 
     /// A day, or a run of days, with nothing asked of it yet.
     ///
@@ -188,16 +228,15 @@ struct SlotMarkView: View {
     /// not. Nothing carrying grey has an effect: a miss is an absence, and
     /// absence does not light up.
     private var missedMark: some View {
-        let arm = size.height * GlowShape.missedArm
-        let thickness = size.height * GlowShape.missedThickness
+        let shape = AnyShape(CrossShape())
+        let bevel = size.height * GlowShape.missedBevel
         return sized(
             ZStack {
-                Rectangle().frame(width: thickness, height: arm)
-                    .rotationEffect(.degrees(45))
-                Rectangle().frame(width: thickness, height: arm)
-                    .rotationEffect(.degrees(-45))
+                InnerShadow(shape: shape, color: .black, radius: bevel, y: bevel)
+                InnerShadow(
+                    shape: shape, color: .white.opacity(0.25), radius: bevel, y: -bevel
+                )
             }
-            .foregroundStyle(GlowPalette.grey)
         )
     }
 
@@ -263,12 +302,72 @@ struct InnerShadow: View {
     var x: CGFloat = 0
     var y: CGFloat = 0
 
+    /// **The shape's alpha, minus an offset blurred copy of itself.** That is
+    /// what an inner shadow *is*, in Figma and in CSS both, and it is why this
+    /// is a mask rather than a stroke.
+    ///
+    /// It used to be `shape.stroke(lineWidth: radius * 2).blur(radius:)`
+    /// clipped to the shape, and the geometry of that is right but the opacity
+    /// is not: a stroke of width `2r` blurred by `r` spreads over roughly `4r`,
+    /// so the peak drops well under the colour it was given, and then half of
+    /// what is left falls outside the clip. A `#000000` at full strength landed
+    /// nowhere near it — measured at 27 levels of depth against a ground of 31
+    /// where the design file gets 78 against 86, and no ground fixed it: at a
+    /// lighter ground the dark half improved and the *white* half fell away,
+    /// 17 down to 10, where the file holds 78 and 20 at once.
+    ///
+    /// `.shadow(.inner(_:))` is not the answer either, and that is measured too
+    /// — an inner shadow on a `ShapeStyle` is modulated by the fill it
+    /// decorates, so over a socket's no-fill it paints nothing.
     var body: some View {
-        shape
-            .stroke(color, lineWidth: radius * 2)
-            .blur(radius: radius)
-            .offset(x: x, y: y)
+        color
+            .mask {
+                shape
+                    .fill(.black)
+                    .overlay {
+                        shape
+                            .fill(.black)
+                            .offset(x: x, y: y)
+                            .blur(radius: radius)
+                            .blendMode(.destinationOut)
+                    }
+                    .compositingGroup()
+            }
             .clipShape(shape)
             .allowsHitTesting(false)
+    }
+}
+
+/// The missed ✕, as the file draws it: two rounded bars crossed at ±45°.
+///
+/// A `Shape` rather than two rotated rectangles, because the mark is *pressed
+/// into* the surface (§8.4's socket recipe at half weight) and an inner shadow
+/// needs one silhouette to subtract from — two rectangles would each get their
+/// own bevel and show the seam where they cross. Both bars go into one `Path`,
+/// so the non-zero fill rule unions them and the bevel sees a single cross.
+///
+/// The proportions come off the cross path in node `234:11216`: a bar a quarter
+/// of the cell thick and seven eighths long, which at ±45° occupies
+/// `(7/8 + 1/4) / √2` — 0.795 of the cell, matching the file's 12.73 in 16.
+struct CrossShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let side = min(rect.width, rect.height)
+        let length = side * GlowShape.missedLength
+        let thickness = side * GlowShape.missedThickness
+        let corner = side * GlowShape.missedCorner
+        var path = Path()
+        for degrees in [45.0, -45.0] {
+            var bar = Path()
+            bar.addRoundedRect(
+                in: CGRect(x: -length / 2, y: -thickness / 2,
+                           width: length, height: thickness),
+                cornerSize: CGSize(width: corner, height: corner)
+            )
+            path.addPath(bar, transform:
+                CGAffineTransform(rotationAngle: degrees * .pi / 180)
+                    .concatenating(CGAffineTransform(
+                        translationX: rect.midX, y: rect.midY)))
+        }
+        return path
     }
 }

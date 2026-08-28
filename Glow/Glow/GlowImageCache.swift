@@ -98,10 +98,26 @@ enum GlowShape: Equatable {
     static let litPillHeight: CGFloat = 14.0 / 24.0
     static let upcomingPillHeight: CGFloat = 12.0 / 24.0
 
-    /// The missed ✕: 1pt bars with 9pt arms, crossed. Not a glyph — see
-    /// SlotMarkView.
-    static let missedThickness: CGFloat = 1.0 / 17.5
-    static let missedArm: CGFloat = 9.0 / 17.5
+    /// The missed ✕, as fractions of the slot — **not** of 17.5.
+    ///
+    /// Those denominators were the old slot width, and the ✕ was the one mark
+    /// #331 did not rescale when the grid went to 24: it stayed a hairline
+    /// where the file draws a bar a quarter of the slot thick. Measured off the
+    /// cross path in node `234:11216`, whose 16pt cell carries a 4.0 bar on a
+    /// 12.73 span — a quarter and seven eighths, which is what these are.
+    ///
+    /// `missedLength` is the bar *before* it is crossed: two of them at ±45°,
+    /// and `(length + thickness) / √2` is the span they occupy, so 7/8 and 1/4
+    /// give 0.795 of the slot exactly as the file does.
+    static let missedThickness: CGFloat = 1.0 / 4.0
+    static let missedLength: CGFloat = 7.0 / 8.0
+    static let missedCorner: CGFloat = 1.0 / 32.0
+
+    /// The ✕'s own bevel, half the socket's. It is **pressed in like a socket,
+    /// not painted like a glyph**: the file gives it no fill and two inner
+    /// shadows — black at full strength below, white at 25% above — where the
+    /// code drew a flat grey cross.
+    static let missedBevel: CGFloat = 1.0 / 32.0
 
     /// **No longer the grid's marks** (#332). Both were: a completion was a 3pt
     /// dot and a run of them a 2pt line, floating in a 17.455pt socket. A
