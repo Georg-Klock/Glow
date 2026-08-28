@@ -45,12 +45,19 @@ struct GoalPopActivity: Widget {
     ///    glyph — the region cannot carry fifteen characters at any pushed
     ///    size, so the line *scales to fit* from 16: short lines render the
     ///    full size, the longest shrinks and survives whole.
-    ///  - expanded: 32 fills the width unwrapped; the scale factor below is
+    ///  - pop: 32 fills the width unwrapped; the scale factor at each site is
     ///    the guard for narrower islands, not the plan.
-    ///  - banner: 20 sits beside the name without crowding it.
+    ///
+    /// **One size wherever the line is read at full width** (2026-08-28). #310
+    /// gave the banner 20 of its own so it would sit beside the habit's name
+    /// without crowding it, and measured the two presentations separately
+    /// because their bounds differ in kind. That is still true of the *compact*
+    /// pill, which is a system-sized region the line cannot fit at any pushed
+    /// size — it keeps its own smaller number. It is no longer true of the
+    /// banner: the pop reads at one size, and the banner accommodates by
+    /// scaling rather than by being smaller to begin with.
     private enum PopType {
-        static let lockScreen: CGFloat = 20
-        static let expanded: CGFloat = 32
+        static let pop: CGFloat = 32
         static let compact: CGFloat = 16
     }
 
@@ -67,8 +74,14 @@ struct GoalPopActivity: Widget {
                 // the question moot on this surface.
                 invertedMark
                 Text(context.state.line)
-                    .font(.system(size: PopType.lockScreen, weight: .bold))
+                    .font(.system(size: PopType.pop, weight: .bold))
                     .foregroundStyle(.black)
+                    // The same guard the Island's expanded region carries, and
+                    // it matters more here: this row also holds the habit's
+                    // name, so at 32 the longest line has to give width back
+                    // rather than wrap or crowd the name out.
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
                 Spacer(minLength: 0)
                 // Redacted on a locked phone. This presentation is the Lock
                 // Screen one, so the habit's name — which is whatever a person
@@ -94,7 +107,7 @@ struct GoalPopActivity: Widget {
                 DynamicIslandExpandedRegion(.center) {
                     VStack(spacing: 4) {
                         Text(context.state.line)
-                            .font(.system(size: PopType.expanded, weight: .bold))
+                            .font(.system(size: PopType.pop, weight: .bold))
                             // The guard, not the plan: 32 fits the longest
                             // line on the widest island unwrapped, and a
                             // narrower device shrinks the line instead of
