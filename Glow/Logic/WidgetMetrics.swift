@@ -174,8 +174,15 @@ enum WidgetMetrics {
         return max(0, Int((available + rowGap) / (slot + rowGap)))
     }
 
-    // No background constants any more. The design draws a gradient container
-    // and the widget followed it for a while; on a real home screen it read as
-    // a panel sitting on the wallpaper rather than marks floating on it. See
-    // GlowWidget.swift.
+    // The background lives in `GlowPalette.widgetSurface` (#333), and the note
+    // that used to sit here is worth keeping rather than deleting: the design
+    // drew a gradient container, the widget followed it for a while, and on a
+    // real home screen it read as a panel sitting on the wallpaper rather than
+    // marks floating on it. That was measured on hardware and it stands.
+    //
+    // #333 is a decision on top of it. The marks became sockets pressed into a
+    // surface (#332), and a socket needs a surface — so the panel is the point
+    // now rather than the problem. What has not changed is that the reading was
+    // real, so if the glass ever looks like a panel again, this is the note
+    // saying that outcome was seen once already.
 }

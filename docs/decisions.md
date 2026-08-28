@@ -5461,3 +5461,64 @@ point bought the medium family its fifth row at a 17.455pt slot. At 24 a fifth
 row needs 152 of 134, so nothing an inset can do reaches it: medium holds four,
 the insets are the design's own numbers, and the large family's ten rows now
 fill the track exactly with no slack at all.
+
+
+## The widget's ground is dark glass, and #87's "0,0,0" goes with it (#333)
+
+**2026-08-28.** `GlowPalette.widgetSurface` is `.ultraThinMaterial` over black,
+declared once so the widget and the render harness cannot disagree about what
+the surface is. The design draws the fill as `#FFFFFF 10% → 7%`, which is
+Figma's stand-in for a material rather than a value to type in; Liquid Glass is
+iOS 26 and out of reach at the 18.0 deployment target.
+
+**The note this replaces was right and is kept.** `WidgetMetrics` ended with a
+measurement: the design drew a gradient container, the widget followed it for a
+while, and on a real Home Screen it read as a panel sitting on the wallpaper
+rather than marks floating on it. That was seen on hardware. #333 is a decision
+on top of it, not a finding that it was wrong — the marks became sockets pressed
+into a surface (#332), and a socket needs a surface, so the panel is the point
+now rather than the problem. The note stays where it was so that if the glass
+ever reads as a panel again, the record says that outcome was seen once already.
+
+**#87's invariant is superseded, deliberately.** "The ground is 0,0,0 in every
+family, exactly" cannot survive a material, and asserting it would only assert
+that #333 had not happened. What #87 was *defending* survives and is what the
+test now says: the design file's own container is a ~13-level gradient, and a
+gradient is what the claim refuses. A material is flat. So the assertions became
+**uniform, neutral and dark** — each broken by a gradient, a tint or a light
+panel — plus a whole-frame share at the ground's own tone, which is the half a
+corner sample could miss.
+
+**The ground was load-bearing for the whole render suite, which nobody knew.**
+Six tests encoded "dark means near zero" and broke at once. They are expressed
+against a measured `ground = 31` now rather than against zero:
+
+- a cleared column reads 32, which against the old absolute `clear = 10` read as
+  *content*;
+- `lineFloor` moved because the resting grey composites to ~123 over glass
+  rather than 109 on black;
+- a new `litFloor` of 185, because the socket's 13% white highlight lifts an
+  *unlit* mark's brightest pixel to about 157 — inside the old 150 boundary;
+- the hue tolerance went from 1 to 2, because the material dithers the ground
+  (30,31,31 and 30,32,31 on corners of one frame).
+
+**One of those six was failing dangerously.** The halo test selected pixels the
+unlit render left at exactly `0,0,0` and asked whether the lit render raised
+them. Over glass nothing is ever zero, so the selector matched **nothing**: its
+hue clause passed vacuously while its "the glow lifts something" clause failed.
+That is the #226 class — a whole-frame claim a blank render satisfies — and the
+tempting fix was to loosen the half that was complaining.
+
+**The resting step's rendered level is not a palette constant.** `#D9D9D9` at
+50% composites against whatever is behind it: 109 over black, **124** over the
+glass. `flatTones` moved with it, measured twice — `0.5 × 217 + 0.5 × 31 = 124`,
+and a probe found the count split 4063/364 across 124 and 125 because the
+material dithers. The opaque tones, 217 and 255, did not move at all on either
+runtime. That difference is the maintenance cost #335's translucency introduced,
+and it is recorded where `flatTones` is declared: any future change to the
+ground silently moves what a resting mark renders as.
+
+**Still open, and it needs hardware.** The socket bevel's `#000000 @ 100%` was
+drawn against a 7–10% white ground. The glass is darker and blurred, so that
+edge will read heavier than the file shows — and the simulator cannot answer it,
+because what it can check is geometry and what is in question is depth.
