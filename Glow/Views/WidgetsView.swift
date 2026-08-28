@@ -196,10 +196,10 @@ struct WidgetsView: View {
         let size = WidgetMetrics.size(of: card.placement.family)
         let scale = size.width > 0 ? min(1, width / size.width) : 1
         return content(for: card)
-            .padding(.leading, WidgetMetrics.padLeading)
-            .padding(.trailing, WidgetMetrics.padTrailing)
+            .padding(.leading, WidgetMetrics.padLeading(for: card.placement.family))
+            .padding(.trailing, WidgetMetrics.padTrailing(for: card.placement.family))
             .padding(.top, WidgetMetrics.padTop)
-                .padding(.bottom, WidgetMetrics.padBottom)
+            .padding(.bottom, WidgetMetrics.padBottom)
             .frame(width: size.width, height: size.height)
             // The rendering a glass Home Screen puts a widget into, injected
             // rather than imitated (#273, kept through #312): the panel below

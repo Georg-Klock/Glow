@@ -160,26 +160,24 @@ struct SlotMarkView: View {
     /// socket, where a lit or open pill is a 14pt socket holding a 12pt inner.
     /// That is what makes a lit pill 2pt taller than the one it replaces: the
     /// light fills the track and the socket grows around it to hold the bevel.
-    @ViewBuilder
+    /// **Nothing.** The socket behind it is the whole mark.
+    ///
+    /// §8.3: "the socket has no fill at all — it is drawn entirely by its
+    /// bevel", and the upcoming row of its table gives `Inner: none`. §8.6
+    /// drops the design file's `#D9D9D9 @ 1%` as a slip for the same reason.
+    ///
+    /// It shipped filled at the resting step, which made a day still to come
+    /// the brightest thing on an untouched row and put the grid back on a grey
+    /// ramp — three strengths of the same disc, which is what #111 collapsed.
+    /// It also contradicted the line `CLAUDE.md` opens with: *what stays dark
+    /// is absence — a missed day, a day still to come, a rep that ran out of
+    /// days*.
+    ///
+    /// **An empty slot is not asked to meet contrast.** It is the ground the
+    /// lit marks are read against, and being hard to see is the whole of its
+    /// job.
     private var upcomingMark: some View {
-        if spansDays {
-            sized(
-                Capsule(style: .continuous)
-                    .fill(GlowPalette.grey)
-                    .frame(height: size.height * GlowShape.upcomingPillHeight)
-            )
-            // Safe to mask out here rather than inside the shape: nothing
-            // unlit casts a halo, so there is none to cut. The lit marks go
-            // through `GlowImageView`, which subtracts the window before the
-            // glow is generated from the shape.
-            .restWindowRemoved(restWindow)
-        } else {
-            sized(
-                Circle()
-                    .fill(GlowPalette.grey)
-                    .padding(GlowShape.socketInset)
-            )
-        }
+        sized(Color.clear)
     }
 
     /// The only mark with no glow at all, and the only one that is not a symbol.

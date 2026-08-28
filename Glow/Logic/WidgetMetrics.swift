@@ -100,6 +100,31 @@ enum WidgetMetrics {
     /// within reach of a row boundary at that size: medium holds four rows and
     /// would hold four at any inset in this neighbourhood. So these are the
     /// design's numbers, with nothing borrowed.
+    /// The small family's own inset, symmetric where the others are not.
+    ///
+    /// The week widget's 6/14 is an optical adjustment for a row that starts
+    /// with a label column and ends with a mark — it is left-heavy because its
+    /// content is. The month has no label column: it is a centred block of
+    /// cells, so it is inset evenly. Node `234:11216` puts `Frame 14` at x=14
+    /// in a 158pt frame, 14 either side.
+    ///
+    /// Applying the week's 6/14 here shifted the whole grid 8pt left and gave
+    /// it 138pt of track where the file draws 130.
+    static let smallPad: CGFloat = 14
+
+    /// The leading inset for a family. Small is symmetric; the rest are not.
+    static func padLeading(for family: WidgetFamily) -> CGFloat {
+        family == .systemSmall ? smallPad : padLeading
+    }
+
+    /// The trailing inset for a family. Both answers are 14 today, and it is
+    /// still asked rather than assumed: the week's 14 is the optical pair to
+    /// its 6, and the month's is half a symmetric inset. They agree by
+    /// coincidence, not by derivation.
+    static func padTrailing(for family: WidgetFamily) -> CGFloat {
+        family == .systemSmall ? smallPad : padTrailing
+    }
+
     static let padTop: CGFloat = 10
     static let padBottom: CGFloat = 14
 
