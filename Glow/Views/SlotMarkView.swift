@@ -228,16 +228,15 @@ struct SlotMarkView: View {
     /// not. Nothing carrying grey has an effect: a miss is an absence, and
     /// absence does not light up.
     private var missedMark: some View {
-        let arm = size.height * GlowShape.missedArm
-        let thickness = size.height * GlowShape.missedThickness
+        let shape = AnyShape(CrossShape())
+        let bevel = size.height * GlowShape.missedBevel
         return sized(
             ZStack {
-                Rectangle().frame(width: thickness, height: arm)
-                    .rotationEffect(.degrees(45))
-                Rectangle().frame(width: thickness, height: arm)
-                    .rotationEffect(.degrees(-45))
+                InnerShadow(shape: shape, color: .black, radius: bevel, y: bevel)
+                InnerShadow(
+                    shape: shape, color: .white.opacity(0.25), radius: bevel, y: -bevel
+                )
             }
-            .foregroundStyle(GlowPalette.grey)
         )
     }
 
@@ -336,5 +335,39 @@ struct InnerShadow: View {
             }
             .clipShape(shape)
             .allowsHitTesting(false)
+    }
+}
+
+/// The missed ✕, as the file draws it: two rounded bars crossed at ±45°.
+///
+/// A `Shape` rather than two rotated rectangles, because the mark is *pressed
+/// into* the surface (§8.4's socket recipe at half weight) and an inner shadow
+/// needs one silhouette to subtract from — two rectangles would each get their
+/// own bevel and show the seam where they cross. Both bars go into one `Path`,
+/// so the non-zero fill rule unions them and the bevel sees a single cross.
+///
+/// The proportions come off the cross path in node `234:11216`: a bar a quarter
+/// of the cell thick and seven eighths long, which at ±45° occupies
+/// `(7/8 + 1/4) / √2` — 0.795 of the cell, matching the file's 12.73 in 16.
+struct CrossShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let side = min(rect.width, rect.height)
+        let length = side * GlowShape.missedLength
+        let thickness = side * GlowShape.missedThickness
+        let corner = side * GlowShape.missedCorner
+        var path = Path()
+        for degrees in [45.0, -45.0] {
+            var bar = Path()
+            bar.addRoundedRect(
+                in: CGRect(x: -length / 2, y: -thickness / 2,
+                           width: length, height: thickness),
+                cornerSize: CGSize(width: corner, height: corner)
+            )
+            path.addPath(bar, transform:
+                CGAffineTransform(rotationAngle: degrees * .pi / 180)
+                    .concatenating(CGAffineTransform(
+                        translationX: rect.midX, y: rect.midY)))
+        }
+        return path
     }
 }
