@@ -59,15 +59,18 @@ struct WidgetRenderDiffTests {
         // with any value. That is the trade: this line is the one assertion in
         // this file a palette move still has to touch, and it is deliberate.
         // Everything else here asks about a *relationship* measured in the same
-        // frame — see `isUnlit(_:beside:)`, whose own multiplier this move did
-        // require touching, because a 98-level jump is not the seven-level one
-        // #240 made.
+        // frame — see `isUnlit(_:beside:)`.
+        //
+        // **109, since #335.** The resting grey is `#D9D9D9` at half, and half
+        // of 217 on the widget's black ground composites there — measured
+        // rather than derived, because 108.5 could round either way and the
+        // probe found 107, 108 and 110 all empty.
         let pixels = try rgba(of: image)
         var lit = 0, grey = 0
         for i in stride(from: 0, to: pixels.count, by: 4) {
             let value = max(pixels[i], pixels[i + 1], pixels[i + 2])
             if value > 200 { lit += 1 }
-            else if (138...144).contains(value) { grey += 1 }
+            else if (106...112).contains(value) { grey += 1 }
         }
         #expect(lit > 500, "no lit marks in the render")
         #expect(grey > 500, "nothing unlit in the render: \(grey) pixels at the grey")

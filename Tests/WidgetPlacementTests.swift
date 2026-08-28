@@ -515,6 +515,6 @@ struct WidgetPreviewLayoutTests {
         #expect(GlowPalette.grey.resolve(in: environment) == GlowPalette.greyAccented)
 
         environment.widgetRenderingMode = .fullColor
-        #expect(GlowPalette.grey.resolve(in: environment) == GlowPalette.greyOpaque)
+        #expect(GlowPalette.grey.resolve(in: environment) == GlowPalette.greyResting)
     }
 }

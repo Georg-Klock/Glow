@@ -500,7 +500,18 @@ struct RenderSignature: Codable, Equatable {
     /// moving them, in the same change, on purpose.
     /// `RenderBaselineTests.flatTonesAreReal` is what notices if that does not
     /// happen — it is what just caught this one.
-    static let flatTones = [141, 255]
+    /// The levels this app paints flat, and the reason the list is a literal.
+    ///
+    /// **141 became 109 with #335.** The resting grey is `#D9D9D9` at half
+    /// rather than `#8D8D8D` opaque, and half of 217 composited on the widget's
+    /// black ground lands on 109 — *measured*, not derived: 108.5 could round
+    /// either way, and the probe that settled it found 107, 108 and 110 all
+    /// reporting no paint at all while 109 held the whole count.
+    ///
+    /// `flatTonesAreReal` is what keeps this honest — a level nothing is
+    /// painted at gates nothing, so the list cannot silently outlive the
+    /// palette. That test is what caught this move.
+    static let flatTones = [109, 255]
 
     var width: Int
     var height: Int
