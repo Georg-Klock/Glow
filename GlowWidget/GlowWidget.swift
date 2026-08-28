@@ -38,7 +38,8 @@ struct GlowWidget: Widget {
             WeekWidgetView(entry: entry)
                 .padding(.leading, WidgetMetrics.padLeading)
                 .padding(.trailing, WidgetMetrics.padTrailing)
-                .padding(.vertical, WidgetMetrics.padVertical)
+                .padding(.top, WidgetMetrics.padTop)
+                .padding(.bottom, WidgetMetrics.padBottom)
                 // Declared with `containerBackground`, never `.background`, and
                 // left removable. That is the whole contract: a widget does not
                 // choose whether it has a background — the person does, by

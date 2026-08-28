@@ -83,7 +83,7 @@ struct SlotView: View {
             GlowImageView(
                 size: CGSize(width: closing, height: closing),
                 shape: .ring,
-                ringLineWidth: size.height * GlowShape.ringWeight
+                ringLineWidth: GlowShape.ringWeight
             )
         } else {
             SlotMarkView(mark: slot.mark, size: size)

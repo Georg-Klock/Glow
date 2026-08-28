@@ -388,7 +388,8 @@ struct RenderBaselineTests {
         let framed = frame.view
             .padding(.leading, WidgetMetrics.padLeading)
             .padding(.trailing, WidgetMetrics.padTrailing)
-            .padding(.vertical, WidgetMetrics.padVertical)
+            .padding(.top, WidgetMetrics.padTop)
+                .padding(.bottom, WidgetMetrics.padBottom)
             .frame(width: frame.size.width, height: frame.size.height)
             .background(GlowPalette.widgetBackground)
             .environment(\.colorScheme, .dark)
@@ -508,10 +509,20 @@ struct RenderSignature: Codable, Equatable {
     /// either way, and the probe that settled it found 107, 108 and 110 all
     /// reporting no paint at all while 109 held the whole count.
     ///
+    /// **217 joined them with #332/#334.** A completion used to take the HDR
+    /// tile and paint 255; it is lit but not emitting now, so it paints the
+    /// reflecting tier at full strength. The gate caught that as a *collapse* —
+    /// `week large` went from 4401 white pixels to 2170, under the retention
+    /// floor — which is exactly the wording of the failure: "a tone that
+    /// collapses like this has moved to another level". It had.
+    ///
+    /// So the list is the palette's three steps, and 255 is now the emitting
+    /// tier alone: open rings and glowing type.
+    ///
     /// `flatTonesAreReal` is what keeps this honest — a level nothing is
     /// painted at gates nothing, so the list cannot silently outlive the
-    /// palette. That test is what caught this move.
-    static let flatTones = [109, 255]
+    /// palette. That test is what caught the 141 → 109 move.
+    static let flatTones = [109, 217, 255]
 
     var width: Int
     var height: Int

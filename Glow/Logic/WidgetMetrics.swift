@@ -64,48 +64,66 @@ enum WidgetMetrics {
 
     /// How many rows a large widget shows.
     ///
-    /// Eleven, and derived rather than written down — every input to it has
-    /// moved at least once. The app reads this to mark where its grid stops
+    /// Ten since #331, and derived rather than written down — every input to it
+    /// has moved at least once. The app reads this to mark where its grid stops
     /// being visible on the home screen.
     static var largeRowCapacity: Int {
         let track = largeWidth - padLeading - padTrailing - labelWidth - labelGap
         return rowCapacity(
-            height: largeHeight - padVertical * 2,
+            height: largeHeight - padTop - padBottom,
             slot: SlotLayout.slotHeight(trackWidth: track),
             hasHeader: true
         )
     }
 
-    /// Content inset. Not symmetric in the file, and left alone rather than
-    /// averaged: the extra point on the right is what stops the last column
-    /// sitting hard against the widget's rounded corner.
-    static let padLeading: CGFloat = 15
-    static let padTrailing: CGFloat = 16
-    /// 15, not the file's 16 — the one number in this type that is not the
-    /// design's, and the point it gives up buys the medium widget's fifth row.
+    /// Content inset. **Asymmetric on both axes, and that is deliberate**
+    /// (#331, `docs/week-marks.md` §8.1).
     ///
-    /// The medium family missed five rows by hundredths of a row on every phone
-    /// measured: 126pt of content against a 27.45pt pitch is 4.95 rows, and the
-    /// hard cut takes the floor. One point anywhere in that sum closes it, and
-    /// there were two candidates. `rowGap` is the other, and it is the one that
-    /// must not move: it is set by how far a halo spills out of a row, so
-    /// closing it would put each row's light into its neighbour — a functional
-    /// number wearing a spacing number's clothes. `padVertical` is a margin
-    /// against the widget's own rounded edge and carries no such job, so it is
-    /// the one that gives.
+    /// Left 6, right 14, top 10, bottom 14. Neither axis is centred and none of
+    /// the four sits on the 8/4 spacing the rest of the frame uses, so they are
+    /// an optical adjustment rather than a derivation — recorded as such here
+    /// so the next reader regularises them on purpose or not at all.
     ///
-    /// The large family is unaffected: 11 rows before and after, because its
-    /// spare change was never within a point of the next row. `WidgetMetricsTests`
-    /// asserts both counts. See #57.
-    static let padVertical: CGFloat = 15
+    /// They also do arithmetic. The track is what is left of the width:
+    /// `338 − 6 − 14 − 98 − 4 = 216`, which is exactly seven 24pt columns and
+    /// six 8pt gaps. And the top pair places the grid's first row: `10 + 14 + 4`
+    /// puts it at y=28, where §8.2 measures it.
+    static let padLeading: CGFloat = 6
+    static let padTrailing: CGFloat = 14
+    /// Top and bottom, which used to be one symmetric `padVertical`.
+    ///
+    /// **#57's point is spent and its reasoning is retired.** `padVertical` was
+    /// 15 rather than the file's 16 because that one point bought the medium
+    /// family its fifth row — 126pt of content against a 27.45pt pitch is 4.95
+    /// rows and the hard cut takes the floor. That whole calculation was
+    /// against a 17.455pt slot. The slot is 24 now, and no single point is
+    /// within reach of a row boundary at that size: medium holds four rows and
+    /// would hold four at any inset in this neighbourhood. So these are the
+    /// design's numbers, with nothing borrowed.
+    static let padTop: CGFloat = 10
+    static let padBottom: CGFloat = 14
 
     /// Header to the first row, and row to row.
-    static let headerGap: CGFloat = 13
-    static let rowGap: CGFloat = 10
+    ///
+    /// Both 8/4 numbers now (#331): the row gap matches the column gap, so the
+    /// grid's pitch is 32 in both directions and a row is as tall as a column
+    /// is wide.
+    ///
+    /// **`rowGap` is still not a spacing number.** It is set by how far a halo
+    /// spills out of a row, and closing it would put each row's light into its
+    /// neighbour. It moved from 10 to 8 because the whole grid rescaled, not
+    /// because it was slack to be taken.
+    static let headerGap: CGFloat = 4
+    static let rowGap: CGFloat = 8
 
     /// The label column, and its distance to the track.
+    ///
+    /// The gap was 15 and is 4 (#331). `nameMaxWidth` below is derived from it
+    /// and moves with it — which is the point of the derivation, because left
+    /// at its old value a full-length habit name would run 11pt underneath the
+    /// first column of marks.
     static let labelWidth: CGFloat = 98
-    static let labelGap: CGFloat = 15
+    static let labelGap: CGFloat = 4
 
     /// Inside the label: the icon's column, and where the name starts.
     ///
@@ -126,9 +144,13 @@ enum WidgetMetrics {
     /// before the track, which is how the design fits "Watch Sunset". The limit
     /// is where the track begins, so a name can never collide with the grid:
     ///
-    ///     (label 98 + gap 15) − icon 24 − iconGap 4.5 = 84.5
+    ///     (label 98 + gap 4) − icon 24 − iconGap 4.5 = 73.5
     ///
-    /// The longest name in the design measures 79, so nothing there reaches it.
+    /// The longest name in the design measures 79, which now *does* reach it —
+    /// "Watch Sunset" truncates where it used to fit. That is the cost of the
+    /// tighter label gap and it is the design's own number (§8.5), not a
+    /// regression to correct by widening the limit: the limit is where the
+    /// track begins, and a name past it collides with the grid.
     static let nameMaxWidth: CGFloat = (labelWidth + labelGap) - iconWidth - iconGap
 
     /// The weekday header's own row: shorter than a slot row, and its cells are
@@ -139,9 +161,9 @@ enum WidgetMetrics {
     /// How many habit rows fit in a given height.
     ///
     /// Derived rather than written down, so it cannot drift when the padding,
-    /// the gap or the slot changes — all three have moved at least once. The
-    /// Eleven for the large family, and asserted by a test rather than
-    /// written down anywhere: every input to it has moved at least once.
+    /// the gap or the slot changes — all three have moved at least once, and
+    /// #331 moved all three at once. Ten for the large family and four for the
+    /// medium, asserted by tests rather than written down anywhere.
     ///
     /// `height` is the content box, inside the vertical padding.
     static func rowCapacity(height: CGFloat, slot: CGFloat, hasHeader: Bool) -> Int {

@@ -5400,3 +5400,64 @@ resting mark on a Clear or Tinted Home Screen now arrives at half strength where
 an opaque grey survived intact. `greyAccented` keeps its existing 0.553 alpha —
 deliberately unanswered here rather than guessed at, since what a resting letter
 is worth once the system has thrown the colour away is its own question.
+
+
+## The grid is 24 / 8 / 32 and a mark fills its slot (#331, #332)
+
+**2026-08-28.** Seven 24pt columns on a 32pt pitch, 216 of track, ten rows on
+the large widget. A mark is a **socket with an inner shape**: the socket has no
+fill and is drawn entirely by its bevel, and the inner shape carries the state —
+filled `#D9D9D9` for a completion, a 1pt inside-aligned white stroke for an open
+slot, absent for an upcoming pill.
+
+**`SlotLayout.gapRatio`'s reasoning is overturned, and not by the number that
+replaced it.** It was 24⁄35 with the argument that the grid is mostly air by
+design, so the marks read as a constellation rather than a progress bar. Moving
+it to 1⁄3 alone makes the grid *sparser*, not denser — the pitch grows from 29.4
+to 32, so a 3pt dot sits further from its neighbour than before. Looked at on a
+render, which is the only reason this is stated correctly. What changed the
+reading is the mark growing into the slot: a 22pt disc where a 3pt dot was. The
+constellation argument gave way to #332, not to the ratio.
+
+**A completion stopped emitting.** It used to take the HDR tile and paint pure
+white. Under #334's two tiers it is lit but not a source of light, so it is a
+flat `#D9D9D9` with the lit-fill bevel. `docs/week-marks.md` §8.4 says the same
+thing from the other end: it gives "lit fill" and "emitting" separate recipes,
+and the emitting one belongs to the open ring. The render baseline recorded the
+consequence precisely — `week large` went from 4,401 white pixels to 2,170, and
+the gate flagged it as a tone that "has moved to another level", which it had.
+
+**`.shadow(.inner(_:))` cannot draw a socket, and that is measured.** An inner
+shadow on a `ShapeStyle` is modulated by the fill it decorates, so over
+`Color.clear` — which is what a socket has, by design — it paints nothing.
+Probed by setting the light half to full-strength red and rendering: zero red
+pixels. The masked-stroke recipe (a stroke twice the blur radius, blurred,
+offset, clipped back to the shape) produced 11,458. Both directions measured,
+and the reason lives in `SlotMarkView` beside the code.
+
+**What the render gates caught that nothing else would.** Three things, all from
+`RenderBaselineTests` and `WidgetRenderDiffTests`:
+
+- `flatTones` naming levels the palette no longer paints — it is `[109, 217,
+  255]` now, which is exactly the palette's three steps.
+- The whole-frame exact-black share, which was a proxy for "no gradient, tint or
+  material has lifted the ground" calibrated against a sparse grid. Measured
+  95–98% then, 74–81% now; the floor is 70.
+- A hard-coded `.upcoming` in the widget's tappable span, from #344.
+
+**Two things this leaves open.**
+
+- **The month widget inherits the new mark**, because `SlotMarkView` is shared
+  and forking it would be the second formula this area exists to avoid. #332
+  does not discuss the month, and its cells are much smaller than a week slot,
+  so the result is a dense grid of discs. Worth a look rather than an assumption.
+- **The bevel's weight is a device question.** It was drawn against a 7–10%
+  white ground; against today's pure black the black half is invisible and the
+  white half is 13%. #333's glass is what it was designed for, and #333 already
+  records that `#000000 @ 100%` will read heavier there than the file shows.
+
+**#57 is retired.** `padVertical` was one point off the design's because that
+point bought the medium family its fifth row at a 17.455pt slot. At 24 a fifth
+row needs 152 of 134, so nothing an inset can do reaches it: medium holds four,
+the insets are the design's own numbers, and the large family's ten rows now
+fill the track exactly with no slack at all.
