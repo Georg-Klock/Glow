@@ -135,31 +135,17 @@ struct WeekWidgetView: View {
                         )
                     }
                 }
-                // **The track's own inner shadow** (#332, #333, §8.2 and
-                // §8.4): `0 / +6, blur 6, #000000 @ 25%`, laid over the
-                // contents rather than behind them. It is the fourth of the
-                // file's four effect recipes and the only one belonging to the
-                // container rather than to a mark — the grid sits *in*
-                // something, and this is the edge of it.
+                // **§8.4's fourth recipe is not drawn here.** It belongs to
+                // `Frame 14`, and that frame has no fill, so in the file its
+                // inner shadow falls on the union of the marks' own alpha
+                // rather than on a panel — the small widget's export settles
+                // it, where every socket and every lit fill carries the shade
+                // already composited into itself. `SlotMarkView.wellShadow`
+                // is where it lives now.
                 //
-                // **Around the rows, not the frame.** Trailing-aligned at the
-                // track's own width so it covers the marks and not the label
-                // column — a row is `[label | track]` and the labels lead — and
-                // wrapped around the row stack alone, so the header stays
-                // outside it and the recess ends with the last habit. §8.2
-                // measures the track at 216 × 312, which is ten rows against a
-                // fixture that has ten; drawn over the whole frame instead, a
-                // widget showing fewer put an empty box under the last row.
-                // Looked at, which is how that was caught.
-                .overlay(alignment: .trailing) {
-                    InnerShadow(
-                        shape: AnyShape(Rectangle()),
-                        color: .black.opacity(0.25),
-                        radius: 6,
-                        y: 6
-                    )
-                    .frame(width: track)
-                }
+                // A `Rectangle` across the track was the misreading: the file
+                // has no such shape, and it read as a box drawn around the
+                // grid.
                 Spacer(minLength: 0)
             }
         }
