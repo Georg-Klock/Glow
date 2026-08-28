@@ -252,7 +252,7 @@ remaining reps into one wide pill, which reads as slack the habit does not have:
 
 ```
 5x created Friday, credit 2       [·  ·][·  ·][○][·][·]     3 owed over 3 days
-5x created Friday, credit 4       [·  ·  ·  ·][○  ·  ·]     the pill this rule avoids
+5x created Friday, credit 4       [·][·][·][·][○  ○  ○]     the pill this rule avoids
 7x created Friday, credit 4       [·][·][·][·][○][·][·]     still reads as a 7x
 ```
 
