@@ -214,7 +214,7 @@ enum Frequency { case daily, timesPerWeek(Int) }
 // timesPerWeek: 1...6 selectable, 7 collapses to .daily
 // timesPerDay(Int) was a third case; see feature/daily-habits-2.0 (#209)
 
-struct Habit    { id, name, icon, frequency, accent, createdAt, sortOrder }
+struct Habit    { id, name, icon, frequency, accent, createdAt, targetAtCreation, sortOrder }
 struct Completion { id, habitId, dayKey, day }     // dayKey is the identity
 ```
 
@@ -376,6 +376,22 @@ anchored ones leave, **as evenly as whole days allow with the remainder to the
 right** (#340), so the near days are single columns and the slack collects at
 the end of the week. The last mark always ends on the final column, because
 there is nothing after it to divide.
+
+**A habit made part-way into the week is granted credit** (#343). It has not
+failed the Monday it did not exist for, so it is given **the minimum number of
+reps that avoids a ✕, and not one more**:
+`credit = max(0, target − days from the creation day to the end of the week)`.
+The minimum matters — granting every pre-creation day would collapse the reps
+still owed into one wide pill, which reads as slack the habit does not have.
+Credit marks are unlit: they are arithmetic, not a claim that anything was done.
+
+**The grant is frozen at creation and can only shrink.** `Habit.targetAtCreation`
+stores the target the habit was made with, so an *upward* edit gets no amnesty —
+5x → 7x keeps the two reps it was granted rather than earning four — while a
+downward edit shrinks it, because otherwise the row would meet its goal off
+credit nobody earned. A row that never recorded a target is granted nothing: an
+unknown grant cannot be reconstructed, and claiming one would be the app
+inventing forgiveness it has no record of (the same rule `createdDay` follows).
 
 **A met goal keeps every completion on its day** (#342). It used to collapse to
 one shape across all seven columns, which forgot every day it had just

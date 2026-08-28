@@ -305,8 +305,12 @@ enum WeekSpans {
         // has marks. Clamp rather than draw a row that overflows its own goal;
         // the completions past the target keep no mark of their own and fall
         // inside the last one, which runs to the end of the week (#342).
-        let done = min(doneColumns.count, target)
-        let repsLeft = target - done
+        // Reps forgiven for the days before the habit existed (#343). Zero for
+        // a habit that lived the whole week, which is every habit made before
+        // this one.
+        let credit = credit(for: habit, in: week, target: target, calendar: calendar)
+        let done = min(doneColumns.count, target - credit)
+        let repsLeft = target - credit - done
         let doneToday = habit.completedDays.contains(todayStart)
         // The rest day stops these rows like any other: nothing can be logged
         // on it and nothing un-logged, so no mark carries an action and the
@@ -323,7 +327,12 @@ enum WeekSpans {
         // its own mark on its own day; the last one runs to the end, because
         // there is nothing after it to divide.
         guard repsLeft > 0 else {
-            let marks = doneColumns.prefix(done).map { Mark(state: .filled, anchor: $0) }
+            // The credit marks pack left, unlit: they are arithmetic, not a
+            // claim that anything was done, so a met row that was partly
+            // forgiven still says so.
+            let marks = Array(
+                repeating: Mark(state: .inactive, anchor: nil), count: credit
+            ) + doneColumns.prefix(done).map { Mark(state: .filled, anchor: $0) }
             let spans = assignColumns(marks, lastColumn: lastColumn)
             return withUndo(
                 spans, doneToday: doneToday, todayRests: todayRests, today: todayStart
@@ -338,7 +347,7 @@ enum WeekSpans {
         // Nothing here is anchored: a week nobody has reached is arithmetic.
         if todayIndex == nil, week.start > todayStart {
             let marks = (0..<target).map {
-                Mark(state: $0 < done ? .filled : .inactive, anchor: nil)
+                Mark(state: $0 >= credit && $0 < credit + done ? .filled : .inactive, anchor: nil)
             }
             return assignColumns(marks, lastColumn: lastColumn)
         }
@@ -372,10 +381,11 @@ enum WeekSpans {
         // `lost` — see `deadDays` — and produces fewer only in the one case
         // §5.1 names, where there is no blank column left to pin to.
         let dead = deadDays(
-            owed: target,
+            owed: target - credit,
             completed: Set(doneColumns),
             past: 0..<(todayIndex ?? dayCount),
-            actionable: actionable
+            actionable: actionable,
+            existed: { habit.existed(on: week.days[$0]) }
         )
 
         // The mark list, in reading order. `assignColumns` turns it into
@@ -385,7 +395,8 @@ enum WeekSpans {
         // place in the order and takes the leftmost free column. Reachable only
         // by editing a mid-week habit's target upward, where the credit stays
         // frozen while the target grows — the one place a ✕ lies about its day.
-        var marks = Array(
+        var marks = Array(repeating: Mark(state: .inactive, anchor: nil), count: credit)
+        marks += Array(
             repeating: Mark(state: .missed, anchor: nil), count: lost - dead.count
         )
 
@@ -424,6 +435,54 @@ enum WeekSpans {
         return withUndo(spans, doneToday: doneToday, todayRests: todayRests, today: todayStart)
     }
 
+    /// Reps granted to a habit created part-way into this week (#343, §6).
+    ///
+    /// > `credit = max(0, target − days from the creation day to the end of the
+    /// > week)`, frozen at creation, and on any target edit
+    /// > `credit = min(frozen, max(0, new target − days from creation to week
+    /// > end))`.
+    ///
+    /// A habit made on Friday has not failed the Monday it did not exist for.
+    /// It is granted **the minimum credit that avoids a ✕, and not one more**:
+    /// granting every pre-creation day would collapse the remaining reps into
+    /// one wide pill, which reads as slack the habit does not have.
+    ///
+    /// **Frozen, so it can only shrink.** An upward edit gets no amnesty —
+    /// 5x → 7x keeps the two it was granted rather than earning four — because
+    /// the grant was for days that did not exist, and editing the target does
+    /// not change how many of those there were. A downward edit does shrink it,
+    /// because otherwise the row meets its goal off credit nobody earned: at
+    /// 5x → 2x the two granted reps would be the whole target.
+    ///
+    /// Nil `targetAtCreation` means the row predates the column, and an unknown
+    /// grant is no grant: it cannot be reconstructed, and claiming one would be
+    /// the app inventing forgiveness it has no record of. Same rule as
+    /// `createdDay` (#186, #265).
+    ///
+    /// Credit marks are unlit. They are arithmetic, not a claim that anything
+    /// was done.
+    private static func credit(
+        for habit: HabitSnapshot,
+        in week: Week,
+        target: Int,
+        calendar: Calendar
+    ) -> Int {
+        // Only a habit made *inside* this week is owed anything. One made
+        // before it lived the whole week; one made after it is #265's case and
+        // never reaches here.
+        guard let created = habit.createdDay,
+              let column = week.days.firstIndex(where: {
+                  WeekCalendar.day($0, calendar: calendar) == created
+              })
+        else { return 0 }
+        // The creation day counts itself: made on Friday, the week has Friday,
+        // Saturday and Sunday left in it.
+        let daysLeft = week.days.count - column
+        let now = max(0, target - daysLeft)
+        guard let atCreation = habit.targetAtCreation else { return 0 }
+        return min(max(0, atCreation - daysLeft), now)
+    }
+
     /// The columns a rep ran out of days on (#341, `docs/week-marks.md` §5).
     ///
     /// > A **blank past day `d`** carries a dead rep when
@@ -460,10 +519,20 @@ enum WeekSpans {
         owed: Int,
         completed: Set<Int>,
         past: Range<Int>,
-        actionable: [Int]
+        actionable: [Int],
+        existed: (Int) -> Bool
     ) -> [Int] {
         past.filter { column in
             guard !completed.contains(column), actionable.contains(column) else { return false }
+            // **A day before the habit existed is not a day it ran out on**
+            // (#265). Credit normally makes this unreachable — `owed` is at
+            // most the days from creation to the week's end, which is exactly
+            // the count that keeps the inequality false before it. The one way
+            // through is §5.1's: an upward target edit on a mid-week habit,
+            // where the grant stays frozen while the target grows. The reps
+            // that die there are real, and they lose their anchor and float
+            // rather than pinning a ✕ to a day nothing was ever asked of.
+            guard existed(column) else { return false }
             let owedThrough = owed - completed.count { $0 <= column }
             return owedThrough > actionable.count { $0 > column }
         }

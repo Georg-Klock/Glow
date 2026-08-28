@@ -117,6 +117,9 @@ struct HabitSnapshot: Identifiable, Equatable, Sendable {
     /// bound anything. An unknown creation means every day is treated as after
     /// it, which is exactly the behaviour that shipped before this existed.
     var createdDay: Date?
+    /// The weekly target this habit was made with, or nil when that was never
+    /// recorded. What freezes creation credit (#343) — see `Habit`.
+    var targetAtCreation: Int?
 
     init(
         id: UUID,
@@ -125,7 +128,8 @@ struct HabitSnapshot: Identifiable, Equatable, Sendable {
         frequency: Frequency,
         completionCounts: [Date: Int],
         isSpacer: Bool = false,
-        createdDay: Date? = nil
+        createdDay: Date? = nil,
+        targetAtCreation: Int? = nil
     ) {
         self.id = id
         self.name = name
@@ -134,6 +138,7 @@ struct HabitSnapshot: Identifiable, Equatable, Sendable {
         self.completionCounts = completionCounts
         self.isSpacer = isSpacer
         self.createdDay = createdDay
+        self.targetAtCreation = targetAtCreation
     }
 
     /// Whether the habit existed on `day`. True when the creation day is

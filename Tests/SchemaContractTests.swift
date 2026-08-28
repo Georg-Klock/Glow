@@ -5,14 +5,19 @@ import Testing
 
 /// #283: the stored shape is a declared version, and editing it is a decision.
 ///
-/// `GlowSchemaV1` froze the shape shipping today. These tests hold the code
-/// to the freeze: the model metadata the schema derives — entity names,
-/// every attribute with its value type, every relationship with its delete
-/// rule — is compared against the shape V1 declared, written out here as
-/// literals. A model edit that changes stored metadata fails this suite, and
-/// the failure's answer is a version decision — a `GlowSchemaV2` with a
-/// migration stage, or an explicit finding that the store is unchanged —
-/// never a silent lean on lightweight inference.
+/// These tests hold the code to a written-out description of the stored shape:
+/// entity names, every attribute with its value type, every relationship with
+/// its delete rule, as literals. A model edit that changes stored metadata
+/// fails this suite, and the failure has to be answered in the same diff rather
+/// than leaned on lightweight inference silently.
+///
+/// **What the answer is depends on where the app is** (#343, 2026-08-28).
+/// Before launch there is no store anyone else holds, so the answer is to
+/// update the literals deliberately and say why — which is what the
+/// `targetAtCreation` line below is. After launch V1 freezes for good and the
+/// answer becomes a `GlowSchemaV2` with a migration stage. The suite does not
+/// change between those two worlds; only the answer to its failure does. See
+/// `GlowSchema.swift`.
 ///
 /// The literals are the point, not a redundancy: a test that derived the
 /// expectation from the model would move with every edit and gate nothing.
@@ -63,6 +68,11 @@ struct SchemaContractTests {
             "timesPerDay": "Int",
             "accentRaw": "String",
             "createdAt": "Date",
+            // Added by #343, and this line is the reviewable event. Optional
+            // rather than defaulted, which is what SwiftData adds by
+            // lightweight migration and what makes "never recorded"
+            // unrepresentable as a target of zero (#186).
+            "targetAtCreation": "Optional<Int>",
             "sortOrder": "Int",
             "isSpacer": "Bool",
         ])
