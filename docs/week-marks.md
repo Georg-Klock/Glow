@@ -121,11 +121,25 @@ the columns before it are the days it swallowed.
    left to say.
 3. **Otherwise**, build the mark list in this order:
    - `credit` credit marks — unlit, no anchor
-   - one **done** mark per completion, anchored on its column
-   - one **dead** mark per dead day (§6), anchored on that column
-   - the **open** mark, anchored on today — omitted when today is spent, is the
-     rest day, or is not in this week
+   - every **anchored** mark in day order: one **done** mark per completion on
+     its column, one **dead** mark per dead day (§6) on that column, and the
+     **open** mark on today — omitted when today is spent, is the rest day, or
+     is not in this week
    - the remaining **upcoming** marks — unlit, no anchor
+
+   **The open mark sorts by its anchor like every other anchored mark** (#382).
+   It used to be listed after the done and dead marks instead, which is the same
+   order only while every completion is in the past. A completion logged *after*
+   today — reachable through `SlotEditing.week(allowingFuture:)` — is an anchor
+   to the right of the open mark's, so in a list read left to right the two
+   swapped: the ring was drawn on a day that is not today and the completion's
+   mark ended before the day it was logged on. A spent today has no anchor, so
+   it keeps its place after the completions: it is not an event on a day, it is
+   the arithmetic that divides what they leave.
+
+   What a week *should* look like once you have logged ahead is a separate
+   question and is not settled here — see #382. This is the anchor rule applied
+   to one more mark, not an answer to it.
 4. Assign columns left to right. An anchored mark ends on its anchor. A run of
    unanchored marks divides the free columns between its neighbours as evenly as
    whole days allow, **remainder to the right**. The last mark in the row always

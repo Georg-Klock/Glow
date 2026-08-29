@@ -520,6 +520,65 @@ struct LateWeekSpansTests {
         #expect(demo.map(\.actionDay) == [day(4), day(6)])
     }
 
+    // MARK: - A completion ahead of today (#382)
+
+    @Test("A completion logged after today does not displace the open mark")
+    func aheadOfTodayKeepsTheOpenMarkOnToday() {
+        // Friday, one completion logged on Sunday — reachable through
+        // `SlotEditing.week(allowingFuture:)`. The open mark used to be
+        // appended *after* the anchored marks rather than sorted into them, so
+        // in a list `assignColumns` reads left to right the two swapped: at 2x
+        // the ring was drawn on Sunday and at 3x on Saturday, and the
+        // completion's own mark ended before the day it was logged on.
+        #expect(shape(row(target: 2, done: [6], todayColumn: 4)) == "open:0-4 filled:5-6")
+        #expect(shape(row(target: 3, done: [6], todayColumn: 4))
+            == "open:0-4 filled:5-5 inactive:6-6")
+
+        // The ring is today's, and it now ends there as well as acting there.
+        let app = row(target: 2, done: [6], todayColumn: 4, editing: .week(allowingFuture: true))
+        #expect(app.first { $0.state == .open }?.lastDay == 4)
+        #expect(app.first { $0.state == .open }?.actionDay == day(4))
+    }
+
+    @Test("A completion ahead of today keeps its own day where the columns allow")
+    func aheadOfTodayKeepsItsDay() {
+        // 2x: one rep owed after Sunday's, so the completion is the last mark
+        // and ends on the final column — its own. At 3x a rep still to come
+        // needs a column behind it, and the clamp takes Sunday off the record
+        // rather than off the rep: that is the documented trade in
+        // `assignColumns`, not this fix.
+        let two = row(target: 2, done: [6], todayColumn: 4)
+        #expect(two.first { $0.state == .filled }?.lastDay == 6)
+    }
+
+    @Test("A completion ahead of a spent today keeps its place after it")
+    func aheadOfASpentTodayStaysAfterIt() {
+        // Today logged as well as Sunday. There is no open mark once today is
+        // spent — what follows the completions is arithmetic that divides, and
+        // arithmetic has no day, so it cannot sort by one.
+        #expect(shape(row(target: 3, done: [4, 6], todayColumn: 4))
+            == "filled:0-4 filled:5-5 inactive:6-6")
+        #expect(!row(target: 3, done: [4, 6], todayColumn: 4).contains { $0.state == .open })
+    }
+
+    @Test("Logging ahead never moves the ring off today", arguments: 0...6)
+    func theRingStaysOnToday(aheadColumn: Int) {
+        for todayColumn in 0...6 where aheadColumn > todayColumn {
+            for target in 1...7 {
+                let spans = row(target: target, done: [aheadColumn], todayColumn: todayColumn)
+                guard let open = spans.first(where: { $0.state == .open }) else { continue }
+                let what = Comment(
+                    rawValue: "\(target)x, today \(todayColumn), "
+                        + "logged \(aheadColumn): \(shape(spans))"
+                )
+                #expect(open.firstDay <= todayColumn && todayColumn <= open.lastDay, what)
+                // The open mark ends on today unless it is the last in the row,
+                // where it runs to the end of the week (§4.2).
+                #expect(open.lastDay == todayColumn || open.id == spans.last?.id, what)
+            }
+        }
+    }
+
     // MARK: - Undoing a span lands on a day that was logged (#256)
 
     /// The week surface, so `withColumnActions` is the code under test.
