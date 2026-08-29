@@ -164,6 +164,30 @@ struct RowGeometryTests {
         #expect(geometry.iconGap == WidgetMetrics.iconGap)
     }
 
+    /// #400: the grid's 20pt margin is now paid in two instalments, and the
+    /// sum is the whole point.
+    ///
+    /// `WeeklyGridView` narrows the `List` by `editControlInset` so that the
+    /// delete circle and the reorder handle — which are the system's, laid out
+    /// against the `List`'s bounds and deaf to `listRowInsets` — come off the
+    /// panel's edge, and hands the same amount back to the rows and the panel
+    /// as `rowPadding`. Every absolute position on the screen is unchanged
+    /// only while the two add up; a number moved on one side and not the other
+    /// slides the whole grid, and it slides it by an amount small enough to be
+    /// read as a rendering difference rather than as a bug.
+    @Test("The list's inset and the rows' add back up to the grid's margin")
+    func theTwoInstalmentsSumToTheMargin() {
+        #expect(
+            GridMetrics.rowPadding + GridMetrics.editControlInset
+                == GridMetrics.horizontalPadding
+        )
+        // Neither end is allowed to be the whole thing. At zero there is no
+        // breathing room and #400 is not fixed; at the full margin the rows
+        // would inset by nothing and the panel would be drawn edge to edge.
+        #expect(GridMetrics.editControlInset > 0)
+        #expect(GridMetrics.rowPadding > 0)
+    }
+
     @Test("A non-finite proposal is treated as no width, not as a huge one")
     func infinityIsNotAScreen() {
         // `.infinity` reaching `scale` would scale every metric to infinity and

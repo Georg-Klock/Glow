@@ -159,6 +159,37 @@ enum GridMetrics {
     /// squircle and cannot ask for one (#370). The design file's 30, the same
     /// number the Widgets tab draws its previews with.
     static let panelCorner: CGFloat = 30
+
+    /// How far the `List`'s own edges come in from the panel's, so that the
+    /// edit-mode controls the system draws there stand off it (#400).
+    ///
+    /// **The delete circle and the reorder handle are laid out against the
+    /// `List`'s bounds and ignore `listRowInsets` entirely.** Measured on an
+    /// iPhone 17 Pro / iOS 26.5 against a 402pt screen: the rows are inset to
+    /// 26.4pt and 367.0pt, and the circle still lands at 17.0-38.7 and the
+    /// handle at 363.0-384.0 — 17pt and 18pt from the *screen*, which is the
+    /// system's own margin and nothing this app asked for. With the panel at
+    /// 20.0-381.7 both controls therefore overhung it, the circle by 3.0pt and
+    /// the handle by 2.3pt, and were drawn partly on the black outside it.
+    ///
+    /// So the room is taken from the `List` rather than given to the controls:
+    /// narrowing the `List` moves everything the system draws at its edges
+    /// inboard together, and `rowPadding` hands the same amount back to the
+    /// rows so that nothing else moves. The panel is drawn behind the `List`
+    /// and padded on its own, so it does not move either — which is the half
+    /// of #400 that was not negotiable.
+    ///
+    /// **An app number, not a widget one**, and this is the file's rule for
+    /// that: the widget has no edit mode, so there is nothing to scale from.
+    /// 10 leaves 7.0pt of panel outside the circle and 7.3pt outside the
+    /// handle. `docs/decisions.md` records what else was rendered.
+    static let editControlInset: CGFloat = 10
+
+    /// What the rows and the panel still inset by once `editControlInset` has
+    /// been taken off the `List`. The two always sum to `horizontalPadding`,
+    /// which is what keeps the grid where it was; `RowGeometryTests` asserts
+    /// it rather than leaving it to the two call sites to stay in step.
+    static var rowPadding: CGFloat { horizontalPadding - editControlInset }
 }
 
 /// One habit: icon and name on the left, a fixed-width status track on the right.
