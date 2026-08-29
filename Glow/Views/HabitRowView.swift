@@ -84,6 +84,11 @@ enum GridMetrics {
     static let horizontalPadding: CGFloat = 20
     /// A floor the widget does not need: its rows are read, these are tapped.
     static let minimumRowHeight: CGFloat = 34
+
+    /// The grid's own corner, where the widget is masked to the system's
+    /// squircle and cannot ask for one (#370). The design file's 30, the same
+    /// number the Widgets tab draws its previews with.
+    static let panelCorner: CGFloat = 30
 }
 
 /// One habit: icon and name on the left, a fixed-width status track on the right.

@@ -5617,3 +5617,45 @@ The corroborating argument is that `widgetSurface` was already declared as one
 view "so the widget and the render harness cannot disagree about what the
 surface is". There were three readers and only two of them agreed.
 
+## 2026-08-28 — The weekly grid gets the widget's surface, and loses 40pt of track (#370)
+
+This Week draws `GlowPalette.widgetSurface` behind its rows: the same ground the
+widget declares, as tall as the habits on it, ending after the last one.
+
+#332 made the marks sockets pressed into a surface and #333 gave that surface to
+the widget. The app's own grid never got one, so in-app the sockets were pressed
+into flat black — the shape said "recessed" and there was nothing to recess into.
+Measured after the change, all three surfaces now composite to the same tone:
+the grid's panel and the Widgets tab's preview both read 30–31 where the render
+signatures put the widget's own ground at 31.
+
+**The track narrowed, and that is the part to argue with.** The panel is inset
+20pt a side — `GridMetrics.horizontalPadding`, the number the app already uses
+for air at the edges — and `RowGeometry` now measures against the panel rather
+than the screen. So every mark on the main screen is smaller than it was.
+
+The alternative was to keep measuring against the screen and draw the panel
+underneath, which puts marks wider than the surface they are pressed into. That
+is not a smaller version of the widget; it is a different picture, and it would
+undo the reason for having a surface at all. Narrowing follows the widget's own
+rule, where the slot falls out of the frame it was actually given.
+
+**#333 records a measurement that cuts the other way**, and it was read before
+this was drawn: the design once drew a gradient container, the widget followed
+it, and on a real Home Screen it read as a panel sitting on the wallpaper rather
+than marks floating on it. That reading was real. It does not transfer here
+because what sits behind this panel is the app's own black rather than a
+photograph — there is no wallpaper for the panel to look pasted onto. If the
+grid ever does read as a pasted card, this is the note saying the failure mode
+was seen once already.
+
+**The panel is per-row.** The grid is a `List`, so a background that hugs the
+rows and scrolls with them is `listRowBackground` applied per row, abutting its
+neighbours into one surface, with `UnevenRoundedRectangle` rounding only the
+ends. The header is given `Color.clear` deliberately: it labels the columns, and
+the panel is what the marks are pressed into.
+
+**Unresolved:** the widget-boundary hairline now falls on a lit surface rather
+than on black. It needs eleven rows to appear, so it is not in the screenshot
+this was verified against.
+

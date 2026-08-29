@@ -323,7 +323,20 @@ struct WeeklyGridView: View {
 
     private var grid: some View {
         GeometryReader { proxy in
-            let geometry = RowGeometry(totalWidth: proxy.size.width)
+            // **The grid sits on a panel, and the panel is what it measures
+            // against** (#370). `GlowPalette.widgetSurface` is the ground the
+            // widget presses its sockets into; #332 made the marks sockets and
+            // #333 gave that surface to the widget, and the app's own grid was
+            // left pressing them into flat black.
+            //
+            // The track narrows by the panel's margin rather than the panel
+            // being drawn under a grid measured against the screen — a mark
+            // wider than the surface it is pressed into is not a smaller
+            // version of the widget, it is a different picture. This is the
+            // same rule the widget follows, where the slot falls out of the
+            // frame it was actually given.
+            let inset = GridMetrics.horizontalPadding
+            let geometry = RowGeometry(totalWidth: max(0, proxy.size.width - inset * 2))
             let snapshots = self.snapshots
             // The rest day's line ends on a habit, and it ends where the widget
             // ends: the same `largeRowCapacity` that decides the boundary
@@ -351,10 +364,34 @@ struct WeeklyGridView: View {
                             editingHabit = habit
                         }
                         .listRowInsets(EdgeInsets(
-                            top: geometry.rowInset, leading: geometry.horizontalPadding,
-                            bottom: geometry.rowInset, trailing: geometry.horizontalPadding
+                            top: geometry.rowInset, leading: inset + geometry.horizontalPadding,
+                            bottom: geometry.rowInset, trailing: inset + geometry.horizontalPadding
                         ))
                         .listRowSeparator(.hidden)
+                        // The panel, one row at a time. A row background spans
+                        // the row edge to edge and abuts its neighbours, so a
+                        // continuous surface falls out of drawing it per row —
+                        // and it grows and scrolls with the list by
+                        // construction, which is what "as tall as the habits on
+                        // it" has to mean in a `List`.
+                        //
+                        // Only the ends are rounded. `UnevenRoundedRectangle`
+                        // rather than a shape per position, so the first and
+                        // last rows are the same declaration reading their own
+                        // index.
+                        .listRowBackground(
+                            GlowPalette.widgetSurface
+                                .clipShape(UnevenRoundedRectangle(
+                                    topLeadingRadius: index == 0 ? GridMetrics.panelCorner : 0,
+                                    bottomLeadingRadius: index == habits.count - 1
+                                        ? GridMetrics.panelCorner : 0,
+                                    bottomTrailingRadius: index == habits.count - 1
+                                        ? GridMetrics.panelCorner : 0,
+                                    topTrailingRadius: index == 0 ? GridMetrics.panelCorner : 0,
+                                    style: .continuous
+                                ))
+                                .padding(.horizontal, inset)
+                        )
                         // Everything above this line is what an unconfigured
                         // large widget shows. Below it a habit exists only in
                         // the app, and without the line nothing would say so.
@@ -399,12 +436,16 @@ struct WeeklyGridView: View {
                 } header: {
                     WeekdayHeader(geometry: geometry, week: week, today: today, snapshots: snapshots)
                         .listRowInsets(EdgeInsets(
-                            top: 0, leading: geometry.horizontalPadding,
+                            top: 0, leading: inset + geometry.horizontalPadding,
                             // The widget's header stands further from the first
                             // row than the rows stand from each other.
                             bottom: (WidgetMetrics.headerGap - WidgetMetrics.rowGap / 2) * geometry.scale,
-                            trailing: geometry.horizontalPadding
+                            trailing: inset + geometry.horizontalPadding
                         ))
+                        // The header is above the panel, not on it: it labels
+                        // the columns and the panel is what the marks are
+                        // pressed into.
+                        .listRowBackground(Color.clear)
                 }
             }
             .listStyle(.plain)
