@@ -6171,3 +6171,43 @@ its own frame — 130pt on the small family, with no icon column in front of it.
 That is far more room than the week's label column leaves, so a name that
 survives This Week and the week widget survives the month one, and naming a
 third surface in the warning would be listing a constraint that never binds.
+## The tab bar's style stops at the tab bar (#393)
+
+**2026-08-29.** `.labelStyle(.iconOnly)` on `RootTabView`'s `TabView` was
+described as the whole of #319 and was one modifier short of it. A
+`.labelStyle` is an environment value, so it reaches every descendant `Label`
+— and a tab's content is a descendant of the `TabView` that hosts it. The bar
+got its three icons and Settings lost the words off three rows: Export
+History, Reset to Default Habits, and the info row shown when the glow slider
+is at its floor. Each `Tab` now restores `.labelStyle(.automatic)` at the top
+of its own content.
+
+**The style stays on the `TabView` rather than moving onto three custom `Tab`
+labels**, which is the other way to stop the leak and reads like the tidier
+one. #319's accessibility half — the titles still spoken under a bar that
+renders none of them — was *measured*, by hosting `RootTabView` and walking
+the tree, and that measurement is the one this suite will not retake: a hosted
+`RootTabView` observes the week preferences and the host writes them from test
+threads (#179, #245, #291). Re-spelling the tabs would retire a measurement
+with nothing left here able to repeat it. Containing the leak at the content
+boundary changes nothing about the bar or its tree.
+
+**Nothing else was relying on the leak** — checked by looking rather than
+reasoned about. The three `Label`s in Settings are the only ones under the
+`TabView` besides `WeeklyGridView`'s toolbar, and that toolbar comes back
+unchanged: the Previous and Next Week chevrons carry their own
+`.labelStyle(.iconOnly)` already, and the ellipsis `Menu` label, which carries
+none, still renders as a bare ellipsis — a toolbar `Label` is icon-only by
+default. Measured on iOS 26.5 and again on the 18.5 runtime the minimum-iOS
+lane pins, because a default that differs by version is exactly what an
+audit like this is for. The repository's own history says the same thing:
+#320 put that ellipsis in the toolbar a day before #319 existed, with no
+inherited style anywhere, and it was an ellipsis then. Menu *items* were never
+affected either — a `Menu`'s contents become a `UIMenu`, which takes the title
+and the image and ignores the style.
+
+**`TabBarAccessibilityTests` counts rather than looks.** It asked whether
+`.labelStyle(.iconOnly)` appears in the file, which is what let a real
+on-screen regression ship green. It now also requires one
+`.labelStyle(.automatic)` per `Tab`, so a fourth tab added without the restore
+fails instead of quietly stripping a fourth screen.
