@@ -83,7 +83,11 @@ read both the clock and the App Group — so it is declared in
 `DebugToday` and `WeekCalendar.today`, because the extension is in the same
 module and a call to it from in here would otherwise compile.
 
-**The rest day arrives the same way** (#181). `WeekPreferences` is where the
+**The rest day arrives the same way** (#181) — though nothing supplies one any
+more: #390 retired the Settings rows for MVP scope and `GlowApp.init` calls
+`WeekPreferences.retireRestDay()` on every launch, so the parameter is nil on a
+real install and the paragraph below describes plumbing that is inert but still
+tested. `WeekPreferences` is where the
 stored value lives; nothing else in here reads it. `WeekGrid`, `WeekSpans`,
 `WeekDots`, `MonthGrid`, `SeededHistory` and `SlotEditing` all
 take `restDay: Int?` — the weekday nothing is expected on, or nil for none — and

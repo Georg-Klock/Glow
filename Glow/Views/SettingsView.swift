@@ -70,12 +70,6 @@ struct SettingsView: View {
     @AppStorage(WeekPreferences.firstWeekdayKey, store: GlowSettings.store)
     private var firstWeekday: Int = WeekPreferences.defaultFirstWeekday
 
-    /// Zero means none. `AppStorage` cannot hold an optional Int, and a
-    /// sentinel here is better than a parallel "has rest day" flag that could
-    /// disagree with the day itself.
-    @AppStorage(WeekPreferences.restDayKey, store: GlowSettings.store)
-    private var restDay: Int = 0
-
     var body: some View {
         NavigationStack {
             form
@@ -124,15 +118,14 @@ struct SettingsView: View {
                 let current = DebugToday.override()
                 if current != overrideDay { overrideDay = current }
             }
-            // Covers the toggle and the day picker both: the widget draws the
-            // same week and withholds the same taps, and it is not told when
-            // the setting moves.
-            // Three preferences, and every one of them changes what a widget
-            // draws: the rest day empties a column and withholds its taps, the
-            // week's first day moves every column, and the glow level is the
-            // brightness the marks are rendered at. Only the first had a reload
-            // (#134).
-            .onChange(of: restDay) { _, _ in WidgetRefresh.invalidate() }
+            // Both of these change what a widget draws: the week's first day
+            // moves every column, and the glow level is the brightness the
+            // marks are rendered at. The widget is not told when either moves,
+            // so Settings tells it (#134).
+            //
+            // There were three. The rest day emptied a column and withheld its
+            // taps, and it had the only reload of the three until #134 added
+            // the others; it is gone from this screen entirely (#390).
             .onChange(of: firstWeekday) { _, _ in WidgetRefresh.invalidate() }
             .onChange(of: peak) { _, _ in WidgetRefresh.invalidate() }
         }
@@ -247,25 +240,16 @@ struct SettingsView: View {
                     Text(popFooter)
                 }
 
-                // One subject, one section: which seven days a week is, and
-                // which of them the app stops asking about. They were two
-                // sections, and the rest day's had no header at all — so the
-                // single most consequential setting in the app read as an
-                // afterthought hanging below the week.
+                // One row now. This section held the rest day too — a toggle
+                // and, when it was on, a day picker — and it was built as one
+                // section on purpose, so that "which seven days a week is" and
+                // "which of them the app stops asking about" read as one
+                // subject. The second half is retired for MVP scope (#390);
+                // what is left is the week's first day.
                 Section {
                     Picker("Week starts on", selection: $firstWeekday) {
                         ForEach(WeekPreferences.pickerOrder, id: \.self) { weekday in
                             Text(weekdayName(weekday)).tag(weekday)
-                        }
-                    }
-
-                    Toggle("Rest day", isOn: restDayBinding)
-                        .tint(GlowPalette.controlTint)
-                    if restDay != 0 {
-                        Picker("Day", selection: $restDay) {
-                            ForEach(WeekPreferences.pickerOrder, id: \.self) { weekday in
-                                Text(weekdayName(weekday)).tag(weekday)
-                            }
                         }
                     }
                 } header: {
@@ -629,16 +613,6 @@ struct SettingsView: View {
         isDemoSeeded = demo.isSeeded
     }
 
-    /// The toggle turns the sentinel into a real day and back, defaulting to
-    /// Sunday because that is the day most people mean by "rest day" — and it
-    /// is a default rather than an assumption, since the picker is right there.
-    private var restDayBinding: Binding<Bool> {
-        Binding(
-            get: { restDay != 0 },
-            set: { restDay = $0 ? WeekPreferences.sunday : 0 }
-        )
-    }
-
     /// Weekday names from the calendar, so a non-English locale gets its own.
     private func weekdayName(_ weekday: Int) -> String {
         let calendar = WeekCalendar.calendar
@@ -666,12 +640,10 @@ struct SettingsView: View {
         return String(format: "Aiming for %.0f×", peak) + " — the screen allows \(ceiling) right now."
     }
 
-    /// Two controls, one subject, so one footer.
+    /// One control now, so one sentence. The paragraph that described the rest
+    /// day went with the rows that set it (#390).
     private var weekFooter: String {
-        "Week start also sets which seven days a weekly goal counts over.\n\n"
-            + "A rest day is true rest: nothing can be logged on it, nothing "
-            + "counts as missed, and the week is not made up around it. "
-            + "Anything already on record still counts."
+        "Week start also sets which seven days a weekly goal counts over."
     }
 
     /// What the display will grant right now — and "now" is load-bearing.

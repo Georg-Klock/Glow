@@ -340,7 +340,8 @@ Every slot is in exactly one of five states.
 4. **Filled.** Completed.
 5. **Rest.** The rest day: a day nothing can happen on, which is not the same
    as a day that has not happened yet. It draws nothing at all. Rest wins over
-   every other state, a stored completion included.
+   every other state, a stored completion included. **Unreachable since #390** —
+   nothing in the app sets a rest day; see "A rest day stops the week" below.
 
 The states map to *marks* via `Slot.mark`, which is where the rendering
 distinctions live and where they are tested.
@@ -493,8 +494,16 @@ announced by a persistent banner on every screen that reads it, with one tap on
 the banner to turn it off. It ships in every build, TestFlight included, for the
 reason demo history does: the phone is where this app is tested.
 
-**A rest day stops the week.** One optional weekday, set in Settings
-(`WeekPreferences.restDay`) and handed to the grids as a parameter rather than
+**Nothing in the app sets a rest day any more** (#390). Settings' toggle and
+day picker are gone for MVP scope, and `WeekPreferences.retireRestDay()` clears
+one an older build stored, so on a real install `restDay` is nil and every
+sentence in this section describes a state the app cannot reach. The arithmetic
+is left in place rather than deleted, and it is still tested — see #391 and
+#392, where the feature comes back with weekday-specific scheduling. What
+follows is what it does when a rest day is supplied.
+
+**A rest day stops the week.** One optional weekday
+(`WeekPreferences.restDay`), handed to the grids as a parameter rather than
 looked up by them (#181), is true rest: its slot is never open, never
 missed, and never writable. Nothing can be logged on it and nothing un-logged
 — `HabitStore.setCompletion` refuses the write, which holds for the widget's

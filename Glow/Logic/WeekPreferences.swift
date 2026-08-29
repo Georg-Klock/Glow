@@ -6,6 +6,11 @@ import Foundation
 /// widget whose week started on a different day from the app would be a bug
 /// nobody could explain.
 ///
+/// **The rest day is retired for MVP scope** (#390). Nothing in Settings offers
+/// it, `retireRestDay()` clears what an older build stored, and the arithmetic
+/// below is left inert rather than swept out — see #391 and #392. What follows
+/// describes how it works if it comes back, and how the tests still reach it.
+///
 /// **This is where the stored rest day lives, and the only place it is read**
 /// (#181). Every surface reads it once — a view through `@AppStorage`, a widget
 /// once per render, `HabitStore` once per instance — and hands the value down
@@ -42,9 +47,16 @@ enum WeekPreferences {
         set { store.set(clampWeekday(newValue), forKey: firstWeekdayKey) }
     }
 
-    /// The day of the week nothing is expected on, or nil for none — which is
-    /// the default, because a tracker that assumes you rest on Sunday is wrong
-    /// about most people.
+    /// The day of the week nothing is expected on, or nil for none.
+    ///
+    /// **Nothing in the app can set this any more** (#390). The Settings rows
+    /// that offered it — a toggle and a day picker — are gone for MVP scope,
+    /// and `retireRestDay()` clears whatever an earlier build left stored, so
+    /// on a real install this reads nil and keeps reading nil. The accessor
+    /// stays because the arithmetic underneath it stays: `RestCut`,
+    /// `RestWindow`, `WeekSpans`' `isRestDay` checks and their tests are inert
+    /// rather than deleted, and this is how the tests reach them. See #391 and
+    /// #392, which are where the feature comes back.
     ///
     /// **Read at a boundary, then passed down.** A view reads it through
     /// `@AppStorage` so SwiftUI can see the dependency, the widget reads it once
@@ -53,6 +65,24 @@ enum WeekPreferences {
     static var restDay: Int? {
         get { restDay(stored: store.object(forKey: restDayKey) as? Int ?? 0) }
         set { store.set(newValue.map(clampWeekday) ?? 0, forKey: restDayKey) }
+    }
+
+    /// Clears the stored rest day, so an install that had one before #390 stops
+    /// having one.
+    ///
+    /// Called once per launch from `GlowApp.init`, beside
+    /// `DebugToday.clearOnLaunch()` and for the same shape of reason: a value
+    /// no surface can change any more must not go on being read. Unconditional
+    /// rather than guarded by a "has migrated" flag — removing an absent key is
+    /// a no-op, and a flag would be a second thing to be wrong.
+    ///
+    /// **The widget is one refresh behind, and only once.** It reads the same
+    /// App Group, so between installing a build with this in it and launching
+    /// the app for the first time, a placed widget can still draw the old rest
+    /// column. The launch that clears the key is followed by
+    /// `WidgetRefresh.invalidate()` in `GlowApp`'s `body`, which closes it.
+    static func retireRestDay() {
+        store.removeObject(forKey: restDayKey)
     }
 
     /// The stored integer as a rest day: 0 is none, anything else is a weekday.

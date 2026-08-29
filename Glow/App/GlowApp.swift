@@ -31,6 +31,18 @@ struct GlowApp: App {
         // surface is ever built from a stale override.
         DebugToday.clearOnLaunch()
 
+        // **A setting no screen offers must not go on being read** (#390). The
+        // rest day came out of Settings for MVP scope, which retires the UI
+        // and not the arithmetic — so an install that had one stored before
+        // this build would keep resting on that day with nothing anywhere to
+        // turn it off. Cleared here, beside the override above and for the
+        // same reason: before the store is opened or a view can read it.
+        //
+        // Runs in the test host too, and harmlessly: the host's store is a
+        // per-process suite whose persistent domain `GlowSettings` already
+        // wipes on creation, and this is over before any test writes a key.
+        WeekPreferences.retireRestDay()
+
         // A test host opens nothing and draws nothing. See `body`.
         let attempt = GlowSettings.isRunningTests
             ? (container: ModelContainer?.none, failure: String?.none)

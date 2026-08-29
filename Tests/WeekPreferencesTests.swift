@@ -61,6 +61,24 @@ struct WeekPreferencesTests {
         }
     }
 
+    @Test("Retiring the rest day clears one an older build stored")
+    func retirementClearsAStoredDay() {
+        // **The half of #390 that the Settings diff cannot do.** Taking the
+        // toggle and the picker out stops anyone setting a rest day; it does
+        // nothing about an install that already had one, which would go on
+        // resting on that day with nothing anywhere to turn it off.
+        // `GlowApp.init` calls this on every launch.
+        withPreferences(restDay: WeekPreferences.sunday) {
+            #expect(WeekPreferences.restDay == WeekPreferences.sunday)
+            WeekPreferences.retireRestDay()
+            #expect(WeekPreferences.restDay == nil)
+            // Idempotent, which is why it needs no "has migrated" flag: the
+            // second launch removes an absent key and that is all.
+            WeekPreferences.retireRestDay()
+            #expect(WeekPreferences.restDay == nil)
+        }
+    }
+
     @Test("A rest day is never open and never missed")
     func restDayIsNeitherOpenNorMissed() {
         let calendar = TestCalendar.monday
