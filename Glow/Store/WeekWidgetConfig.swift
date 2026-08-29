@@ -27,17 +27,39 @@ struct WeekRowEntity: AppEntity, Identifiable {
     let id: UUID
     let name: String
     let isSpacer: Bool
+    /// Which blank row this is, counted down the app's own order. Meaningless
+    /// on a habit, which has a name of its own.
+    var number: Int = 1
 
-    /// Several blank rows appear as several identically-labelled entries, and
-    /// that is accepted rather than numbered. It is what the app itself draws —
-    /// indistinguishable blank rows — and a "Blank Row 2" would be a name for
-    /// something that has no name anywhere else in the product.
+    /// **Blank rows are numbered** (#371), and that reverses what this comment
+    /// used to say.
+    ///
+    /// It read that several blank rows appear as several identically-labelled
+    /// entries, accepted rather than numbered, because the app itself draws
+    /// indistinguishable blank rows and "Blank Row 2" names something that has
+    /// no name anywhere else in the product. The objection is still true about
+    /// the *product*. It stopped being affordable when the rows did not reach
+    /// the picker at all: the store hands one over correctly titled — asserted
+    /// in `BlankRowPickerTests` — and it is lost downstream, and an identical
+    /// `DisplayRepresentation` on every one of them is the single property that
+    /// distinguishes a blank row from a habit in that list.
+    ///
+    /// So the name exists for the picker rather than for the product. Numbered
+    /// from one even when there is only one, because a lone "Blank Row 1" is
+    /// odd in a way somebody notices and reports, where a silently missing row
+    /// is what this issue already was.
     var displayRepresentation: DisplayRepresentation {
-        DisplayRepresentation(title: isSpacer ? "Blank Row" : "\(name)")
+        DisplayRepresentation(title: isSpacer ? "Blank Row \(number)" : "\(name)")
     }
 }
 
 struct WeekRowQuery: EntityQuery {
+    /// The store to read, or nil for the real one. The same seam
+    /// `WeekWidgetStore.rowNames(container:)` carries and for the same reason:
+    /// a test that built its own entities would be asserting against a copy of
+    /// this query rather than against it. See `BlankRowPickerTests`.
+    var container: ModelContainer?
+
     func entities(for identifiers: [UUID]) async throws -> [WeekRowEntity] {
         let all = try await suggestedEntities()
         // Resolved **in the app's own order**, not in the order asked for.
@@ -62,8 +84,18 @@ struct WeekRowQuery: EntityQuery {
     }
 
     func suggestedEntities() async throws -> [WeekRowEntity] {
-        try WeekWidgetStore.rowNames().map {
-            WeekRowEntity(id: $0.id, name: $0.name, isSpacer: $0.isSpacer)
+        // Numbered here rather than on the entity, because "which blank row is
+        // this" is a question about the list and an entity holds only itself.
+        // `entities(for:)` resolves through this same call, so a row keeps the
+        // number the picker offered it under.
+        var blanks = 0
+        return try WeekWidgetStore.rowNames(
+            container: container ?? GlowStore.makeReadOnlyContainer()
+        ).map { row in
+            if row.isSpacer { blanks += 1 }
+            return WeekRowEntity(
+                id: row.id, name: row.name, isSpacer: row.isSpacer, number: blanks
+            )
         }
     }
 

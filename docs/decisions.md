@@ -5715,3 +5715,42 @@ section header is not an ordinary row. It fails silently; the symptom was a
 panel 61pt short whose top edge sat at the first habit instead of above the
 letters. The header draws its own surface instead.
 
+## 2026-08-28 — Blank rows are numbered, because unnumbered ones reached nobody (#371)
+
+The week widget's picker offers "Blank Row 1", "Blank Row 2" and so on, counted
+down the app's own order. It used to offer "Blank Row" for every one of them.
+
+That was deliberate: the app draws indistinguishable blank rows, and a
+"Blank Row 2" is a name for something that has no name anywhere else in the
+product. **The objection is still true about the product.** It stopped being
+affordable when the rows did not reach the picker at all.
+
+What is established, by `BlankRowPickerTests` against the real store and the
+real query: the fetch returns the blank row in the app's order, and it maps to
+an entity resolving to "Blank Row". Every step this repository controls does
+what `WeekWidgetConfig` promises. The row is lost after that, in the system's
+picker.
+
+**This fix is a well-motivated guess, not a diagnosed cause**, and it should be
+read that way. An identical `DisplayRepresentation` on every blank row is the
+one property distinguishing them from habits in that list, which makes collapse
+the best explanation available — but the picker has not been observed dropping
+them, and a unit test cannot observe it. If blank rows still do not appear after
+this ships, the theory is wrong and the next step is device evidence rather than
+a second guess.
+
+Numbered from one even when there is only one: a lone "Blank Row 1" is odd in a
+way somebody notices and reports, where a silently missing row is what this
+issue already was.
+
+**The number is computed in `suggestedEntities()`, not held by the entity.**
+Which blank row this is, is a question about the list; an entity holds only
+itself. `entities(for:)` resolves through the same call, so a row keeps the
+number it was offered under.
+
+`WeekRowQuery` gained a `container:` seam for the test, mirroring the one
+`WeekWidgetStore.rowNames(container:)` already carries. A test that built its
+own entities would assert against a copy of the numbering rule rather than
+against the code the picker calls, which is the mirror copy the working rules
+forbid.
+
