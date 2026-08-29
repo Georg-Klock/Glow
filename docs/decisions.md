@@ -5579,3 +5579,54 @@ style and decide nothing.
   and those populate the neighbouring levels the detector subtracts. Both
   numbers are right; they measure different things, and confusing them is how a
   baseline gets approved for the wrong reason.
+
+## 2026-08-28 — One pill height, and the inner comes off the socket (#370 follow-up)
+
+Every pill is a 14pt recess at a 24pt slot, and anything inside one — a ring or
+a fill — is 2pt shorter and 2pt narrower than it.
+
+Three things were not that, and only one of them was the number everyone would
+have guessed.
+
+**An empty pill was 12 and a lit one 14.** The 2pt difference was deliberate: a
+lit ring's 12pt inner was exactly the 12pt outer of the upcoming track it
+replaced, so the light filled the track and the socket grew around it to hold
+the bevel. Both are 14 now — empty and lit are the same recess, flush rather
+than nested, and only what sits inside differs. `litPillHeight` and
+`upcomingPillHeight` collapsed into one `pillHeight` rather than being set
+equal, because two constants holding one number is how a difference nobody asked
+for comes back.
+
+**A spanning fill was 2pt shorter and exactly as wide.** Its height came off the
+socket and its width did not, so it ran to the socket's ends where a dot stands
+1pt clear of them. `.ring` and `.dot` were already right, because a single
+`.padding(socketInset)` does both axes and only the pill's height had to be
+spelled out separately.
+
+**A spanning open ring was drawn at slot size, and came out larger than the
+socket it sits in.** `glow(.ring)` passed the full slot and never learned about
+the pill. Measured in the app before the fix: 26.17pt inside a 28.5pt slot,
+against a socket of 16.6pt. It is 15.33pt now — `(14−2) × scale`, with the
+remainder being halo bleed past the stroke.
+
+**Single-day marks needed nothing.** `socket(_:circle:)` ignores the height it is
+handed when the shape is a circle, so a single day's socket is the whole slot
+and its inner was already the slot inset by 1 on four sides. That asymmetry
+between the circle and capsule paths is why the capsule ones drifted and the
+circle ones did not, and it is worth knowing before touching either.
+
+**A floor moved with it.** `renderIsReal`'s unlit-evidence floor went from 250 to
+200. The count fell to 247 because a shorter ring has a shorter perimeter and so
+puts fewer antialiased edge pixels through the narrow 106…112 band. Counted on
+the rendered frame, 112 of what remains is the label column and 86 the header
+letters — the text the assertion exists to find — and 23 is anywhere near a
+mark. The floor is set from the text now, with the mark's contribution treated
+as the noise it always was.
+
+**The visual gate barely covers this.** The baseline fixture holds two
+`timesPerWeek` habits, so one open spanning ring and one met span: eleven of 256
+signature cells moved for a change that halves every open pill. `week medium
+configured` and `month small` are byte-identical, which is the useful half of
+that — they contain only single-day marks, and single-day marks were correct
+already.
+
