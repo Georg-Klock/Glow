@@ -59,7 +59,14 @@ import UIKit
 ///
 /// The preference cannot be set from in here: it is read as the test host
 /// launches, long before any test runs.
+/// **Serialized, and the screen is unmounted before the test ends** (#357).
+/// Both halves are below, on `tearDown()` and here. A `WeeklyGridView` that
+/// is still mounted answers process-wide notifications — `@Query` over every
+/// context's save, and `UserDefaults.didChangeNotification` — so a second one
+/// alive at the same time, or one left standing past its own test, takes the
+/// whole host down inside SwiftData when a save it never asked for arrives.
 @MainActor
+@Suite(.serialized)
 struct EmptyStateAccessibilityTests {
     @Test func theEmptyStateSpeaksItsTwoButtonsAndNothingElse() throws {
         let screen = try Screen()
@@ -121,8 +128,26 @@ struct EmptyStateAccessibilityTests {
     /// present from.
     @MainActor
     struct Screen {
+        /// **Every container this suite builds is kept for the life of the test
+        /// host, deliberately** (#357).
+        ///
+        /// Unmounting the screen is not enough, and the measurement that says so
+        /// is the reproduction of this bug. SwiftData leaves an observer of its
+        /// own on `NotificationCenter.default` — the `_SwiftData_SwiftUI` frame
+        /// in every crash report — and unmounting the view does not take it
+        /// with it. Once the container it refers to is gone, the next
+        /// `ModelContext.save()` *anywhere in the process* is posted to it and
+        /// traps inside SwiftData: `EXC_BREAKPOINT`, the host restarted, and a
+        /// bare `[Failed]` against whichever test was running.
+        ///
+        /// So the container's lifetime is the whole variable. Held here it
+        /// never dies, and the orphaned observer always has something live to
+        /// resolve against. Four in-memory containers for the life of one test
+        /// host is the price.
+        private static var kept: [ModelContainer] = []
+
         let container: ModelContainer
-        let host: UIViewController
+        let host: UIHostingController<AnyView>
         let window: UIWindow
 
         init() throws {
@@ -132,7 +157,11 @@ struct EmptyStateAccessibilityTests {
                     schema: GlowStore.schema, isStoredInMemoryOnly: true
                 )
             )
-            host = UIHostingController(rootView: WeeklyGridView().modelContainer(container))
+            // `AnyView` so the root can be replaced by an empty one in
+            // `tearDown()`; the type is what makes unmounting possible at all.
+            host = UIHostingController(
+                rootView: AnyView(WeeklyGridView().modelContainer(container))
+            )
             window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
             // Joined to the host app's scene: a window with none presents no
             // sheet, which reads as a dead button rather than as a detached
@@ -143,6 +172,7 @@ struct EmptyStateAccessibilityTests {
             window.rootViewController = host
             window.isHidden = false
             window.makeKeyAndVisible()
+            Screen.kept.append(container)
             settle()
         }
 
@@ -155,18 +185,51 @@ struct EmptyStateAccessibilityTests {
             host.view.layoutIfNeeded()
         }
 
-        /// Put the window away before the next test builds its own.
+        /// Take the screen apart **while its container is still alive** (#357).
         ///
-        /// A hosted `WeeklyGridView` left standing keeps a `@Query` over a
-        /// container the test has finished with, and three of them alive at
-        /// once took the test host down mid-suite — which reads as a failure in
-        /// whichever test happened to be running when it went.
+        /// Dropping the window did nothing, and that is measured rather than
+        /// argued: with the previous body — root view controller cleared,
+        /// window hidden, scene detached, run loop spun — a weak reference to
+        /// the hosting controller, to the window and to the `ModelContainer`
+        /// was still non-nil three seconds later, after the last strong
+        /// reference had gone out of scope. Every screen this suite ever built
+        /// stayed mounted for the life of the test host, which is also what the
+        /// log says: one `Unbalanced calls to begin/end appearance transitions`
+        /// per screen, naming the previous test's controller.
+        ///
+        /// That matters because none of what a mounted `WeeklyGridView`
+        /// subscribes to is scoped to the test that built it. Its `@Query`
+        /// answers *any* `ModelContext`'s save anywhere in the process, and
+        /// `UserDefaults.didChangeNotification` is process-wide by definition.
+        /// Every crash report on #357 is a save or a defaults change being
+        /// delivered to one of those subscriptions and trapping inside
+        /// SwiftData — the host dies, `xcodebuild` restarts it, and whichever
+        /// test was running is reported as a bare `[Failed]`.
+        ///
+        /// Replacing the root view unmounts the graph here, in the test that
+        /// built it, while its container is still standing. What survives
+        /// teardown is then an empty hosting controller with nothing
+        /// subscribed, which is the precondition every one of those reports
+        /// needs and no longer has.
         func tearDown() {
             host.presentedViewController?.dismiss(animated: false)
+            host.rootView = AnyView(EmptyView())
+            host.view.layoutIfNeeded()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
             window.rootViewController = nil
             window.isHidden = true
             window.windowScene = nil
-            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+            // The assertion is the point: an unmount that stopped working would
+            // otherwise restore the flake silently.
+            #expect(
+                contentElements().isEmpty,
+                """
+                The screen is still mounted after tearDown, so its @Query and
+                its two notification subscriptions are still live over a
+                container this test is about to release. That is #357.
+                """
+            )
         }
 
         func contentElements() -> [NSObject] {
