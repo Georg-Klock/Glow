@@ -212,7 +212,16 @@ struct WidgetRenderDiffTests {
         // measured off the render this is checking.
         let side = SlotLayout.slotHeight(trackWidth: track)
         let headerBottom = WidgetMetrics.padTop + WidgetMetrics.headerHeight
+        // Centred, not flush under the header (#368): eight rows in a frame
+        // that holds ten leave a gap above them, and `WidgetMetrics.rowsOffset`
+        // is where the widget gets that gap from.
         let firstRowTop = headerBottom + WidgetMetrics.headerGap
+            + WidgetMetrics.rowsOffset(
+                contentHeight: Self.size.height - WidgetMetrics.padTop - WidgetMetrics.padBottom,
+                slot: side,
+                rows: 8,
+                hasHeader: true
+            )
         let lastRowBottom = firstRowTop + 8 * side + 7 * WidgetMetrics.rowGap
 
         func yRange(from top: CGFloat, to bottom: CGFloat) -> Range<Int> {
@@ -268,10 +277,25 @@ struct WidgetRenderDiffTests {
     /// `row` is which band, counted from the first one under the header. It
     /// defaults to the first, which is what every scan here wanted until a
     /// configured widget had to be checked row by row (#188).
-    private func brightest(atColumn centre: CGFloat, row: Int = 0, in pixels: [UInt8]) -> Int {
+    ///
+    /// `rows` is how many the widget under test draws, because the block is
+    /// centred in what the header leaves (#368) and so its top edge moves with
+    /// the count. The offset comes from `WidgetMetrics.rowsOffset` — the same
+    /// call the widget centres by — rather than being worked out again here,
+    /// which would be a copy that keeps agreeing with itself after the widget
+    /// has moved.
+    private func brightest(
+        atColumn centre: CGFloat, row: Int = 0, rows: Int = 1, in pixels: [UInt8]
+    ) -> Int {
         let width = Int(Self.size.width * Self.scale)
         let side = SlotLayout.slotHeight(trackWidth: track)
         let top = WidgetMetrics.padTop + WidgetMetrics.headerHeight + WidgetMetrics.headerGap
+            + WidgetMetrics.rowsOffset(
+                contentHeight: Self.size.height - WidgetMetrics.padTop - WidgetMetrics.padBottom,
+                slot: side,
+                rows: rows,
+                hasHeader: true
+            )
             + CGFloat(row) * (side + WidgetMetrics.rowGap)
         let x = Int((centre * Self.scale).rounded())
         var best = 0
@@ -291,11 +315,11 @@ struct WidgetRenderDiffTests {
     /// on black (2026-08-24) and would be read as a mark. The cut casts no halo, so a
     /// quarter-slot clears it, and that is still well inside the window the
     /// span is supposed to have lost.
-    private func brightestInRestColumn(_ index: Int, in pixels: [UInt8]) -> Int {
+    private func brightestInRestColumn(_ index: Int, rows: Int = 1, in pixels: [UInt8]) -> Int {
         let quarter = SlotLayout.dailySlot(trackWidth: track) / 4
         return max(
-            brightest(atColumn: columnCentre(index) - quarter, in: pixels),
-            brightest(atColumn: columnCentre(index) + quarter, in: pixels)
+            brightest(atColumn: columnCentre(index) - quarter, rows: rows, in: pixels),
+            brightest(atColumn: columnCentre(index) + quarter, rows: rows, in: pixels)
         )
     }
 
@@ -307,8 +331,8 @@ struct WidgetRenderDiffTests {
     /// the quantity that says the rest day's column was *drawn* rather than
     /// merely left dark. A claim that the column holds no light is satisfied
     /// perfectly by a column with nothing in it — see #219.
-    private func brightestAtRestLine(_ index: Int, in pixels: [UInt8]) -> Int {
-        brightest(atColumn: columnCentre(index), in: pixels)
+    private func brightestAtRestLine(_ index: Int, rows: Int = 1, in pixels: [UInt8]) -> Int {
+        brightest(atColumn: columnCentre(index), rows: rows, in: pixels)
     }
 
     /// Whether a tone is unlit, judged against the lit marks in the same frame
@@ -640,13 +664,13 @@ struct WidgetRenderDiffTests {
             try withoutHalo {
                 let pixels = try rgba(of: try render(entry))
 
-                #expect(brightest(atColumn: columnCentre(2), row: 0, in: pixels) > Self.litFloor,
+                #expect(brightest(atColumn: columnCentre(2), row: 0, rows: 3, in: pixels) > Self.litFloor,
                         "row 0 is not Beta: nothing lit on Wednesday")
-                #expect(brightest(atColumn: columnCentre(0), row: 0, in: pixels) < Self.litFloor,
+                #expect(brightest(atColumn: columnCentre(0), row: 0, rows: 3, in: pixels) < Self.litFloor,
                         "row 0 is lit on Monday — the tap order reached the render")
-                #expect(brightest(atColumn: columnCentre(0), row: 2, in: pixels) > Self.litFloor,
+                #expect(brightest(atColumn: columnCentre(0), row: 2, rows: 3, in: pixels) > Self.litFloor,
                         "row 2 is not Alpha: nothing lit on Monday")
-                #expect(brightest(atColumn: columnCentre(2), row: 2, in: pixels) < Self.litFloor,
+                #expect(brightest(atColumn: columnCentre(2), row: 2, rows: 3, in: pixels) < Self.litFloor,
                         "row 2 is lit on Wednesday — the tap order reached the render")
 
                 // The blank row draws nothing — no socket, no cross, no dot —
@@ -654,11 +678,11 @@ struct WidgetRenderDiffTests {
                 // That is `RestCut`'s own rule, and until now no committed
                 // render contained a spacer at all, so nothing was checking it.
                 for column in 0..<6 {
-                    let value = brightest(atColumn: columnCentre(column), row: 1, in: pixels)
+                    let value = brightest(atColumn: columnCentre(column), row: 1, rows: 3, in: pixels)
                     #expect(value <= Self.clear,
                             "the blank row drew something at column \(column) (\(value))")
                 }
-                #expect(brightest(atColumn: columnCentre(6), row: 1, in: pixels) > Self.lineFloor,
+                #expect(brightest(atColumn: columnCentre(6), row: 1, rows: 3, in: pixels) > Self.lineFloor,
                         "the rest day's cut does not cross the blank row")
             }
         }
