@@ -59,8 +59,11 @@ import UIKit
 ///
 /// * **The date.** `WidgetRenderDiffTests` anchors on `Date()`, which is fine
 ///   for invariants and fatal for a baseline — the month family redraws its
-///   whole grid every month. Every frame here is rendered for
-///   `Fixture.anchor`, a fixed Tuesday.
+///   whole grid every month. Every frame here is rendered for a fixed day:
+///   `Fixture.anchor`, a Tuesday, and — since #384 — `Fixture.sundayAnchor`,
+///   the Sunday of the same week. Two days rather than one because the shape
+///   of a missed mark is a function of how much of the week is already behind
+///   today, and one Tuesday can only ever draw the narrowest case.
 /// * **The glow.** Pinned to `GlowSettings.defaultValue` with the render cache
 ///   cleared, because the halo is part of the picture and another suite is
 ///   allowed to have turned it down.
@@ -293,6 +296,20 @@ struct RenderBaselineTests {
                   view: AnyView(WeekWidgetView(
                       entry: Fixture.configuredWeek(), familyOverride: .systemMedium
                   ))),
+            // The second pinned day (#384). Same week, same nine rows, read
+            // from the Sunday instead of the Tuesday — which is the only way
+            // this fixture can draw a missed span wider than one column, more
+            // than one missed span in a row, or a completion and a ✕ in
+            // reading order. `Fixture.sundayAnchor` has the derivation.
+            //
+            // Large, because it is the family that shows all nine rows; medium
+            // shows four and would hold the wide ✕ but neither of the other
+            // two.
+            Frame(name: "week large sunday", size: WidgetMetrics.size(of: .systemLarge),
+                  view: AnyView(WeekWidgetView(
+                      entry: Fixture.week(today: Fixture.sundayAnchor),
+                      familyOverride: .systemLarge
+                  ))),
             Frame(name: "month small", size: WidgetMetrics.size(of: .systemSmall),
                   view: AnyView(MonthWidgetView(entry: month))),
         ]
@@ -304,20 +321,76 @@ struct RenderBaselineTests {
     enum Fixture {
         /// A Tuesday, so the week has a completed past, a live today and an
         /// untouched future in it.
-        static let anchor: Date = {
+        static let anchor: Date = day(10)
+
+        /// The Sunday of the **same** week, and the second pinned day (#384).
+        ///
+        /// One Tuesday could only ever draw one blank past day, so a missed
+        /// mark in a committed frame was always exactly one column wide and
+        /// there was never more than one of it. Sunday is the last day of the
+        /// week, so the same nine rows — unchanged, not restaged — divide the
+        /// other way round: five past days behind today instead of one. Run
+        /// through `WeekSpans`, that is what the Tuesday frames could not hold:
+        ///
+        ///  - **a missed span wider than one column.** Early night (2x,
+        ///    nothing logged) is `missed` 0–5 and `open` 6; on Tuesday the same
+        ///    row is `open` 0–1, `inactive` 2–6, with no ✕ in it at all.
+        ///
+        ///    The glyph does not stretch — read the render before repeating
+        ///    #384's "a wide ✕", which this frame does not contain. What is
+        ///    new is that the ✕ is drawn once, **centred over six columns**,
+        ///    so it sits between two column centres. Every mark in every
+        ///    earlier frame is either on a column centre or a bar filling its
+        ///    own range; this is the first that is neither.
+        ///  - **a completion and a ✕ interleaved.** Piano (4x, Mon and Tue) is
+        ///    `filled` 0, `filled` 1, `missed` 2–5, `open` 6 — the reading order
+        ///    a lit mark and a lost one appear in, which no frame drew.
+        ///  - **several ✕ in one row.** Cold plunge (7x) is six one-column
+        ///    missed spans and then today's open one — six ✕ from the span
+        ///    path, where the widest a Tuesday frame reached was one. Both
+        ///    shapes a missed span takes, one spanning and many single, are in
+        ///    this one frame.
+        ///
+        /// The daily rows widen with it: Hydration is six crosses and Stretch
+        /// is `✕ ● ✕ ✕ ✕ ✕ ○`. Those come through `WeekGrid`, not `WeekSpans`,
+        /// and the Tuesday frames already held one of each — what is new is the
+        /// count, which is what the tone census measures.
+        ///
+        /// **Sunday rather than Saturday**, the only other day with more than
+        /// one past day and a live today: on Saturday, Early night is still
+        /// `open` 0–5 and Piano still `open` 2–5, because neither has run out
+        /// of days yet. Both the spanning ✕ and the interleave appear for the
+        /// first time on Sunday, and Wednesday through Friday are weaker again.
+        ///
+        /// **The Tuesday frames stay, and not only for continuity.** No span in
+        /// the Sunday frame is `inactive` — a week with one day left has no
+        /// future to be inactive in — so the two days cover between them what
+        /// neither covers alone.
+        static let sundayAnchor: Date = day(15)
+
+        /// A day in March 2026, which is the month both anchors sit in.
+        private static func day(_ dayOfMonth: Int) -> Date {
             var components = DateComponents()
             components.year = 2026
             components.month = 3
-            components.day = 10
+            components.day = dayOfMonth
             return WeekCalendar.calendar.date(from: components) ?? Date(timeIntervalSince1970: 0)
-        }()
+        }
 
         private static func id(_ n: Int) -> UUID {
             UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", n))!
         }
 
-        static func week() -> WeekEntry {
-            let week = WeekCalendar.week(containing: WeekCalendar.day(anchor))
+        /// The pinned week, seen from `today`.
+        ///
+        /// **`today` is the only thing this parameter moves.** The nine rows
+        /// and their completions are written against the week's own Monday and
+        /// Tuesday and do not depend on it, so the Sunday frame is a second
+        /// *reading* of one week rather than a second scene to keep in step
+        /// with the first. Editing a row edits both frames, which is what makes
+        /// the pair worth having.
+        static func week(today: Date = anchor) -> WeekEntry {
+            let week = WeekCalendar.week(containing: WeekCalendar.day(today))
             let monday = week.days[0]
             let tuesday = week.days[1]
 
@@ -331,7 +404,9 @@ struct RenderBaselineTests {
             }
 
             return WeekEntry(
-                date: tuesday,
+                // The day the entry is *for*, which is the parameter — not
+                // `tuesday`, which is a column these habits log against.
+                date: WeekCalendar.day(today),
                 week: week,
                 habits: .loaded([
                     habit(1, "Workout", "figure.run", .daily, done: [monday]),
