@@ -103,10 +103,19 @@ struct RenderBaselineTests {
 
         for (name, signature) in actual.sorted(by: { $0.key < $1.key }) {
             guard let expected = baseline.frames[name] else {
+                // **An addition attaches its render and nothing else** (#385).
+                // There is no expected and no diff — that is what "new" means —
+                // and what a reviewer needs to look at is the frame itself.
+                // Without this the run failed with no image at all, and
+                // `visualFailureAttachments` then refused the whole run, so the
+                // deliberate change this message describes could not be
+                // approved by `Tools/approve-baseline.sh`.
+                attachActual(name: name)
                 Issue.record("""
                     \(name) has no committed signature. A new family is a \
                     deliberate change: approve it into \
-                    RenderTests/Baselines/render-signatures.json.
+                    RenderTests/Baselines/render-signatures.json. Its render is \
+                    attached as \(name.replacingOccurrences(of: " ", with: "-"))-actual.png.
                     """)
                 continue
             }
@@ -482,15 +491,24 @@ struct RenderBaselineTests {
     /// `-actual.png` rather than at the diff. It is still worth attaching: a
     /// render failure that leaves nothing to look at is what
     /// `visualFailureAttachments` in `Tools/test-inventory.json` refuses.
-    private func attachFailure(name: String, expected: RenderSignature, actual: RenderSignature) {
+    /// The frame as it renders now, attached under its own name.
+    ///
+    /// Split out of `attachFailure` because a frame with no committed signature
+    /// has this and only this to show (#385). Nothing here traps: it runs only
+    /// on a failing path, and a crash while collecting evidence for a failure
+    /// destroys the evidence.
+    private func attachActual(name: String) {
         let slug = name.replacingOccurrences(of: " ", with: "-")
-        // Nothing here traps. This runs only on the failing path, and a crash
-        // while collecting evidence for a failure destroys the evidence.
         if let frame = RenderBaselineTests.frames.first(where: { $0.name == name }),
            let png = try? RenderBaselineTests.render(frame),
            let data = UIImage(cgImage: png).pngData() {
             Attachment.record(data, named: "\(slug)-actual.png")
         }
+    }
+
+    private func attachFailure(name: String, expected: RenderSignature, actual: RenderSignature) {
+        let slug = name.replacingOccurrences(of: " ", with: "-")
+        attachActual(name: name)
         if let data = expected.gridImage(width: actual.width, height: actual.height) {
             Attachment.record(data, named: "\(slug)-expected.png")
         }
