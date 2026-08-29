@@ -183,10 +183,15 @@ struct SettingsView: View {
                 // Glow leads: it is the one control here that is the product
                 // rather than a preference about it.
                 Section {
+                    // One step per whole multiple of SDR white — eight stops
+                    // for an eight-times ceiling (`GlowSettings.range`), not
+                    // the fifteen a half-step gave. `readout` already rounds
+                    // to `%.0f×`, so nothing downstream expected the half
+                    // steps in between.
                     Slider(
                         value: $peak,
                         in: GlowSettings.range,
-                        step: 0.5
+                        step: 1
                     ) {
                         Text("Glow")
                     } minimumValueLabel: {
