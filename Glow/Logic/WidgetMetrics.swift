@@ -183,6 +183,31 @@ enum WidgetMetrics {
     /// and a slot does not.
     static let headerHeight: CGFloat = 14
 
+    /// How far the row block sits below whatever precedes it, so that it is
+    /// centred in the height the header leaves (#368).
+    ///
+    /// **Declared here because two things read it and a copy would rot.** The
+    /// widget centres its rows with this, and `WidgetRenderDiffTests` locates
+    /// the band it samples with the same call — a harness that computed its own
+    /// offset would keep passing while the widget drifted underneath it, which
+    /// is the mirror-copy failure the working rules name.
+    ///
+    /// Zero when the rows fill the family, which is why a large widget at
+    /// capacity is untouched by centring. Never negative: an overfull block is
+    /// cut by `rowCapacity` before it reaches here, and clamping rather than
+    /// trusting that keeps the two independent.
+    ///
+    /// `contentHeight` is the content box, inside the vertical padding — the
+    /// same input `rowCapacity` takes.
+    static func rowsOffset(
+        contentHeight: CGFloat, slot: CGFloat, rows: Int, hasHeader: Bool
+    ) -> CGFloat {
+        let header = hasHeader ? headerHeight + headerGap : 0
+        let available = contentHeight - header
+        let block = CGFloat(rows) * slot + CGFloat(max(0, rows - 1)) * rowGap
+        return max(0, (available - block) / 2)
+    }
+
     /// How many habit rows fit in a given height.
     ///
     /// Derived rather than written down, so it cannot drift when the padding,

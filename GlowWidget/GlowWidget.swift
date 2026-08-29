@@ -188,8 +188,19 @@ struct WeekProvider: AppIntentTimelineProvider {
         // there: "is any placed week widget being served at Small" cannot be
         // answered by a trace that never says which family a timeline was
         // built for.
+        // The frame WidgetKit actually gave this widget, beside the size
+        // `WidgetMetrics` assumes for it (#367). Those are two different
+        // claims: one is measured per render on the device in front of you,
+        // the other is a constant authored against a 6.1" phone. How many rows
+        // fit is computed from the first and asserted from the second, so a
+        // disagreement between them is invisible until a row goes missing —
+        // which is what it is being read to find out. Sizes only, no names,
+        // per `WidgetTrace`.
+        let assumed = WidgetMetrics.size(of: context.family)
         WidgetTrace.record(
             "week timeline: family=\(context.family), rows=\(configuration.rows.map { "\($0.count)" } ?? "unset")"
+                + ", display \(WidgetTrace.size(context.displaySize))"
+                + " vs assumed \(WidgetTrace.size(assumed))"
         )
 
         // A tap animates. Everything else renders still.
