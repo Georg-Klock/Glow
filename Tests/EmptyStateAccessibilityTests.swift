@@ -146,11 +146,14 @@ struct EmptyStateAccessibilityTests {
         /// host is the price.
         private static var kept: [ModelContainer] = []
 
+        /// EXPERIMENT ONLY (#357) — which teardown a round asks for.
+        enum TearDown { case dropWindowOnly, unmount }
+
         let container: ModelContainer
         let host: UIHostingController<AnyView>
         let window: UIWindow
 
-        init() throws {
+        init(keepContainer: Bool = true) throws {
             container = try ModelContainer(
                 for: GlowStore.schema,
                 configurations: ModelConfiguration(
@@ -172,7 +175,7 @@ struct EmptyStateAccessibilityTests {
             window.rootViewController = host
             window.isHidden = false
             window.makeKeyAndVisible()
-            Screen.kept.append(container)
+            if keepContainer { Screen.kept.append(container) }
             settle()
         }
 
@@ -211,15 +214,18 @@ struct EmptyStateAccessibilityTests {
         /// teardown is then an empty hosting controller with nothing
         /// subscribed, which is the precondition every one of those reports
         /// needs and no longer has.
-        func tearDown() {
+        func tearDown(_ mode: TearDown = .unmount) {
             host.presentedViewController?.dismiss(animated: false)
-            host.rootView = AnyView(EmptyView())
-            host.view.layoutIfNeeded()
+            if mode == .unmount {
+                host.rootView = AnyView(EmptyView())
+                host.view.layoutIfNeeded()
+            }
             RunLoop.current.run(until: Date().addingTimeInterval(0.3))
             window.rootViewController = nil
             window.isHidden = true
             window.windowScene = nil
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+            guard mode == .unmount else { return }
             // The assertion is the point: an unmount that stopped working would
             // otherwise restore the flake silently.
             #expect(
