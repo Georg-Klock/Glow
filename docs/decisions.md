@@ -5579,3 +5579,41 @@ style and decide nothing.
   and those populate the neighbouring levels the detector subtracts. Both
   numbers are right; they measure different things, and confusing them is how a
   baseline gets approved for the wrong reason.
+
+## 2026-08-28 — The Widgets tab previews Default, not Tinted (#369)
+
+The previews on the Widgets tab draw `GlowPalette.widgetSurface` in `fullColor`,
+with no stroked edge: the same background the widget declares and the same
+rendering a Default Home Screen gives it.
+
+They used to draw something else on all three counts. `.accented` was injected
+into the environment, `Color.black` under `glassEffect(.regular)` stood in for
+the background, and a `GlowPalette.grey` border was stroked around the result.
+Each was deliberate — #273 chose injected accented rendering over an imitation
+of it, #312 chose the black plate beneath, and the 2026-08-25 and 2026-08-26
+entries measured `.regular` against `.clear` over that plate — and all of it was
+reasoned for a page previewing the **Tinted/Clear** appearance.
+
+What that reasoning never claimed, and what turned out to matter, is that the
+page is read as a picture of the widget you are about to place. On a Default
+Home Screen the widget renders `fullColor`, so the previews were showing an
+appearance most people never select. The gap is not cosmetic: accented discards
+colour and keeps alpha, which is why `GlowPalette.grey` is a `ShapeStyle` at
+all, so a mark resolved through `greyAccented` on this page and through the
+opaque resting step on the phone.
+
+The border went with it, and its own justification dissolved rather than being
+overruled. It was there because the old panel was the page's black plus a
+material — the same ground as the page — leaving the marks with no widget
+around them. `widgetSurface` gives the preview a ground the page does not have.
+
+**What this costs:** the app no longer shows the Tinted/Clear appearance
+anywhere. That was never the page's stated job — #237 settled that the preview's
+job is to show the person their own habits in the widget's shape — and the
+appearance is a Home Screen setting, not an app one. If it is ever wanted back
+it wants its own surface, not this one doing both.
+
+The corroborating argument is that `widgetSurface` was already declared as one
+view "so the widget and the render harness cannot disagree about what the
+surface is". There were three readers and only two of them agreed.
+
