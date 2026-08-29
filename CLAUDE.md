@@ -241,14 +241,26 @@ cannot silently fall forward (#286). The deployment target stays 18.0 because
 that lane gates it; raising it is a product decision.
 
 **The two lanes do not run at the same times.** The current runtime gates every
-pull request. The minimum-iOS lane runs on `main`, nightly at 06:00 UTC, and on
-demand — not on a pull request unless it carries the `ios18` label. It is a
-40-minute job against the current lane's 12, all of it in front of a merge, and
-it was therefore the whole of this repository's pull-request feedback latency;
-measured, and decided, in `docs/decisions.md`. The consequence to keep in mind:
-**an iOS 18 failure now reddens `main`, not the pull request that caused it.**
-The likeliest cause is a render baseline approved on one runtime and not the
-other, which `Tools/approve-baseline.sh` exists to prevent.
+pull request and every push. The minimum-iOS lane runs **nightly at 06:00 UTC**,
+on `workflow_dispatch`, and on a pull request only when it carries the `ios18`
+label. It is a 40-minute job against the current lane's 12, and while it sat in
+front of every merge it *was* this repository's pull-request feedback latency;
+without it, that feedback measured 9m13s. Measured and decided in
+`docs/decisions.md`.
+
+It ran on `push: main` for about an hour in between, and that did not work:
+GitHub holds only one pending run per concurrency group, so on a busy night each
+merge evicted the previous pending main run before it started — including the
+one for the change that introduced it. Do not put it back on `push` without
+reading that entry; the failure is silent and it is worst exactly when the most
+is landing.
+
+Two consequences to keep in mind. **An iOS 18 failure now appears at 06:00 UTC,
+not on the pull request that caused it** — the likeliest cause is a render
+baseline approved on one runtime and not the other, which
+`Tools/approve-baseline.sh` exists to prevent, and `--check` is the pre-push
+habit that closes it. And **a change that genuinely needs the answer before it
+merges asks for it**, with the `ios18` label or `workflow_dispatch`.
 
 ## Working rules
 

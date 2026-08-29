@@ -4,9 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
-  # The minimum-iOS lane runs here rather than on every pull request. See the
-  # comment on build-and-test-min: 06:00 UTC, so a compatibility failure is
-  # waiting in the morning rather than in front of a merge.
+  # **This is the minimum-iOS gate**, not a backstop for one. See the comment on
+  # build-and-test-min: 06:00 UTC, so a compatibility failure is waiting in the
+  # morning rather than in front of a merge.
   schedule:
     - cron: "0 6 * * *"
   # And on demand, for the case the schedule is too slow: a runtime-sensitive
@@ -22,12 +22,15 @@ permissions:
 
 # A new push to a *branch* makes the previous run's answer irrelevant, and macOS
 # runners are the expensive kind. A new push to `main` does not: each merge
-# commit is a distinct state that shipped, and since the minimum-iOS lane moved
-# off the pull-request path this is the only place it runs outside the nightly.
-# Cancelling here used to be free; it was already eating whole main runs — three
-# consecutive merges in one evening cancelled the two before them — and doing
-# that now would silently retire the iOS 18 gate rather than reschedule it.
-# So: pull requests still cancel their own predecessors, and main runs queue.
+# commit is a distinct state that shipped, so main queues rather than cancels.
+#
+# Note what this does *not* buy, because it was briefly relied on and should not
+# be again: `cancel-in-progress: false` protects a run that has already started,
+# and GitHub holds at most **one pending run per concurrency group**. When
+# merges outpace CI, each new main run evicts the previous *pending* one — run
+# 33230929897 was cancelled with zero jobs that way. Nothing load-bearing hangs
+# on a main run surviving; the minimum-iOS gate is the nightly, which has the
+# schedule to itself.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -208,26 +211,41 @@ jobs:
   # stays comparable to a developer machine's. Keeping the 18.0 target and
   # gating it is still the decision.
   #
-  # **Not on pull requests, since 2026-08-29.** #286 accepted the CI-time cost
-  # without measuring who paid it. Measured: this lane is 40 minutes against
-  # the current lane's 12, of which 36 are the suite itself — the same tests,
-  # 3.6x slower on an iPhone SE 3 and a runtime downloaded fresh each run. The
-  # jobs are parallel, so it *was* the whole of every pull request's feedback
-  # latency, and every review comment, every rebase and every baseline
-  # re-approval paid it again. Moving it to main, to a nightly schedule and to
-  # a label takes pull-request feedback from ~40 minutes to ~12.
+  # **Nightly, not per-merge, since 2026-08-29.** #286 accepted the CI-time cost
+  # without measuring who paid it. Measured: this lane is 40 minutes against the
+  # current lane's 12, of which 36 are the suite itself — the same tests, 3.6x
+  # slower on an iPhone SE 3 and a runtime downloaded fresh each run. The jobs
+  # are parallel, so it *was* the whole of every pull request's feedback
+  # latency, and every review comment, rebase and baseline re-approval paid it
+  # again. Off the pull-request path, that feedback measured 9m13s.
   #
-  # What that trades: an iOS-18-only regression is now caught after merge
-  # instead of before it, by this lane on the merge commit — minutes later,
-  # on a branch nobody is waiting on. Put the `ios18` label on a pull request
-  # to get the old behaviour for a change that warrants it.
+  # It first moved to `push: main`, and that did not work. Runs on `main` sat
+  # pending behind a saturated macOS allowance, and GitHub keeps only one
+  # pending run per concurrency group, so each merge evicted the previous
+  # pending run — including this workflow's own (33230929897, cancelled with
+  # zero jobs). A gate that a busy night silently skips is not a gate.
+  #
+  # So the schedule owns it. Once a day on the latest `main` is the right
+  # cadence for a question that changes only when the deployment target or the
+  # runtime does — neither of which moves per commit — and it costs one run a
+  # day instead of one per merge, which is what kept the macOS runners free
+  # enough for the latency win to be real. `workflow_dispatch` answers it on
+  # demand, and the `ios18` label puts it back in front of a merge for a change
+  # that warrants it.
+  #
+  # What that trades: an iOS-18-only regression can sit on `main` until the next
+  # 06:00 UTC. #286's decision still holds — the 18.0 target is gated by a real
+  # run of the authoritative suite on a real iOS 18 runtime — but it is gated
+  # daily rather than per-merge. Label the pull request when that is not enough.
   build-and-test-min:
     name: Build and test (iOS 18)
     runs-on: macos-26
     timeout-minutes: 60
     if: >-
-      github.event_name != 'pull_request' ||
-      contains(github.event.pull_request.labels.*.name, 'ios18')
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       contains(github.event.pull_request.labels.*.name, 'ios18'))
     env:
       # The newest iOS 18 simulator runtime Apple ships. Bump deliberately;
       # the runtime cache key follows this value.
