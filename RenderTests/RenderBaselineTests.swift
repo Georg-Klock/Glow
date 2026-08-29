@@ -4,8 +4,9 @@ import SwiftUI
 import Testing
 import UIKit
 
-/// A committed, reviewed picture of what every widget family looks like — and
-/// a gate that goes red when one of them changes without anyone approving it.
+/// A committed, reviewed picture of what every widget family looks like — and,
+/// since #386, of the rows the app draws for itself — and a gate that goes red
+/// when one of them changes without anyone approving it.
 ///
 /// #138. The render tests next door already sample pixels, and they already
 /// print numbers: `bg-audit: week small exact-black 97.3%`. Printing is not a
@@ -67,6 +68,9 @@ import UIKit
 /// * **The glow.** Pinned to `GlowSettings.defaultValue` with the render cache
 ///   cleared, because the halo is part of the picture and another suite is
 ///   allowed to have turned it down.
+/// * **The rest day.** Pinned to none, because `HabitRowView` reads it out of
+///   the App Group rather than taking it as a parameter (#386). No widget
+///   frame depends on it; the app's row does.
 /// * **Size, scale, colour space and appearance.** 2x, sRGB, dark, over
 ///   `GlowPalette.widgetBackground`, exactly as the widget configurations do.
 ///
@@ -278,6 +282,24 @@ struct RenderBaselineTests {
         let name: String
         let size: CGSize
         let view: AnyView
+        /// The content inset `render` lays the view inside.
+        ///
+        /// The widget's own, for every widget frame. The app's grid is the same
+        /// four numbers at the screen's scale, so it carries its own rather
+        /// than borrowing unscaled ones (#386).
+        let insets: EdgeInsets
+
+        init(name: String, size: CGSize, view: AnyView, insets: EdgeInsets = Frame.widgetInsets) {
+            self.name = name
+            self.size = size
+            self.view = view
+            self.insets = insets
+        }
+
+        static let widgetInsets = EdgeInsets(
+            top: WidgetMetrics.padTop, leading: WidgetMetrics.padLeading,
+            bottom: WidgetMetrics.padBottom, trailing: WidgetMetrics.padTrailing
+        )
     }
 
     static var frames: [Frame] {
@@ -312,7 +334,119 @@ struct RenderBaselineTests {
                   ))),
             Frame(name: "month small", size: WidgetMetrics.size(of: .systemSmall),
                   view: AnyView(MonthWidgetView(entry: month))),
+            // **The app, not the widget** (#386). See `GridRows`.
+            Frame(name: "grid rows", size: GridRows.size,
+                  view: AnyView(GridRows(entry: week)),
+                  insets: GridRows.insets),
         ]
+    }
+
+    // MARK: - The app's own rows (#386)
+
+    /// The nine rows of the pinned week as **the app** draws them.
+    ///
+    /// Every other frame here is a widget. `WeeklyGridView` and `WidgetsView`
+    /// had no pixel gate of any kind, which made the app's grid the least
+    /// gated surface in the project and the one the visual pass changed most —
+    /// and `HabitRowView.spans` is the frame in all six of #381's crash logs.
+    /// The widget draws the same `WeekSpans` output through a different view,
+    /// and the widget was the half with baselines.
+    ///
+    /// **What this commits to, and what it does not.** This is
+    /// `HabitRowView` — the real one, compiled into this target from
+    /// `Glow/Views` — over the real `RowGeometry`, for every habit in the
+    /// pinned fixture. So the label column, the icon, the track, the marks and
+    /// their arithmetic at the *screen's* scale are gated, where before they
+    /// were gated only at the widget's.
+    ///
+    /// It is **not** `WeeklyGridView`. The `List` around these rows — its row
+    /// insets, the panel and its rounded ends, the weekday header, the pager,
+    /// the widget-boundary hairline, edit mode — is still rendered by nothing.
+    /// That screen builds a `NavigationStack` over a `@Query` and needs a model
+    /// container to exist at all, which is the harder half the issue names and
+    /// this does not attempt. Nor is `WidgetsView` covered.
+    ///
+    /// The stack below is therefore **the test's surround, not the screen's**:
+    /// one row gap between rows and the widget's inset around the block, which
+    /// is a frame to hold the rows still rather than a claim about how the list
+    /// arranges them. Every number in it comes from `RowGeometry` — the app's
+    /// own object — so it moves when the app moves, but a change to
+    /// `WeeklyGridView`'s `listRowInsets` will not show up here, and should not
+    /// be read as covered because this frame exists.
+    ///
+    /// **The label's three renderings are held, and that was checked rather
+    /// than assumed.** `HabitRowView` picks `GlowPalette.lit` or
+    /// `GlowPalette.grey` underneath from `isHandled`, and crossfades an
+    /// emitting copy over it at `opacity(lit)` — where `lit` is `@State`
+    /// initialised to 1 and set from `.onAppear`. A renderer that skipped
+    /// `onAppear` would leave every name emitting, and the frame would silently
+    /// gate nothing here.
+    ///
+    /// It does not skip it. In the committed frame exactly four names emit —
+    /// Workout, Early night, Hydration, Cold plunge — and those are exactly the
+    /// four rows `WeekGrid`/`WeekSpans` leave `open` on the pinned Tuesday. All
+    /// three steps of #335's scale are painted in the one frame.
+    struct GridRows: View {
+        let entry: WeekEntry
+
+        /// The panel the grid sits on: a 6.1" phone's width, less the margin
+        /// `WeeklyGridView` insets the panel by. The widget frames pin
+        /// `WidgetMetrics.largeWidth` for the same reason — a signature is only
+        /// comparable against a width that cannot move.
+        static let screenWidth: CGFloat = 393
+        static var panelWidth: CGFloat { screenWidth - GridMetrics.horizontalPadding * 2 }
+        static var geometry: RowGeometry { RowGeometry(totalWidth: panelWidth) }
+
+        static var insets: EdgeInsets {
+            let geometry = geometry
+            return EdgeInsets(
+                top: geometry.padTop, leading: geometry.padLeading,
+                bottom: geometry.padBottom, trailing: geometry.padTrailing
+            )
+        }
+
+        /// Derived, not written down, the way `WidgetMetrics.size(of:)` is: as
+        /// many rows as the fixture has, at the app's own slot height and row
+        /// gap. A metric that moves under this makes the gate report a size
+        /// mismatch, which is a clearer failure than a silently cropped frame.
+        static var size: CGSize {
+            let geometry = geometry
+            let slot = SlotLayout.slotHeight(trackWidth: geometry.trackWidth)
+            let rows = CGFloat(Fixture.week().habits.value?.count ?? 0)
+            let height = rows * slot
+                + max(0, rows - 1) * geometry.rowInset * 2
+                + geometry.padTop + geometry.padBottom
+            return CGSize(width: panelWidth, height: height.rounded(.up))
+        }
+
+        var body: some View {
+            let geometry = Self.geometry
+            let snapshots = entry.habits.value ?? []
+            // The same call `WeeklyGridView` makes, so the cut this frame
+            // draws is the one the screen would draw rather than a second
+            // opinion about it.
+            let cut = RestCut.rows(snapshots, capacity: WidgetMetrics.largeRowCapacity)
+            VStack(spacing: geometry.rowInset * 2) {
+                ForEach(Array(snapshots.enumerated()), id: \.element.id) { index, snapshot in
+                    HabitRowView(
+                        snapshot: snapshot,
+                        week: entry.week,
+                        today: entry.date,
+                        geometry: geometry,
+                        index: index,
+                        cut: cut,
+                        // What the screen hands its rows on a store nobody
+                        // seeded: the week is editable, the future is not.
+                        editing: .week(allowingFuture: false)
+                    ) { _ in } onEdit: { }
+                    .frame(width: geometry.labelWidth + geometry.labelGap + geometry.trackWidth)
+                }
+            }
+            // Stated rather than inherited. `editMode` is nil in a rendered
+            // tree, which already means "not editing" — writing it down is what
+            // stops a later default from moving this frame without a diff.
+            .environment(\.editMode, .constant(.inactive))
+        }
     }
 
     /// The pinned scene. Fixed identifiers as well as a fixed date: a `UUID()`
@@ -491,10 +625,10 @@ struct RenderBaselineTests {
     /// Renders one frame under the pinned appearance contract.
     static func render(_ frame: Frame) throws -> CGImage {
         let framed = frame.view
-            .padding(.leading, WidgetMetrics.padLeading)
-            .padding(.trailing, WidgetMetrics.padTrailing)
-            .padding(.top, WidgetMetrics.padTop)
-                .padding(.bottom, WidgetMetrics.padBottom)
+            .padding(.leading, frame.insets.leading)
+            .padding(.trailing, frame.insets.trailing)
+            .padding(.top, frame.insets.top)
+            .padding(.bottom, frame.insets.bottom)
             .frame(width: frame.size.width, height: frame.size.height)
             .background { GlowPalette.widgetSurface }
             .environment(\.colorScheme, .dark)
@@ -509,11 +643,21 @@ struct RenderBaselineTests {
         // off — and the cache is cleared, because a suite that legitimately
         // rendered at another setting leaves tiles in it.
         let previous = GlowSettings.store.object(forKey: GlowSettings.key)
+        // **The second piece of ambient state, and it arrived with the app's
+        // own row** (#386). `HabitRowView` reads the rest day out of the App
+        // Group with `@AppStorage`, so it is a preference the scene depends on
+        // and does not carry — the widget frames have none, which is why this
+        // was not needed before. Pinned to nothing, which is what a real
+        // install has since #390, rather than to whatever the last suite to run
+        // on this device left behind.
+        let previousRestDay = GlowSettings.store.object(forKey: WeekPreferences.restDayKey)
         defer {
             GlowSettings.store.set(previous, forKey: GlowSettings.key)
+            GlowSettings.store.set(previousRestDay, forKey: WeekPreferences.restDayKey)
             GlowImageCache.shared.removeAll()
         }
         GlowSettings.store.set(GlowSettings.defaultValue, forKey: GlowSettings.key)
+        GlowSettings.store.set(0, forKey: WeekPreferences.restDayKey)
         GlowImageCache.shared.removeAll()
 
         var out: [String: RenderSignature] = [:]

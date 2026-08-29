@@ -229,6 +229,13 @@ targets:
       - path: Glow/Glow
       - path: Glow/Views/HabitIconView.swift
       - path: Glow/Views/SlotMarkView.swift
+      # The app's own grid row, so the render gate holds a surface that is not
+      # a widget (#386). `HabitRowView` needs the two mark views it draws with;
+      # `WeeklyGridView` is deliberately not here — it builds a NavigationStack
+      # over a @Query and would drag a model container into this target.
+      - path: Glow/Views/HabitRowView.swift
+      - path: Glow/Views/SlotView.swift
+      - path: Glow/Views/SpanView.swift
     # Hosted by the app, same as GlowTests — hostless, Bundle.main is the
     # xctest runner and HabitSymbol finds no SymbolCatalog.json, so "sunrise"
     # quietly renders as the text "s…" instead of a symbol. Measured, not
