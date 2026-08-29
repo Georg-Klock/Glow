@@ -139,6 +139,24 @@ enum SlotLayout {
         return Int(min(6, max(0, raw)))
     }
 
+    /// How far the **last** column of a span sits from that span's own centre.
+    ///
+    /// A dead mark is a claim about one day — its anchor — and a mark ends on
+    /// its anchor, so the ✕ belongs on the span's last column rather than in
+    /// the middle of the run of days it swallowed (`docs/week-marks.md` §4,
+    /// #389). A cross is drawn centred in whatever frame it is given, so this
+    /// is what it has to move.
+    ///
+    /// Half the distance from the first column's centre to the last's, which
+    /// falls out of `columnCentre`: the span's centre is the midpoint of those
+    /// two, so half the span between them reaches either end of it. Zero for a
+    /// one-column mark, where the two are the same column.
+    static func anchorOffset(trackWidth: CGFloat, dayCount: Int) -> CGFloat {
+        guard dayCount > 1 else { return 0 }
+        let pitch = dailySlot(trackWidth: trackWidth) + gap(trackWidth: trackWidth)
+        return CGFloat(dayCount - 1) / 2 * pitch
+    }
+
     /// Width of a shape covering `dayCount` whole columns and the gaps between
     /// them — the unit a habit due a number of times a week is drawn in.
     static func spanWidth(trackWidth: CGFloat, dayCount: Int) -> CGFloat {

@@ -100,7 +100,10 @@ struct SpanView: View {
                 mark: span.mark,
                 size: size,
                 spansDays: span.dayCount > 1,
-                restWindow: restWindow
+                restWindow: restWindow,
+                anchorOffset: SlotLayout.anchorOffset(
+                    trackWidth: trackWidth, dayCount: span.dayCount
+                )
             )
         }
     }

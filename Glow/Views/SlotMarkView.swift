@@ -18,6 +18,10 @@ struct SlotMarkView: View {
     /// The rest day's column, in this mark's own coordinates, taken out of the
     /// shape. Nil on every mark that does not cross one. See `RestWindow`.
     var restWindow: ClosedRange<CGFloat>?
+    /// How far this mark's anchor column sits from the centre of its own
+    /// frame. Only the ✕ reads it — every other mark either fills its span or
+    /// is one column wide. See `SlotLayout.anchorOffset(trackWidth:dayCount:)`.
+    var anchorOffset: CGFloat = 0
 
     var body: some View {
         content.background { socketForMark }
@@ -63,7 +67,26 @@ struct SlotMarkView: View {
             // emitting one is the open ring's.
             doneMark
         case .missed:
-            missedMark.offset(x: restOffset(fillsSpan: false))
+            // **The ✕ sits on its anchor day** (#389) — the span's last column,
+            // because a mark ends on its anchor and the columns before it are
+            // the days it swallowed (`docs/week-marks.md` §4).
+            //
+            // It used to be centred in the span's frame, so every dead mark
+            // wider than one column drew its cross on a day it had nothing to
+            // do with, and an even-width one drew it in the gap *between* two
+            // columns — a ✕ with no day to its name. Reported off a device as
+            // a `WeekSpans` fault, which it was not: the arithmetic said one
+            // thing and the drawing said another.
+            //
+            // A span crossing the rest day keeps #100's fallback instead. A
+            // pinned ✕ never anchors on one — `WeekSpans.deadDays` excludes it
+            // from the candidates — but a floating one (§5.1) has no anchor to
+            // sit on, and then the window is all there is to place it by. The
+            // rest day is retired (#390) and comes back with its own design
+            // work in #391 and #392.
+            missedMark.offset(
+                x: restWindow == nil ? anchorOffset : restOffset(fillsSpan: false)
+            )
         case .upcoming:
             // The same shape and size as a completion, only unlit. A day that
             // has not happened and a day that has differ by exactly one thing —

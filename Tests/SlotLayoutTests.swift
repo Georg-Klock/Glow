@@ -110,6 +110,33 @@ struct SlotLayoutTests {
         }
     }
 
+    @Test("A centred cross moved by the anchor offset lands on the span's last column")
+    func anchorOffsetLandsOnTheLastColumn() {
+        // A ✕ is drawn centred in its span's frame, so what it takes to sit on
+        // the day it is a claim about is exactly this offset (#389). Checked
+        // against `columnCentre`, which is what every mark that has to sit on a
+        // weekday already asks — the two cannot drift apart.
+        for width in [120.0, 220.0, 400.0] as [CGFloat] {
+            for first in 0..<7 {
+                for last in first..<7 {
+                    let dayCount = last - first + 1
+                    let spanStart = SlotLayout.columnStart(trackWidth: width, index: first)
+                    let spanWidth = SlotLayout.spanWidth(trackWidth: width, dayCount: dayCount)
+                    let cross = spanStart + spanWidth / 2
+                        + SlotLayout.anchorOffset(trackWidth: width, dayCount: dayCount)
+                    let anchor = SlotLayout.columnCentre(trackWidth: width, index: last)
+                    #expect(abs(cross - anchor) < 0.0001, "track \(width), \(first)...\(last)")
+                }
+            }
+        }
+    }
+
+    @Test("A one-column mark is already on its day")
+    func anchorOffsetIsZeroForOneColumn() {
+        #expect(SlotLayout.anchorOffset(trackWidth: trackWidth, dayCount: 1) == 0)
+        #expect(SlotLayout.anchorOffset(trackWidth: trackWidth, dayCount: 0) == 0)
+    }
+
     @Test("A touch off either end belongs to the column it left")
     func touchesOutsideTheTrackClamp() {
         #expect(SlotLayout.column(atX: -40, trackWidth: trackWidth) == 0)
