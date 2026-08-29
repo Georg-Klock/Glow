@@ -6321,8 +6321,18 @@ the container has been deallocated, it traps.
 
 **Measured, one variable at a time**, each arm run six times as its own
 `-only-testing` invocation, on the iPhone 17e simulator (iOS 26.5), on a
-machine carrying two other agents — load average 11–41, 914–995 CoreSimulator
-processes, recorded per run rather than claimed:
+machine carrying two other agents — load average 11–41, 958–995 CoreSimulator
+processes, recorded per run rather than claimed.
+
+**Runs taken while another checkout was driving the same phone were discarded**,
+and that trap is the second thing this entry is for. `Tools/approve-baseline.sh`
+goes through the slot gate with `--no-udid`, so `Tools/test.sh` picks the newest
+runtime deterministically — the iPhone 17e, which is one of the three slot
+devices. Another checkout doing that presents as the host dying mid-test, which
+looks exactly like this bug. The tell is in the result bundle: `Test crashed
+with signal kill` is SIGKILL, the host killed from outside, where this bug is
+`EXC_BREAKPOINT` and leaves an `.ips`. About a third of the first pass went that
+way before the discriminator was added.
 
 | arm | screens live at the save | container released | crashed |
 | --- | --- | --- | --- |
@@ -6333,17 +6343,24 @@ processes, recorded per run rather than claimed:
 
 Arm A is the reported crash, not a lookalike: same trap address, same
 `_SwiftData_SwiftUI` frames, same `HabitStore.commit()` under the notification
-post. Arms B and E are the hypothesis this was filed under — a hosted screen
-overlapping the next test's — and they rule it out. Two and three live screens
-over live containers, one of them saving, never crashed.
+post, in seven `.ips` reports written during that window. Arms B and E are the
+hypothesis this was filed under — a hosted screen overlapping the next test's —
+and they rule it out. Two and three live screens over live containers, one of
+them saving, never crashed.
 
-**Which makes the rate explanation the ordinary one.** Nothing in the suite
-unmounted a screen, so the window, the hosting controller and the container
-went away when UIKit got round to it rather than when the test ended; a weak
-reference to all three was still non-nil three seconds after the last strong
-one went out of scope. The 4% is how often that deallocation landed before the
-next save rather than after it — which is also why it got worse on a loaded
-machine, and why it looked like #291.
+**What is not shown.** The link from that mechanism to the observed 4% is open.
+`main`'s shape amplified — prior screen torn down `main`'s way, container not
+held, six rounds a run — came back clean 6 runs out of 6 in a paired run
+against the held shape, and `main`'s actual suite came back clean 12 out of 12
+interleaved with the fixed one. At 4% per run those counts resolve nothing, and
+a machine shared with two other agents did not offer more. Nor does `main`
+visibly release the container: after its teardown, weak references to the
+hosting controller, the window and the container were all still non-nil three
+seconds later. Something must eventually collect that graph for the crash to be
+reachable at all, and that step is inferred rather than measured.
+
+So this is a fix for a proven mechanism, not a measured drop in a rate — taken
+because it is two lines and makes the one known precondition unreachable.
 
 **Decision: hold every container this suite builds for the life of the test
 host, and change nothing else.** Two lines. Four in-memory containers is the

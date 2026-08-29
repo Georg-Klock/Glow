@@ -154,6 +154,11 @@ struct EmptyStateAccessibilityTests {
         /// what *releases* the container and that is the one thing that must
         /// not happen.
         ///
+        /// **What is closed here is the precondition, not a measured rate.**
+        /// `main`'s own shape, amplified, did not crash in 6 runs, and its
+        /// suite did not crash in 12 interleaved with this one — at 4% those
+        /// counts resolve nothing. The crash provably cannot happen over a
+        /// live container, and after this there is no path that releases one.
         /// Four in-memory containers for the life of one test host is the
         /// price, and none of this reaches the app: `GlowStore` builds one
         /// container for the life of the process and never releases it.
