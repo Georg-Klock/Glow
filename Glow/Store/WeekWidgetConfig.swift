@@ -147,7 +147,30 @@ struct SelectWeekLayoutIntent: WidgetConfigurationIntent {
     /// today's behaviour — see `WidgetRows.rows`. It is also what every widget
     /// already on a home screen arrives with when this ships, which is what
     /// makes the change invisible to anyone who does not want it.
-    @Parameter(title: "Habits")
+    /// **Capped per family, by the system** (#366). A medium widget draws four
+    /// rows and a large one ten, and the picker now refuses an eleventh rather
+    /// than taking it and letting the view cut it silently.
+    ///
+    /// **The numbers must be literals, and that is the whole problem.**
+    /// `IntentCollectionSize(min:max:)` takes `_const Int`, which rejects even
+    /// a `static let` bound to a literal — tried, and it fails to compile with
+    /// *expect a compile-time constant literal*. So the cap cannot be
+    /// `WidgetMetrics`' derived capacity, and this is a second copy of a number
+    /// the grid already computes.
+    ///
+    /// The copy cannot be removed, so it is watched instead:
+    /// `WidgetRowLimitTests` reads these two literals back out of this file and
+    /// fails if either stops matching the capacity the frame yields. A scan,
+    /// for the same reason `WidgetPlacementTests` scans for #254's interpolated
+    /// literal — the constraint is on the source, so the source is the only
+    /// place to check it.
+    ///
+    /// `min: 0` keeps the existing meaning of an empty selection: a widget
+    /// nobody configured, which draws the app's own list. See `WidgetRows`.
+    @Parameter(title: "Habits", size: [
+        .systemMedium: IntentCollectionSize(min: 0, max: 4),
+        .systemLarge: IntentCollectionSize(min: 0, max: 10),
+    ])
     var rows: [WeekRowEntity]?
 
     /// Which habit the **small** size shows (#322). The small family draws one
@@ -163,6 +186,40 @@ struct SelectWeekLayoutIntent: WidgetConfigurationIntent {
     /// what resets its configuration.
     @Parameter(title: "Habit (Small size)")
     var habit: WeeklyHabitEntity?
+
+    /// **The sheet varies by family** (#366), and the comment above used to say
+    /// it could not.
+    ///
+    /// That claim was the load-bearing reason this kind was going to be split
+    /// into one per family, which would have re-frozen every placed widget the
+    /// way #209 and #322 did. It is false: `When(widgetFamily:)` is iOS 17 and
+    /// the per-family `size:` is iOS 18, against a deployment target of 18.0.
+    /// Checked in the iOS 26.5 SDK's `AppIntents.swiftinterface`, not from
+    /// memory — the same discipline `WidgetsView` records for `WidgetKit`.
+    ///
+    /// So small offers the habit and nothing else, and the other two offer the
+    /// rows and nothing else. Each parameter still exists on every family; what
+    /// changes is which one the sheet draws.
+    static var parameterSummary: some ParameterSummary {
+        When(widgetFamily: .equalTo, .systemSmall) {
+            Summary { \.$habit }
+        } otherwise: {
+            Summary { \.$rows }
+        }
+    }
+}
+
+/// How many rows the picker will accept, per family.
+///
+/// **Not read by the intent** — it cannot be, because `_const` demands a
+/// literal there. This is the number the *test* checks the literal against, and
+/// the number the rest of the app should ask when it wants to know the cap. It
+/// is deliberately not a third opinion: `WidgetRowLimitTests` ties it to
+/// `WidgetMetrics` at one end and to the source literal at the other, so all
+/// three move together or the suite says which one did not.
+enum WidgetRowLimit {
+    static let medium = 4
+    static let large = 10
 }
 
 /// One query shared by the week widget's provider and its entity query, so the

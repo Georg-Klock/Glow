@@ -5885,4 +5885,43 @@ number it was offered under.
 own entities would assert against a copy of the numbering rule rather than
 against the code the picker calls, which is the mirror copy the working rules
 forbid.
+## 2026-08-29 — The sheet varies by family, so the kinds do not split (#366)
+
+The week widget keeps one kind and one intent. Small offers the habit picker
+and nothing else; medium and large offer the row picker, capped at four and ten
+by the system rather than by the view cutting silently.
+
+**This reverses a decision made an hour earlier on a false premise.** #366 was
+going to split the kind into one per family, reopening #322 and re-freezing
+every placed widget the way #209 and #322 did, because `WeekWidgetConfig` said
+"the sheet cannot vary by family" and that was taken at face value. It is not
+true. Checked in the iOS 26.5 SDK's `AppIntents.swiftinterface`:
+
+| capability | API | since |
+|---|---|---|
+| per-family collection cap | `@Parameter(size: [IntentWidgetFamily: IntentCollectionSize])` | iOS 18.0 |
+| per-family parameter visibility | `When(widgetFamily: .equalTo, …) { } otherwise: { }` | iOS 17.0 |
+
+The deployment target is 18.0, so both are in reach, and the split buys nothing
+the summary does not already give. The lesson is the one `WidgetsView` already
+records for `WidgetKit`: check the interface, not the memory — and a comment
+asserting a platform limit is a claim with a date on it, not a fact.
+
+**The caps are literals and cannot be anything else.**
+`IntentCollectionSize(min:max:)` takes `_const Int`, which rejects even a
+`static let` bound to a literal — *expect a compile-time constant literal*. So
+three numbers have to agree and the language will enforce none of it: the
+capacity `WidgetMetrics` derives from the frame, `WidgetRowLimit`'s documented
+value, and the literal inside `size:` that the system actually enforces.
+
+`WidgetRowLimitTests` ties all three — it recomputes the capacity from the
+frame's own inputs, compares it to the constant, and **scans this file for the
+literal**. The scan follows `WidgetPlacementTests`' scan for #254's
+interpolated literal: when the constraint lives in source text, the source is
+the only place to check it. One derivation would be better; the language does
+not allow it, so divergence fails loudly and names the number that moved.
+
+**What this does not fix.** The parameters still both exist on every family —
+what changes is which one the sheet draws. A small widget's stored `rows` and a
+medium's stored `habit` are still there, ignored, exactly as before.
 
