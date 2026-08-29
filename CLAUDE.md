@@ -229,8 +229,14 @@ that lane gates it; raising it is a product decision.
 ## Working rules
 
 - **One topic branch, one PR, per unit of work.** `git checkout -b <topic>` off
-  `main`. Never commit to `main`. **Never merge your own PR** — merging is
-  Georg's call.
+  `main`. Never commit to `main`. **Merging is Georg's call**, and the default
+  is that Claude opens the pull request and stops there.
+
+  He can delegate it, and has — the rule said *never merge your own PR* while
+  the person it reserved the button for was asking for the button to be pressed,
+  which is a file arguing with the room. A delegation covers the session it was
+  given in and does not carry to the next one: the next session opens PRs and
+  stops, until it is told otherwise.
 - **Commit at every working state, push often.** The remote is the backup; an
   unpushed commit exists on one SSD.
 - **Claude is the `Author`, Georg is the `Committer`.** The point of this
