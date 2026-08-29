@@ -59,6 +59,10 @@ import UIKit
 ///
 /// The preference cannot be set from in here: it is read as the test host
 /// launches, long before any test runs.
+/// **Every container this suite builds is held for the life of the test host**
+/// (#357), on `Screen.kept` below. The flake that closes was the host
+/// *dying*, not a test failing an expectation, which is why it arrived as a
+/// bare `[Failed]` with nothing in it to read.
 @MainActor
 struct EmptyStateAccessibilityTests {
     @Test func theEmptyStateSpeaksItsTwoButtonsAndNothingElse() throws {
@@ -121,6 +125,45 @@ struct EmptyStateAccessibilityTests {
     /// present from.
     @MainActor
     struct Screen {
+        /// **Every container this suite builds is held for the life of the
+        /// test host, and that is the fix for #357.**
+        ///
+        /// SwiftData registers an observer of its own on
+        /// `NotificationCenter.default` for the `@Query` in a hosted
+        /// `WeeklyGridView` — the `_SwiftData_SwiftUI` frame in every crash
+        /// report — and nothing takes that observer away when the view goes.
+        /// Once the container behind it has been deallocated, the next
+        /// `ModelContext.save()` *anywhere in the process* is posted to it and
+        /// traps inside SwiftData: `EXC_BREAKPOINT`, the test host restarted
+        /// by `xcodebuild`, and a bare `[Failed]` against whichever test was
+        /// running when it went.
+        ///
+        /// That is measured, not reasoned about. Releasing the container after
+        /// unmounting the screen and then saving from the next one reproduced
+        /// the reported crash — the same trap address, the same
+        /// `_SwiftData_SwiftUI` frames, `HabitStore.commit()` under a
+        /// `postNotificationName` — on **6 runs out of 6**. The same arm with
+        /// the container held: **0 out of 6**.
+        ///
+        /// **What it is not** is two screens alive at once, which is what this
+        /// was filed under. Two live screens over two live containers, one of
+        /// them saving, is 0 runs out of 6; three at once is clean too. A
+        /// foreign save reaching a *live* container's observer is fine. So
+        /// this suite is left free to overlap, and nothing here unmounts: the
+        /// teardown below is unchanged, because replacing the root view is
+        /// what *releases* the container and that is the one thing that must
+        /// not happen.
+        ///
+        /// **What is closed here is the precondition, not a measured rate.**
+        /// `main`'s own shape, amplified, did not crash in 6 runs, and its
+        /// suite did not crash in 12 interleaved with this one — at 4% those
+        /// counts resolve nothing. The crash provably cannot happen over a
+        /// live container, and after this there is no path that releases one.
+        /// Four in-memory containers for the life of one test host is the
+        /// price, and none of this reaches the app: `GlowStore` builds one
+        /// container for the life of the process and never releases it.
+        private static var kept: [ModelContainer] = []
+
         let container: ModelContainer
         let host: UIViewController
         let window: UIWindow
@@ -143,6 +186,7 @@ struct EmptyStateAccessibilityTests {
             window.rootViewController = host
             window.isHidden = false
             window.makeKeyAndVisible()
+            Screen.kept.append(container)
             settle()
         }
 
@@ -157,10 +201,12 @@ struct EmptyStateAccessibilityTests {
 
         /// Put the window away before the next test builds its own.
         ///
-        /// A hosted `WeeklyGridView` left standing keeps a `@Query` over a
-        /// container the test has finished with, and three of them alive at
-        /// once took the test host down mid-suite — which reads as a failure in
-        /// whichever test happened to be running when it went.
+        /// **Unchanged, and deliberately so** (#357). Unmounting the screen
+        /// here — replacing the root view — was tried, and it is what releases
+        /// the `ModelContainer`, which is the crash's one precondition:
+        /// measured, that turns a 4% flake into a crash on 6 runs out of 6.
+        /// The container has to outlive the observer, so the screen may as
+        /// well stay up. See `kept` above.
         func tearDown() {
             host.presentedViewController?.dismiss(animated: false)
             window.rootViewController = nil
