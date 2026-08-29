@@ -105,6 +105,19 @@ targets:
         PROVISIONING_PROFILE_SPECIFIER: Glow Up Development
         CODE_SIGN_IDENTITY: Apple Development
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        # Dark-only, at the system's level rather than SwiftUI's (#403).
+        #
+        # `GlowApp` sets `.preferredColorScheme(.dark)` on both of its branches,
+        # which covers everything SwiftUI draws — and nothing before SwiftUI
+        # runs. The launch screen is generated from
+        # `UILaunchScreen_Generation` above, it is the first thing on screen on
+        # every cold launch, and with no appearance declared it resolves against
+        # the device's own setting: white on a light phone, for as long as the
+        # launch takes. This key is what the generated launch screen reads, and
+        # it also settles the system UI the app presents but does not draw —
+        # the keyboard, the share sheet — which had the same gap for the same
+        # reason.
+        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_CFBundleDisplayName: Glow Up
