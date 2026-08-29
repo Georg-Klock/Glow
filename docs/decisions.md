@@ -6302,3 +6302,59 @@ the unit test covers the predicate, but the animation itself was not watched:
 synthetic taps on a `.swipeActions` button do not register through the
 simulator's HID injection, so the button could be opened and screenshotted but
 not pressed.
+## #357 is a released container, not an overlapping screen
+
+**2026-08-29.** `activatingTheSecondButtonInstallsTheCuratedSet()` had been
+failing at roughly 4% since 23 August, on diffs that could not reach it. The
+failure was the test host *crashing*: `EXC_BREAKPOINT` at one address inside
+SwiftData, reached out of `__CFNOTIFICATIONCENTER_IS_CALLING_OUT_TO_AN_OBSERVER__`
+under `HabitStore.commit()`'s `context.save()`, with a `_SwiftData_SwiftUI`
+frame between them. `xcodebuild` restarts the host and reports a bare
+`[Failed]`, which is why the summaries had nothing in them to read.
+
+**The precondition is a deallocated `ModelContainer` with a live observer, and
+nothing else.** SwiftData registers an observer on `NotificationCenter.default`
+for the `@Query` in a hosted `WeeklyGridView`, and does not remove it when the
+view goes away. Any later `ModelContext.save()` in the process is posted to it.
+While the container it belongs to is alive, that foreign save is harmless. Once
+the container has been deallocated, it traps.
+
+**Measured, one variable at a time**, each arm run six times as its own
+`-only-testing` invocation, on the iPhone 17e simulator (iOS 26.5), on a
+machine carrying two other agents — load average 11–41, 914–995 CoreSimulator
+processes, recorded per run rather than claimed:
+
+| arm | screens live at the save | container released | crashed |
+| --- | --- | --- | --- |
+| A | one | yes | 6/6 |
+| C | one | no | 0/6 |
+| B | two | no | 0/6 |
+| E | three | no | 0/6 |
+
+Arm A is the reported crash, not a lookalike: same trap address, same
+`_SwiftData_SwiftUI` frames, same `HabitStore.commit()` under the notification
+post. Arms B and E are the hypothesis this was filed under — a hosted screen
+overlapping the next test's — and they rule it out. Two and three live screens
+over live containers, one of them saving, never crashed.
+
+**Which makes the rate explanation the ordinary one.** Nothing in the suite
+unmounted a screen, so the window, the hosting controller and the container
+went away when UIKit got round to it rather than when the test ended; a weak
+reference to all three was still non-nil three seconds after the last strong
+one went out of scope. The 4% is how often that deallocation landed before the
+next save rather than after it — which is also why it got worse on a loaded
+machine, and why it looked like #291.
+
+**Decision: hold every container this suite builds for the life of the test
+host.** Four in-memory containers is the whole cost. The screen is unmounted
+too, which is a separate and smaller thing — it stops a screen nobody is
+looking at answering `UserDefaults.didChangeNotification` with a fetch, the
+second crash shape on the issue — but **unmounting without holding the
+container is worse than doing neither**: it is exactly arm A, and it takes the
+rate from 4% to 100%. The two go together or not at all.
+
+**None of this reaches the app.** `GlowStore` builds one container for the life
+of the process and never releases it, and `EmptyStateAccessibilityTests` is the
+only suite in the repository that hosts a live view, so it is the only one that
+ever registers such an observer. Every other suite builds and drops containers
+freely and always has.
