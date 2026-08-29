@@ -25,7 +25,16 @@ struct RowGeometry: Equatable {
     /// size.
     let textSize: CGFloat
 
-    var horizontalPadding: CGFloat { WidgetMetrics.padLeading * scale }
+    /// The widget's own insets, and they are **not** the same on both sides.
+    /// 6 and 14 is an optical adjustment for a row that starts with a label
+    /// column and ends with a mark; the screen borrows it rather than
+    /// symmetrising it, because a symmetric copy is not the same picture.
+    var padLeading: CGFloat { WidgetMetrics.padLeading * scale }
+    var padTrailing: CGFloat { WidgetMetrics.padTrailing * scale }
+    var padTop: CGFloat { WidgetMetrics.padTop * scale }
+    var padBottom: CGFloat { WidgetMetrics.padBottom * scale }
+    var headerHeight: CGFloat { WidgetMetrics.headerHeight * scale }
+    var headerGap: CGFloat { WidgetMetrics.headerGap * scale }
     var labelGap: CGFloat { WidgetMetrics.labelGap * scale }
     /// Half the widget's row gap, applied above and below each list row.
     var rowInset: CGFloat { WidgetMetrics.rowGap * scale / 2 }
@@ -58,20 +67,39 @@ struct RowGeometry: Equatable {
 
     init(totalWidth: CGFloat) {
         let width = Self.usable(totalWidth)
-        let scale = max(1, width / WidgetMetrics.largeWidth)
+        // **One factor, and nothing exempt from it.** The screen is the large
+        // widget scaled, so the scale is the ratio — not a ratio floored at 1,
+        // which drew a panel narrower than 338pt as a widget with oversized
+        // marks in it rather than as a smaller widget.
+        //
+        // **Not floored at the bottom either**, and #136 is why. A zero
+        // proposal is the first pass of every `GeometryReader`, and a floor
+        // here made the label column 98pt wide inside a row 0pt wide — the
+        // clamp that used to absorb that was `min(_, width * 0.42)`, which was
+        // written against Dynamic Type and was quietly doing this second job
+        // as well. Scaling all the way down does the job honestly: at zero
+        // width every measurement below is zero, which is what `zeroWidth`
+        // asserts.
+        let scale = width / WidgetMetrics.largeWidth
         self.scale = scale
 
-        // The label column grows with the user's text size, but never past a
-        // point where the track it is stealing from stops being a week.
-        let scaledLabel = UIFontMetrics(forTextStyle: .subheadline)
-            .scaledValue(for: WidgetMetrics.labelWidth * scale)
-        labelWidth = max(0, min(scaledLabel, width * 0.42))
-
-        textSize = UIFontMetrics(forTextStyle: .subheadline)
-            .scaledValue(for: WidgetMetrics.textSize * scale)
+        // **Dynamic Type is deliberately not applied here.** It used to be, and
+        // the label column was clamped to 42% of the width to stop a large type
+        // size eating the track. Both are gone: the screen is now the widget at
+        // a scale factor, and a label column that grows on its own is the one
+        // thing that cannot be. The cost is real and named in
+        // docs/decisions.md — text on this screen no longer grows with the
+        // reader's setting.
+        //
+        // The clamp is not replaced by a smaller one. `labelWidth` is
+        // `98/338` of the width by construction now, so it cannot outgrow the
+        // row it is in without the row growing too.
+        labelWidth = max(0, WidgetMetrics.labelWidth * scale)
+        textSize = WidgetMetrics.textSize * scale
 
         let available = width
-            - WidgetMetrics.padLeading * scale * 2
+            - WidgetMetrics.padLeading * scale
+            - WidgetMetrics.padTrailing * scale
             - labelWidth
             - WidgetMetrics.labelGap * scale
         trackWidth = max(0, available)
@@ -82,8 +110,18 @@ enum GridMetrics {
     /// Chrome that exists only in the app — the Low Power banner and the empty
     /// state — and so has no widget number to scale from.
     static let horizontalPadding: CGFloat = 20
-    /// A floor the widget does not need: its rows are read, these are tapped.
-    static let minimumRowHeight: CGFloat = 34
+    /// **The tap-target floor is gone** (#370 follow-up). It was 34pt, a floor
+    /// the widget does not need because its rows are read where these are
+    /// tapped. A floor is by definition a departure from the widget's geometry,
+    /// and the screen is now required to be the widget scaled. On a phone whose
+    /// panel is narrower than 338pt a row is under 34pt, which is below the
+    /// recommended target. Named in docs/decisions.md rather than left to be
+    /// discovered.
+
+    /// The grid's own corner, where the widget is masked to the system's
+    /// squircle and cannot ask for one (#370). The design file's 30, the same
+    /// number the Widgets tab draws its previews with.
+    static let panelCorner: CGFloat = 30
 }
 
 /// One habit: icon and name on the left, a fixed-width status track on the right.
@@ -212,7 +250,7 @@ struct HabitRowView: View {
                 }
             }
         }
-        .frame(height: max(slotHeight, GridMetrics.minimumRowHeight))
+        .frame(height: slotHeight)
         .background(alignment: .leading) { restDayCut }
         // Outside the background, so the cut leaves on the same timing the
         // track does. Reduce Motion takes the snap, as everywhere else the grid
@@ -261,7 +299,7 @@ struct HabitRowView: View {
             // the last habit.
             let above: CGFloat = index == cut.lowerBound ? 0 : geometry.rowInset
             let below: CGFloat = index == cut.upperBound ? 0 : geometry.rowInset
-            let rowHeight = max(slotHeight, GridMetrics.minimumRowHeight)
+            let rowHeight = slotHeight
             Rectangle()
                 .fill(GlowPalette.grey)
                 // The span bar's weight, in points. The line is a line, and the

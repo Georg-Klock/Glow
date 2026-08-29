@@ -183,11 +183,12 @@ struct WidgetsView: View {
 
     /// The production view, at the size the family really gets, scaled to fit.
     ///
-    /// Everything outside the view itself is what the system does on a glass
+    /// Everything outside the view itself is what the system does on a Default
     /// Home Screen: the same asymmetric padding, because
     /// `contentMarginsDisabled()` means the widget applies its own, and the
-    /// substituted panel `panel` draws. The rounded corner is drawn here
-    /// because the system is not here to mask it.
+    /// same `GlowPalette.widgetSurface` the widget declares as its container
+    /// background. The rounded corner is drawn here because the system is not
+    /// here to mask it.
     ///
     /// Not interactive. The marks are intents in the real widget and still are
     /// here, so hit testing is switched off rather than left to surprise
@@ -201,27 +202,41 @@ struct WidgetsView: View {
             .padding(.top, WidgetMetrics.padTop)
             .padding(.bottom, WidgetMetrics.padBottom)
             .frame(width: size.width, height: size.height)
-            // The rendering a glass Home Screen puts a widget into, injected
-            // rather than imitated (#273, kept through #312): the panel below
-            // is the Tinted/Clear substitution, and accented is the rendering
-            // that appearance pairs with it. `GlowPalette.grey` is a
-            // `ShapeStyle` resolving against exactly this value, so the marks
-            // take the alpha-stored grey by the same line of code that runs on
-            // a Home Screen — the content of these previews is the real
-            // accented rendering, not a drawing of it.
-            .environment(\.widgetRenderingMode, .accented)
-            .background { panel }
+            // **The widget's own surface, not an imitation of one** (#369).
+            //
+            // `GlowPalette.widgetSurface` is what `GlowWidget` declares as its
+            // container background and what the render harness renders over, so
+            // this page is now the third reader of one declaration rather than
+            // the one surface drawing its own. It was `Color.black` under
+            // `glassEffect(.regular)`, which is a different material over a
+            // different black — `widgetBackground` exists precisely because
+            // `Color.black` is a system colour and free to be something other
+            // than 0,0,0.
+            //
+            // **No rendering-mode override.** This used to inject `.accented`,
+            // which is the Tinted/Clear substitution, while a Default Home
+            // Screen renders `fullColor`. That is not a near-miss: accented
+            // discards colour and keeps alpha, so the marks resolved through
+            // `GlowPalette.greyAccented` here and through the opaque resting
+            // step on the phone. Different pixels by construction. Outside
+            // WidgetKit the environment's own default is `fullColor`, which is
+            // the appearance being matched, so the override simply goes.
+            //
+            // **And no stroked edge.** iOS masks a widget to its squircle and
+            // strokes nothing, so any border here is by definition a way to
+            // tell a preview from the real thing. The reason one was added
+            // dissolves rather than being overruled: it existed because the
+            // old panel was the page's own black plus a material, leaving the
+            // marks with no widget around them. `widgetSurface` gives the
+            // preview a ground the page does not have, which is how the widget
+            // reads on a Home Screen.
+            //
+            // What #273 and #312 settled — injected accented rendering, and the
+            // black plate under it — was reasoned for a page previewing the
+            // *Tinted/Clear* appearance. Matching Default supersedes it; see
+            // docs/decisions.md.
+            .background { GlowPalette.widgetSurface }
             .clipShape(RoundedRectangle(cornerRadius: Self.corner, style: .continuous))
-            // The widget's own edge, because nothing else here draws one: the
-            // panel is glass over black and so is the page, so an unstroked
-            // preview is marks floating in the void with no widget around
-            // them. Screenshotted before adding it. The unlit grey and the
-            // barbell's thickness, both from the palette — this page
-            // introduces no colour and no weight of its own.
-            .overlay {
-                RoundedRectangle(cornerRadius: Self.corner, style: .continuous)
-                    .strokeBorder(GlowPalette.grey, lineWidth: GlowShape.barThickness)
-            }
             .scaleEffect(scale, anchor: .topLeading)
             // The scaled footprint, so the layout above and below reserves what
             // is actually drawn — `scaleEffect` alone changes nothing about the
@@ -233,47 +248,6 @@ struct WidgetsView: View {
             // heading above says which widget this is.
             .accessibilityHidden(true)
     }
-
-    /// What sits behind a preview: the glass the system substitutes for the
-    /// widget's declared background, composited over a black Home Screen.
-    ///
-    /// **The material is real, the wallpaper is chosen** (#273, #312). Under
-    /// Tinted and Clear the system removes the declared background and
-    /// composites its own glass out of the wallpaper behind it; neither the
-    /// wallpaper nor the system's compositing is reachable from app code —
-    /// `GlowWidget.swift` records the same limit for the real widget — so the
-    /// glass here is SwiftUI's own, and what it sits on is this page's choice.
-    /// #312 settles the choice: black, the Home Screen this app's aesthetic
-    /// assumes, replacing the mid-grey stand-in the appearance picker needed.
-    /// That plate existed so the glass card could look different from the
-    /// Default card beside it, and the Default card left with the picker.
-    ///
-    /// **The plate is opaque, and that is not a detail.** Rendered
-    /// translucent, the glass samples what is behind it — which here is the
-    /// page, not a wallpaper — and the caption above each preview appeared
-    /// ghosted inside the widget. Screenshotted, not reasoned about. An opaque
-    /// plate gives the effect a defined backdrop and the ghost goes.
-    ///
-    /// `glassEffect` is iOS 26, and this app deploys to 18. The fallback is a
-    /// `Material`, which is the same approximation one generation blunter —
-    /// and the half of the preview that actually carries the information, the
-    /// accented content, is identical under both.
-    @ViewBuilder
-    private var panel: some View {
-        let shape = RoundedRectangle(cornerRadius: Self.corner, style: .continuous)
-        if #available(iOS 26.0, *) {
-            // `.regular` rather than `.clear`: the two measured
-            // pixel-identical over a preview's plate — see docs/decisions.md,
-            // 2026-08-25 and 2026-08-26.
-            Self.plate.glassEffect(.regular, in: shape)
-        } else {
-            Self.plate.overlay(.regularMaterial)
-        }
-    }
-
-    /// The Home Screen a preview's glass is composited over (#312): black,
-    /// matching the app's own surfaces and the aesthetic the design assumes.
-    private static let plate = Color.black
 
     /// The space between two widgets sitting side by side, from the sizes
     /// themselves: what is left of a Medium's width once two Smalls are in it.
