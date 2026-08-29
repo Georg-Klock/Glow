@@ -5617,6 +5617,89 @@ The corroborating argument is that `widgetSurface` was already declared as one
 view "so the widget and the render harness cannot disagree about what the
 surface is". There were three readers and only two of them agreed.
 
+
+## Pull-request latency: the minimum-iOS lane runs after the merge
+
+**Question.** #286 put the declared minimum on its own CI lane and accepted the
+CI-time cost in one line. What was the cost, and who paid it?
+
+**Measured** (2026-08-29, across the last 100 runs).
+
+- `Build and test`: 12 minutes. `Gate self-test`: under 1. `Build and test
+  (iOS 18)`: **40 minutes** — 3.3 of them re-downloading the runtime, which the
+  runner image does not carry and which cannot be cached (see the lane's own
+  comment), and 36.4 running the suite.
+- Those 36.4 minutes are the *same tests* the current lane runs in 10. The
+  difference is the hardware and the runtime: an iPhone SE 3 on iOS 18.5
+  against an iPhone 17e on 26.5, about 3.6x.
+- The jobs are parallel, so the slowest is the whole answer. Pull-request
+  feedback was 40 minutes, and pull-request-to-merge across 60 merged pull
+  requests averaged 136 minutes — the recent ones 50 to 80, which is one CI
+  cycle and nothing else. Merge latency *was* CI latency.
+- Every push paid it again: a review comment, a rebase, a re-approved baseline.
+
+**Decision.** The lane runs on `push: main`, on a 06:00 UTC schedule, and on
+`workflow_dispatch`. On a pull request it runs only when the pull request
+carries the `ios18` label. Pull-request feedback goes to about 12 minutes.
+
+**What that trades.** An iOS-18-only regression is now caught after the merge
+rather than before it — by the same lane, on the merge commit, minutes later,
+on a branch nobody is waiting on. The label is there for a change that warrants
+the old behaviour. #286's decision is intact: the 18.0 deployment target is
+still gated by a real run of the authoritative suite on a real iOS 18 runtime.
+What changed is when the answer arrives, not whether it does.
+
+**And `main` stopped cancelling itself.** `cancel-in-progress` was set for
+every ref. On a branch that is right — a new push makes the old answer
+irrelevant. On `main` it was already destroying whole runs: three merges in one
+evening on 2026-08-28 cancelled the two runs before them. That was tolerable
+while `main` only re-ran what the pull request had already proved. It is not
+tolerable now that `main` is where the minimum-iOS lane lives, because it would
+retire that gate by accident rather than reschedule it. Pull requests still
+cancel their predecessors; `main` runs queue.
+
+**What was considered and rejected: skipping `GlowRenderTests` on that lane.**
+The first read of the failure data was that the render baseline is
+single-runtime — `render-signatures.json` has one `frames` key and no runtime
+or device in it — and so comparing it on iOS 18 asks whether two rasterisers
+agree rather than whether the app works. That read was wrong, and the file that
+disproves it is `render-signatures-ios18.json`, which #286 added for exactly
+this reason; `RenderBaselineTests.swift` picks per OS major. The two files have
+moved in the same eight commits since 2026-08-27. The iOS 18 render failures
+that suggested the idea all predate the second baseline. Skipping would have
+dropped real cross-OS render coverage in the middle of a visual overhaul, and
+left `render-signatures-ios18.json` as dead weight.
+
+**What that left instead.** The real cost of two baselines is that the second
+one needs its own local run (`GLOW_EXPECTED_RUNTIME_MAJOR=18`) and approving
+only the first is silent until CI says so — which, after this change, is after
+the merge. `Tools/approve-baseline.sh` renders both and approves both from one
+command, and refuses to approve either when the run failed for any reason
+beyond the signatures moving. `--check` does it without writing.
+
+## Two files that every parallel branch touches
+
+**Question.** Six open pull requests, three touching `docs/decisions.md` and
+two touching a render baseline. Whichever merges second rebases. What should
+git do with each?
+
+**Decision.** Opposite things, declared in `.gitattributes`.
+
+`docs/decisions.md merge=union`. This file is append-only by construction: an
+entry is a new section at the end, so two branches that each add one are in
+sequence, not in conflict — git stops only because both hunks end at the last
+line. `union` keeps both sides. What it gives up is which of the two lands
+first, which is the one property a log of dated entries does not depend on.
+
+`RenderTests/Baselines/render-signatures*.json -merge`. The opposite case: a
+textual merge of two sets of measured frame signatures produces valid JSON
+describing a render no machine performed, which then passes review precisely
+because it merged cleanly. `-merge` makes git refuse and mark the path
+conflicted, with no markers written into the JSON. Resolving means re-measuring
+— rebase, then `Tools/approve-baseline.sh` — never editing hunks by hand.
+
+`union` is the wrong driver for any file where two branches can edit the same
+line; it is set on that one file for the reason above, not as a policy.
 ## 2026-08-28 — The weekly grid gets the widget's surface, and loses 40pt of track (#370)
 
 This Week draws `GlowPalette.widgetSurface` behind its rows: the same ground the

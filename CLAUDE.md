@@ -136,7 +136,9 @@ contradiction left standing reads as an instruction to whoever finds it next.
   #221.
 
   When the render baseline moves, the script prints the one command that
-  approves it. Approving is a decision: say in the pull request what moved.
+  approves it — for the runtime it just ran on. There are two committed
+  baselines, so prefer `Tools/approve-baseline.sh` below, which does both.
+  Approving is a decision: say in the pull request what moved.
 
   It picks the newest installed runtime by default. A lane that exists to test
   a *specific* one sets `GLOW_EXPECTED_RUNTIME_MAJOR` (e.g. `18`), which
@@ -145,6 +147,18 @@ contradiction left standing reads as an instruction to whoever finds it next.
   fails loudly instead of falling forward to a newer runtime (#286). What ran
   is recorded either way: runtime and device on the console, in
   `<run>/simulator.txt`, and at the end of `summary.md`.
+
+- **Approve both render baselines:** `Tools/approve-baseline.sh` (and `--check`)
+
+  A visual change moves two committed files: `render-signatures.json`, measured
+  on the newest runtime here, and `render-signatures-ios<major>.json`, measured
+  on the one the minimum-iOS lane pins (#286). They are two measurements of the
+  same change. This renders on both and approves both, and **refuses to approve
+  either when the run failed for any reason beyond the signatures moving** — an
+  "actual" copied out of a broken run is how a real failure becomes a committed
+  baseline that every later run agrees with. `--check` renders both and writes
+  nothing, exiting non-zero if either is out of date; that is the pre-pull-request
+  check, because the lane that would otherwise catch it now reports after merge.
 
 - **Regenerate the symbol picker catalog:** `Tools/make-symbol-catalog.py`
 - **Render the website's HDR word images:** `Tools/make-glow-word.swift`
@@ -226,6 +240,16 @@ runtime the lane installs and pins with `GLOW_EXPECTED_RUNTIME_MAJOR` so it
 cannot silently fall forward (#286). The deployment target stays 18.0 because
 that lane gates it; raising it is a product decision.
 
+**The two lanes do not run at the same times.** The current runtime gates every
+pull request. The minimum-iOS lane runs on `main`, nightly at 06:00 UTC, and on
+demand — not on a pull request unless it carries the `ios18` label. It is a
+40-minute job against the current lane's 12, all of it in front of a merge, and
+it was therefore the whole of this repository's pull-request feedback latency;
+measured, and decided, in `docs/decisions.md`. The consequence to keep in mind:
+**an iOS 18 failure now reddens `main`, not the pull request that caused it.**
+The likeliest cause is a render baseline approved on one runtime and not the
+other, which `Tools/approve-baseline.sh` exists to prevent.
+
 ## Working rules
 
 - **One topic branch, one PR, per unit of work.** `git checkout -b <topic>` off
@@ -237,6 +261,19 @@ that lane gates it; raising it is a product decision.
   which is a file arguing with the room. A delegation covers the session it was
   given in and does not carry to the next one: the next session opens PRs and
   stops, until it is told otherwise.
+
+  **What is delegable is the waiting, not the decision.** `gh pr merge --auto`
+  (auto-merge is enabled on the repository) lands a pull request the moment its
+  checks go green, so a delegation does not mean sitting and watching CI — which
+  is the part that was never his call to begin with.
+
+  `main` is protected: `Gate self-test` and `Build and test` must pass before
+  anything lands. The minimum-iOS check is deliberately *not* required, because
+  it no longer runs on pull requests and requiring it would block every one of
+  them forever. "Up to date before merging" is deliberately off too — it would
+  force a rebase and a fresh full run on every merge, which is the latency this
+  setup just removed. Administrators are not included, so there is still a way
+  through when one is needed.
 - **Commit at every working state, push often.** The remote is the backup; an
   unpushed commit exists on one SSD.
 - **Claude is the `Author`, Georg is the `Committer`.** The point of this
