@@ -12,10 +12,15 @@ import SwiftUI
 /// cannot disagree. If they did, the columns would stop lining up, which is
 /// the one thing the whole screen is for.
 ///
-/// Three deliberate departures, each a considered use of room the widget does
-/// not have: text and the label column still grow with Dynamic Type (clamped
-/// so the track never stops being a week), rows never shrink below a tappable
-/// height, and the header carries dates under its letters.
+/// **One departure is left, and this comment used to claim three.** It said
+/// text and the label column still grew with Dynamic Type and that rows never
+/// shrank below a tappable height; both went on 2026-08-24, when the screen
+/// became the widget times one factor (docs/decisions.md), and `init` below has
+/// said so ever since. The stale half of that sentence is where #405's claim
+/// that the screen and the widget can truncate a name differently came from —
+/// they cannot: the one factor scales `textSize` too, so `nameMaxWidth` is
+/// 6.125 text-sizes on both. What remains is the header, which carries dates
+/// under its letters where the widget has room only for the letters.
 struct RowGeometry: Equatable {
     /// The screen's width over the large widget's own.
     let scale: CGFloat

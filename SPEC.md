@@ -606,6 +606,20 @@ and named the cost, and this is that cost being paid back on the end that
 needed it — a mode whose exit is behind a menu reads as a mode you are stuck
 in.
 
+**A name that will not fit is shown not fitting** (#405). The name field has no
+character limit and imposes none — what is stored is exactly what was typed.
+Truncation is a width, not a count, so how many letters fit depends on which
+letters they are and no counter can state a number. So from the first letter the
+sheet draws the habit's own row underneath the field — the same font, icon
+column, label column and tail truncation This Week draws — under a line that
+reads *How it reads on This Week and in the widget* until the name overruns and
+*Cut off here on This Week and in the widget* once it does. **One row is honest
+about both surfaces**, because they are one row at two sizes: `RowGeometry` is
+the large widget's geometry times a single factor, applied to the text size as
+well as to the label column, so a name breaks at the same character on This Week
+as it does in the widget. Measured on a 390pt phone, "Watch Sunset Every
+Evening" reads "Watch Su…" on all three.
+
 **A blank row is grouping somebody put there** (#143, narrowed by #257).
 Blank rows exist so habits can be clustered, and they are made deliberately —
 "Add Blank Row" — never as a side effect. Deleting a habit removes its row and

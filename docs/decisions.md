@@ -6058,3 +6058,116 @@ shape. iOS 26 gathers the two trailing items onto one glass platter (#258), so
 they read as a two-segment control rather than two separate buttons — which is
 what "immediately to the left of the ellipsis" asks for, seen through that
 platter rule.
+## 2026-08-29 — The name warning is the row, because the limit is not a number (#405)
+
+The habit name field has never had a limit. Truncation happens at display time
+and is bounded by width: `.lineLimit(1).truncationMode(.tail)` against
+`nameMaxWidth`, which is `(label 98 + gap 4) − icon 24 − iconGap 4.5 = 73.5`.
+#405 asked for a signal while typing and left three options open — a live
+preview, a character counter, or a hard cap on the field.
+
+**A counter cannot be written.** It would have to name a number of letters, and
+there is no such number: the limit is a width, so "Illinois" and "Watch Waves"
+reach it at different lengths. A counter set to whatever the widest plausible
+name allows would cry wolf on narrow strings and stay silent on wide ones — a
+warning that is wrong in both directions is worse than none.
+
+**A cap is the wrong thing entirely.** Refusing further typing edits what the
+person meant rather than telling them what will happen to it. The issue is
+about warning, and the store is unchanged: `save()` still writes `trimmedName`,
+whatever it is.
+
+**So the signal is the row.** Below the name field, from the first letter, the
+sheet draws the habit label exactly as This Week and the widget draw it, so the
+ellipsis in the sheet is the ellipsis that ships. The line under it is what
+changes — *How it reads on This Week and in the widget* while the name fits,
+*Cut off here on This Week and in the widget* once it does not. The row itself
+is shown either way: a block that appears at one keystroke and vanishes at the
+next is a worse way to say the same thing, and the ellipsis is drawn by SwiftUI
+rather than predicted here.
+
+**#405's second claim is wrong, and that is what makes one preview possible.**
+The issue said `geometry.nameMaxWidth` "scales with the device and Dynamic
+Type" while `WidgetMetrics.nameMaxWidth` is fixed, so "there is no single width
+a creation-time indicator could check that is guaranteed correct on both
+surfaces". Neither half holds today. Dynamic Type came out of `RowGeometry` on
+2026-08-24 — it is one factor, `panelWidth / 338`, and that factor is applied
+to `textSize` as well as to the label column. So the screen's row and the
+widget's row are the same row at two sizes, `nameMaxWidth / textSize` is 73.5/12
+on both, and a name breaks at the same character on each. The claim in the issue
+came from `RowGeometry`'s own header comment, which still says text "grows with
+Dynamic Type" and has been stale since that change; the type's `init` says
+otherwise a few lines below. `RowGeometryTests` now holds the ratio, so the
+preview cannot quietly stop being honest about both.
+
+**Rendered at the screen's scale, not the widget's, and not magnified.** A
+larger preview would read better in the sheet and would not be reliable: the
+system font's tracking is set per point size, so the same name at 17pt is not
+guaranteed to break where it breaks at 12pt. The scale used is the grid's own —
+`RowGeometry(totalWidth: sheetWidth − 2 × GridMetrics.horizontalPadding)`, the
+same call `WeeklyGridView` makes against the same width — because This Week is
+the surface the person is one tap from looking at.
+
+**`nameMaxWidth` is a ceiling the row never reaches, and building the preview
+out of it was wrong.** The first version compared the typed name against
+`nameMaxWidth` and rendered it in a frame of that width. On the screenshot that
+caught it, the sheet read "Watch Sun…" and This Week read "Watch Su…" — one
+character apart. `HabitRowView` holds the whole label to
+`.frame(width: labelWidth)` when it is not editing, and `WeekWidgetView` does
+the same at 98, so what the name is left with is that column less the icon,
+less **both** of the `HStack`'s gaps — the one before the name and the one
+before the trailing `Spacer`:
+
+    98 − 24 − 4.5 − 4.5 = 65
+
+against `nameMaxWidth`'s 73.5, which is 13% wider than anything a name can
+actually use. Measured, not derived: the row reports 67.31pt on a 390pt phone,
+and 65 × 1.03551 is 67.31. **Whether that is the intended limit is a separate
+question** — `WidgetMetrics.nameMaxWidth`'s own comment says a name is meant to
+overflow the label column and use the gap before the track, "which is how the
+design fits Watch Sunset", and the enclosing frame is what stops it. Raising it
+moves both render baselines and is not part of #405; it is #412, so the next
+person finds the measurement rather than the arithmetic.
+
+**So the arrangement is copied, not the numbers.** The preview *is*
+`HabitRowView`'s non-editing label: icon column, name, spacer, held to the label
+column's width. It reports the width the name was actually granted; a `0 × 0`
+hidden copy of the same `Text` reports what it wanted; the line underneath is
+the comparison. Nothing here restates a layout, so nothing here can go stale
+against one — the mirror-copy failure the working rules name, in a place where
+it would have shown as a warning beside an uncut name.
+
+**Both measurements are in the layout, and that is the second bug this cost.**
+They were in a `.background` of the sheet's content, which is invisible and
+costs nothing — and on the New Habit sheet the warning never appeared at all,
+for a 24-character name, because background content was not re-measured as the
+field's text changed: both widths stayed at whatever the first pass saw. On the
+Edit sheet it worked, because `onAppear` sets the name and forces one more pass
+after the first. A `0 × 0` frame in the ordinary layout costs the same nothing
+and is measured every pass. **`.background` is not a free place to measure
+something that changes.**
+
+**Edit mode is the third rendering and is deliberately not previewed.**
+`HabitRowView` drops both the spacer and the column width while the list is in
+edit mode, so a name that is cut at rest shows one more character there. That is
+a transient state of the list rather than how the habit is read, and a warning
+should show the narrower of the two.
+
+**Measured on a 390pt phone** (iPhone 17e simulator; panel 350, scale 1.036, so
+the grid's row is 12.43pt against the widget's 12): "Watch Sunset Every Evening"
+reads "Watch Su…" on This Week, "Watch Su…" in `WeekWidgetView` as the Widgets
+tab renders it, and "Watch Su…" in the sheet. The two surfaces do not disagree,
+and the preview matches both.
+
+**Grey, not amber.** `GlowPalette.warning` is documented as the app's one
+non-white colour, reserved for saying that the glow is unavailable. This is not
+that, and widening it is a palette decision rather than a side effect of this
+screen. The editor is the system's surface (see "Two greys"), so the line under
+the row is a system secondary label, and the preview itself is the alarm.
+
+**The month widget is not in the sentence, deliberately.** `MonthWidgetView`
+draws a name with `.lineLimit(1)` and no width frame at all, so it truncates at
+its own frame — 130pt on the small family, with no icon column in front of it.
+That is far more room than the week's label column leaves, so a name that
+survives This Week and the week widget survives the month one, and naming a
+third surface in the warning would be listing a constraint that never binds.
