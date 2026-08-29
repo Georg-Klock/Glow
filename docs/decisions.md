@@ -6346,12 +6346,23 @@ next save rather than after it — which is also why it got worse on a loaded
 machine, and why it looked like #291.
 
 **Decision: hold every container this suite builds for the life of the test
-host.** Four in-memory containers is the whole cost. The screen is unmounted
-too, which is a separate and smaller thing — it stops a screen nobody is
-looking at answering `UserDefaults.didChangeNotification` with a fetch, the
-second crash shape on the issue — but **unmounting without holding the
-container is worse than doing neither**: it is exactly arm A, and it takes the
-rate from 4% to 100%. The two go together or not at all.
+host, and change nothing else.** Two lines. Four in-memory containers is the
+whole cost.
+
+**Unmounting the screen was tried and rejected**, which is worth recording
+because it is the obvious move and it is the wrong one. Replacing the hosting
+controller's root view does unmount the graph — and that is precisely what
+*releases* the container: with the window merely dropped, weak references to
+the controller, the window and the container were all still non-nil three
+seconds later; with the root view replaced, the container was gone. Unmounting
+is arm A. It takes the rate from 4% to 100%. The container has to outlive the
+observer, so the screen may as well stay up.
+
+The same holds for the second crash shape — a screen nobody is looking at
+answering `UserDefaults.didChangeNotification` with
+`DemoHistory.inventedCount()` → a fetch. That fetch is on the screen's own
+context, so a held container is what makes it safe; silencing the screen is
+not needed and would cost the container.
 
 **None of this reaches the app.** `GlowStore` builds one container for the life
 of the process and never releases it, and `EmptyStateAccessibilityTests` is the

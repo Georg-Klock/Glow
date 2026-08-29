@@ -59,20 +59,11 @@ import UIKit
 ///
 /// The preference cannot be set from in here: it is read as the test host
 /// launches, long before any test runs.
-/// **Every container this suite builds is held for the life of the test host,
-/// and the screen is unmounted before its test ends** (#357). Both are on
-/// `Screen` below, with the measurement that says which of them is the fix.
-/// The flake this closes was the host *dying*, not a test failing an
-/// expectation, which is why it showed up as a bare `[Failed]` with nothing
-/// to read.
-///
-/// Serialized as well, which is not the fix and does not pretend to be: two
-/// screens alive at once was measured clean. These four tests each spin the
-/// run loop for 1.5s, so one test's body can begin inside another's
-/// `settle()`; serializing costs nothing — they share the main actor anyway —
-/// and it makes the teardown above deterministic.
+/// **Every container this suite builds is held for the life of the test host**
+/// (#357), on `Screen.kept` below. The flake that closes was the host
+/// *dying*, not a test failing an expectation, which is why it arrived as a
+/// bare `[Failed]` with nothing in it to read.
 @MainActor
-@Suite(.serialized)
 struct EmptyStateAccessibilityTests {
     @Test func theEmptyStateSpeaksItsTwoButtonsAndNothingElse() throws {
         let screen = try Screen()
@@ -154,10 +145,14 @@ struct EmptyStateAccessibilityTests {
         /// `postNotificationName` — on **6 runs out of 6**. The same arm with
         /// the container held: **0 out of 6**.
         ///
-        /// **What it is not** is two screens alive at once. Two live screens
-        /// over two live containers, one of them saving, is 0 out of 5; three
-        /// at once is clean too. A foreign save reaching a live container's
-        /// observer is fine. A save reaching a *dead* one is the bug.
+        /// **What it is not** is two screens alive at once, which is what this
+        /// was filed under. Two live screens over two live containers, one of
+        /// them saving, is 0 runs out of 6; three at once is clean too. A
+        /// foreign save reaching a *live* container's observer is fine. So
+        /// this suite is left free to overlap, and nothing here unmounts: the
+        /// teardown below is unchanged, because replacing the root view is
+        /// what *releases* the container and that is the one thing that must
+        /// not happen.
         ///
         /// Four in-memory containers for the life of one test host is the
         /// price, and none of this reaches the app: `GlowStore` builds one
@@ -165,7 +160,7 @@ struct EmptyStateAccessibilityTests {
         private static var kept: [ModelContainer] = []
 
         let container: ModelContainer
-        let host: UIHostingController<AnyView>
+        let host: UIViewController
         let window: UIWindow
 
         init() throws {
@@ -175,11 +170,7 @@ struct EmptyStateAccessibilityTests {
                     schema: GlowStore.schema, isStoredInMemoryOnly: true
                 )
             )
-            // `AnyView` so the root can be replaced by an empty one in
-            // `tearDown()`; the type is what makes unmounting possible at all.
-            host = UIHostingController(
-                rootView: AnyView(WeeklyGridView().modelContainer(container))
-            )
+            host = UIHostingController(rootView: WeeklyGridView().modelContainer(container))
             window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
             // Joined to the host app's scene: a window with none presents no
             // sheet, which reads as a dead button rather than as a detached
@@ -203,50 +194,20 @@ struct EmptyStateAccessibilityTests {
             host.view.layoutIfNeeded()
         }
 
-        /// Unmount the screen — **and read `kept` above before touching this**,
-        /// because unmounting is what releases the container (#357).
+        /// Put the window away before the next test builds its own.
         ///
-        /// Dropping the window is not unmounting, and that is measured: with
-        /// the previous body — root view controller cleared, window hidden,
-        /// scene detached, run loop spun — a weak reference to the hosting
-        /// controller, to the window *and* to the `ModelContainer` was still
-        /// non-nil three seconds after the last strong reference went out of
-        /// scope, and the screen still vended its two buttons. Every screen
-        /// this suite built stayed mounted for the life of the test host,
-        /// which is what the log says too: one `Unbalanced calls to begin/end
-        /// appearance transitions` per screen, naming the previous test's
-        /// controller.
-        ///
-        /// Replacing the root view does unmount it — same measurement, no
-        /// elements left, and the container released. That release is the
-        /// crash's one precondition, so this line and `kept` are a pair:
-        /// unmounting without holding the container turns a 4% flake into a
-        /// crash on every run. Measured both ways; the numbers are above.
-        ///
-        /// What the unmount buys, once the container is held, is the second
-        /// crash shape on #357: a `WeeklyGridView` nobody is looking at any
-        /// more still answers `UserDefaults.didChangeNotification` with
-        /// `refreshDemoHistory()` → `DemoHistory.inventedCount()` → a fetch.
-        /// An unmounted screen answers nothing.
+        /// **Unchanged, and deliberately so** (#357). Unmounting the screen
+        /// here — replacing the root view — was tried, and it is what releases
+        /// the `ModelContainer`, which is the crash's one precondition:
+        /// measured, that turns a 4% flake into a crash on 6 runs out of 6.
+        /// The container has to outlive the observer, so the screen may as
+        /// well stay up. See `kept` above.
         func tearDown() {
             host.presentedViewController?.dismiss(animated: false)
-            host.rootView = AnyView(EmptyView())
-            host.view.layoutIfNeeded()
-            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
             window.rootViewController = nil
             window.isHidden = true
             window.windowScene = nil
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-            // The assertion is the point: an unmount that stopped working would
-            // otherwise restore the flake silently.
-            #expect(
-                contentElements().isEmpty,
-                """
-                The screen is still mounted after tearDown, so its @Query and
-                its two notification subscriptions are still live. See #357 and
-                the note on Screen.kept.
-                """
-            )
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
         }
 
         func contentElements() -> [NSObject] {
