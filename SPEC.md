@@ -711,6 +711,30 @@ really happened on — the same day the month grid and the row's own dots alread
 draw it on. Touching the rest day's column inside a span does nothing: the
 column is drawn as a hole, and pressing a hole is pressing nothing.
 
+**The grid sits on one panel, and the panel does not move** (#398). The grey
+material is a single shape behind the whole list, as tall as the habits on it
+and no taller than the screen, with all four corners rounded. It was N+1 row
+backgrounds that abutted — one per row plus the header's — which read as a card
+and behaved like N+1 rectangles: a swiped row took its own background away with
+it and opened its Edit and Delete buttons on bare black. Now the row's content
+is what slides and the buttons sit on the material. The consequence, stated
+rather than left to be found: on a list longer than the screen the panel fills
+the screen, so its bottom corner stops travelling with the last row.
+
+**The weekday header scrolls out of view, where it used to pin** (#398). It was
+a `Section` header, and a `Section` header in a `.plain` list is sticky: it sat
+at the top of the list while the habits scrolled underneath it. It is an
+ordinary row now, so it cannot pin and goes with everything else — which is
+what the widget does, since a widget has nothing to scroll.
+
+**A removed row collapses to nothing and the rows below close the gap**
+(#398). `MotionPolicy` decides whether it happens, exactly as it decides
+whether a completion closes: the second kind of motion the app has, and under
+Reduce Motion the row is simply gone with no frame in between. Both routes to a
+removal — the swipe's Delete and edit mode's minus — animate the same way,
+because a rule that told them apart would be animating the gesture rather than
+the change.
+
 **Edit mode gives the week's width back** (#164). `List` draws a delete circle
 at the leading edge of every row and a reorder handle at the trailing one, and
 while it does, everything weekday-shaped leaves: each row's track, the rest-day

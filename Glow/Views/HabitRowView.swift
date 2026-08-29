@@ -46,6 +46,38 @@ struct RowGeometry: Equatable {
     var iconSize: CGFloat { WidgetMetrics.iconSize / WidgetMetrics.textSize * textSize }
     var iconWidth: CGFloat { WidgetMetrics.iconWidth * scale }
     var iconGap: CGFloat { WidgetMetrics.iconGap * scale }
+    /// How tall one row's content is: every slot is as tall as a daily one is
+    /// wide, so a row is one slot tall whatever its frequency draws inside it.
+    ///
+    /// Here rather than privately in `HabitRowView` because two things now
+    /// depend on it — the row's own frame, and the height of the one panel the
+    /// grid draws behind every row (#398). A row and the surface it is pressed
+    /// into disagreeing about a row's height is the panel ending in the wrong
+    /// place, so they read the same property rather than the same formula
+    /// twice.
+    var slotHeight: CGFloat { SlotLayout.slotHeight(trackWidth: trackWidth) }
+
+    /// How tall the grid's panel is for `rows` habits: the header block, then
+    /// every row with the insets `WeeklyGridView` gives it.
+    ///
+    /// **This is the same arithmetic the `List` performs, written down once**
+    /// (#398). The panel used to be N+1 row backgrounds that happened to abut,
+    /// so it could not be the wrong height — it *was* the rows. One surface
+    /// behind them all has to be told, and this is the telling.
+    /// `RowGeometryTests` sums the same primitives independently.
+    ///
+    /// Zero rows has no panel: the grid is not drawn on an empty store.
+    func panelHeight(rows: Int) -> CGFloat {
+        guard rows > 0 else { return 0 }
+        let header = padTop + headerHeight + (headerGap - WidgetMetrics.rowGap * scale / 2)
+        // Every row stands `rowInset` off the row above; the last one stands
+        // the widget's `padBottom` off the panel's edge instead.
+        let rowsBlock = CGFloat(rows) * (rowInset + slotHeight)
+            + CGFloat(rows - 1) * rowInset
+            + padBottom
+        return header + rowsBlock
+    }
+
     /// How far a name may run before truncating: into the gap, never into the
     /// track. The widget's rule, at the screen's scale.
     ///
@@ -214,9 +246,7 @@ struct HabitRowView: View {
         )
     }
 
-    private var slotHeight: CGFloat {
-        SlotLayout.slotHeight(trackWidth: geometry.trackWidth)
-    }
+    private var slotHeight: CGFloat { geometry.slotHeight }
 
     /// Which column the rest day falls in, or nil for none.
     ///

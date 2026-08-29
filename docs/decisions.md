@@ -6211,3 +6211,94 @@ and the image and ignores the style.
 on-screen regression ship green. It now also requires one
 `.labelStyle(.automatic)` per `Tab`, so a fourth tab added without the restore
 fails instead of quietly stripping a fourth screen.
+
+## One panel behind the grid, and what that did and did not buy (#398, #402)
+
+**2026-08-29.** The grid's grey material was drawn once per row —
+`.listRowBackground(GlowPalette.widgetSurface…)` clipped square except at the
+two ends — plus once more inside the weekday header's own `.background`. Edge to
+edge and abutting, so a continuous panel fell out of it. It is now a single
+shape behind the whole `List`, and the rows' backgrounds are `Color.clear`.
+
+**The correctness reason is the one that stands.** A row's background belonged
+to the row, so `.swipeActions` slid it away with the row and opened Edit and
+Delete on the `List`'s bare black. Measured on an iPhone 15 Pro, iOS 26.5, 30
+rows, sampling the band the swipe reveals: `(0, 0, 0)` across it before,
+`(31, 31, 31)` — the panel — after, with the two buttons on the material.
+
+**What it did not buy: the scroll performance.** #402 named two candidates for
+the 6–12fps scroll and could not separate them. Separated here, same device,
+same store, same scripted drag, `simctl io recordVideo` frame deltas over four
+2-second drags, with the Settings `Form` as the control the issue used:
+
+| build | mean Δ | implied fps |
+|---|---|---|
+| `main`, N+1 materials | 265.4 / 254.4ms | 3.8 / 3.9 |
+| this change, one material | 293.0 / 246.7ms | 3.4 / 4.1 |
+| plus sockets drawn flat (throwaway probe) | 36.2ms | 27.6 |
+| Settings' plain `Form`, control, same minute | 15.3ms | 65.1 |
+
+Two runs each for `main` and this change, interleaved, because the host was
+shared with two other test suites and its load average moved between 10 and 65
+during the hour. **The material is worth nothing measurable — the two builds
+straddle each other — and the sockets are worth about 7x.** #402's candidate
+(1) is real and small; its candidate (2) is the problem. `SlotMarkView` draws
+every socket entirely by inner shadows, and `InnerShadow` is a mask with an
+offset blurred copy inside a `compositingGroup` — three of those per mark,
+several dozen marks on screen, each an offscreen blur the compositor redoes
+every frame the row moves.
+
+The one thing the material *is* worth is the app's own CPU: the same four drags
+cost the app process 0.94s and 0.96s of user time on `main` against 0.55s and
+0.58s here, a ~40% cut. It does not reach the frame rate, which says the
+bottleneck is in the render server rather than in the app.
+
+The probe was thrown away — what a socket looks like is #332's decision and not
+one to make by expedience at the end of a performance run. **#402 stays open
+with this attribution on it, and its hypothesis is disproved rather than
+confirmed.**
+
+**Method note, because the issue's method does not work unchanged here.**
+`simctl io recordVideo` and the simulator panel's touch injection are mutually
+exclusive on this machine: with the live panel attached, a recording in flight
+swallows the gesture entirely — the app burned 0.01 CPU-seconds across a 16s
+window that contained a full drag, and the video held three frames. Detach the
+panel first and both work. The control is what proves the pipeline: 65fps
+through the same recorder, on the same device, in the same minute.
+
+**The panel does not scroll, which is what was asked for.** "The content above
+swipes with the background unmoving" has no reading in which the background
+still travels with the last row, so on a list longer than the screen the panel
+fills the screen and its bottom corner stops moving. Shorter than the screen it
+still ends under the last row, because it is sized by
+`RowGeometry.panelHeight(rows:)` — the same numbers the rows lay themselves out
+with, summed independently in `RowGeometryTests`.
+
+**The header stopped being a section header, and that changes what it does.**
+#398 recorded a constraint — "the weekday header **already** does the right
+thing today — it scrolls fully out of view with no pinning, confirmed against
+the actual behavior rather than assumed" — and it is wrong. A `Section` header
+in a `.plain` list is a *sticky* header, and on `main` it behaves like one:
+screenshotted at the bottom of a 30-row list, the letters sit at the top of the
+list on their own rounded panel with the next habit scrolling underneath them.
+As an ordinary row it cannot pin, so it now scrolls away with everything else.
+That is what the issue asked for and what the widget does, and it is a
+behaviour change rather than the no-op the issue expected.
+
+The `Section` had to go for a second reason: it put 22.7pt of spacing above the
+header, and one shape behind the whole list would have had to include that as
+grey over the letters where the widget puts `padTop`'s 10.7 — the screen
+ceasing to be the widget scaled (#370). Without it the panel's top edge is the
+header row's top edge and the whole grid sits that much higher.
+
+**One thing this uncovered.** #188's widget-boundary hairline was **invisible
+on `main`** — it is `.offset(y: 6)` past its row's bottom edge, into the next
+row, where the next row's own background covered it. With no row backgrounds it
+draws.
+
+**What was not verified.** The delete collapse renders through
+`MotionPolicy.collapsesRemoval` and `.animation(_:value: habits.count)`, and
+the unit test covers the predicate, but the animation itself was not watched:
+synthetic taps on a `.swipeActions` button do not register through the
+simulator's HID injection, so the button could be opened and screenshotted but
+not pressed.

@@ -45,6 +45,13 @@ struct MotionPolicyTests {
         #expect(MotionPolicy.pressScale(SlotView.pressScale, reduceMotion: true) == 1)
     }
 
+    /// #398: the second kind of motion the app has.
+    @Test("A removed row collapses, unless motion was declined")
+    func removalCollapses() {
+        #expect(MotionPolicy.collapsesRemoval(reduceMotion: false))
+        #expect(!MotionPolicy.collapsesRemoval(reduceMotion: true))
+    }
+
     /// The claim no unit test can make on its own.
     ///
     /// Reduce Motion is an environment value; a suite cannot set it and watch a
@@ -80,8 +87,14 @@ struct MotionPolicyTests {
             // decision from the one place that owns it. The widget's burst is
             // the third shape: it reads the setting at the tap and leaves a
             // still timeline, so its file names `WidgetBurst.reduceMotion`.
+            // ...or it *is* that one place. `MotionPolicy` cannot read
+            // `MotionPolicy.`, and it names the calls it decides about in its
+            // own documentation, which is enough to make this scan see it as a
+            // file that animates. Matched on the declaration rather than the
+            // file name so a second copy of the enum would not slip through.
             let guarded = text.contains("accessibilityReduceMotion")
                 || text.contains("MotionPolicy.")
+                || text.contains("enum MotionPolicy")
                 || text.contains("WidgetBurst.reduceMotion")
             if !guarded { offenders.append(file.lastPathComponent) }
         }

@@ -35,6 +35,10 @@ struct RowGeometryTests {
             ("iconWidth", geometry.iconWidth),
             ("iconGap", geometry.iconGap),
             ("nameMaxWidth", geometry.nameMaxWidth),
+            ("slotHeight", geometry.slotHeight),
+            ("panelHeight(0)", geometry.panelHeight(rows: 0)),
+            ("panelHeight(1)", geometry.panelHeight(rows: 1)),
+            ("panelHeight(11)", geometry.panelHeight(rows: 11)),
         ]
     }
 
@@ -78,6 +82,56 @@ struct RowGeometryTests {
         // And the name may still run past its icon into the gap, which is the
         // rule `nameMaxWidth` exists to express.
         #expect(geometry.nameMaxWidth > geometry.iconWidth)
+    }
+
+    /// #398: the panel is one shape now, so it has to be *told* how tall it is.
+    ///
+    /// The `List` used to answer this by construction — the panel was the row
+    /// backgrounds, so it could not be the wrong height. Summed here from the
+    /// same primitives `WeeklyGridView` gives its rows, independently of
+    /// `panelHeight`'s own expression: a header block, then every row with the
+    /// insets the grid sets on it, the last one standing `padBottom` off the
+    /// edge instead of `rowInset`.
+    @Test("The panel is exactly as tall as the rows on it")
+    func panelHeightMatchesTheRows() {
+        for width in [338, 402, 430, 1024] as [CGFloat] {
+            let g = RowGeometry(totalWidth: width)
+            for rows in 1...12 {
+                let header = g.padTop + g.headerHeight
+                    + (g.headerGap - WidgetMetrics.rowGap * g.scale / 2)
+                var summed = header
+                for index in 0..<rows {
+                    summed += g.rowInset + g.slotHeight
+                    summed += index == rows - 1 ? g.padBottom : g.rowInset
+                }
+                #expect(
+                    abs(g.panelHeight(rows: rows) - summed) < 0.0001,
+                    "width \(width), rows \(rows): \(g.panelHeight(rows: rows)) vs \(summed)"
+                )
+            }
+        }
+    }
+
+    /// An empty store shows the empty state, not a grid — so there is no panel
+    /// to draw, and asking for one must not produce a header-shaped sliver.
+    @Test("No rows, no panel")
+    func noRowsNoPanel() {
+        #expect(RowGeometry(totalWidth: 402).panelHeight(rows: 0) == 0)
+        #expect(RowGeometry(totalWidth: 0).panelHeight(rows: 0) == 0)
+    }
+
+    /// Each row adds the same amount, which is what makes the panel end under
+    /// the last one rather than drifting as the list grows.
+    @Test("Every row past the first adds one row's height")
+    func panelGrowsByOneRow() {
+        let g = RowGeometry(totalWidth: 402)
+        let step = g.panelHeight(rows: 3) - g.panelHeight(rows: 2)
+        #expect(step > 0)
+        for rows in 2...11 {
+            #expect(
+                abs((g.panelHeight(rows: rows + 1) - g.panelHeight(rows: rows)) - step) < 0.0001
+            )
+        }
     }
 
     /// #405 assumed the screen and the widget could disagree about where a name
