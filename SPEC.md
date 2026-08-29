@@ -584,16 +584,27 @@ scheduled in between: a shorter animation is still an animation. `MotionPolicy`
 holds the rule; the widget's own completion carries it too, recorded at the tap
 and spent on a timeline of one still entry.
 
-**This Week creates and edits its habits through one editor.** It carries one
-trailing control: an ellipsis menu holding **New Habit**, **Blank Row** and
-**Edit** (#320) — the Edit item itself reads **Done** while editing, so leaving
-edit mode is the same two-tap menu action as entering it, and there is one
-control on screen at all times. The menu belongs to the current week only
+**This Week creates and edits its habits through one editor.** Outside edit
+mode it carries one trailing control: an ellipsis menu holding **New Habit**,
+**Blank Row** and **Edit** (#320). The menu belongs to the current week only
 (#207): paged back, the trailing slot holds **Today** instead, because
 reordering, deleting and adding are properties of the list and mean nothing
 more three weeks ago than they mean now. The editor opened on the adding
 screen's *kind* while there were two of them (#209); there is one, so it opens
 on the count and nothing else.
+
+**Editing has a toolbar of its own** (#399). While the list is fanned open the
+week pager and the week readout both leave — neither answers a question editing
+asks, and the pager is the only control that could change the week, so hiding
+it is also what makes "edit mode ends when you leave this week" a rule nothing
+on screen can reach. What appears in their place is a **Done** checkmark,
+immediately left of the ellipsis, carrying the same `checkmark` symbol the menu
+item used to. The menu keeps New Habit and Blank Row and drops Edit for as long
+as editing lasts, so Done is said once rather than twice. **Entering is still
+two taps and leaving is now one**: #320 put both ends in the menu for symmetry
+and named the cost, and this is that cost being paid back on the end that
+needed it — a mode whose exit is behind a menu reads as a mode you are stuck
+in.
 
 **A blank row is grouping somebody put there** (#143, narrowed by #257).
 Blank rows exist so habits can be clustered, and they are made deliberately —
@@ -672,10 +683,13 @@ the title is the dates. On the current week the title stands alone. The dates
 under the weekday letters say the rest, and on a week with no today in it no
 column is lit.
 
-**Edit mode ends when you leave this week** (#207). The menu that holds its
-entry and exit is on the current week only, so paging back while editing would
-leave the list fanned open with no Done on screen. The mode goes with the week
-rather than the exit going missing.
+**Edit mode ends when you leave this week** (#207). The controls that enter and
+leave it are on the current week only, so paging back while editing would leave
+the list fanned open with no Done on screen. The mode goes with the week rather
+than the exit going missing. Since #399 the pager is hidden while editing, so
+nothing on screen takes that path any more; the rule stays because it is what
+makes the pager's absence a tidiness rather than the only thing standing
+between edit mode and a dead end.
 
 A span row resolves the tap to **the column under the finger** rather than to
 the span's nominal day, so a habit due N times a week records the weekday it
