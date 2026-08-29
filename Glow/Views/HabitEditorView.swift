@@ -20,6 +20,19 @@ struct HabitEditorView: View {
     @State private var isConfirmingDelete = false
     @State private var isPickingIcon = false
 
+    /// How wide the typed name wants to be with nothing stopping it, and how
+    /// much width the row actually gives it. Both measured off real `Text`
+    /// views in the row's own font and the row's own layout, rather than
+    /// computed — the thing that decides where the ellipsis goes is the thing
+    /// being asked, so the warning and the preview cannot disagree about
+    /// whether there is one. When the name fits, the two are equal.
+    @State private var idealNameWidth: CGFloat = 0
+    @State private var grantedNameWidth: CGFloat = 0
+    /// The sheet's own width, which on a phone is the window's, which is what
+    /// This Week measures its rows against. Starts at the widget's width so the
+    /// first pass is a real row rather than a zero-wide one.
+    @State private var sheetWidth: CGFloat = WidgetMetrics.largeWidth
+
     /// One height and one corner for every platter on this screen.
     ///
     /// The icon, the name and the stepper were three different heights: two
@@ -110,6 +123,10 @@ struct HabitEditorView: View {
                             .background(platter)
                     }
 
+                    // The name as the app will draw it, from the first letter
+                    // on. See `namePreview`.
+                    if !trimmedName.isEmpty { namePreview }
+
                     // One platter, and now one row on it. It held two while a
                     // habit could be counted within a day as well as across a
                     // week (#209): the kind and the count read top to bottom as
@@ -139,6 +156,13 @@ struct HabitEditorView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 24)
+            }
+            // Outside the content's own padding: what the grid divides up is
+            // the window's width, not this stack's.
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { width in
+                sheetWidth = width
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle(isEditing ? "Edit Habit" : "New Habit")
@@ -181,6 +205,148 @@ struct HabitEditorView: View {
     private var platter: some View {
         RoundedRectangle(cornerRadius: Self.platterRadius, style: .continuous)
             .fill(Color(.secondarySystemGroupedBackground))
+    }
+
+    // MARK: - Where the name is cut
+
+    /// The row a habit name is drawn in — This Week's own, built the way
+    /// `WeeklyGridView` builds it: the window's width, less the panel's margin
+    /// on both sides. Not a copy of the grid's numbers, the same call.
+    ///
+    /// **The screen's row and the widget's row are one row at two sizes.**
+    /// `RowGeometry` is the large widget times one factor — the panel's width
+    /// over 338 — and that factor is applied to `textSize` as well as to the
+    /// label column. So `nameMaxWidth / textSize` is `73.5 / 12` on This Week
+    /// whatever phone it is, and `73.5 / 12` in the widget. #405 assumed
+    /// otherwise, on the strength of this type's own stale header comment;
+    /// Dynamic Type came out of `RowGeometry` on 2026-08-24 (docs/decisions.md)
+    /// and nothing has scaled independently since. `RowGeometryTests` holds
+    /// that ratio now.
+    ///
+    /// Which is why one preview can be honest about both. Measured on a 390pt
+    /// phone — panel 350, scale 1.036, so the grid's row is 12.43pt against the
+    /// widget's 12 — "Watch Sunset Every Evening" cuts at "Watch Su…" on This
+    /// Week, at "Watch Su…" in the widget rendered on the Widgets tab, and at
+    /// "Watch Su…" here. Rendered at the grid's scale rather than the widget's
+    /// because that is the row the person is one tap away from looking at.
+    private var rowPreview: RowGeometry {
+        RowGeometry(totalWidth: max(0, sheetWidth - GridMetrics.horizontalPadding * 2))
+    }
+
+    /// Whether the name gets less room than it wants, and so ends in an
+    /// ellipsis.
+    ///
+    /// **Not `idealNameWidth > nameMaxWidth`**, which was the first version of
+    /// this and was a character optimistic on the screenshot that caught it.
+    /// `nameMaxWidth` is a ceiling the row never reaches: `HabitRowView` holds
+    /// the whole label to `.frame(width: labelWidth)` when it is not editing,
+    /// and `WeekWidgetView` does the same, so after the icon column, the two
+    /// `HStack` gaps and the trailing spacer, what is left for the name is
+    /// 65pt at a 12pt text size where `nameMaxWidth` says 73.5 — measured off
+    /// the row below at 67.3pt on a 390pt phone, whose scale is 1.0355.
+    ///
+    /// Which is why nothing here recomputes that: the row below *is* the row,
+    /// and it reports what the name was actually given.
+    private var isNameCut: Bool { idealNameWidth > grantedNameWidth }
+
+    /// The typed name with nothing holding it back, which is the width the row
+    /// is not going to give it.
+    ///
+    /// **In the layout, not in a `.background`.** It was a background, and on
+    /// the New Habit sheet the warning never appeared for a 24-character name:
+    /// background content was not re-measured as the field's text changed, so
+    /// both widths stayed at whatever the first pass saw. A `0 × 0` frame costs
+    /// the same nothing and is measured every pass.
+    private var idealNameProbe: some View {
+        Text(trimmedName)
+            .font(.system(size: rowPreview.textSize))
+            .fixedSize()
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { width in
+                idealNameWidth = width
+            }
+            .frame(width: 0, height: 0)
+            .hidden()
+    }
+
+    /// `HabitRowView`'s label, laid out the way that view lays it out when it is
+    /// not editing: the icon column, the name, a spacer, and the whole thing
+    /// held to the label column's width.
+    ///
+    /// **The arrangement is copied, not the numbers.** Which width the name ends
+    /// up with is decided by this whole stack rather than by any one constant
+    /// in it, so reproducing the stack is the only way the sheet and the row
+    /// stay in step through a change to either.
+    ///
+    /// Editing is not reproduced. `HabitRowView` drops the spacer and the column
+    /// width while the list is in edit mode, which gives the name more room —
+    /// but that is a transient state of the list, not how the habit is read, and
+    /// a preview should show the narrower of the two.
+    private var rowLabel: some View {
+        HStack(spacing: rowPreview.iconGap) {
+            HabitIconView(icon: icon, size: rowPreview.iconSize)
+                .frame(width: rowPreview.iconWidth)
+            Text(trimmedName)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: rowPreview.nameMaxWidth, alignment: .leading)
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.width
+                } action: { width in
+                    grantedNameWidth = width
+                }
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: rowPreview.textSize))
+        .frame(width: rowPreview.labelWidth, alignment: .leading)
+    }
+
+    /// The habit's row, drawn here exactly as This Week and the widget will draw
+    /// it, so the ellipsis in the sheet is the ellipsis that ships.
+    ///
+    /// **A preview, not a counter.** A counter would have to name a number of
+    /// letters, and there is no such number: the limit is a width, so
+    /// "Illinois" and "Watch Waves" reach it at different lengths. And **not a
+    /// cap on the field**: what is stored is what was typed, unchanged. This
+    /// shows; it does not edit.
+    ///
+    /// **Shown from the first letter, not only once the name overruns.** The
+    /// line under it is what changes — the row is the same row either way, and
+    /// a block that appears at one keystroke and vanishes at the next is a
+    /// worse way to say the same thing. It costs one 12pt row and one footnote,
+    /// and it means the ellipsis, drawn by SwiftUI rather than predicted here,
+    /// is what carries the warning.
+    ///
+    /// Grey rather than amber. `GlowPalette.warning` is documented as the app's
+    /// one non-white colour, reserved for saying the glow is unavailable — this
+    /// is not that, and widening it is a palette decision rather than a
+    /// side effect of this screen.
+    private var namePreview: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ZStack(alignment: .topLeading) {
+                idealNameProbe
+                rowLabel
+            }
+
+            Text(
+                isNameCut
+                    ? "Cut off here on This Week and in the widget."
+                    : "How it reads on This Week and in the widget."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Self.namePadding)
+        // One announcement rather than a glyph, a fragment of a name and a
+        // sentence read as three stops.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            isNameCut
+                ? "This name is too long. On This Week and in the widget it is cut off."
+                : "On This Week and in the widget this name is shown in full."
+        )
     }
 
     /// Minus, the reading, plus — in that order across the row.

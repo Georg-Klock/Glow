@@ -80,6 +80,36 @@ struct RowGeometryTests {
         #expect(geometry.nameMaxWidth > geometry.iconWidth)
     }
 
+    /// #405 assumed the screen and the widget could disagree about where a name
+    /// is cut, which would mean no single creation-time preview could be honest
+    /// about both. They cannot disagree: this type applies one factor to the
+    /// label column *and* to the text size, so the ratio between the two is the
+    /// widget's ratio at every width. `HabitEditorView`'s preview rests on this.
+    @Test("A name is cut at the same character on the screen as in the widget")
+    func nameRunIsTheWidgetsRatio() {
+        let widget = WidgetMetrics.nameMaxWidth / WidgetMetrics.textSize
+        for width in [1, 100, 200, 320, 338, 353, 402, 430, 1024] as [CGFloat] {
+            let geometry = RowGeometry(totalWidth: width)
+            let screen = geometry.nameMaxWidth / geometry.textSize
+            #expect(
+                abs(screen - widget) < 1e-9,
+                "the name runs \(screen) text-sizes at width \(width), not \(widget)"
+            )
+        }
+    }
+
+    /// And at the widget's own width it is not merely the same ratio but the
+    /// same numbers, which is the scale the editor's preview renders at.
+    @Test("At 338 the screen's row is the widget's row")
+    func atTheWidgetsOwnWidth() {
+        let geometry = RowGeometry(totalWidth: WidgetMetrics.largeWidth)
+        #expect(geometry.scale == 1)
+        #expect(geometry.nameMaxWidth == WidgetMetrics.nameMaxWidth)
+        #expect(geometry.textSize == WidgetMetrics.textSize)
+        #expect(geometry.iconWidth == WidgetMetrics.iconWidth)
+        #expect(geometry.iconGap == WidgetMetrics.iconGap)
+    }
+
     @Test("A non-finite proposal is treated as no width, not as a huge one")
     func infinityIsNotAScreen() {
         // `.infinity` reaching `scale` would scale every metric to infinity and
