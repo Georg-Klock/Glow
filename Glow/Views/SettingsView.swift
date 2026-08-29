@@ -220,10 +220,21 @@ struct SettingsView: View {
                     Text(readout)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+
+                    // Inside the platter, and directly under the number it is
+                    // about (#395). It was a `Section(footer:)`, which SwiftUI
+                    // always draws below the card on the screen's own black —
+                    // so the one line explaining why the second number moves
+                    // was separated from that number by the platter's own
+                    // edge. As a row it is adjacent to it, which is also what
+                    // let it lose half its words: "what the screen grants"
+                    // does not need saying again when the sentence above just
+                    // said it.
+                    Text(Self.glowNote)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 } header: {
                     Text("Glow")
-                } footer: {
-                    Text("What the screen grants changes with ambient light, brightness and heat.")
                 }
 
                 Section {
@@ -242,10 +253,13 @@ struct SettingsView: View {
                     // in a `Form` drops it — leaving three unlabelled words
                     // where a row used to say what it was for.
                     .labelsHidden()
+
+                    // Inside the platter (#395), under the picker it answers.
+                    Text(popNote)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 } header: {
                     Text("Say well done")
-                } footer: {
-                    Text(popFooter)
                 }
 
                 // One row now. This section held the rest day too — a toggle
@@ -260,10 +274,13 @@ struct SettingsView: View {
                             Text(weekdayName(weekday)).tag(weekday)
                         }
                     }
+
+                    // Inside the platter (#395), under the picker it answers.
+                    Text(Self.weekNote)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 } header: {
                     Text("Week")
-                } footer: {
-                    Text(weekFooter)
                 }
 
                 // Data last: the export, beside the one control that writes
@@ -394,9 +411,10 @@ struct SettingsView: View {
     /// reflects it.
     ///
     /// **A plain synchronous write, and #203 asked for `withAnimation`.** The
-    /// footer under this picker is one sentence, two, or a longer two-clause
-    /// one, so it resizes and every section below it moves — and that move
-    /// snaps. Wrapping the write does not change it: built with a three-second
+    /// line under this picker is one sentence or a longer two-clause one — a
+    /// footer under the section until #395 moved it inside — so it resizes and
+    /// every section below it moves, and that move snaps. Wrapping the write
+    /// does not change it: built with a three-second
     /// linear `withAnimation` around the write, and again with a linear
     /// `animation` modifier keyed to `popLevel` on the `Form` as well, a burst
     /// of screenshots 0.2s apart caught the Week section moving 373pt → 405pt
@@ -425,17 +443,22 @@ struct SettingsView: View {
         (.everything, "Everything"),
     ]
 
-    private var popFooter: String {
+    /// What the current choice does, in one short line per choice.
+    ///
+    /// Three sentences that were 5, 25 and 21 words are 5, 15 and 9 (#395).
+    /// The cut is the same in all three: the Dynamic Island is named once, and
+    /// what it responds to is named once, because the picker directly above
+    /// has already said which of the three this is. "for a moment" went
+    /// everywhere — the Island is not a place anything stays.
+    private var popNote: String {
         switch popLevel {
         case .off:
             "The Dynamic Island stays quiet."
         case .everything:
-            "The Dynamic Island says so for a moment every time you log "
-                + "something, and says something different when that finishes "
-                + "the day or the week."
+            "The Dynamic Island answers every log, and says more when one "
+                + "finishes the day or the week."
         case .goals, .unset:
-            "When you finish a habit for the day or the week, the Dynamic "
-                + "Island says so for a moment. Not every repetition."
+            "The Dynamic Island answers a finished day or week."
         }
     }
 
@@ -642,11 +665,22 @@ struct SettingsView: View {
         return String(format: "Aiming for %.0f×", peak) + " — the screen allows \(ceiling) right now."
     }
 
-    /// One control now, so one sentence. The paragraph that described the rest
-    /// day went with the rows that set it (#390).
-    private var weekFooter: String {
-        "Week start also sets which seven days a weekly goal counts over."
-    }
+    /// Why the week's first day is more than a column order.
+    ///
+    /// One control, one line. The paragraph that described the rest day went
+    /// with the rows that set it (#390), and what was left — "Week start also
+    /// sets which seven days a weekly goal counts over" — spends half its
+    /// words restating the row it now sits directly under (#395).
+    private static let weekNote = "Weekly goals count from this day."
+
+    /// Why the second number in `readout` is not a specification.
+    ///
+    /// Sits under `readout` rather than under the section, so "it" has
+    /// something to point at: the sentence above has just named what the
+    /// screen allows right now, and this is the one fact about that number
+    /// worth carrying — it is a reading, and readings move.
+    private static let glowNote =
+        "It moves with ambient light, brightness and heat."
 
     /// What the display will grant right now — and "now" is load-bearing.
     ///
