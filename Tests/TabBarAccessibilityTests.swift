@@ -53,4 +53,30 @@ struct TabBarAccessibilityTests {
             )
         }
     }
+
+    /// The style above is the *bar's*, and a `.labelStyle` is an environment
+    /// value: left to travel it reaches every `Label` in every tab's content,
+    /// which is how three Settings rows shipped as bare icons (#393). Each tab
+    /// restores `.automatic` at the top of its own content, so this counts
+    /// rather than merely looking — a fourth tab added without the restore is
+    /// exactly the regression, and it is invisible to a check that only asks
+    /// whether the spelling appears anywhere in the file.
+    ///
+    /// A scan for the same reason the two above are scans: the property is
+    /// visual, and the one thing that could watch it is a hosted
+    /// `RootTabView`, which this suite will not run (#245, #291).
+    @Test("The bar's icon-only style stops at the bar")
+    func everyTabStopsTheIconOnlyStyle() throws {
+        let source = try rootTabViewSource()
+        let tabs = source.components(separatedBy: "Tab(").count - 1
+        let restores = source.components(separatedBy: ".labelStyle(.automatic)").count - 1
+        #expect(
+            tabs > 0 && restores == tabs,
+            """
+            \(tabs) tab(s), \(restores) restore(s) of .labelStyle(.automatic). \
+            A tab whose content does not restore the style inherits the bar's \
+            .iconOnly, and every Label on that screen loses its words — #393.
+            """
+        )
+    }
 }

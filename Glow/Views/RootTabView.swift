@@ -44,16 +44,16 @@ struct RootTabView: View {
             // drawing of where these things go, in the same spirit as the
             // calendar and the cog beside it.
             Tab("Widgets", systemImage: "square.grid.2x2", value: Screen.widgets) {
-                WidgetsView()
+                WidgetsView().labelStyle(.automatic)
             }
             Tab("This Week", systemImage: "calendar", value: Screen.week) {
-                WeeklyGridView()
+                WeeklyGridView().labelStyle(.automatic)
             }
             // `gear` rather than `gearshape`: the cog with teeth and a hole,
             // not the rounded outline. Every other tab icon here is a drawing
             // of a thing rather than a stylised glyph.
             Tab("Settings", systemImage: "gear", value: Screen.settings) {
-                SettingsView()
+                SettingsView().labelStyle(.automatic)
             }
         }
         // Icons only, no rendered titles (#319). Checked against the iOS 26.5
@@ -63,6 +63,24 @@ struct RootTabView: View {
         // `TabBarAccessibilityTests` holds. The titles stay declared on each
         // `Tab` above for exactly that reason: the look drops the words, the
         // screen reader must not.
+        //
+        // **It is the bar's style and it stops at the bar** (#393). A
+        // `.labelStyle` is an environment value, so it reaches every
+        // descendant `Label` — and a tab's content is a descendant of the
+        // `TabView` that hosts it. Applied here and left to travel, it took
+        // the words off three Settings rows that have nothing to do with the
+        // tab bar: Export History, Reset to Default Habits, and the info row
+        // shown when the glow slider is at its floor. Each `Tab` above
+        // therefore restores `.automatic` at the top of its own content, so
+        // the style covers the three tab labels and nothing below them.
+        //
+        // The restore is on the content rather than the style being moved
+        // onto three custom `Tab` labels because the accessibility half of
+        // #319 was *measured* against this exact spelling, and a hosted
+        // `RootTabView` is the one thing this suite will not run (#245,
+        // #291) — so re-spelling it would retire a measurement nothing left
+        // here can retake. A fourth tab needs the same `.automatic`;
+        // `TabBarAccessibilityTests` fails if one is added without it.
         .labelStyle(.iconOnly)
         .tint(GlowPalette.color)
         // A failed operation's one visible surface (#282); the editor sheet
