@@ -449,7 +449,10 @@ private struct WidgetSpan: View {
             mark: span.mark,
             size: size,
             spansDays: span.dayCount > 1,
-            restWindow: restWindow
+            restWindow: restWindow,
+            anchorOffset: SlotLayout.anchorOffset(
+                trackWidth: track, dayCount: span.dayCount
+            )
         )
         let label = SlotVoice.span(
             habitName: habit.name, state: span.state, actionDay: span.actionDay
