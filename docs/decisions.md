@@ -6009,3 +6009,52 @@ in the app writes it.
 section** rather than being rewritten around it. The behaviour is still exactly
 what the code does when a rest day is supplied; what changed is that nothing
 supplies one.
+
+## Editing gets its own toolbar, and the exit comes out of the menu (#399)
+
+**2026-08-29.** Supersedes the second half of "Edit lives in the ellipsis menu,
+and the item itself swaps to Done" (#320, 2026-08-26). The entry above stands as
+the record of what was decided then; what follows is what is true now.
+
+**What changed.** While `editMode.isEditing`, the current week's bar holds two
+things and no more: a **Done** checkmark and the ellipsis menu, in that order,
+in the trailing group. The week pager leaves the leading side, the week readout
+leaves the centre, and the menu drops its Edit item for as long as editing
+lasts.
+
+**Which half of #320 is reversed, and which is not.** #320 declined exactly this
+shape — "Edit in the menu to enter, a plain always-visible Done in its place
+once editing starts" — on the grounds that symmetry was the point and one
+control at all times was the literal ask. The symmetry is what is given up. The
+one-control rule survives in the form that was actually load-bearing: Done is
+still said once, because it is *moved* out of the menu rather than added beside
+it. A menu reading Done next to a button reading Done is two controls for one
+action, which is the thing #320 was avoiding.
+
+**Why the exit and not the entrance.** Entering edit mode is a decision somebody
+went looking for, and two taps for it costs nothing. Leaving is the way out of a
+mode, and #320 itself named the cost it was accepting — "Done is two taps." A
+mode whose exit is behind a menu reads as a mode you are stuck in, and that is
+the asymmetry #207 already established for the pager: back is always there,
+forward exists only when there is something to come forward from.
+
+**The title has to be replaced, not removed.** `navigationTitle` is still set —
+it is what a pushed screen would name its back button, and what the system reads
+when the toolbar is off screen — so an *absent* principal item is not an empty
+centre; the system falls back to that title and draws "This Week" where the
+readout was. The item stays and its content becomes a 1×1 `Color.clear`.
+
+**Hiding the pager is not what keeps edit mode reachable.** `show(week:)` still
+ends editing on the way out of the current week (#207), and it must: the rule is
+what stops a mode existing on a week whose toolbar has no exit. What hiding the
+pager adds is that nothing on screen can take that path any more — the guard
+went from load-bearing to belt-and-braces, which is the right direction for a
+guard to move.
+
+**Measured.** iPhone 15 Pro, iOS 26.5, screenshotted at each state: menu shows
+New Habit / Blank Row / Edit; editing shows `<` and the readout gone with a
+checkmark left of the ellipsis; the checkmark returns the bar to its resting
+shape. iOS 26 gathers the two trailing items onto one glass platter (#258), so
+they read as a two-segment control rather than two separate buttons — which is
+what "immediately to the left of the ellipsis" asks for, seen through that
+platter rule.

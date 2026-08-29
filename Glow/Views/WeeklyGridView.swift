@@ -171,9 +171,27 @@ struct WeeklyGridView: View {
             .navigationTitle(weekTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                weekPager
+                // **Editing gets the bar to itself** (#399). The pager and the
+                // readout both answer "which week", and while the list is
+                // fanned open that is not the question — the week cannot be
+                // changed from here anyway, because `show(week:)` ends edit
+                // mode on the way out and the pager is the only thing that
+                // would call it. So both go, and what is left is the one thing
+                // editing needs: a way out of it.
+                if !editMode.isEditing {
+                    weekPager
+                }
                 ToolbarItem(placement: .principal) {
-                    weekReadout
+                    // The item stays and its *content* leaves. An absent
+                    // principal item is not an empty centre — the system falls
+                    // back to `navigationTitle`, which is still set (see above)
+                    // and would draw "This Week" in the readout's place, which
+                    // is the opposite of what #399 asks for.
+                    if editMode.isEditing {
+                        Color.clear.frame(width: 1, height: 1)
+                    } else {
+                        weekReadout
+                    }
                 }
                 // **The two ends are one decision, not two** (#207). What the
                 // trailing group holds depends on which week is on screen, so
@@ -182,12 +200,34 @@ struct WeeklyGridView: View {
                 // and in the past the way home is on both sides.
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if isOnCurrentWeek {
+                        // **Leaving edit mode is one tap; entering it is still
+                        // two** (#399, superseding half of #320). #320 put both
+                        // ends in the menu so there was one control at all
+                        // times, and named the cost: Done was two taps. That is
+                        // the half being reversed — the asymmetry is deliberate
+                        // rather than an oversight. Entering is a decision
+                        // somebody went looking for; leaving is the way out of a
+                        // mode, and a mode whose exit is behind a menu reads as
+                        // a mode you are stuck in.
+                        //
+                        // The icon is the one the menu's own item already used,
+                        // which is what makes this a promotion of that item
+                        // rather than a second Done beside it — the menu drops
+                        // to New Habit and Blank Row while editing.
+                        if editMode.isEditing {
+                            Button {
+                                withAnimation { editMode = .inactive }
+                            } label: {
+                                Label("Done", systemImage: "checkmark")
+                            }
+                            // Per-`Label`, not on an ancestor: a label style set
+                            // at a shared parent reaches every `Label` below it,
+                            // content included (#393). The pager does the same.
+                            .labelStyle(.iconOnly)
+                        }
                         // One menu rather than a button and a menu (#320): the
-                        // three list actions share the one control, behind an
-                        // ellipsis now that "add" no longer covers them. The
-                        // cost is named in docs/decisions.md — Edit is two taps,
-                        // and so is Done, because the same item swaps to it
-                        // while editing rather than a direct button appearing.
+                        // list actions share the one control, behind an ellipsis
+                        // now that "add" no longer covers them.
                         //
                         // Not `EditButton()`: that type has no menu-item form,
                         // and its automatic Edit/Done label swap goes with it —
@@ -201,17 +241,14 @@ struct WeeklyGridView: View {
                             Button("Blank Row", systemImage: "rectangle.dashed") {
                                 addSpacer()
                             }
-                            if !habits.isEmpty {
+                            // Entering only. Done left this menu for the
+                            // button above it (#399), so this item no longer
+                            // swaps its label — it is absent while editing
+                            // rather than reading Done in a second place.
+                            if !habits.isEmpty, !editMode.isEditing {
                                 Divider()
-                                Button(
-                                    editMode.isEditing ? "Done" : "Edit",
-                                    systemImage: editMode.isEditing
-                                        ? "checkmark" : "pencil"
-                                ) {
-                                    withAnimation {
-                                        editMode =
-                                            editMode.isEditing ? .inactive : .active
-                                    }
+                                Button("Edit", systemImage: "pencil") {
+                                    withAnimation { editMode = .active }
                                 }
                             }
                         } label: {
