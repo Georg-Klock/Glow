@@ -560,17 +560,22 @@ struct WeeklyGridView: View {
     /// asymmetric and the forward chevron is absent from the current week
     /// (#207). Each step clamps, so the adjustment stops where the buttons do.
     private var weekReadout: some View {
-        // The two lines are left-aligned to each other, which is the part this
-        // view owns. *Where the pair sits* is the system's, and #190 measured
-        // it shifting left when the second line arrived. It no longer does:
-        // with #207's toolbar the title's own centre is 602–604px of a 1206px
-        // screen in all four states — current week, one week back, three weeks
-        // back, and at the floor — so the readout stays put and only its
-        // contents change. The trailing group is narrower now (one Today
-        // button, or the one menu — Edit and Add at #207, folded into it by
-        // #320 — rather than two controls beside a wider pager), which is the
-        // likeliest reason the item stopped being squeezed.
-        VStack(alignment: .leading, spacing: 0) {
+        // The two lines are centred on each other, which is the part this view
+        // owns (#401). They were left-aligned, and the two are never the same
+        // length — "3 Weeks Ago" over "Aug 3 – Aug 9" — so the shorter line sat
+        // off the centre the pair as a whole was placed on. A centred block of
+        // left-aligned text is the one place in the app that did this.
+        //
+        // *Where the pair sits* is the system's, and #190 measured it shifting
+        // left when the second line arrived. It no longer does: with #207's
+        // toolbar the title's own centre is 602–604px of a 1206px screen in all
+        // four states — current week, one week back, three weeks back, and at
+        // the floor — so the readout stays put and only its contents change.
+        // The trailing group is narrower now (one Today button, or the one menu
+        // — Edit and Add at #207, folded into it by #320 — rather than two
+        // controls beside a wider pager), which is the likeliest reason the item
+        // stopped being squeezed.
+        VStack(alignment: .center, spacing: 0) {
             Text(weekTitle)
                 .font(.headline)
             if let weekSubtitle {
