@@ -265,10 +265,45 @@ struct RenderBaselineTests {
     /// handled state, and the pinned fixture's one habit was open, so those
     /// frames held no `greyOpaque` pixel at all — and the *other* branch above
     /// was what held them there. Those families are gone (#209), and with them
-    /// #213's claim; every frame left paints both levels well above this. The
-    /// floor still separates a tone from a rounding artefact, which is the job
-    /// it was written for.
-    static let toneFloor = 200
+    /// #213's claim. The floor still separates a tone from a rounding
+    /// artefact, which is the job it was written for — but "every frame left
+    /// paints both levels well above this", which this note used to add, has
+    /// not been true since #404 measured level 124 and found both frames that
+    /// carry it in quantity sitting under 200. See below.
+    ///
+    /// **120 since #404, and the reason is worth more than the number.** The
+    /// icon went from 14pt to 10pt, which is less ink in the label column, and
+    /// level 124 — the resting step — is painted there, in `Sunset`'s icon and
+    /// name. The best family on the current runtime fell from 223 to 194 and
+    /// `flatTonesAreReal` went red; on iOS 18 the same change measures 412 and
+    /// it never did. Two facts follow from that pair, and only the second is
+    /// about #404:
+    ///
+    /// - **The two runtimes disagree about this level by a factor of two, and
+    ///   a second pinned day did not close it.** Level 124 after the change:
+    ///   `week large` 194, `week large sunday` 169, `month small` 90, both
+    ///   medium frames about zero, against 412, 399, 90 and about zero on
+    ///   iOS 18. 223 against a floor of 200 was a 10% margin before anything
+    ///   moved. #384's second pinned day landed as #413 while this branch was
+    ///   open, and it is *not* the repair this needed: the Sunday reading of
+    ///   the same week is lower than the Tuesday's, not higher, because the
+    ///   handled row it turns on is unchanged and the marks it adds are drawn
+    ///   at other levels. What would lift this level is a fixture with more
+    ///   than one habit in the handled state.
+    /// - **194 is still a tone, not an artefact.** The calibration above
+    ///   measured a level with its tone moved away at −2 to 42. 194 is four
+    ///   and a half times the worst of those, and 120 is close to three times
+    ///   it, so the separation this constant exists to make is intact. What
+    ///   the old 200 additionally asserted — that a painted level holds
+    ///   hundreds of pixels — was never true of level 124 on this fixture.
+    ///
+    /// Lowering it is not only a loosening. At 200 the newly measured
+    /// `week large sunday` — 169 — would fall to the "must not appear" branch,
+    /// which asks that frame to keep *not* painting a level it plainly does;
+    /// at 120 its 124 is a tone the frame has to go on painting. What genuinely
+    /// narrows is the other side: `month small` paints 90 there and now clears
+    /// the line by 30 rather than by 110.
+    static let toneFloor = 120
 
     // MARK: - The scene
 
