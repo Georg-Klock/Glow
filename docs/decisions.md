@@ -6522,10 +6522,14 @@ button both still work.
 **The inset is 10pt, and it is an app number.** `GridMetrics` is the home for
 chrome that exists only in the app and so has no widget number to scale from,
 and the widget has no edit mode. 20pt was rendered as well — it is the value at
-which the `List`'s bounds coincide with the panel's, which is architecturally
-tidy and would also keep a swiped row's Edit and Delete buttons inside the
-grey — and it leaves 17pt of gap, which is not "a little". 6.4pt
+which the `List`'s bounds coincide with the panel's, architecturally the tidier
+of the two — and it leaves 17pt of gap, which is not "a little". 6.4pt
 (`WidgetMetrics.padLeading` at the screen's scale) leaves 3.4pt, which still
-reads as touching. The two frames coinciding remains available if the swipe
-buttons are ever worth chasing; at 10pt they overhang the panel by 2pt where
-they used to overhang it by 12.
+reads as touching.
+
+**A swiped row's buttons came along, which was not the point but is worth
+recording.** Everything the `List` draws at its trailing edge moved by the same
+10pt, the swipe actions included: the Delete pill now ends at 381.3pt against a
+panel ending at 381.7, measured on the same device. Before the change it was
+that 10pt further out — past the panel, on the black — which is the shape #398
+went after from the other side when it put one surface behind the whole list.
