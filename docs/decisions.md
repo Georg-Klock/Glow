@@ -5925,3 +5925,46 @@ not allow it, so divergence fails loudly and names the number that moved.
 what changes is which one the sheet draws. A small widget's stored `rows` and a
 medium's stored `habit` are still there, ignored, exactly as before.
 
+
+## The nightly is the minimum-iOS gate, because `main` could not be
+
+**Supersedes** the decision above, "Pull-request latency: the minimum-iOS lane
+runs after the merge", the same day it was taken (2026-08-29). That entry moved
+the lane to `push: main` plus a nightly and called `main` the gate with the
+nightly as a backstop. `main` cannot be the gate, and the evidence arrived
+within the hour.
+
+**What happened.** The change set `cancel-in-progress` to false for `main`, on
+the reasoning that each merge commit is a distinct state and cancelling one
+would retire the gate by accident. That is true and it is not sufficient.
+`cancel-in-progress` governs runs that have *started*; GitHub additionally
+holds at most **one pending run per concurrency group**. Runs on `main` sat
+pending behind a saturated macOS allowance — five concurrent jobs, four queued,
+measured — so each merge evicted the previous pending run. Run 33230929897, the
+main run for the very pull request that made the change, was cancelled with
+zero jobs. Merges were landing about every ten minutes against a forty-minute
+run; eviction was not a race that might happen, it was the steady state.
+
+**Decision.** The lane runs on the 06:00 UTC schedule, on `workflow_dispatch`,
+and on a pull request carrying the `ios18` label. Not on `push` at all.
+
+Once a day on the latest `main` is the right cadence for the question it asks.
+Whether the app works on the declared minimum changes when the deployment
+target changes or when the runtime does, and neither moves per commit. Per-merge
+was answering a slow-moving question at the speed of the fastest-moving thing in
+the repository, and paying for it in the runner contention that made pull
+requests queue behind each other — the very cost the parent decision set out to
+remove. Off the pull-request path, pull-request feedback measured 9m13s.
+
+**What this trades, stated plainly.** An iOS-18-only regression can sit on
+`main` until the next 06:00 UTC. #286's decision still holds — the 18.0
+deployment target is gated by a real run of the authoritative suite on a real
+iOS 18 runtime — but it is gated daily rather than per-merge, and the label is
+how a change that warrants more gets it.
+
+**And a correction to keep.** The parent entry's claim that "an iOS-18-only
+regression is now caught after merge instead of before it, by this lane on the
+merge commit — minutes later" was wrong for the reason above: on a busy night
+that run was liable to be evicted before it started. A gate that a busy night
+silently skips is not a gate, and the failure mode is the worst kind, because
+the queue is busiest exactly when the most is landing.
