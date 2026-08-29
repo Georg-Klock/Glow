@@ -431,6 +431,14 @@ single line, truncating with an ellipsis.
   at x 0; glyph 14.98 × 17.08 centred (SF Symbol at 14pt). Name at x 28.5,
   max width **73.5** — `(98 + 4) − 24 − 4.5`, which is exactly where the track
   begins, so a name can never reach the grid.
+
+  **The glyph is 10pt in the code, not the file's 14** (#404). The file draws
+  the icon a step *larger* than the name it labels, which is the opposite of
+  what the label reads as; `WidgetMetrics.iconSize` is `textSize - 2` and the
+  widget was rendered at 14, 13, 12, 11 and 10 before that was settled. The
+  column is unchanged at 24, so nothing else in this section moves — this is a
+  seventh entry for §8.6's list, found after the file was transcribed rather
+  than on the way in.
 - **Weekday letter** — cell 24 × 14 at the column's own x, text centred.
 
 Colour is one hex and three steps of it, and it says what is still asked of you:
