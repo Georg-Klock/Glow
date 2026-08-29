@@ -5968,3 +5968,44 @@ merge commit — minutes later" was wrong for the reason above: on a busy night
 that run was liable to be evicted before it started. A gate that a busy night
 silently skips is not a gate, and the failure mode is the worst kind, because
 the queue is busiest exactly when the most is landing.
+
+
+## The rest day leaves Settings, and the arithmetic stays (#390)
+
+**2026-08-29.** Georg: "No rest day. Ignore rest day for now and remove from
+settings." Weekday-specific scheduling goes with it, to come back together —
+#391 and #392.
+
+**The size question the issue left open, decided.** #390 named two readings and
+declined to pick: delete the arithmetic — 21 app files and 20 test files — or
+retire the UI and leave the plumbing inert. **Retire the UI.** What was asked
+for was a Settings change, and the fuller deletion is an order of magnitude more
+diff, removes a tested feature two open issues plan to bring back, and would
+take `RestCut`, `RestWindow` and every rest case in `WeekSpansTests`,
+`WeekGridTests`, `MonthGridTests` and the rest with it. Inert code that is still
+covered is cheaper to revive than deleted code is to rewrite.
+
+**What that takes, beyond removing the rows.** Deleting a toggle stops anyone
+*setting* a rest day; it does nothing about an install that already had one,
+which would go on resting on that day with nothing anywhere to turn it off.
+So `WeekPreferences.retireRestDay()` clears the stored key, called from
+`GlowApp.init` beside `DebugToday.clearOnLaunch()` (#204) and for the same
+shape of reason: a value no surface can change must not go on being read.
+Unconditional rather than flagged — removing an absent key is a no-op, and a
+"has migrated" flag is a second thing to be wrong about.
+
+**The widget is one refresh behind, once.** It reads the same App Group, so
+between installing this build and first launching the app, a placed widget can
+still draw the old rest column. The launch that clears the key is followed by
+`WidgetRefresh.invalidate()` in `GlowApp`'s body, which closes it. Stated rather
+than left to be discovered.
+
+**What the accessor is now for.** `WeekPreferences.restDay` stays, and it is
+how the tests still reach the arithmetic — `TestPreferences.withWeek` and
+`WidgetRenderDiffTests.withRestColumn` both drive it through the store. Nothing
+in the app writes it.
+
+**SPEC.md now describes an unreachable state, and says so at the top of the
+section** rather than being rewritten around it. The behaviour is still exactly
+what the code does when a rest day is supplied; what changed is that nothing
+supplies one.
