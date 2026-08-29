@@ -219,17 +219,32 @@ Tuesday are unaccused, inside the dead mark:
 ## 5. The dead-rep rule
 
 > A **blank past day `d`** carries a dead rep when
-> `owed_through(d) > actionable_days_after(d)`,
-> where `owed_through(d) = target − credit − completions on or before d`.
+> `owed_through(d) > capacity_after(d)`,
+> where `owed_through(d) = target − credit − completions on or before d` and
+> `capacity_after(d)` is the days after `d` that can still carry one of those
+> reps: the blank actionable ones, **plus the ones already completed**.
 
 Pure, day-pinned, and computed from the record rather than from an event log —
 so a backfill recomputes it away with no stored state to migrate.
 
-**The count is always right.** Walk the week: `owed_through − days_after`
-increases by exactly one on each blank day and stays flat on each completed day,
-so it is monotone, and the days it is positive on are the last *k* blank days,
-where *k* is `max(0, owed − days_left)` today. The pinned ✕ and the arithmetic
-cannot disagree.
+**A completed day is capacity, not a free day** (#381). It counted
+`actionable_days_after` — every day after `d` that is not the rest day, blank or
+not — and that is right only while every completion is in the past and off the
+rest day. Neither is guaranteed: the week view opens the days *after* today on a
+demo-seeded store, and moving the rest day in Settings turns a day that was
+logged into a day nothing may be logged on. In the first case a completion after
+`d` was counted as a free day *and* not subtracted from `owed_through`, so its
+rep was owed twice; in the second the day was dropped from both sides at once.
+Either way the walk stopped agreeing with `max(0, owed − days_left)`, and
+`WeekSpans` asked for a negative number of ✕ marks — `EXC_BREAKPOINT`, on every
+redraw of the week.
+
+**The count is always right.** Walk the week: `owed_through − capacity_after`
+increases by exactly one on each blank actionable day, stays flat on each
+completed day — which moves both sides by one — and stays flat on a blank rest
+day, which is in neither set. So it is monotone, and the days it is positive on
+are the last *k* blank days, where *k* is `max(0, owed − days_left)` today. The
+pinned ✕ and the arithmetic cannot disagree.
 
 **It never warns and never predicts.** A miss becomes a ✕ at the moment the day
 ends and the arithmetic tips, and not before. A 3x row stays clean until Friday
@@ -572,7 +587,7 @@ Consequences to carry with it:
 
 - **The rest day.** It still exists as a setting and still subtracts a column
   (#72, #73, #100). How it interacts with pinning a ✕, with reaching back across
-  it, and with `actionable_days_after` is **unsolved and deliberately out of
+  it, and with `capacity_after` is **unsolved and deliberately out of
   scope here.** Nothing in this document should be read as having settled it.
 - **Animation.** What moves when the division re-flows at midnight.
 - **The glow work behind this**: a completed habit's icon and name going dark,

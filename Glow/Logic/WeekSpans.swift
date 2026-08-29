@@ -353,9 +353,24 @@ enum WeekSpans {
         }
 
         // The columns a rep could still land on: every day from today onward
-        // that is not the rest day, and not today itself once today is spent —
-        // a weekly cadence holds one completion per day (R3), so a logged today
-        // has no room for a second.
+        // that is not the rest day and does not already carry a completion —
+        // **a weekly cadence holds one completion per day (R3), so a day that
+        // has one has no room for a second** (#381).
+        //
+        // That rule used to be applied to today alone (`doneToday ? > : >=`),
+        // which is the only day it can reach when every completion is in the
+        // past. It is not: the week view opens the days *after* today on a
+        // demo-seeded store, and moving the rest day in Settings turns a day
+        // that was logged into a day nothing may be logged on. Both put a
+        // completion where this count was still offering the day, so `lost`
+        // came out smaller than the days `deadDays` had already found — and
+        // `lost - dead.count` went negative into `Array(repeating:count:)`,
+        // which traps. Six TestFlight crashes on build 202608282309 were this.
+        //
+        // Excluding a completed day here is also what keeps this count and the
+        // walk in `deadDays` measuring the same thing; see the capacity note
+        // there. The two must agree, and the trap is what happens when they do
+        // not.
         //
         // This is the whole of the rest day's part in the arithmetic. The
         // *shape* still divides seven columns and subtracts the rest column
@@ -365,9 +380,12 @@ enum WeekSpans {
         let actionable = (0...lastColumn).filter {
             !WeekPreferences.isRestDay(week.days[$0], restDay: restDay, calendar: calendar)
         }
+        let completedColumns = Set(doneColumns)
         let actionableLeft: Int
         if let todayIndex {
-            actionableLeft = actionable.count { doneToday ? $0 > todayIndex : $0 >= todayIndex }
+            actionableLeft = actionable.count {
+                $0 >= todayIndex && !completedColumns.contains($0)
+            }
         } else {
             // A week already over. Every rep still owed has run out of days.
             actionableLeft = 0
@@ -486,8 +504,11 @@ enum WeekSpans {
     /// The columns a rep ran out of days on (#341, `docs/week-marks.md` §5).
     ///
     /// > A **blank past day `d`** carries a dead rep when
-    /// > `owed_through(d) > actionable_days_after(d)`, where
-    /// > `owed_through(d) = target − credit − completions on or before d`.
+    /// > `owed_through(d) > capacity_after(d)`, where
+    /// > `owed_through(d) = target − credit − completions on or before d` and
+    /// > `capacity_after(d)` is the days after `d` that can still carry one of
+    /// > those reps: the blank actionable ones, plus the ones already
+    /// > completed (#381).
     ///
     /// Pure, day-pinned, and computed from the record rather than from an event
     /// log — so a backfill recomputes it away with no stored state to migrate.
@@ -496,9 +517,10 @@ enum WeekSpans {
     /// had nothing to do with.
     ///
     /// **The count is always right.** Walking the week,
-    /// `owed_through − days_after` rises by exactly one on each blank
-    /// actionable day, stays flat on each completed one, and stays flat on the
-    /// rest day, which is in neither set. So it is monotone, and the days it is
+    /// `owed_through − capacity_after` rises by exactly one on each blank
+    /// actionable day, stays flat on each completed one — a completed day
+    /// moves both sides by one — and stays flat on a blank rest day, which is
+    /// in neither set. So it is monotone, and the days it is
     /// positive on are the last *k* blank days, where *k* is
     /// `max(0, repsLeft − actionableLeft)` today — the same `lost` the row is
     /// drawn from. The pinned ✕ and the arithmetic cannot disagree, and
@@ -534,7 +556,27 @@ enum WeekSpans {
             // rather than pinning a ✕ to a day nothing was ever asked of.
             guard existed(column) else { return false }
             let owedThrough = owed - completed.count { $0 <= column }
-            return owedThrough > actionable.count { $0 > column }
+            // What is left after `column` to carry those reps: every blank
+            // actionable day, plus every day that already carries a completion
+            // — that day has carried one, whether or not the rest day was
+            // later moved onto it (#381).
+            //
+            // Counting `actionable.count { $0 > column }` instead double-books
+            // in one direction and forgets in the other. A completion after
+            // `column` is not subtracted from `owedThrough` — it is not on or
+            // before the column — so the day it sits on has to be counted here
+            // or the rep it satisfied is owed twice. And a completion on what
+            // is now the rest day is not in `actionable` at all, so its day was
+            // being dropped from both sides at once.
+            //
+            // With this the walk is monotone again: stepping from `d` to
+            // `d + 1`, `owedThrough` drops by one if `d + 1` carries a
+            // completion and the capacity drops by exactly the same one, so
+            // the difference rises by one on each blank actionable day and by
+            // nothing else. That is what makes this count equal to `lost`.
+            let capacity = actionable.count { $0 > column && !completed.contains($0) }
+                + completed.count { $0 > column }
+            return owedThrough > capacity
         }
     }
 
