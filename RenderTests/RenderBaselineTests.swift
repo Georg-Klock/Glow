@@ -332,6 +332,27 @@ struct RenderBaselineTests {
                     habit(5, "Hydration", "drop", .daily, done: []),
                     habit(6, "Touch Grass", "leaf", .daily, done: [monday, tuesday]),
                     habit(7, "Sunset", "sunrise", .timesPerWeek(1), done: [monday]),
+                    // **The two rows that put a ✕ and a second filled mark
+                    // into a committed frame** (#384). Every other span row
+                    // here divides into `open`, `inactive` and `filled` and
+                    // nothing else, so three things the mark model draws were
+                    // rendered by no baseline at all: the cross itself
+                    // (`56d34ca`), a row of seven one-column marks, and more
+                    // than one filled mark in a row (#342). A change to any of
+                    // them moved no signature.
+                    //
+                    // Still a plausible week, which is this fixture's other
+                    // job. Seven a week with nothing logged has genuinely lost
+                    // Monday by Tuesday — that is the ✕ rule doing exactly what
+                    // it says, not a state contrived to make one appear.
+                    //
+                    // **Appended, not inserted.** `configuredWeek()` picks by
+                    // index into this array, and the medium family draws the
+                    // first four rows — so adding at the end moves the large
+                    // frame's signature and leaves the other three alone, which
+                    // is a diff a reviewer can read.
+                    habit(8, "Cold plunge", "snowflake", .timesPerWeek(7), done: []),
+                    habit(9, "Piano", "pianokeys", .timesPerWeek(4), done: [monday, tuesday]),
                 ])
             )
         }
