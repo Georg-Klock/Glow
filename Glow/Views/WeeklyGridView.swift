@@ -364,8 +364,14 @@ struct WeeklyGridView: View {
                             editingHabit = habit
                         }
                         .listRowInsets(EdgeInsets(
-                            top: geometry.rowInset, leading: inset + geometry.horizontalPadding,
-                            bottom: geometry.rowInset, trailing: inset + geometry.horizontalPadding
+                            top: geometry.rowInset,
+                            leading: inset + geometry.padLeading,
+                            // The last row stands the widget's `padBottom` off
+                            // the panel's edge; every other row stands half a
+                            // row gap off its neighbour.
+                            bottom: index == habits.count - 1
+                                ? geometry.padBottom : geometry.rowInset,
+                            trailing: inset + geometry.padTrailing
                         ))
                         .listRowSeparator(.hidden)
                         // The panel, one row at a time. A row background spans
@@ -382,12 +388,10 @@ struct WeeklyGridView: View {
                         .listRowBackground(
                             GlowPalette.widgetSurface
                                 .clipShape(UnevenRoundedRectangle(
-                                    topLeadingRadius: index == 0 ? GridMetrics.panelCorner : 0,
                                     bottomLeadingRadius: index == habits.count - 1
                                         ? GridMetrics.panelCorner : 0,
                                     bottomTrailingRadius: index == habits.count - 1
                                         ? GridMetrics.panelCorner : 0,
-                                    topTrailingRadius: index == 0 ? GridMetrics.panelCorner : 0,
                                     style: .continuous
                                 ))
                                 .padding(.horizontal, inset)
@@ -434,22 +438,49 @@ struct WeeklyGridView: View {
                     .onMove(perform: move)
                     .onDelete(perform: deleteAt)
                 } header: {
+                    // **The header is on the panel.** A widget's
+                    // `containerBackground` covers its whole frame, letters
+                    // included, so a header floating above the surface is the
+                    // one thing that gives away that this is not a large
+                    // widget. It carries the panel's top corners for the same
+                    // reason.
+                    //
+                    // **The surface is drawn inside the header, not handed to
+                    // `listRowBackground`.** A section header is not an
+                    // ordinary row and ignores that modifier — measured, and
+                    // the symptom was a panel 61pt short with its top edge at
+                    // the first habit instead of above the letters. So the row
+                    // insets go to zero and the header does its own padding,
+                    // which is also what lets the background span the full
+                    // width before being inset to the panel's margin.
                     WeekdayHeader(geometry: geometry, week: week, today: today, snapshots: snapshots)
-                        .listRowInsets(EdgeInsets(
-                            top: 0, leading: inset + geometry.horizontalPadding,
-                            // The widget's header stands further from the first
-                            // row than the rows stand from each other.
-                            bottom: (WidgetMetrics.headerGap - WidgetMetrics.rowGap / 2) * geometry.scale,
-                            trailing: inset + geometry.horizontalPadding
-                        ))
-                        // The header is above the panel, not on it: it labels
-                        // the columns and the panel is what the marks are
-                        // pressed into.
+                        .padding(.top, geometry.padTop)
+                        .padding(.leading, inset + geometry.padLeading)
+                        .padding(.trailing, inset + geometry.padTrailing)
+                        // The widget's header stands further from the first
+                        // row than the rows stand from each other.
+                        .padding(
+                            .bottom,
+                            (WidgetMetrics.headerGap - WidgetMetrics.rowGap / 2) * geometry.scale
+                        )
+                        .background {
+                            GlowPalette.widgetSurface
+                                .clipShape(UnevenRoundedRectangle(
+                                    topLeadingRadius: GridMetrics.panelCorner,
+                                    topTrailingRadius: GridMetrics.panelCorner,
+                                    style: .continuous
+                                ))
+                                .padding(.horizontal, inset)
+                        }
+                        .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
                 }
             }
             .listStyle(.plain)
-            .environment(\.defaultMinListRowHeight, GridMetrics.minimumRowHeight)
+            // No floor. The row is exactly the widget's slot at the screen's
+            // scale, so anything the list imposed underneath it would be a
+            // departure from the geometry this screen now has to reproduce.
+            .environment(\.defaultMinListRowHeight, 0)
         }
     }
 
@@ -950,7 +981,6 @@ struct WeekdayHeader: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var initials: [String] { WeekCalendar.weekdayInitials() }
-    private var numbers: [String] { WeekCalendar.dayNumbers(in: week) }
 
     var body: some View {
         HStack(spacing: geometry.labelGap) {
@@ -959,18 +989,15 @@ struct WeekdayHeader: View {
             HStack(spacing: SlotLayout.gap(trackWidth: geometry.trackWidth)) {
                 ForEach(0..<7, id: \.self) { index in
                     let isToday = week.days[index] == today
-                    // Letter and date, in the app only. The widget has no room
-                    // for a second line and does not need one: you read the
-                    // widget for a second, and the app when you want to know
-                    // which Tuesday. The letter is the widget's letter at the
-                    // screen's scale; the date steps down from it.
-                    let column = VStack(spacing: 1) {
-                        Text(initials[index])
-                            .font(.system(size: geometry.textSize))
-                        Text(numbers[index])
-                            .font(.system(size: geometry.textSize - 2))
-                            .monospacedDigit()
-                    }
+                    // **The letter alone.** A date used to sit under it — room
+                    // the widget does not have, spent on saying which Tuesday.
+                    // It went when this screen was required to be a large
+                    // widget scaled up: a second line makes the header taller
+                    // than `headerHeight`, and every row below it then sits
+                    // somewhere the widget's does not. See docs/decisions.md.
+                    let column = Text(initials[index])
+                        .font(.system(size: geometry.textSize))
+                        .frame(height: geometry.headerHeight)
 
                     Group {
                         // Three steps, not two (#335, §8.5). Today emits only

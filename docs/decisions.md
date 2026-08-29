@@ -5659,3 +5659,59 @@ the panel is what the marks are pressed into.
 than on black. It needs eleven rows to appear, so it is not in the screenshot
 this was verified against.
 
+## 2026-08-28 — This Week at ten rows is the large widget, exactly (#370)
+
+The weekly grid is now the large widget scaled by one factor. Measured on the
+simulator at a 362pt panel, scale 1.0710: the panel is 379.7pt tall against a
+predicted 379.1, the header's letters land 18.33pt below the panel's top edge
+against 18.21, the first habit row lands at 43.00 against 42.84, and the row
+pitch is 34.33 against 32 x scale. Every landmark is inside a third of a point,
+which is edge detection rather than offset.
+
+Four things had to move, and two of them cost something real.
+
+**The header went onto the panel and lost its dates.** A widget's
+`containerBackground` covers its whole frame, letters included, so a header
+above the surface is what gives the imitation away. The date under each letter
+was room the widget does not have, spent on saying which Tuesday — it made the
+header taller than `headerHeight` and put every row below it somewhere the
+widget's is not. It is gone from the app's main screen.
+
+**`RowGeometry` is one honest ratio.** It was `max(1, width / 338)`, which drew
+a panel narrower than 338pt as a widget with oversized marks rather than as a
+smaller widget. It is now the plain ratio at both ends. The screen also took on
+the widget's asymmetric 6/14 insets, which it had been symmetrising to 6/6.
+
+**The tap-target floor is gone.** Rows were `max(slotHeight, 34)`. At a 362pt
+panel the scaled row is 34.3pt so it clears, but on a phone whose panel is
+narrower than 338pt a row is now under 34pt — below the recommended size for a
+control that is tapped seven times per row. A floor is by definition a
+departure from the widget's geometry, and the screen is now required not to
+depart.
+
+**Dynamic Type scaling is gone.** `RowGeometry` ran the label column and the
+text size through `UIFontMetrics`, so the grid grew with the reader's setting.
+It no longer does: text on This Week is 12pt x scale whatever the reader has
+asked for. A label column that grows on its own is the one thing a scaled copy
+cannot have.
+
+Those last two are an accessibility regression and were taken deliberately,
+with the cost stated before the change was made. The obvious middle position,
+if this is ever revisited, is exact fidelity at the default type size and
+growth only once the reader has actually asked for larger text — the grid would
+stop being the widget precisely when someone needs it not to be.
+
+**A trap worth keeping.** The clamp that went with Dynamic Type,
+`min(scaledLabel, width * 0.42)`, was documented as a guard against a large type
+size eating the track. It was also the only thing collapsing the label column
+when a `GeometryReader` proposes zero on its first pass, which is #136's
+subject. Removing it for the stated reason silently removed the unstated one,
+and `RowGeometryTests.zeroWidth` is what caught it. The fix was not a smaller
+clamp: with a proportional scale, `labelWidth` is 98/338 of the width by
+construction and cannot outgrow the row it sits in.
+
+**A second trap.** `listRowBackground` on a `Section` header does nothing — a
+section header is not an ordinary row. It fails silently; the symptom was a
+panel 61pt short whose top edge sat at the first habit instead of above the
+letters. The header draws its own surface instead.
+

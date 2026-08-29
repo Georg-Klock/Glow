@@ -18,7 +18,17 @@ struct RowGeometryTests {
             ("labelWidth", geometry.labelWidth),
             ("trackWidth", geometry.trackWidth),
             ("textSize", geometry.textSize),
-            ("horizontalPadding", geometry.horizontalPadding),
+            // `horizontalPadding` was one value on both sides and is now the
+            // widget's asymmetric pair, plus the frame insets the screen took
+            // on when it had to be a large widget scaled up. Enumerated here
+            // because this list is the type's surface: a property that is not
+            // in it is a property nothing checks is a width.
+            ("padLeading", geometry.padLeading),
+            ("padTrailing", geometry.padTrailing),
+            ("padTop", geometry.padTop),
+            ("padBottom", geometry.padBottom),
+            ("headerHeight", geometry.headerHeight),
+            ("headerGap", geometry.headerGap),
             ("labelGap", geometry.labelGap),
             ("rowInset", geometry.rowInset),
             ("iconSize", geometry.iconSize),
