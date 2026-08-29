@@ -5700,3 +5700,101 @@ conflicted, with no markers written into the JSON. Resolving means re-measuring
 
 `union` is the wrong driver for any file where two branches can edit the same
 line; it is set on that one file for the reason above, not as a policy.
+## 2026-08-28 — The weekly grid gets the widget's surface, and loses 40pt of track (#370)
+
+This Week draws `GlowPalette.widgetSurface` behind its rows: the same ground the
+widget declares, as tall as the habits on it, ending after the last one.
+
+#332 made the marks sockets pressed into a surface and #333 gave that surface to
+the widget. The app's own grid never got one, so in-app the sockets were pressed
+into flat black — the shape said "recessed" and there was nothing to recess into.
+Measured after the change, all three surfaces now composite to the same tone:
+the grid's panel and the Widgets tab's preview both read 30–31 where the render
+signatures put the widget's own ground at 31.
+
+**The track narrowed, and that is the part to argue with.** The panel is inset
+20pt a side — `GridMetrics.horizontalPadding`, the number the app already uses
+for air at the edges — and `RowGeometry` now measures against the panel rather
+than the screen. So every mark on the main screen is smaller than it was.
+
+The alternative was to keep measuring against the screen and draw the panel
+underneath, which puts marks wider than the surface they are pressed into. That
+is not a smaller version of the widget; it is a different picture, and it would
+undo the reason for having a surface at all. Narrowing follows the widget's own
+rule, where the slot falls out of the frame it was actually given.
+
+**#333 records a measurement that cuts the other way**, and it was read before
+this was drawn: the design once drew a gradient container, the widget followed
+it, and on a real Home Screen it read as a panel sitting on the wallpaper rather
+than marks floating on it. That reading was real. It does not transfer here
+because what sits behind this panel is the app's own black rather than a
+photograph — there is no wallpaper for the panel to look pasted onto. If the
+grid ever does read as a pasted card, this is the note saying the failure mode
+was seen once already.
+
+**The panel is per-row.** The grid is a `List`, so a background that hugs the
+rows and scrolls with them is `listRowBackground` applied per row, abutting its
+neighbours into one surface, with `UnevenRoundedRectangle` rounding only the
+ends. The header is given `Color.clear` deliberately: it labels the columns, and
+the panel is what the marks are pressed into.
+
+**Unresolved:** the widget-boundary hairline now falls on a lit surface rather
+than on black. It needs eleven rows to appear, so it is not in the screenshot
+this was verified against.
+
+## 2026-08-28 — This Week at ten rows is the large widget, exactly (#370)
+
+The weekly grid is now the large widget scaled by one factor. Measured on the
+simulator at a 362pt panel, scale 1.0710: the panel is 379.7pt tall against a
+predicted 379.1, the header's letters land 18.33pt below the panel's top edge
+against 18.21, the first habit row lands at 43.00 against 42.84, and the row
+pitch is 34.33 against 32 x scale. Every landmark is inside a third of a point,
+which is edge detection rather than offset.
+
+Four things had to move, and two of them cost something real.
+
+**The header went onto the panel and lost its dates.** A widget's
+`containerBackground` covers its whole frame, letters included, so a header
+above the surface is what gives the imitation away. The date under each letter
+was room the widget does not have, spent on saying which Tuesday — it made the
+header taller than `headerHeight` and put every row below it somewhere the
+widget's is not. It is gone from the app's main screen.
+
+**`RowGeometry` is one honest ratio.** It was `max(1, width / 338)`, which drew
+a panel narrower than 338pt as a widget with oversized marks rather than as a
+smaller widget. It is now the plain ratio at both ends. The screen also took on
+the widget's asymmetric 6/14 insets, which it had been symmetrising to 6/6.
+
+**The tap-target floor is gone.** Rows were `max(slotHeight, 34)`. At a 362pt
+panel the scaled row is 34.3pt so it clears, but on a phone whose panel is
+narrower than 338pt a row is now under 34pt — below the recommended size for a
+control that is tapped seven times per row. A floor is by definition a
+departure from the widget's geometry, and the screen is now required not to
+depart.
+
+**Dynamic Type scaling is gone.** `RowGeometry` ran the label column and the
+text size through `UIFontMetrics`, so the grid grew with the reader's setting.
+It no longer does: text on This Week is 12pt x scale whatever the reader has
+asked for. A label column that grows on its own is the one thing a scaled copy
+cannot have.
+
+Those last two are an accessibility regression and were taken deliberately,
+with the cost stated before the change was made. The obvious middle position,
+if this is ever revisited, is exact fidelity at the default type size and
+growth only once the reader has actually asked for larger text — the grid would
+stop being the widget precisely when someone needs it not to be.
+
+**A trap worth keeping.** The clamp that went with Dynamic Type,
+`min(scaledLabel, width * 0.42)`, was documented as a guard against a large type
+size eating the track. It was also the only thing collapsing the label column
+when a `GeometryReader` proposes zero on its first pass, which is #136's
+subject. Removing it for the stated reason silently removed the unstated one,
+and `RowGeometryTests.zeroWidth` is what caught it. The fix was not a smaller
+clamp: with a proportional scale, `labelWidth` is 98/338 of the width by
+construction and cannot outgrow the row it sits in.
+
+**A second trap.** `listRowBackground` on a `Section` header does nothing — a
+section header is not an ordinary row. It fails silently; the symptom was a
+panel 61pt short whose top edge sat at the first habit instead of above the
+letters. The header draws its own surface instead.
+
