@@ -498,11 +498,15 @@ struct WidgetPreviewLayoutTests {
         #expect(g.rows.flatMap { $0 } == g.cards)
     }
 
-    /// The previews render *accented* — the rendering a glass Home Screen puts
-    /// a widget into, and the pairing #312's glass-over-black panel makes.
-    /// `WidgetAppearance` and its picker are gone (#312); the resolution rule
-    /// the picker exercised is not, because the page still puts views into
-    /// that mode. The rest of the grey's behaviour is `WidgetBackgroundTests`.
+    /// The rule still holds, and it is no longer the Widgets tab that needs it.
+    ///
+    /// The page used to inject `.accented` into its previews, and this test was
+    /// kept for that reader. It renders `fullColor` now, matching a Default Home
+    /// Screen (#369) — but the *widget* still renders accented whenever the Home
+    /// Screen is set to Tinted or Clear, which is the appearance this resolution
+    /// exists for. `WidgetAppearance` and its picker are gone (#312); the rule
+    /// they exercised outlived both. The rest of the grey's behaviour is
+    /// `WidgetBackgroundTests`.
     @Test("Accented rendering resolves the grey to the alpha-stored one")
     @MainActor
     func accentedRenderingKeepsTheHierarchy() {
