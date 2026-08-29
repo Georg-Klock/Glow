@@ -1,0 +1,29 @@
+# How git should combine the two files every parallel branch touches. They
+# collide for different reasons and the right answers are opposites.
+
+# docs/decisions.md is append-only by construction: an entry is a new section
+# at the end, so two branches that each add one are not in conflict, they are
+# in sequence — and git only stops because both hunks end at the last line.
+# `union` keeps both sides. What it gives up is the order the two entries land
+# in, which is the one property an append-only log of dated decisions does not
+# depend on; each entry carries its own date and issue number.
+#
+# This is the wrong driver for any file where two branches can edit the *same*
+# line, because it would keep both versions of it and call that a merge. It is
+# set here, on this file, for that reason and not as a general policy.
+docs/decisions.md merge=union
+
+# The render baselines are the opposite case. Each is a set of measured frame
+# signatures; a textual merge of two of them yields valid JSON describing a
+# render no machine ever produced, which then passes review precisely because
+# it "merged cleanly". `-merge` makes git refuse: it leaves the current
+# branch's version in place and marks the path conflicted, with no markers
+# written into the JSON.
+#
+# Resolving one means re-measuring, never editing. Rebase, run the suite, and
+# copy the run's own render-signatures-actual.json over the file — the command
+# Tools/test.sh prints when the baseline moves. The unsuffixed file is the
+# current runtime's; -ios<major> is that lane's. A visual change moves both,
+# so approve both in the same commit.
+RenderTests/Baselines/render-signatures.json -merge
+RenderTests/Baselines/render-signatures-ios*.json -merge
