@@ -418,14 +418,12 @@ enum WeekSpans {
             repeating: Mark(state: .missed, anchor: nil), count: lost - dead.count
         )
 
-        // Completions and dead reps interleave by day: a rep that ran out on
-        // Tuesday comes before a completion logged on Wednesday, because a mark
-        // ends on its own day and the days are in order.
-        marks += (
-            doneColumns.prefix(done).map { Mark(state: .filled, anchor: $0) }
-            + dead.map { Mark(state: .missed, anchor: $0) }
-        ).sorted { ($0.anchor ?? 0) < ($1.anchor ?? 0) }
-
+        // The open mark, before it takes its place in the list.
+        //
+        // Split out from the append it used to be so that it can be *sorted in*
+        // below rather than added after — see there.
+        var open: Mark?
+        var upcoming = 0
         if live > 0 {
             // The last day that still leaves one *actionable* column for each
             // rep behind this one. Columns and actionable days are not the same
@@ -441,13 +439,40 @@ enum WeekSpans {
             // Once today is spent there is no open mark at all, and what
             // follows the completions is arithmetic that divides.
             let anchor: Int? = doneToday ? nil : todayIndex.map { min($0, deadline) }
-            marks.append(Mark(
+            open = Mark(
                 state: isOpen ? .open : .inactive,
                 anchor: anchor,
                 actionDay: isOpen ? todayStart : nil
-            ))
-            marks += Array(repeating: Mark(state: .inactive, anchor: nil), count: live - 1)
+            )
+            upcoming = live - 1
         }
+
+        // Every anchored mark, in day order. Completions, dead reps and the
+        // open mark interleave by day: a rep that ran out on Tuesday comes
+        // before a completion logged on Wednesday, because a mark ends on its
+        // own day and the days are in order.
+        //
+        // **The open mark is sorted in here rather than appended after** (#382).
+        // It used to be added once the completions and dead reps were already
+        // sorted, which is right only while every completion is in the past —
+        // then every anchor to its left is already `<= todayIndex`. A
+        // completion logged *after* today is an anchor to the right of the open
+        // mark's, in a list `assignColumns` reads left to right, so the columns
+        // came out in list order and the two swapped: today's ring was drawn on
+        // a day it is not, and the completion's mark ended before the day it
+        // was logged on. Both are things §4 says a mark never does, and neither
+        // needs the anchor rule bent to fix — it needs applying to one more
+        // mark. Reachable through `SlotEditing.week(allowingFuture:)`.
+        //
+        // A spent today has no anchor and cannot sort: it is not an event on a
+        // day, it is the arithmetic that divides what the completions leave, so
+        // it keeps its place after them.
+        var anchored = doneColumns.prefix(done).map { Mark(state: .filled, anchor: $0) }
+            + dead.map { Mark(state: .missed, anchor: $0) }
+        if let open, open.anchor != nil { anchored.append(open) }
+        marks += anchored.sorted { ($0.anchor ?? 0) < ($1.anchor ?? 0) }
+        if let open, open.anchor == nil { marks.append(open) }
+        marks += Array(repeating: Mark(state: .inactive, anchor: nil), count: upcoming)
 
         let spans = assignColumns(marks, lastColumn: lastColumn)
         return withUndo(spans, doneToday: doneToday, todayRests: todayRests, today: todayStart)
