@@ -51,6 +51,13 @@ enum WidgetTrace {
         id?.uuidString ?? "unset"
     }
 
+    /// A size, to a tenth of a point. A frame is geometry, not content — there
+    /// is nothing in it a person typed — so it is recordable under the same
+    /// rule that lets counts and timings through.
+    static func size(_ size: CGSize) -> String {
+        String(format: "%.1fx%.1f", size.width, size.height)
+    }
+
     /// Which process wrote a line, and which run of it.
     ///
     /// **Because a single tap has been seen toggling a habit twice, 13ms
