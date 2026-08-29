@@ -145,6 +145,63 @@ def readable(name: str) -> str:
     return EXPORT_SUFFIX.sub("", name)
 
 
+# A frame's evidence is named `<frame>-expected.png`, `<frame>-actual.png`,
+# `<frame>-diff.png`. Grouping on that prefix is what lets this tell **a frame
+# that moved** from **a frame that is new** (#385), which the bundle-wide rule
+# it replaced could not: a move has an expected and a diff, an addition has
+# neither, and requiring all three of a run refused every addition — closing the
+# route `RenderBaselineTests` documents for adding a family, and leaving a
+# hand-run `cp` past the guard as the only way through.
+#
+# `render-signatures-actual.json` is not a frame: the suffixes below are `.png`
+# and it is `.json`, so it never joins a group.
+FRAME_EVIDENCE = re.compile(r"^(?P<frame>.+)-(?P<kind>expected|actual|diff)\.png$")
+
+
+def frame_evidence(names: list[str]) -> dict[str, set[str]]:
+    """{frame: {"actual", "expected", "diff"}} for every frame that attached any."""
+    groups: dict[str, set[str]] = {}
+    for name in names:
+        match = FRAME_EVIDENCE.match(name)
+        if match:
+            groups.setdefault(match["frame"], set()).add(match["kind"])
+    return groups
+
+
+def visual_failures(names: list[str], visual: dict) -> list[str]:
+    """What a non-passing render bundle owes a reviewer, per frame."""
+    always = visual["always"]
+    together = sorted(visual["together"])
+    groups = frame_evidence(names)
+
+    if not groups:
+        return [
+            f"{visual['bundle']} failed and attached no frame image at all. A visual "
+            "failure has to leave something a person can look at."
+        ]
+
+    def png(kinds):
+        return ", ".join(f"-{kind}.png" for kind in kinds)
+
+    problems = []
+    for frame, kinds in sorted(groups.items()):
+        if always not in kinds:
+            problems.append(
+                f"{visual['bundle']}: {frame} attached {png(sorted(kinds))} but no "
+                f"-{always}.png. Whatever else a frame shows, it has to show what it "
+                "rendered."
+            )
+        present = [kind for kind in together if kind in kinds]
+        if present and len(present) != len(together):
+            missing = [kind for kind in together if kind not in kinds]
+            problems.append(
+                f"{visual['bundle']}: {frame} attached {png(present)} but not "
+                f"{png(missing)}. A frame that moved shows all three; a frame that is "
+                f"new shows -{always}.png alone."
+            )
+    return problems
+
+
 def attachment_names(manifest: list[dict], test: str | None = None) -> list[str]:
     names = []
     for entry in manifest:
@@ -241,13 +298,7 @@ def validate(build: dict, tests: dict, summary: dict, manifest: list[dict], inve
     if visual:
         entry = found.get(visual["bundle"], {"notPassed": []})
         if entry["notPassed"]:
-            got = attachment_names(manifest)
-            for suffix in visual["names"]:
-                if not any(name.endswith(suffix) for name in got):
-                    failures.append(
-                        f"{visual['bundle']} failed and attached no {suffix}. A visual "
-                        "failure has to leave something a person can look at."
-                    )
+            failures.extend(visual_failures(attachment_names(manifest), visual))
 
     report = {
         "result": "failed" if failures else "passed",
@@ -320,7 +371,8 @@ def self_test() -> int:
         "requiredAttachments": ["render-signatures-actual.json"],
         "visualFailureAttachments": {
             "bundle": "GlowRenderTests",
-            "names": ["-expected.png", "-actual.png", "-diff.png"],
+            "always": "actual",
+            "together": ["expected", "diff"],
         },
         "diagnosticAllowlist": [],
     }
@@ -330,6 +382,27 @@ def self_test() -> int:
                          "render-signatures-actual_0_E13EAD92-777B-4F8E-B68A-4A24EF56BF7C.json"}],
     }]
     good = tests_tree({"GlowTests": 320, "GlowRenderTests": 12})
+    # A run whose render bundle did not pass, which is what makes
+    # `visualFailureAttachments` apply at all.
+    render_failed = {"testNodes": [{"nodeType": "Test Plan", "name": "Glow", "children": [
+        {"nodeType": "Unit test bundle", "name": "GlowTests",
+         "children": [node(f"t{i}") for i in range(320)]},
+        {"nodeType": "Unit test bundle", "name": "GlowRenderTests",
+         "children": [node(f"r{i}") for i in range(11)] + [node("framesMatchBaseline()", "Failed")]},
+    ]}]}
+
+    def evidence(names: list[str]) -> list[dict]:
+        """The standard manifest plus these frame images, exported-name mangling
+        and all — the suffix a real export adds is what `readable` strips, and a
+        rule that only works on clean names would pass here and fail on CI."""
+        return manifest + [{
+            "testIdentifier": "RenderBaselineTests/framesMatchBaseline()",
+            "attachments": [
+                {"suggestedHumanReadableName":
+                 name.replace(".png", "_0_E13EAD92-777B-4F8E-B68A-4A24EF56BF7C.png")}
+                for name in names
+            ],
+        }]
 
     scenarios: list[tuple[str, tuple, str | None]] = [
         ("a clean run passes",
@@ -403,7 +476,30 @@ def self_test() -> int:
                "children": [node(f"r{i}") for i in range(11)] + [node("framesMatchBaseline()", "Failed")]},
           ]}]},
           summary(332, failed=1), manifest, inventory),
-         "attached no -diff.png"),
+         "attached no frame image at all"),
+        ("a render failure that attached only a frame's render passes: an addition "
+         "has no expected and no diff to show (#385)",
+         (clean_build, render_failed, summary(332, failed=1),
+          evidence(["week-marks-actual.png"]), inventory),
+         "!attached"),
+        ("a render failure that attached all three for a frame passes: that is a move",
+         (clean_build, render_failed, summary(332, failed=1),
+          evidence(["week-large-actual.png", "week-large-expected.png",
+                    "week-large-diff.png"]), inventory),
+         "!attached"),
+        ("an added frame and a moved frame in one run both pass",
+         (clean_build, render_failed, summary(332, failed=1),
+          evidence(["week-marks-actual.png", "week-large-actual.png",
+                    "week-large-expected.png", "week-large-diff.png"]), inventory),
+         "!attached"),
+        ("a frame that attached an expected but no diff fails",
+         (clean_build, render_failed, summary(332, failed=1),
+          evidence(["week-large-actual.png", "week-large-expected.png"]), inventory),
+         "attached -expected.png but not -diff.png"),
+        ("a frame that attached everything but its own render fails",
+         (clean_build, render_failed, summary(332, failed=1),
+          evidence(["week-large-expected.png", "week-large-diff.png"]), inventory),
+         "but no -actual.png"),
         ("a summary that disagrees with the tree fails",
          (clean_build, good, summary(9999), manifest, inventory),
          "is not describing this run"),
@@ -415,6 +511,14 @@ def self_test() -> int:
         if expected is None:
             ok = not failures
             detail = "" if ok else f" — got {failures}"
+        elif expected.startswith("!"):
+            # A run that legitimately fails for one reason still has to stay
+            # silent about another. "No failure says this" is the only way to
+            # state that, and every scenario a render failure is *allowed* to
+            # produce needs it (#385).
+            forbidden = expected[1:]
+            ok = not any(forbidden in failure for failure in failures)
+            detail = "" if ok else f" — {forbidden!r} should not appear in {failures}"
         else:
             ok = any(expected in failure for failure in failures)
             detail = "" if ok else f" — expected {expected!r} in {failures}"

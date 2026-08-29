@@ -36,6 +36,16 @@
     "Not covered: the glow. The simulator has no EDR headroom, so every frame",
     "in the baseline is the SDR render. GlowRendererTests holds that claim.",
     "",
+    "visualFailureAttachments: what a non-passing render bundle owes a reviewer,",
+    "per frame rather than per run. Evidence is named <frame>-actual.png,",
+    "<frame>-expected.png, <frame>-diff.png, so grouping on that prefix tells a",
+    "frame that moved from a frame that is new: `always` is required of every",
+    "frame that attached anything, and the `together` pair must be all present",
+    "or all absent. A move shows three images; an addition has no expected and",
+    "no diff to show and shows its render alone. Requiring all three of the run",
+    "refused every addition, which closed the route RenderBaselineTests",
+    "documents for adding a family. See #385.",
+    "",
     "release: what a built product has to contain to be shippable. Read by",
     "Tools/check-release-build.py, which CI runs on the unsigned Release build",
     "and Tools/ship-testflight.sh runs on the archive and on the exported .ipa.",
@@ -64,7 +74,8 @@
   "requiredAttachments": ["render-signatures-actual.json"],
   "visualFailureAttachments": {
     "bundle": "GlowRenderTests",
-    "names": ["-expected.png", "-actual.png", "-diff.png"]
+    "always": "actual",
+    "together": ["expected", "diff"]
   },
   "diagnosticAllowlist": [
     {
