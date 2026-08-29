@@ -45,6 +45,13 @@ struct MotionPolicyTests {
         #expect(MotionPolicy.pressScale(SlotView.pressScale, reduceMotion: true) == 1)
     }
 
+    /// #398: the second kind of motion the app has.
+    @Test("A removed row collapses, unless motion was declined")
+    func removalCollapses() {
+        #expect(MotionPolicy.collapsesRemoval(reduceMotion: false))
+        #expect(!MotionPolicy.collapsesRemoval(reduceMotion: true))
+    }
+
     /// The claim no unit test can make on its own.
     ///
     /// Reduce Motion is an environment value; a suite cannot set it and watch a

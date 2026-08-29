@@ -381,144 +381,226 @@ struct WeeklyGridView: View {
             // down a list that scrolls.
             let cut = RestCut.rows(snapshots, capacity: WidgetMetrics.largeRowCapacity)
             List {
-                Section {
-                    ForEach(Array(habits.enumerated()), id: \.element.id) { index, habit in
-                        HabitRowView(
-                            snapshot: snapshots[index],
-                            week: week,
-                            today: today,
-                            geometry: geometry,
-                            index: index,
-                            cut: cut,
-                            editing: editing
-                        ) { day in
-                            toggle(habit, on: day)
-                        } onEdit: {
-                            // A blank row has nothing to edit. Opening the sheet
-                            // on one would offer a name, an icon and a cadence
-                            // for something that is only a position.
-                            guard !habit.isSpacer else { return }
-                            editingHabit = habit
-                        }
-                        .listRowInsets(EdgeInsets(
-                            top: geometry.rowInset,
-                            leading: inset + geometry.padLeading,
-                            // The last row stands the widget's `padBottom` off
-                            // the panel's edge; every other row stands half a
-                            // row gap off its neighbour.
-                            bottom: index == habits.count - 1
-                                ? geometry.padBottom : geometry.rowInset,
-                            trailing: inset + geometry.padTrailing
-                        ))
-                        .listRowSeparator(.hidden)
-                        // The panel, one row at a time. A row background spans
-                        // the row edge to edge and abuts its neighbours, so a
-                        // continuous surface falls out of drawing it per row —
-                        // and it grows and scrolls with the list by
-                        // construction, which is what "as tall as the habits on
-                        // it" has to mean in a `List`.
-                        //
-                        // Only the ends are rounded. `UnevenRoundedRectangle`
-                        // rather than a shape per position, so the first and
-                        // last rows are the same declaration reading their own
-                        // index.
-                        .listRowBackground(
-                            GlowPalette.widgetSurface
-                                .clipShape(UnevenRoundedRectangle(
-                                    bottomLeadingRadius: index == habits.count - 1
-                                        ? GridMetrics.panelCorner : 0,
-                                    bottomTrailingRadius: index == habits.count - 1
-                                        ? GridMetrics.panelCorner : 0,
-                                    style: .continuous
-                                ))
-                                .padding(.horizontal, inset)
-                        )
-                        // Everything above this line is what an unconfigured
-                        // large widget shows. Below it a habit exists only in
-                        // the app, and without the line nothing would say so.
-                        // See `showsWidgetBoundary` for what #188 narrowed.
-                        //
-                        // Drawn only once there is a row beneath it, so it never
-                        // appears on a fresh install and never explains a limit
-                        // nobody has reached.
-                        .overlay(alignment: .bottom) {
-                            if showsWidgetBoundary, index == WidgetMetrics.largeRowCapacity - 1 {
-                                Rectangle()
-                                    .fill(GlowPalette.grey)
-                                    .frame(height: 0.5)
-                                    .offset(y: 6)
-                            }
-                        }
-                        // Swipe actions rather than a long-press menu: this is
-                        // where iOS users already reach for edit and delete.
-                        .swipeActions(edge: .trailing) {
-                            // Explicitly red: the app's white tint at the root
-                            // beats `role: .destructive`, and a swipe action
-                            // tinted white is a blank pill — white glyph on a
-                            // white background, invisible where it most needs
-                            // to look dangerous. The editor's delete button
-                            // says red out loud for the same reason; the
-                            // confirmation dialog alone keeps its role colour,
-                            // because alert contexts ignore the app tint.
-                            Button("Delete", systemImage: "trash", role: .destructive) {
-                                delete(habit)
-                            }
-                            .tint(.red)
-                            if !habit.isSpacer {
-                                Button("Edit", systemImage: "pencil") {
-                                    editingHabit = habit
-                                }
-                                .tint(.indigo)
-                            }
+                // **The weekday header is an ordinary row, not a section
+                // header** (#398). It was one, and a `Section` brought a
+                // spacing above it that the panel — one shape behind the
+                // whole list — would have had to include: 22.7pt of grey
+                // over the letters where the widget puts `padTop`'s 10.7,
+                // which is the screen ceasing to be the widget scaled
+                // (#370). Measured on an iPhone 17 Pro against the same
+                // frame before the change.
+                //
+                // **This changes what the header does when the list
+                // scrolls, and #398 said it would not.** That issue's
+                // constraint — "the weekday header already scrolls fully
+                // out of view with no pinning, confirmed against the
+                // actual behavior" — does not hold: a `Section` header in
+                // a `.plain` list is a *sticky* header, and on `main` it
+                // is. Screenshotted at the bottom of a 30-row list, iPhone
+                // 15 Pro / iOS 26.5: the letters sit at the top of the
+                // list on their own rounded panel with the next habit
+                // scrolling underneath them. As an ordinary row the header
+                // cannot pin, so it now scrolls away — which is what the
+                // issue asked for and what the widget does, but it is a
+                // behaviour change and not the no-op the issue expected.
+                //
+                // The row carries no edit accessory, because `onDelete`
+                // and `onMove` are the `ForEach`'s and this row is not in
+                // it.
+                //
+                // **The header is on the panel.** A widget's
+                // `containerBackground` covers its whole frame, letters
+                // included, so a header floating above the surface is the
+                // one thing that gives away that this is not a large
+                // widget.
+                //
+                // **It no longer draws its own copy of the surface** (#398).
+                // It had to while it was a section header, because that is
+                // not an ordinary row and ignores `listRowBackground` —
+                // measured, and the symptom was a panel 61pt short with its
+                // top edge at the first habit instead of above the letters.
+                // With one panel behind the whole list, the header only has
+                // to keep its own padding, which is what `panelHeight`
+                // counts as the header block.
+                WeekdayHeader(geometry: geometry, week: week, today: today, snapshots: snapshots)
+                    .padding(.top, geometry.padTop)
+                    .padding(.leading, inset + geometry.padLeading)
+                    .padding(.trailing, inset + geometry.padTrailing)
+                    // The widget's header stands further from the first
+                    // row than the rows stand from each other.
+                    .padding(
+                        .bottom,
+                        (WidgetMetrics.headerGap - WidgetMetrics.rowGap / 2) * geometry.scale
+                    )
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                ForEach(Array(habits.enumerated()), id: \.element.id) { index, habit in
+                    HabitRowView(
+                        snapshot: snapshots[index],
+                        week: week,
+                        today: today,
+                        geometry: geometry,
+                        index: index,
+                        cut: cut,
+                        editing: editing
+                    ) { day in
+                        toggle(habit, on: day)
+                    } onEdit: {
+                        // A blank row has nothing to edit. Opening the sheet
+                        // on one would offer a name, an icon and a cadence
+                        // for something that is only a position.
+                        guard !habit.isSpacer else { return }
+                        editingHabit = habit
+                    }
+                    .listRowInsets(EdgeInsets(
+                        top: geometry.rowInset,
+                        leading: inset + geometry.padLeading,
+                        // The last row stands the widget's `padBottom` off
+                        // the panel's edge; every other row stands half a
+                        // row gap off its neighbour.
+                        bottom: index == habits.count - 1
+                            ? geometry.padBottom : geometry.rowInset,
+                        trailing: inset + geometry.padTrailing
+                    ))
+                    .listRowSeparator(.hidden)
+                    // **Nothing behind a row any more** (#398). The panel
+                    // used to be drawn here, once per row, each piece
+                    // clipped square except at the two ends — edge to edge
+                    // and abutting, so a continuous surface fell out of it.
+                    // It also meant the surface belonged to the row: a
+                    // swipe took the row's background with it and opened
+                    // Edit and Delete on the `List`'s bare black, which is
+                    // the bug. Sampled at the revealed band, iPhone 15 Pro
+                    // / iOS 26.5: `(0,0,0)` before, `(31,31,31)` — the
+                    // panel — after. The panel is now a single shape
+                    // behind the whole list; see `panel`.
+                    .listRowBackground(Color.clear)
+                    // Everything above this line is what an unconfigured
+                    // large widget shows. Below it a habit exists only in
+                    // the app, and without the line nothing would say so.
+                    // See `showsWidgetBoundary` for what #188 narrowed.
+                    //
+                    // Drawn only once there is a row beneath it, so it never
+                    // appears on a fresh install and never explains a limit
+                    // nobody has reached.
+                    .overlay(alignment: .bottom) {
+                        if showsWidgetBoundary, index == WidgetMetrics.largeRowCapacity - 1 {
+                            Rectangle()
+                                .fill(GlowPalette.grey)
+                                .frame(height: 0.5)
+                                .offset(y: 6)
                         }
                     }
-                    .onMove(perform: move)
-                    .onDelete(perform: deleteAt)
-                } header: {
-                    // **The header is on the panel.** A widget's
-                    // `containerBackground` covers its whole frame, letters
-                    // included, so a header floating above the surface is the
-                    // one thing that gives away that this is not a large
-                    // widget. It carries the panel's top corners for the same
-                    // reason.
-                    //
-                    // **The surface is drawn inside the header, not handed to
-                    // `listRowBackground`.** A section header is not an
-                    // ordinary row and ignores that modifier — measured, and
-                    // the symptom was a panel 61pt short with its top edge at
-                    // the first habit instead of above the letters. So the row
-                    // insets go to zero and the header does its own padding,
-                    // which is also what lets the background span the full
-                    // width before being inset to the panel's margin.
-                    WeekdayHeader(geometry: geometry, week: week, today: today, snapshots: snapshots)
-                        .padding(.top, geometry.padTop)
-                        .padding(.leading, inset + geometry.padLeading)
-                        .padding(.trailing, inset + geometry.padTrailing)
-                        // The widget's header stands further from the first
-                        // row than the rows stand from each other.
-                        .padding(
-                            .bottom,
-                            (WidgetMetrics.headerGap - WidgetMetrics.rowGap / 2) * geometry.scale
-                        )
-                        .background {
-                            GlowPalette.widgetSurface
-                                .clipShape(UnevenRoundedRectangle(
-                                    topLeadingRadius: GridMetrics.panelCorner,
-                                    topTrailingRadius: GridMetrics.panelCorner,
-                                    style: .continuous
-                                ))
-                                .padding(.horizontal, inset)
+                    // Swipe actions rather than a long-press menu: this is
+                    // where iOS users already reach for edit and delete.
+                    .swipeActions(edge: .trailing) {
+                        // Explicitly red: the app's white tint at the root
+                        // beats `role: .destructive`, and a swipe action
+                        // tinted white is a blank pill — white glyph on a
+                        // white background, invisible where it most needs
+                        // to look dangerous. The editor's delete button
+                        // says red out loud for the same reason; the
+                        // confirmation dialog alone keeps its role colour,
+                        // because alert contexts ignore the app tint.
+                        Button("Delete", systemImage: "trash", role: .destructive) {
+                            delete(habit)
                         }
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
+                        .tint(.red)
+                        if !habit.isSpacer {
+                            Button("Edit", systemImage: "pencil") {
+                                editingHabit = habit
+                            }
+                            .tint(.indigo)
+                        }
+                    }
                 }
+                .onMove(perform: move)
+                .onDelete(perform: deleteAt)
             }
             .listStyle(.plain)
             // No floor. The row is exactly the widget's slot at the screen's
             // scale, so anything the list imposed underneath it would be a
             // departure from the geometry this screen now has to reproduce.
             .environment(\.defaultMinListRowHeight, 0)
+            // The list's own ground goes, so the panel below is what shows
+            // through the rows' now-clear backgrounds.
+            .scrollContentBackground(.hidden)
+            // **The panel, once** (#398). `.background` attaches to the `List`
+            // itself rather than to anything inside its scroll, so it does not
+            // move: rows slide over it, a swipe opens its buttons on it rather
+            // than on bare black, and the weekday header still scrolls out of
+            // view because nothing about the header changed.
+            .background(alignment: .top) {
+                panel(geometry: geometry, inset: inset)
+            }
+            // **The collapse a removed row leaves behind** (#398), driven off
+            // the count rather than out of `delete`.
+            //
+            // `withAnimation` around the store write does not reach this: the
+            // rows are `@Query`'s, and the query publishes its new value after
+            // the transaction that changed the store has closed. Measured, not
+            // assumed — the row vanished between two frames with the write
+            // wrapped, 21ms after the tap, and the frames are in the pull
+            // request.
+            //
+            // The count is the right value to watch: it moves when a row is
+            // added or removed and stands still when one is reordered, which
+            // already has the drag's own motion, and when a mark is toggled,
+            // which has `MotionPolicy`'s.
+            .animation(rowRemoval, value: habits.count)
         }
+    }
+
+    /// The grid's one grey surface (#398).
+    ///
+    /// **As tall as the habits on it, and no taller than the screen.** The
+    /// panel used to be N+1 row backgrounds that abutted, which gave it that
+    /// height for free. One shape has to be told how tall it is, which is
+    /// `RowGeometry.panelHeight(rows:)`, reading the same numbers the rows lay
+    /// themselves out with.
+    ///
+    /// **This is not the fix for #402, and that was measured.** Going from 31
+    /// real-time blur regions to one is worth ~5% of the frame rate — inside
+    /// the noise — against the ~7x that removing the sockets' inner shadows
+    /// buys. It does cut the app's own CPU for a scroll by about 40%. The
+    /// numbers and the method are in `docs/decisions.md`; #402 keeps the
+    /// attribution and stays open.
+    ///
+    /// **It does not scroll, and that is the change Georg asked for.** A row's
+    /// content is what slides to reveal its swipe buttons; the surface those
+    /// buttons sit on stays where it is. The consequence, said plainly rather
+    /// than left to be found: on a list longer than the screen the panel fills
+    /// the screen and its bottom corner stops travelling with the last row.
+    /// A panel that ends under the last row *is* a panel that moves.
+    ///
+    /// All four corners, where the header carried the top two and the last row
+    /// the bottom two. One shape, one radius.
+    private func panel(geometry: RowGeometry, inset: CGFloat) -> some View {
+        // The reader is the `List`'s own height, not the screen's. The two are
+        // not the same: the list scrolls under the tab bar, and measuring the
+        // outer `GeometryReader` instead left the panel ending 90pt short with
+        // the last rows sitting on bare black — which is the bug this issue is
+        // about, reintroduced by the fix for it. Measured, not reasoned about.
+        GeometryReader { panelProxy in
+            GlowPalette.widgetSurface
+                .frame(height: min(
+                    panelProxy.size.height, geometry.panelHeight(rows: habits.count)
+                ))
+                .clipShape(RoundedRectangle(
+                    cornerRadius: GridMetrics.panelCorner, style: .continuous
+                ))
+                .padding(.horizontal, inset)
+        }
+        // The rows are drawn past the list's own frame, under the floating tab
+        // bar — before #398 they carried their backgrounds down there with
+        // them, and a panel that stopped at the safe area left the last rows on
+        // bare black. The panel follows them.
+        .ignoresSafeArea(.container, edges: .bottom)
+        // Nothing here is readable and the marks above it are what a screen
+        // reader walks. A decorative rectangle in the tree is one more stop on
+        // the way to them.
+        .accessibilityHidden(true)
     }
 
     /// Two buttons on an empty screen, and nothing else (#243).
@@ -969,6 +1051,23 @@ struct WeeklyGridView: View {
         for habit in offsets.map({ habits[$0] }) {
             delete(habit)
         }
+    }
+
+    /// The collapse a removed row leaves behind (#398).
+    ///
+    /// `nil` under Reduce Motion, which is `withAnimation`'s own spelling for
+    /// "no frame in between" — see `MotionPolicy`, which owns the predicate the
+    /// way it owns every other one on this screen.
+    ///
+    /// The curve is here rather than there for `HabitRowView.editFade`'s
+    /// reason: what animates is a decision, how long it takes is drawing. A
+    /// third of a second of `easeInOut` is the shape `List` gives a row it
+    /// removes, kept rather than replaced — the ask was that the rows below
+    /// close the gap smoothly, not that this screen invent a curve for it.
+    private var rowRemoval: Animation? {
+        MotionPolicy.collapsesRemoval(reduceMotion: gridReduceMotion)
+            ? .easeInOut(duration: 0.3)
+            : nil
     }
 
     private func delete(_ habit: Habit) {
