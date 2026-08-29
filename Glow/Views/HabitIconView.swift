@@ -3,9 +3,11 @@ import SwiftUI
 /// A habit's icon, as a symbol or as whatever text was stored before symbols.
 struct HabitIconView: View {
     let icon: String
-    /// The widget draws its glyphs at 14 against 12pt names — a deliberate
-    /// step up, so the icon holds the column without the name growing with it.
-    /// The app has no frame in the design and keeps the body size.
+    /// The widget draws its glyphs two points under the name beside them —
+    /// 10 against 12 since #404, where it was 14 and read as larger than the
+    /// text it labels. The 24pt column below is what holds the layout, not the
+    /// glyph, so the icon can shrink inside it without anything after it
+    /// moving. The app has no frame in the design and keeps the body size.
     var size: CGFloat?
 
     /// The icon does not change with its row's state.

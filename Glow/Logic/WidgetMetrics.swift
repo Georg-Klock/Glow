@@ -160,8 +160,21 @@ enum WidgetMetrics {
 
     /// SF Pro Regular, one size for the habit name and every weekday letter.
     static let textSize: CGFloat = 12
-    /// The habit icon is a step larger than the name it sits beside.
-    static let iconSize: CGFloat = 14
+    /// The habit icon is two points smaller than the name it sits beside, and
+    /// derived from it rather than written down (#404).
+    ///
+    /// It used to be `textSize + 2`, which drew the glyph 17% *larger* than the
+    /// name beside it — the opposite of what the label reads as. The brief was
+    /// "2 steps smaller as the font", and this file has no step scale to count
+    /// on: `textSize` is a literal point size, not a Dynamic Type style. So the
+    /// most literal reading is the one taken — two points below the text — and
+    /// it is written as an expression so that moving `textSize` moves this with
+    /// it instead of silently reopening the gap.
+    ///
+    /// The icon *column* is unchanged at `iconWidth` 24: the glyph shrank, the
+    /// space it sits in did not, so nothing after it moves and `nameMaxWidth`
+    /// is untouched.
+    static let iconSize: CGFloat = textSize - 2
 
     /// How far a habit name may run before it is truncated.
     ///
