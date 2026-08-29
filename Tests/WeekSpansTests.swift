@@ -55,6 +55,58 @@ struct WeekSpansTests {
         #expect(row[1].firstDay == 2 && row[1].lastDay == 6)  // Wednesday through Sunday
     }
 
+    @Test("The row #389 reported: the arithmetic was right, the cross was not")
+    func theRowThatReportedItDrawsItsCrossOnThursday() {
+        // #389 read a screen as `4x, completions Thursday and Friday, today
+        // Saturday` and could not reproduce it — those facts divide the week
+        // cleanly, with two reps owed against Saturday and Sunday and no ✕ at
+        // all. A ✕ needs `target − credit ≥ 5` there, and the seed is 4.
+        //
+        // The row that draws what was actually photographed is this one: **one
+        // completion, not two**. Three owed against two actionable days is one
+        // dead rep, and §5 pins it to Thursday — the day the count tips. So
+        // `WeekSpans` was never wrong; the drawing was, and it is the same
+        // fault either way.
+        let clean = spans(
+            .fixture(
+                frequency: .timesPerWeek(4),
+                completedDays: [TestCalendar.date(2026, 8, 20), TestCalendar.date(2026, 8, 21)]
+            ),
+            target: 4,
+            today: TestCalendar.date(2026, 8, 22)
+        )
+        #expect(!clean.contains { $0.state == .missed })
+
+        let reported = spans(
+            .fixture(
+                frequency: .timesPerWeek(4),
+                completedDays: [TestCalendar.date(2026, 8, 21)]  // Friday only
+            ),
+            target: 4,
+            today: TestCalendar.date(2026, 8, 22)
+        )
+        #expect(reported.count == 4)
+        let dead = reported.first { $0.state == .missed }
+        // Monday through Thursday: the cross is a claim about Thursday and the
+        // three days before it are what it swallowed.
+        #expect(dead?.firstDay == 0 && dead?.lastDay == 3)
+
+        // Where the cross is actually drawn. Centred in that frame it landed
+        // between Tuesday and Wednesday — "a ✕ with no day to its name", which
+        // is what was photographed. The offset puts it on Thursday.
+        let track: CGFloat = 220
+        let frameCentre = SlotLayout.columnStart(trackWidth: track, index: 0)
+            + SlotLayout.spanWidth(trackWidth: track, dayCount: 4) / 2
+        let thursday = SlotLayout.columnCentre(trackWidth: track, index: 3)
+        let wednesday = SlotLayout.columnCentre(trackWidth: track, index: 2)
+        let slot = SlotLayout.dailySlot(trackWidth: track)
+        #expect(abs(frameCentre - wednesday) > slot / 2)
+        #expect(
+            abs(frameCentre + SlotLayout.anchorOffset(trackWidth: track, dayCount: 4) - thursday)
+                < 0.0001
+        )
+    }
+
     @Test("Once the goal is met the week stops being divided at all")
     func goalMetIsOneSpan() {
         let habit = HabitSnapshot.fixture(

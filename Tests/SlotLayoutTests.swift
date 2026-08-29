@@ -137,23 +137,6 @@ struct SlotLayoutTests {
         #expect(SlotLayout.anchorOffset(trackWidth: trackWidth, dayCount: 0) == 0)
     }
 
-    @Test("An even-width span used to put the cross in a gap")
-    func aCentredCrossOnAnEvenSpanFallsBetweenColumns() {
-        // The measurement behind #389. A dead mark two columns wide centres on
-        // the midpoint of the gap between them, which is not a column at all —
-        // "a ✕ with no day to its name". Four columns land in the same gap.
-        let slot = SlotLayout.dailySlot(trackWidth: trackWidth)
-        for (first, last) in [(1, 2), (0, 3)] {
-            let dayCount = last - first + 1
-            let centre = SlotLayout.columnStart(trackWidth: trackWidth, index: first)
-                + SlotLayout.spanWidth(trackWidth: trackWidth, dayCount: dayCount) / 2
-            for index in 0..<7 {
-                let column = SlotLayout.columnCentre(trackWidth: trackWidth, index: index)
-                #expect(abs(centre - column) > slot / 2, "\(first)...\(last) vs column \(index)")
-            }
-        }
-    }
-
     @Test("A touch off either end belongs to the column it left")
     func touchesOutsideTheTrackClamp() {
         #expect(SlotLayout.column(atX: -40, trackWidth: trackWidth) == 0)
