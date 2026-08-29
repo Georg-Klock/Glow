@@ -582,8 +582,22 @@ app watches `isLowPowerModeEnabled`, shows an amber banner for as long as it
 lasts, and explains it once per activation — quoting the live
 `currentEDRHeadroom` so the claim is checkable rather than asserted.
 
+**Two surfaces say it, in the same amber** (#396). The grid carries the strip
+across the top; Settings replaces its glow preview — the tile the brightness
+slider exists to demonstrate — with a notice in that tile's own footprint and
+capsule. Both open the same sheet, and the fill, the border and their opacities
+are declared once in `LowPowerNoticeView.swift` so the two cannot drift apart.
+Settings' tile is tapped for the explanation rather than announcing it: one
+announcement per activation is the grid's job.
+
+Leaving `GlowImageView` on screen under an amber overlay was the alternative,
+and it is worse than it sounds: the tone-mapped white lozenge is exactly the
+misleading object, so annotating it keeps the thing being complained about.
+There is no glow to preview while the mode is on, and the notice says so in its
+place.
+
 Low Power Mode cannot be toggled in the Simulator. Launch with
-`-glow-force-low-power` to see the banner and the notice.
+`-glow-force-low-power` to see the banner, the notice and Settings' tile.
 
 ## The same technique, off the phone
 

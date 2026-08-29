@@ -58,6 +58,25 @@ struct LowPowerNoticeView: View {
     }
 }
 
+/// The amber a Low Power surface is drawn in, in one place.
+///
+/// Two surfaces carry this now — the grid's strip and Settings' preview tile
+/// (#396) — and they are the same notice in two footprints rather than two
+/// notices. A second hand-typed copy of a fill, a border and their two
+/// opacities is a second thing to forget the next time one of them moves, so
+/// there is one, and the shape is the only thing the caller chooses.
+private extension View {
+    func lowPowerSurface(_ shape: some InsettableShape) -> some View {
+        background { shape.fill(GlowPalette.warning.opacity(0.16)) }
+            .overlay { shape.strokeBorder(GlowPalette.warning.opacity(0.45), lineWidth: 1) }
+    }
+}
+
+/// What both surfaces say to VoiceOver, which is the same sentence because
+/// they report the same condition and open the same sheet.
+private let lowPowerAccessibilityLabel =
+    "Low Power Mode is on. The glow is paused. Tap for details."
+
 /// The persistent amber strip on the grid while Low Power Mode is on.
 ///
 /// A modal is shown once when it switches on; this stays for as long as the
@@ -80,16 +99,45 @@ struct LowPowerBanner: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(GlowPalette.warning.opacity(0.16))
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(GlowPalette.warning.opacity(0.45), lineWidth: 1)
-            }
+            .lowPowerSurface(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Low Power Mode is on. The glow is paused. Tap for details.")
+        .accessibilityLabel(lowPowerAccessibilityLabel)
+    }
+}
+
+/// The amber tile Settings draws in place of its glow preview.
+///
+/// **Exactly the preview's own footprint** (#396), which is the whole
+/// specification: under Low Power Mode the HDR tile tone-maps back to ordinary
+/// white, so the one object on the screen that exists to demonstrate the
+/// slider becomes a flat white lozenge that says nothing about why. The grid
+/// answers the same condition with a strip across the top of it. There is no
+/// room for a strip here and no reason for one — the thing that stopped
+/// working is a single object, so the notice is drawn where that object was,
+/// in its size and its capsule.
+///
+/// It replaces the tile rather than covering it. An overlay would leave the
+/// misleading white underneath and only annotate it; what is true is that
+/// there is no glow to preview right now.
+struct LowPowerPreviewNotice: View {
+    /// The preview's own size, passed in rather than repeated here: the tile
+    /// this stands in for is measured by the view that draws it.
+    let size: CGSize
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: "bolt.slash.fill")
+                Text("Glow paused")
+            }
+            .font(.footnote)
+            .foregroundStyle(GlowPalette.warning)
+            .frame(width: size.width, height: size.height)
+            .lowPowerSurface(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(lowPowerAccessibilityLabel)
     }
 }

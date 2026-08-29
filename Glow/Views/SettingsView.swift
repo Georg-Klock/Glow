@@ -17,6 +17,11 @@ import WidgetKit
 struct SettingsView: View {
     @Environment(\.modelContext) private var context
 
+    /// The power-state notification does not arrive while the app is
+    /// suspended, so the flag is re-read when the scene comes back — the same
+    /// pairing `WeeklyGridView` uses.
+    @Environment(\.scenePhase) private var scenePhase
+
     /// Every habit, per-day and per-week alike, because an export of "your
     /// history" that quietly left one kind out would be worse than no export.
     @Query(sort: [SortDescriptor(\Habit.sortOrder)]) private var habits: [Habit]
@@ -51,6 +56,18 @@ struct SettingsView: View {
     /// stays either way.
     @AppStorage(GlowSettings.haloDisabledKey, store: GlowSettings.store)
     private var haloDisabled: Bool = false
+
+    /// Low Power Mode switches the glow off, and this screen is where the glow
+    /// is demonstrated — so the preview has to be able to say so (#396). Its
+    /// own monitor: the grid holds one too, and an `@Observable` watching a
+    /// process-wide notification is cheap enough that a shared one would only
+    /// add a lifetime to reason about.
+    @State private var lowPower = LowPowerMonitor()
+
+    /// Whether the explanation sheet is up. The grid announces the condition
+    /// once, unprompted; this screen never does — here the notice is something
+    /// the person tapped the preview to ask for.
+    @State private var isShowingLowPowerNotice = false
 
     /// Mirrors `DemoHistory.isSeeded`. State rather than a computed binding so
     /// the toggle animates the flip it caused instead of waiting on a re-read.
@@ -117,6 +134,12 @@ struct SettingsView: View {
             .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
                 let current = DebugToday.override()
                 if current != overrideDay { overrideDay = current }
+            }
+            // The notification the monitor watches is not delivered while the
+            // app is suspended, so coming back to the foreground is its own
+            // read. `WeeklyGridView` pairs the two the same way.
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { lowPower.refresh() }
             }
             // Both of these change what a widget draws: the week's first day
             // moves every column, and the glow level is the brightness the
@@ -315,6 +338,11 @@ struct SettingsView: View {
             .sheet(item: $exportFile, onDismiss: { discardExport() }) { file in
                 ShareSheet(url: file.url)
             }
+            // The same sheet the grid's strip opens, reached from the same
+            // condition — one explanation of why the glow is off, not two.
+            .sheet(isPresented: $isShowingLowPowerNotice) {
+                LowPowerNoticeView(headroom: lowPower.currentHeadroom)
+            }
             .alert("Reset to Default Habits?", isPresented: $isConfirmingReset) {
                 TextField("Type \(ResetConfirmation.word) to confirm", text: $typedConfirmation)
                     .textInputAutocapitalization(.characters)
@@ -346,11 +374,29 @@ struct SettingsView: View {
     /// third of the way through its falloff by a hand-typed 22pt of padding
     /// inside a form row — and worst at the top of the slider, which is least
     /// honest exactly where the setting matters most.
+    ///
+    /// **And under Low Power Mode there is nothing real to show** (#396). iOS
+    /// cuts the headroom the HDR tile needs, so `GlowImageView` tone-maps back
+    /// to ordinary white and the slider's one demonstration becomes a flat
+    /// white lozenge with nothing said about why — the notice that "reads
+    /// empty" this issue names. `LowPowerPreviewNotice` takes its place, in its
+    /// size and its capsule, and opens the explanation the grid already gives.
     private var preview: some View {
-        GlowImageView(size: Self.previewSize)
+        previewContent
             .padding(.vertical, Self.previewHalo)
             .frame(maxWidth: .infinity)
             .background(Color.black)
+    }
+
+    @ViewBuilder
+    private var previewContent: some View {
+        if lowPower.isLowPowerMode {
+            LowPowerPreviewNotice(size: Self.previewSize) {
+                isShowingLowPowerNotice = true
+            }
+        } else {
+            GlowImageView(size: Self.previewSize)
+        }
     }
 
     /// The preview slot, and the room its halo needs.
