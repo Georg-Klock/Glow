@@ -89,14 +89,21 @@ enum GlowShape: Equatable {
     /// a completion, stroked for an open slot, absent for an upcoming pill.
     static let socketInset: CGFloat = 1
 
-    /// Socket heights, as fractions of the slot.
+    /// The socket's height, as a fraction of the slot: **one height for every
+    /// pill**, 14pt at a 24pt slot, with the ring's 1pt inside-aligned stroke
+    /// leaving a 12pt inner.
     ///
-    /// **A pill that is asked for something is 2pt taller than one that is
-    /// not**, and its inner is exactly the size of the upcoming track it
-    /// replaces — so the light fills the track and the socket grows around it
-    /// to hold the bevel. That is where 14 and 12 come from.
-    static let litPillHeight: CGFloat = 14.0 / 24.0
-    static let upcomingPillHeight: CGFloat = 12.0 / 24.0
+    /// **It used to be two.** An upcoming pill was 12 and a lit one 14, so that
+    /// the lit ring's inner was exactly the outer of the upcoming track it
+    /// replaced — the light filled the track and the socket grew around it to
+    /// hold the bevel. That relationship is what the single height gives up:
+    /// an empty pill and a lit one are now the same outer size, flush rather
+    /// than nested, and the ring's 12pt inner sits inside the empty pill's 14
+    /// rather than matching it.
+    ///
+    /// One constant rather than two that happen to be equal, so nothing can
+    /// drift back to a 2pt difference nobody asked for.
+    static let pillHeight: CGFloat = 14.0 / 24.0
 
     /// The missed ✕, as fractions of the slot — **not** of 17.5.
     ///
@@ -361,6 +368,16 @@ struct GlowImageView: View {
     /// measured by `SlotLayout` and want a fixed width, but the widget's are
     /// distributed by an HStack and must not be pinned.
     var fillsWidth = false
+    /// Whether this mark runs across several days, which is what decides how
+    /// tall its socket is — and therefore how tall its inner may be.
+    ///
+    /// `SlotMarkView.socket(_:circle:)` ignores the height it is handed when
+    /// the shape is a circle, so a single-day socket is the whole slot and its
+    /// inner is the slot inset by `socketInset`. A spanning socket is
+    /// `pillHeight` of the slot, and its inner has to come off *that* — which
+    /// is what this says. Without it a spanning ring was drawn at slot size and
+    /// came out larger than the socket it sits in.
+    var spansDays = false
     /// The rest day's column, in this view's own coordinates, taken out of the
     /// shape. See `RestWindow`.
     var restWindow: ClosedRange<CGFloat>?
@@ -397,19 +414,47 @@ struct GlowImageView: View {
             // thicken it is gone with the fraction it was scaled by: a
             // constant-weight ring needs no help reading at the small end,
             // because it no longer gets thinner there.
-            Capsule(style: .continuous)
-                .strokeBorder(GlowPalette.color, lineWidth: ringLineWidth ?? GlowShape.ringWeight)
-                .padding(GlowShape.socketInset)
+            // Inset from the socket by `socketInset` on all four sides — and
+            // which socket that is depends on the shape. A spanning mark's is
+            // `pillHeight`, so the ring's height comes off the pill; a single
+            // day's socket is the whole slot, so the padding alone does it.
+            Group {
+                if spansDays {
+                    Capsule(style: .continuous)
+                        .strokeBorder(
+                            GlowPalette.color, lineWidth: ringLineWidth ?? GlowShape.ringWeight
+                        )
+                        .frame(
+                            height: size.height * GlowShape.pillHeight
+                                - GlowShape.socketInset * 2
+                        )
+                        .padding(.horizontal, GlowShape.socketInset)
+                } else {
+                    Capsule(style: .continuous)
+                        .strokeBorder(
+                            GlowPalette.color, lineWidth: ringLineWidth ?? GlowShape.ringWeight
+                        )
+                        .padding(GlowShape.socketInset)
+                }
+            }
         case .dot:
             // **The socket's inner shape, filled** (#332). It was a 3pt dot
             // floating in the slot; it is the slot inset by 1 on every side, so
             // a completion fills its day rather than marking a point in it.
             Circle().padding(GlowShape.socketInset)
         case .bar:
-            // The same shape stretched: a lit pill's inner, which is exactly
-            // the size of the upcoming track it replaces.
+            // The same shape stretched: a lit pill's inner.
+            //
+            // **Inset on all four sides, not two.** The height came off the
+            // socket and the width did not, so a spanning mark's inner was 2pt
+            // shorter than its recess and exactly as wide — it ran to the
+            // socket's ends where a ring or a dot stands 1pt clear of them.
+            // `.ring` and `.dot` were already right, because a single
+            // `.padding(socketInset)` does both axes at once and only the
+            // pill's height had to be spelled out.
             Capsule(style: .continuous)
-                .frame(height: size.height * GlowShape.litPillHeight - GlowShape.socketInset * 2)
+                .frame(height: size.height * GlowShape.pillHeight - GlowShape.socketInset * 2)
+                .padding(.horizontal, GlowShape.socketInset)
         }
     }
 

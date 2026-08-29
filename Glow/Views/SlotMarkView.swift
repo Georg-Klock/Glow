@@ -32,14 +32,15 @@ struct SlotMarkView: View {
         switch mark {
         case .rest, .missed:
             EmptyView()
-        case .upcoming:
-            // The upcoming pill *is* the socket, at 12pt with no inner shape,
-            // so it draws its own bevel at its own height rather than taking
-            // the 14pt one a lit mark grows into.
-            sized(socket(size.height * GlowShape.upcomingPillHeight, circle: !spansDays))
-                .restWindowRemoved(restWindow)
-        case .openToday, .doneToday, .donePast:
-            sized(socket(size.height * GlowShape.litPillHeight, circle: !spansDays))
+        // **One socket, at one height.** These were two branches: an upcoming
+        // pill stood 2pt shorter so a lit ring's inner matched its outer
+        // exactly, and the light filled the track while the socket grew around
+        // it. Both are 14 now — the recess is the same whatever the day says,
+        // and only what sits inside it differs. An upcoming pill still has no
+        // inner shape at all: it *is* the socket, and its bevel is the mark.
+        // See `GlowShape.pillHeight`.
+        case .upcoming, .openToday, .doneToday, .donePast:
+            sized(socket(size.height * GlowShape.pillHeight, circle: !spansDays))
                 .restWindowRemoved(restWindow)
         }
     }
@@ -79,7 +80,8 @@ struct SlotMarkView: View {
 
     private func glow(_ shape: GlowShape) -> some View {
         GlowImageView(
-            size: size, shape: shape, fillsWidth: fillsWidth, restWindow: restWindow
+            size: size, shape: shape, fillsWidth: fillsWidth,
+            spansDays: spansDays, restWindow: restWindow
         )
     }
 
@@ -106,9 +108,13 @@ struct SlotMarkView: View {
                 Capsule(style: .continuous)
                     .fill(fill)
                     .frame(
-                        height: size.height * GlowShape.litPillHeight
+                        height: size.height * GlowShape.pillHeight
                             - GlowShape.socketInset * 2
                     )
+                    // Both axes, like `.dot`'s `.padding(socketInset)`. The
+                    // height is spelled out because it comes off the pill
+                    // rather than off the slot; the width was simply missing.
+                    .padding(.horizontal, GlowShape.socketInset)
             )
             .restWindowRemoved(restWindow)
         } else {
