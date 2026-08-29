@@ -253,8 +253,19 @@ other, which `Tools/approve-baseline.sh` exists to prevent.
 ## Working rules
 
 - **One topic branch, one PR, per unit of work.** `git checkout -b <topic>` off
-  `main`. Never commit to `main`. **Never merge your own PR** — merging is
-  Georg's call.
+  `main`. Never commit to `main`. **Merging is Georg's call**, and the default
+  is that Claude opens the pull request and stops there.
+
+  He can delegate it, and has — the rule said *never merge your own PR* while
+  the person it reserved the button for was asking for the button to be pressed,
+  which is a file arguing with the room. A delegation covers the session it was
+  given in and does not carry to the next one: the next session opens PRs and
+  stops, until it is told otherwise.
+
+  **What is delegable is the waiting, not the decision.** `gh pr merge --auto`
+  (auto-merge is enabled on the repository) lands a pull request the moment its
+  checks go green, so a delegation does not mean sitting and watching CI — which
+  is the part that was never his call to begin with.
 
   `main` is protected: `Gate self-test` and `Build and test` must pass before
   anything lands. The minimum-iOS check is deliberately *not* required, because
@@ -263,11 +274,6 @@ other, which `Tools/approve-baseline.sh` exists to prevent.
   force a rebase and a fresh full run on every merge, which is the latency this
   setup just removed. Administrators are not included, so there is still a way
   through when one is needed.
-
-  **Georg delegates the waiting, not the decision.** `gh pr merge --auto` (auto
-  -merge is enabled on the repository) lands a pull request the moment its
-  checks go green. Choosing to merge is still his; sitting and watching CI for
-  40 minutes never was.
 - **Commit at every working state, push often.** The remote is the backup; an
   unpushed commit exists on one SSD.
 - **Claude is the `Author`, Georg is the `Committer`.** The point of this
