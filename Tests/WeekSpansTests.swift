@@ -1103,10 +1103,13 @@ struct MarkInvariantsTests {
             for target in 1...6 {
                 for todayColumn in 0...6 {
                     for pattern in 0..<128 {
-                        // A completion can only sit on a day that has arrived,
-                        // and never on the rest day: the store refuses that
-                        // write, so a row holding one is not a state the app
-                        // can reach.
+                        // Completions on days that have arrived, off the rest
+                        // day. Not because the other two are unreachable — they
+                        // are, and #381 is the crash that proved it — but
+                        // because the properties below are stated in terms of
+                        // *past* completions and a future one is not the same
+                        // claim. `LaterCompletionTests` sweeps the wider space
+                        // for the invariants that hold everywhere.
                         let done = (0...6).filter {
                             pattern & (1 << $0) != 0 && $0 <= todayColumn && $0 != restColumn
                         }
@@ -1257,6 +1260,113 @@ struct MarkInvariantsTests {
                     mark.element.lastDay == row.done[position],
                     "mark \(position) does not end on its day — \(row.what)"
                 )
+            }
+        }
+    }
+}
+
+/// The two ways a completion stops being in the past, and the crash they were
+/// (#381).
+///
+/// `MarkInvariantsTests` sweeps completions on days that have arrived, off the
+/// rest day, and said in a comment that the other rows were states "the app
+/// can[not] reach". Both halves of that were wrong:
+///
+/// - **The rest day is a setting**, so the app cannot reach a *write* on it —
+///   `SlotEditing.day` and `HabitStore.setCompletion` both refuse one — but a
+///   day logged on Tuesday becomes a rest-day column the moment Settings moves
+///   the rest day to Tuesday. Nothing rewrites the record, and nothing should:
+///   the completion happened.
+/// - **A later day of this week is writable** on a demo-seeded store, which is
+///   what `SlotEditing.week(allowingFuture:)` is for and what
+///   `HabitStore.toggleCompletion(_:on:allowingFuture:)` honours.
+///
+/// Either one put a completion on a day `actionableLeft` was still counting as
+/// free while `deadDays` had already spent it, so `lost` came out below
+/// `dead.count` and `Array(repeating:count:)` was handed a negative count.
+/// `EXC_BREAKPOINT`, on every redraw of the week — which is to say a crash
+/// loop, because the completion is stored and the row is on the first screen.
+/// Six TestFlight crashes on build `202608282309` were exactly this.
+@Suite("Completions that are not in the past")
+struct LaterCompletionTests {
+    private let calendar = TestCalendar.monday
+    /// Friday of the week beginning Monday 2026-08-24 — the week the crash
+    /// logs were taken in.
+    private let friday = TestCalendar.date(2026, 8, 28)
+    private var week: Week { WeekCalendar.week(containing: friday, calendar: calendar) }
+
+    private func spans(
+        target: Int, done: [Int], todayColumn: Int, restColumn: Int?
+    ) -> [SlotSpan] {
+        WeekSpans.spans(
+            for: .fixture(
+                frequency: .timesPerWeek(target),
+                completedDays: Set(done.map { week.days[$0] })
+            ),
+            in: week,
+            today: week.days[todayColumn],
+            target: target,
+            editing: .week(allowingFuture: true),
+            restDay: restColumn.map { TestPreferences.weekday(ofColumn: $0, in: week) },
+            calendar: calendar
+        )
+    }
+
+    @Test("The rest day moving onto a logged day draws a row rather than trapping")
+    func restDayMovedOntoACompletion() {
+        // Three a week, Sunday logged, today Friday — and Friday is now the
+        // rest day. Before the fix `lost` was 0 and `deadDays` found Thursday,
+        // so the row asked for -1 crosses.
+        let row = spans(target: 3, done: [6], todayColumn: 4, restColumn: 4)
+
+        #expect(row.count == 3)
+        #expect(row.first?.firstDay == 0)
+        #expect(row.last?.lastDay == 6)
+        #expect(row.count { $0.state == .filled } == 1)
+    }
+
+    @Test("A completion on a later day of this week draws a row rather than trapping")
+    func completionAfterToday() {
+        // Three a week, Sunday logged from the demo-seeded week view, today
+        // Saturday, no rest day. Sunday cannot carry a second rep, so the third
+        // one has run out of days — which is a ✕, not a trap.
+        let row = spans(target: 3, done: [6], todayColumn: 5, restColumn: nil)
+
+        #expect(row.count == 3)
+        #expect(row.first?.firstDay == 0)
+        #expect(row.last?.lastDay == 6)
+        #expect(row.contains { $0.state == .missed })
+    }
+
+    @Test("Every completion pattern draws its target, wherever the completions fall")
+    func everyPatternDrawsItsTarget() {
+        // The sweep `MarkInvariantsTests` excludes: all 128 subsets against
+        // every today and every rest day, with no filter on when a completion
+        // landed. Only the invariants that hold for any of them — the call
+        // returns at all, the row is exactly `target` marks, and those marks
+        // tile columns 0 through 6 with no gap and no overlap.
+        for restColumn in [nil, 0, 3, 6] as [Int?] {
+            for target in 1...7 {
+                for todayColumn in 0...6 {
+                    for pattern in 0..<128 {
+                        let done = (0...6).filter { pattern & (1 << $0) != 0 }
+                        let row = spans(
+                            target: target, done: done,
+                            todayColumn: todayColumn, restColumn: restColumn
+                        )
+                        let what = "target \(target), today \(todayColumn), done \(done), "
+                            + "rest \(String(describing: restColumn)): "
+                            + row.map { "\($0.state.rawValue):\($0.firstDay)-\($0.lastDay)" }
+                                .joined(separator: " ")
+
+                        #expect(row.count == target, "mark count — \(what)")
+                        #expect(row.first?.firstDay == 0, "starts at 0 — \(what)")
+                        #expect(row.last?.lastDay == 6, "ends at 6 — \(what)")
+                        for (a, b) in zip(row, row.dropFirst()) {
+                            #expect(b.firstDay == a.lastDay + 1, "gap — \(what)")
+                        }
+                    }
+                }
             }
         }
     }
