@@ -1051,7 +1051,7 @@ struct WeeklyGridView: View {
         let content = InAppPop.PopContent(
             id: UUID(),
             habitName: name,
-            line: GoalPop.line(habitID: habitID, on: day)
+            line: GoalPop.line()
         )
         withAnimation(gridReduceMotion ? nil : .easeOut(duration: 0.2)) { pop = content }
     }

@@ -75,45 +75,36 @@ struct GoalPopTests {
 
     // MARK: - The line
 
-    @Test("The same completion always says the same thing")
-    func lineIsStable() {
-        // A Live Activity's content can be re-read, and a phrase that changed
-        // under the reader would look like a glitch.
-        let id = UUID()
-        let first = GoalPop.line(habitID: id, on: day(4), calendar: calendar)
-        for _ in 0..<50 {
-            #expect(GoalPop.line(habitID: id, on: day(4), calendar: calendar) == first)
+    @Test("One habit on one day does not keep saying the same thing")
+    func theLineIsDrawnFresh() {
+        // The defect #450 was filed for: the line was hashed from the habit
+        // and the day, so one habit said exactly one thing all day however
+        // many times it was toggled. Over 200 draws from what used to be a
+        // fixed seed, more than one phrase has to appear. With 173 phrases the
+        // chance of a false failure is (1/173)^199.
+        var seen = Set<String>()
+        for _ in 0..<200 {
+            seen.insert(GoalPop.line())
         }
-        #expect(GoalPop.lines.contains(first))
+        #expect(seen.count > 1, "the pop repeats: every draw said the same thing")
     }
 
-    @Test("Two habits on one day usually differ, and one habit across days does")
-    func theSeedUsesBothHalves() {
-        // Both halves of the seed have to reach the index, or the pool is 173
-        // phrases with six of them ever spoken. A day that moved and a habit
-        // that changed both have to be able to change the line.
-        let id = UUID()
-        var acrossDays = Set<String>()
-        for column in 0..<7 {
-            acrossDays.insert(GoalPop.line(habitID: id, on: day(column), calendar: calendar))
+    @Test("Every line drawn is one of the pool's")
+    func theLineComesFromThePool() {
+        for _ in 0..<200 {
+            #expect(GoalPop.lines.contains(GoalPop.line()))
         }
-        #expect(acrossDays.count > 1, "one habit says the same thing all week")
-
-        var acrossHabits = Set<String>()
-        for _ in 0..<40 {
-            acrossHabits.insert(GoalPop.line(habitID: UUID(), on: day(2), calendar: calendar))
-        }
-        #expect(acrossHabits.count > 1, "every habit says the same thing on one day")
     }
 
     @Test("Every line in the pool is reachable")
     func everyLineIsReachable() {
-        // A hash that collapsed onto part of the list would make the count a
+        // A draw that could not reach part of the list would make the count a
         // lie. 20,000 draws over 173 phrases leaves the chance of missing any
-        // one of them at e^-115.
+        // one of them at e^-115 — an argument that is more true of a real
+        // random draw than it was of the hash it replaced.
         var seen = Set<String>()
-        for i in 0..<20_000 {
-            seen.insert(GoalPop.line(habitID: UUID(), on: day(i % 7), calendar: calendar))
+        for _ in 0..<20_000 {
+            seen.insert(GoalPop.line())
         }
         #expect(seen.count == GoalPop.lines.count)
     }
@@ -284,10 +275,7 @@ struct OnePopPerTapTests {
         #expect(verdict)
         // And the goal-completing tap draws from the same pool as any other:
         // there is no second list for it to reach.
-        let id = UUID()
-        let calendar = TestCalendar.monday
-        let day = TestCalendar.date(2026, 8, 21)
-        #expect(GoalPop.lines.contains(GoalPop.line(habitID: id, on: day, calendar: calendar)))
+        #expect(GoalPop.lines.contains(GoalPop.line()))
     }
 
     /// The two call sites are a `@MainActor` view and an ActivityKit wrapper,
