@@ -493,15 +493,16 @@ actual bug. Every line here is something that already happened.
 - **Figma's radius ≈ SwiftUI's radius.** The CSS that design tools emit doubles
   blur radii; do not halve an already-doubled number.
 - **The render gate cannot see `.drawingGroup()`** (#402). Both baselines and
-  the widget render diff go through `ImageRenderer`, which draws with Core
-  Graphics; that modifier needs Metal and does not apply there. A build carrying
-  it on every mark in the app *and* the widget came back green with both
-  baselines untouched — while the same screen captured off the simulator had
-  moved on 15.4% of its pixels. Unchanged baselines are not evidence of
-  pixel-identity for anything that rasterises: capture the screen with `simctl
-  io screenshot` and diff that instead. The capture is deterministic — the same
-  build installed twice gives byte-identical PNGs — so a difference there is
-  real.
+  the widget render diff go through `ImageRenderer`, and that renderer produces
+  **byte-identical PNGs with the modifier and without it** — probed directly on
+  the socket's own inner-shadow recipe, not inferred from the gate being quiet.
+  A build carrying it on every mark in the app *and* the widget came back green
+  with both baselines untouched, while the same screen captured off the
+  simulator had moved on 15.4% of its pixels. Unchanged baselines are not
+  evidence of pixel-identity for anything that rasterises: capture the screen
+  with `simctl io screenshot` and diff that instead. That capture *is*
+  deterministic — the same build installed twice gives byte-identical PNGs — so
+  a difference there is real.
 
 ## Writing in public
 
