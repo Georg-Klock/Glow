@@ -6820,3 +6820,71 @@ simulator can show them and the render baselines can hold them — but the socke
 bevel's black is drawn against `GlowPalette.widgetSurface`, which #338 already
 flags as wanting a real screen. The final weight of a 15% fill against dark
 glass, and against the HDR marks beside it, is a device question.
+
+## Bounding the tap's day lookup, without the schema decision it looked like it needed (#318)
+
+**Question.** The write path is the one path in the app that was never bounded.
+`HabitStore.completions(of:on:)` fetched every completion a habit has and
+picked the day's out in memory, and `toggleCompletion` runs it twice — so the
+cost of marking a day off grew with every day the person had ever used the app.
+#135 bounded every *read* two months earlier; the entry above says why this one
+was left, and names the blocker: a row written before `dayKey` existed has an
+empty key and its day is *inferred*, so a predicate on the key alone skips
+exactly the rows #130 is about. #318's measurement offered three ways out and
+said two of them touch the schema.
+
+**Decision** (2026-08-29). Bound it now, with no schema change, because #135
+already answered this and the answer transfers verbatim.
+`Habit.rowsFalling(in:)` is `dayKey == "" || (dayKey >= low && dayKey <= high)`,
+and the comment on it says why it needs no way to know whether a store is
+stamped: on a stamped store the empty-key branch matches nothing and the range
+does all the work, on an unstamped one it degrades to the scan that already
+happens, and both answer the same. The write path takes that predicate in its
+single-day form — `dayKey == key || dayKey == ""` — with the in-memory `dayID`
+filter left exactly where it was, to settle the rows the empty arm brings back.
+
+The fetch is therefore narrower than it was and never narrower than the
+*answer* was: the only rows it stops materializing carry a recorded day that is
+not the one asked for, which the filter behind it discarded anyway. Backfilling
+`dayKey` and indexing it were the options that touch the schema. Neither is
+needed for this and neither was taken.
+
+**Measured** on `bench/tap-latency-318`'s harness — the real types, an on-disk
+store, twelve habits, arms alternated in one process, medians of eight rounds
+with the first dropped. iPhone 17 Pro simulator, iOS 26.5, two rounds of each
+arm; the machine was shared with other work, so load average and CoreSimulator
+process count were recorded at both ends of every run (load 18–63, 761–800
+processes) rather than claimed once. Both readings are given.
+
+| history | day lookup, before | after | toggle on, before | after |
+| --- | --- | --- | --- | --- |
+| 70 days | 1.82 / 1.86ms | **0.57 / 0.58ms** | 8.6 / 15.1ms | 16.0 / 15.6ms |
+| 730 days | 15.0 / 16.3ms | **1.05 / 1.07ms** | 52.0 / 55.1ms | 23.7 / 24.3ms |
+| 3650 days | 75.2 / 74.8ms | **3.70 / 3.92ms** | 250.0 / 247.8ms | 103.7 / 116.0ms |
+
+The lookup is what this changes and it is 20× at ten years, 15× at two, 3× at
+ten weeks. At ten weeks the *toggle* is inside this machine's noise tonight —
+one before-reading is lower than either after-reading — and nothing should be
+read into that either way.
+
+**What it does not fix, and the more interesting half.** Un-marking still costs
+around half a second at ten years after this, against two thirds before — so
+the day lookup was never where most of that went. A second alternating session
+on the same harness, this change against this change plus `setCompletion`'s two
+`habit.completions?` mutations removed, un-marking:
+
+| history | bounded fetch | + no relationship mutation |
+| --- | --- | --- |
+| 70 days | 15.6 / 13.0ms | 4.1 / 13.9ms |
+| 730 days | 92.9 / 105.7ms | 9.1 / 9.2ms |
+| 3650 days | 493.8 / 536.4ms | 33.0 / 42.5ms |
+
+`habit.completions` is a to-many relationship and reading it faults every
+completion the habit has ever had, so keeping it in step by hand made a tap
+cost the whole record. The ten-week row is the noisiest here and is the one to
+read most carefully — 4.1 against 13.9 in two readings of the same arm — but
+the two-year and ten-year rows are an order of magnitude.
+
+That is its own change, because it rests on SwiftData maintaining the inverse
+from `Completion.habit` alone, which is a claim about the framework and wants
+an assertion of its own rather than a comment.

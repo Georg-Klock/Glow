@@ -119,6 +119,15 @@ pushes the bound into SQLite on `Completion.dayKey`.
 `habit.snapshot()` with no range still means the whole history and is what the
 export calls.
 
+**And so is the write path, since #318.** `HabitStore`'s day lookup — the one
+`toggleCompletion` runs twice per tap — fetched every completion the habit had
+and picked the day's out in memory, so the app's hottest path scaled with the
+whole record while every *read* had been bounded since #135: 1.8ms per lookup
+over ten weeks of history, 75ms over ten years. It now carries the same
+predicate shape the reads do, the day's `dayKey` **or** an empty one, which is
+what keeps a row whose day is inferred rather than recorded (#130). Like the
+reads, it needs no way to ask whether a store has been through the backfill.
+
 The snapshot it hands back therefore holds only those days, which is the one
 thing to know before passing one on. Everything week-shaped asks only about days
 inside the week it was given, so a week's worth is all a week's row needs;

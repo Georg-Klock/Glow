@@ -333,16 +333,49 @@ struct HabitStore {
     /// wrong number; here it decides whether a tap creates a row or removes
     /// one, so a stale array is how a day ends up with two completions on it.
     ///
-    /// Filtered in memory rather than by a predicate on `dayKey`, because a
-    /// legacy row's key is empty and its day is inferred — a predicate would
-    /// silently skip exactly the rows #130 is about. Once a store has been
-    /// through `StoreMigration.stampDayIdentities` the predicate could be
-    /// pushed down; that is #135's to take, and it needs a way to know the
-    /// store is fully stamped, which the migration record now says.
+    /// **Bounded to the day in the fetch, and the legacy rows come with it**
+    /// (#318). This used to fetch every completion the habit had and keep the
+    /// day's in memory, which is the app's hottest path scaling with the whole
+    /// record: measured at 70.8ms per lookup over ten years of history, run
+    /// twice per tap.
+    ///
+    /// The predicate cannot be `dayKey == key` alone — a row written before
+    /// that column existed has an empty key and its day is *inferred*
+    /// (`Completion.dayID`), so that predicate would silently skip exactly the
+    /// rows #130 is about and a tap would log a second completion beside one
+    /// already there. Adding `|| dayKey == ""` keeps every one of them: the
+    /// fetch returns the day's stamped rows plus whatever is still unstamped,
+    /// and the in-memory filter — unchanged — decides the unstamped ones the
+    /// same way it always did.
+    ///
+    /// So this is narrower than the old fetch and never narrower than the old
+    /// *answer*: the only rows it stops materialising are rows carrying a
+    /// recorded day that is not this one, which the filter behind it dropped
+    /// anyway.
+    ///
+    /// **No schema change, and it does not wait for one.** `stampDayIdentities`
+    /// empties the legacy arm on any store it has been through — it runs at
+    /// every open in both processes and proves `dayKey == ""` fetches back zero
+    /// before it reports success — but nothing here depends on that having
+    /// happened. A store mid-backfill, a store whose backfill failed, and the
+    /// widget's read-only container that cannot run one at all all get the same
+    /// answer; they only pay for the rows still unstamped. Indexing `dayKey`
+    /// would narrow it further and *is* a schema change; it is not needed for
+    /// this and is not taken here.
+    ///
+    /// **A fetch, for the same reason `Habit.liveCompletions` is one** (#145):
+    /// the cached `completions` array can be missing a row another context
+    /// wrote — the widget tap's intent opens a container of its own — and can
+    /// be holding one it deleted. On a read that only cost a
+    /// wrong number; here it decides whether a tap creates a row or removes
+    /// one, so a stale array is how a day ends up with two completions on it.
     private func completions(of habit: Habit, on dayID: DayID) throws -> [Completion] {
         let habitID = habit.id
+        let key = dayID.text
         let descriptor = FetchDescriptor<Completion>(
-            predicate: #Predicate { $0.habit?.id == habitID }
+            predicate: #Predicate {
+                $0.habit?.id == habitID && ($0.dayKey == key || $0.dayKey == "")
+            }
         )
         return try context.fetch(descriptor).filter { $0.dayID == dayID }
     }
