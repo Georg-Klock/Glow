@@ -171,8 +171,11 @@ struct WeekWidgetView: View {
                 // inner shadow falls on the union of the marks' own alpha
                 // rather than on a panel — the small widget's export settles
                 // it, where every socket and every lit fill carries the shade
-                // already composited into itself. `SlotMarkView.wellShadow`
-                // is where it lives now.
+                // already composited into itself. It lives on the marks now,
+                // and since #427 not on all of them: a completion's lit fill
+                // carries it at 25% and the ✕ at 48%, and an open or upcoming
+                // socket carries none — node `260:2819` draws no third inner
+                // shadow there.
                 //
                 // A `Rectangle` across the track was the misreading: the file
                 // has no such shape, and it read as a box drawn around the

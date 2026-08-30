@@ -83,10 +83,13 @@ enum GlowShape: Equatable {
 
     /// **A mark is a socket with an inner shape** (#332, §8.3).
     ///
-    /// The socket has no fill at all — it is drawn entirely by its bevel. The
-    /// inner shape is the socket inset by this on all four sides with its
+    /// The inner shape is the socket inset by this on all four sides with its
     /// radius reduced by the same, and it is what carries the state: filled for
     /// a completion, stroked for an open slot, absent for an upcoming pill.
+    ///
+    /// The socket itself is a 15% black fill under its bevel since #427; §8.3's
+    /// "no fill at all" is superseded and `SlotMarkView.socket(_:circle:)`
+    /// carries the reasoning.
     static let socketInset: CGFloat = 1
 
     /// The socket's height, as a fraction of the slot: **one height for every
@@ -111,26 +114,43 @@ enum GlowShape: Equatable {
     /// `docs/decisions.md`.
     static let pillHeight: CGFloat = 1
 
-    /// The missed ✕, as fractions of the slot — **not** of 17.5.
+    /// The missed ✕, as fractions of the slot, measured off the cross path in
+    /// node `260:2819` (#427).
     ///
-    /// Those denominators were the old slot width, and the ✕ was the one mark
-    /// #331 did not rescale when the grid went to 24: it stayed a hairline
-    /// where the file draws a bar a quarter of the slot thick. Measured off the
-    /// cross path in node `234:11216`, whose 16pt cell carries a 4.0 bar on a
-    /// 12.73 span — a quarter and seven eighths, which is what these are.
+    /// **`missedSpan` is the ✕'s bounding box, not a bar length** — the number
+    /// the design file can be measured for directly. Flattening that node's
+    /// path to 100 samples per curve gives `22.0007 × 22.0006` centred dead in
+    /// the 24pt slot, which is `11/12`: **the same 22pt inner every other mark
+    /// takes** since #426, so the ✕ is not an exception to that rule but an
+    /// instance of it. It replaces a `missedLength` of `7/8` that described the
+    /// bar *before* it was crossed, and which the two `CrossShape` bars turned
+    /// into a span of 0.77 rather than the 0.795 its comment claimed — a
+    /// quantity nothing in the file could be held against.
     ///
-    /// `missedLength` is the bar *before* it is crossed: two of them at ±45°,
-    /// and `(length + thickness) / √2` is the span they occupy, so 7/8 and 1/4
-    /// give 0.795 of the slot exactly as the file does.
-    static let missedThickness: CGFloat = 1.0 / 4.0
-    static let missedLength: CGFloat = 7.0 / 8.0
-    static let missedCorner: CGFloat = 1.0 / 32.0
+    /// `missedThickness` is `6.7592` in the file: the straight end-cap
+    /// (`5.0692`, between the two corner arcs at a tip) plus both corner radii.
+    /// `9/32` fits that to 0.009pt and is taken as the intent.
+    static let missedSpan: CGFloat = 11.0 / 12.0
+    static let missedThickness: CGFloat = 9.0 / 32.0
 
-    /// The ✕'s own bevel, half the socket's. It is **pressed in like a socket,
-    /// not painted like a glyph**: the file gives it no fill and two inner
-    /// shadows — black at full strength below, white at 25% above — where the
-    /// code drew a flat grey cross.
-    static let missedBevel: CGFloat = 1.0 / 32.0
+    /// **The corner radius and the bevel offset are one number, used twice.**
+    /// The file's corner radius computes to `0.8450` and its inner-shadow
+    /// offset and blur are `0.844815`, which is a coincidence only if you
+    /// expect two independent values to agree to four figures. Held as one
+    /// constant so they cannot drift apart; `0.0352` of the slot is `0.8448` at
+    /// 24 and was `1/32` — `0.75` — before #427.
+    ///
+    /// The ✕ is **pressed in like a socket, not painted like a glyph**: no
+    /// stroke, no grey, a 15% black fill and three inner shadows.
+    static let missedCorner: CGFloat = 0.0352
+
+    /// The ✕'s deep well — black at 48%, `dy 4` and `blur 3` at a 24pt slot
+    /// (#427). The open socket's well *left* in the same pass; this one
+    /// arrived, and at nearly twice the strength. That asymmetry is what the
+    /// file draws and is deliberate: see `docs/decisions.md` before unifying
+    /// the two back into one number.
+    static let missedWellOffset: CGFloat = 1.0 / 6.0
+    static let missedWellBlur: CGFloat = 1.0 / 8.0
 
     /// **No longer the grid's marks** (#332). Both were: a completion was a 3pt
     /// dot and a run of them a 2pt line, floating in a 17.455pt socket. A
