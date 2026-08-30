@@ -492,6 +492,20 @@ actual bug. Every line here is something that already happened.
   filled `Capsule` — rather than styling them and hoping.
 - **Figma's radius ≈ SwiftUI's radius.** The CSS that design tools emit doubles
   blur radii; do not halve an already-doubled number.
+- **An unchanged render baseline is not evidence of pixel-identity** (#402,
+  #429). `.drawingGroup()` on the socket was measured moving 7.24% of the
+  screen's pixels through the real compositor while both baselines sat still,
+  and an earlier build carrying it on every mark in the app *and* the widget
+  came back green the same way. The reason was coverage, not blindness: the
+  gate rendered widget families only, and the flag is off for the widget.
+  Once #429 gave the baseline an app frame — `grid rows` — the same modifier
+  moved six of its row-profile cells by one level, on both runtimes.
+  Two rules come out of it. **A quiet gate only answers for the surfaces it
+  renders**, so ask which frames cover the view you changed before reading
+  silence as agreement. And for anything that rasterises, **capture the screen
+  with `simctl io screenshot` and diff that** — it is the only view of what the
+  device actually draws. That capture is deterministic: the same build
+  installed twice gives byte-identical PNGs, so a difference there is real.
 
 ## Writing in public
 

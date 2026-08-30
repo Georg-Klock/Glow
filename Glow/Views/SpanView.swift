@@ -101,6 +101,7 @@ struct SpanView: View {
                 size: size,
                 spansDays: span.dayCount > 1,
                 restWindow: restWindow,
+                flattensSocket: true,
                 anchorOffset: SlotLayout.anchorOffset(
                     trackWidth: trackWidth, dayCount: span.dayCount
                 )

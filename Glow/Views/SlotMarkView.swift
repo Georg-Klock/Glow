@@ -18,6 +18,48 @@ struct SlotMarkView: View {
     /// The rest day's column, in this mark's own coordinates, taken out of the
     /// shape. Nil on every mark that does not cross one. See `RestWindow`.
     var restWindow: ClosedRange<CGFloat>?
+    /// Draw the socket into one flattened layer rather than as live filters.
+    ///
+    /// **The socket is the scroll cost, and this is what takes it off the
+    /// compositor** (#402). Its bevel is a pair of `InnerShadow`s, and each of
+    /// those is a mask holding an offset blurred copy of the shape inside a
+    /// compositing group — four offscreen passes per shadow, eight per socket,
+    /// and a full screen of the week grid holds around 119 sockets. Every one
+    /// of them is re-evaluated by the render server on every frame a row moves,
+    /// which is why the grid scrolled at 7fps where the Settings `Form` beside
+    /// it does 60.
+    ///
+    /// `.drawingGroup()` renders that stack once into a single layer, and a
+    /// layer that only changes position is composited rather than re-rendered.
+    /// Measured on an iPhone 17 Pro / iOS 26.5 over 30 rows and the same eight
+    /// flicks: 137.8ms between frames without it, 31.0ms with — 7.3fps to
+    /// 32.2fps, against 16.6ms for the plain `Form` control taken the same
+    /// minute.
+    ///
+    /// **It is off for the widget, deliberately.** A widget is a snapshot and
+    /// never scrolls, so there is nothing here for it to win, and it renders
+    /// through WidgetKit's archiver rather than through this process — a
+    /// rasterising modifier there is untested risk for no gain.
+    ///
+    /// **It is not pixel-identical, and that is measured.** Captured off the
+    /// simulator through the real compositor, the same store planted in both
+    /// builds: 7.24% of the screen's pixels differ, every one of them inside
+    /// the grid, 92% of them by one level out of 255 and none by more than 12.
+    /// The magnitude is where it matters — of the pixels that move, only 645
+    /// sit at or above level 100, and **none of those moves by more than 2**.
+    /// Everything larger is below level 100, inside the bevel's own gradient.
+    /// `.extendedLinear` is further off, not closer, so what moves is the
+    /// rasteriser's blur rather than its colour space.
+    ///
+    /// **The render baseline sees it too**, which it did not when this was
+    /// first measured. `grid rows` is an app frame rather than a widget family
+    /// (#429), and it renders exactly the surface this modifier changes: six
+    /// of its row-profile cells move by one level, on both committed runtimes.
+    /// No tone count moves — 124, 217 and 255 hold at 218, 700 and 4,200 — so
+    /// nothing crosses a step of the palette; only the bevel's gradient shifts
+    /// under it. Both baselines are approved for that.
+    var flattensSocket = false
+
     /// How far this mark's anchor column sits from the centre of its own
     /// frame. Only the ✕ reads it — every other mark either fills its span or
     /// is one column wide. See `SlotLayout.anchorOffset(trackWidth:dayCount:)`.
@@ -48,6 +90,7 @@ struct SlotMarkView: View {
         // `GlowShape.pillHeight`.
         case .upcoming, .openToday, .doneToday, .donePast:
             sized(socket(size.height * GlowShape.pillHeight, circle: !spansDays))
+                .flattened(flattensSocket)
                 .restWindowRemoved(restWindow)
         }
     }
@@ -329,6 +372,19 @@ struct SlotMarkView: View {
         guard max(leftRoom, rightRoom) > 0 else { return 0 }
         let centre = leftRoom >= rightRoom ? leftRoom / 2 : high + rightRoom / 2
         return centre - size.width / 2
+    }
+}
+
+
+extension View {
+    /// One flattened layer when asked for, and the view itself when not.
+    ///
+    /// A `@ViewBuilder` branch rather than `.drawingGroup(enabled:)`, which does
+    /// not exist: the modifier takes no switch, so the choice has to be made
+    /// over the view.
+    @ViewBuilder
+    fileprivate func flattened(_ flattens: Bool) -> some View {
+        if flattens { drawingGroup() } else { self }
     }
 }
 
