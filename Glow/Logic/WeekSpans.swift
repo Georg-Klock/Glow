@@ -521,7 +521,29 @@ enum WeekSpans {
         // The creation day counts itself: made on Friday, the week has Friday,
         // Saturday and Sunday left in it.
         let daysLeft = week.days.count - column
-        let now = max(0, target - daysLeft)
+        // **A day before creation that carries a completion is not a day the
+        // habit was forgiven for** (#415). `daysLeft` alone is the capacity of
+        // a week nothing was back-filled into; a completion logged before the
+        // creation day is a day a rep already landed on, so it adds to what the
+        // target can be met out of exactly as a remaining day does.
+        //
+        // Without this the grant is not the minimum. A 6x habit made on
+        // Wednesday with Monday and Tuesday logged has five days left and two
+        // reps already banked — capacity seven against a target of six, so
+        // nothing is unavoidable and nothing needs forgiving — and it was still
+        // granted one. The over-grant is a mark: the credit mark takes column 0,
+        // Monday's completion clamps up to 1 and Tuesday's to 2, and by the open
+        // mark `assignColumns` has no column left before Thursday. The ring came
+        // out on a day that is not today, breaking §3 invariant 4 and §4.2,
+        // while `actionDay` stayed on today.
+        //
+        // So this is §6's own rule — "the minimum credit that avoids a ✕, and
+        // not one more" — applied to a week the rule was written without: it
+        // assumed no day before creation could carry anything. `DemoHistory`
+        // writes exactly that week, and #265 lets a daily row back-fill one by
+        // hand.
+        let backfilled = (0..<column).count { habit.completedDays.contains(week.days[$0]) }
+        let now = max(0, target - daysLeft - backfilled)
         guard let atCreation = habit.targetAtCreation else { return 0 }
         return min(max(0, atCreation - daysLeft), now)
     }
