@@ -424,8 +424,8 @@ struct WeeklyGridView: View {
                 // counts as the header block.
                 WeekdayHeader(geometry: geometry, week: week, today: today, snapshots: snapshots)
                     .padding(.top, geometry.padTop)
-                    .padding(.leading, inset + geometry.padLeading)
-                    .padding(.trailing, inset + geometry.padTrailing)
+                    .padding(.leading, GridMetrics.rowPadding + geometry.padLeading)
+                    .padding(.trailing, GridMetrics.rowPadding + geometry.padTrailing)
                     // The widget's header stands further from the first
                     // row than the rows stand from each other.
                     .padding(
@@ -455,13 +455,13 @@ struct WeeklyGridView: View {
                     }
                     .listRowInsets(EdgeInsets(
                         top: geometry.rowInset,
-                        leading: inset + geometry.padLeading,
+                        leading: GridMetrics.rowPadding + geometry.padLeading,
                         // The last row stands the widget's `padBottom` off
                         // the panel's edge; every other row stands half a
                         // row gap off its neighbour.
                         bottom: index == habits.count - 1
                             ? geometry.padBottom : geometry.rowInset,
-                        trailing: inset + geometry.padTrailing
+                        trailing: GridMetrics.rowPadding + geometry.padTrailing
                     ))
                     .listRowSeparator(.hidden)
                     // **Nothing behind a row any more** (#398). The panel
@@ -532,8 +532,29 @@ struct WeeklyGridView: View {
             // than on bare black, and the weekday header still scrolls out of
             // view because nothing about the header changed.
             .background(alignment: .top) {
-                panel(geometry: geometry, inset: inset)
+                panel(geometry: geometry, inset: GridMetrics.rowPadding)
             }
+            // **The edit controls' breathing room, taken from the `List`**
+            // (#400). The delete circle and the reorder handle are the
+            // system's, laid out against the `List`'s own bounds — measured,
+            // they ignore `listRowInsets` completely — so the only way to
+            // move them without drawing replacements is to move the bounds.
+            //
+            // **After `.background`, and that ordering is the whole trick.**
+            // The panel is drawn behind the `List` and then padded with it, so
+            // the two come in together and the rows hand back what the `List`
+            // took: every absolute position on this screen is what it was,
+            // and only the system's controls move. Sampled on an iPhone 17
+            // Pro / iOS 26.5, the whole grid outside edit mode is
+            // pixel-identical across this change. Put `.padding` *before*
+            // `.background` and the panel stays where it is while the rows
+            // move, which is the same picture with the grid 10pt narrower.
+            //
+            // It applies at all times rather than only while editing: a
+            // conditional would move the panel and the rows on the way into
+            // edit mode, and nothing on this screen should move because a
+            // control appeared beside it.
+            .padding(.horizontal, GridMetrics.editControlInset)
             // **The collapse a removed row leaves behind** (#398), driven off
             // the count rather than out of `delete`.
             //
@@ -576,6 +597,11 @@ struct WeeklyGridView: View {
     ///
     /// All four corners, where the header carried the top two and the last row
     /// the bottom two. One shape, one radius.
+    ///
+    /// `inset` is `GridMetrics.rowPadding`, not the full
+    /// `horizontalPadding` (#400): the `List` this is drawn behind is itself
+    /// padded by `editControlInset`, and the two sum back to 20pt. The panel
+    /// sits exactly where it did before that split.
     private func panel(geometry: RowGeometry, inset: CGFloat) -> some View {
         // The reader is the `List`'s own height, not the screen's. The two are
         // not the same: the list scrolls under the tab bar, and measuring the

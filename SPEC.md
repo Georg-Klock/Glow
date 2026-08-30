@@ -753,6 +753,20 @@ in the vacated track, which would leave them a third of the way across. A blank
 row has nothing to fade and nothing to centre; it shows the two controls and the
 gap it stands for. Reduce Motion snaps the change rather than shortening it.
 
+**The edit controls stand off the panel's edge, and the panel does not move to
+let them** (#400). The delete circle and the reorder handle are the system's,
+laid out against the `List`'s own bounds — they ignore `listRowInsets`, so the
+insets that place the grid on the panel never reached them. Measured on an
+iPhone 17 Pro against a 402pt screen, both overhung the panel and were drawn
+partly on the black outside it: the circle at 17.0-38.7pt against a panel
+starting at 20.0, the handle at 363.0-384.0 against one ending at 381.7. The
+room comes out of the `List` instead — it is narrowed by 10pt on each side and
+the rows are inset by 10pt less, so every absolute position on the screen is
+what it was and only the system's two controls move. They now stand 7.0pt and
+7.3pt inside the panel's edges. Nothing about the panel changed: its shape, its
+corners and its 20pt margin are untouched, which is the half of the ask that was
+not negotiable.
+
 **Every name reads plain white while editing** (#206). Outside edit mode a name
 is grey until its habit is due today and lit while it is — §1's rule carried
 through to type. Editing is the one moment that reading stops being the useful

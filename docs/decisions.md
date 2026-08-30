@@ -6469,3 +6469,67 @@ a person actually looks at.
 **Medium is untouched**, and that is asserted rather than assumed: it has 14pt
 of slack on the design frame and more on a phone, so the height never overrules
 the width there.
+## The edit controls' breathing room comes out of the List, not the panel
+
+**#400, 2026-08-29.** "Move in the red delete button and the re-ordering handle
+in the edit mode so they have some space between the edge of the widget
+background" — and, asked how much, "a little breathing room, but don't change
+the background at all."
+
+**What was actually there, measured.** The issue described the controls as
+flush with the panel's edge. They were past it. On an iPhone 17 Pro / iOS 26.5,
+402pt wide, with the panel at 20.0-381.7pt: the delete circle spanned
+17.0-38.7pt and the reorder handle 363.0-384.0pt. Both overhung the grey and
+were drawn partly on the black outside it — the circle by 3.0pt, the handle by
+2.3pt.
+
+**Why `listRowInsets` never reached them.** Those two controls are the system's,
+from `.onDelete` and `.onMove` on the `ForEach`, and they are laid out against
+the `List`'s own bounds. The rows on that screen are inset to 26.4pt and
+367.0pt; the controls landed at 17.0 and 384.0, which is 17pt and 18pt from the
+*screen* — the system's own margin, unrelated to anything this app asked for.
+
+**Decision: narrow the `List` and hand the same amount back to the rows.**
+`GridMetrics.editControlInset` is 10pt of horizontal padding on the `List`, and
+`GridMetrics.rowPadding` is the 10pt the rows and the panel still add. The two
+sum to `horizontalPadding`'s 20, so every absolute position on the screen is
+what it was and only the system's controls move: they now stand 7.0pt and 7.3pt
+inside the panel. `RowGeometryTests` asserts the sum, because a number moved on
+one side and not the other slides the whole grid by an amount that reads as a
+rendering difference rather than as a bug.
+
+The ordering carries the "don't change the background" half: `.padding` goes
+*after* `.background`, so the panel is drawn behind the `List` and padded with
+it and the two come in together. Put it before, and the panel stays while the
+rows move — the same picture with the grid 10pt narrower. Verified rather than
+argued: the whole screen outside edit mode is pixel-identical across this
+change, 0 differing subpixels of 9,486,396 in a full-screen capture on the same
+device with the same store.
+
+**The issue's conclusion that this needed custom controls is wrong, and that is
+the useful part of this entry.** Triage established that the native accessories
+have no positioning API and that the realistic path was replacing the delete
+circle and the reorder handle with custom-built ones carrying their own inset —
+"a bigger change than it looks from the screenshot, not a modifier away." That
+is true of the *controls*: nothing positions them. It is not true of the
+problem, because the frame they are positioned against is ours to move. The
+change is one modifier and three compensations, and it keeps the system's own
+delete confirmation, drag session, hit targets and accessibility rather than
+reimplementing them. Both were re-verified on device after the change:
+reordering by dragging a handle and deleting through the minus and its Delete
+button both still work.
+
+**The inset is 10pt, and it is an app number.** `GridMetrics` is the home for
+chrome that exists only in the app and so has no widget number to scale from,
+and the widget has no edit mode. 20pt was rendered as well — it is the value at
+which the `List`'s bounds coincide with the panel's, architecturally the tidier
+of the two — and it leaves 17pt of gap, which is not "a little". 6.4pt
+(`WidgetMetrics.padLeading` at the screen's scale) leaves 3.4pt, which still
+reads as touching.
+
+**A swiped row's buttons came along, which was not the point but is worth
+recording.** Everything the `List` draws at its trailing edge moved by the same
+10pt, the swipe actions included: the Delete pill now ends at 381.3pt against a
+panel ending at 381.7, measured on the same device. Before the change it was
+that 10pt further out — past the panel, on the black — which is the shape #398
+went after from the other side when it put one surface behind the whole list.
