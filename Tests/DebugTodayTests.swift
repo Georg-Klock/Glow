@@ -169,4 +169,59 @@ struct DebugTodayTests {
             #expect(refused <= realToday)
         }
     }
+
+    // MARK: - Every surface reads it
+
+    /// #439: an override every screen honours except one is worse than none.
+    ///
+    /// `WidgetsView` established today as `WeekCalendar.day(Date())` at three
+    /// sites, so the override reached This Week, the intent, the demo seed and
+    /// all three widget providers, and not the previews of those widgets —
+    /// which is the page whose whole claim is that it cannot drift from the
+    /// Home Screen. Nothing caught it: the view is in no test of any kind, and
+    /// the spelling compiles and reads perfectly well.
+    ///
+    /// So a scan, for `logicDoesNotReadTheClock`'s reason: the property is the
+    /// *absence* of a spelling, and there is no runtime moment at which to
+    /// assert it. Narrow on purpose — `Date()` on its own is a timestamp and
+    /// this app takes plenty of them; it is `Date()` normalized to a *day* that
+    /// establishes today, and that is `WeekCalendar.today()`'s job.
+    ///
+    /// `DebugToday.swift` is exempt because it is the boundary: `today()` is
+    /// the fallback the whole rule is written around, `realToday()` is the half
+    /// of the banner that says what day it really is, and `override()` compares
+    /// the stored day against the real week.
+    @Test("Nothing but the boundary turns the clock into a day")
+    func onlyTheBoundaryEstablishesToday() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        var scanned = 0
+        for directory in ["Glow", "GlowWidget"] {
+            let base = root.appendingPathComponent(directory)
+            guard let walk = FileManager.default.enumerator(
+                at: base, includingPropertiesForKeys: nil
+            ) else {
+                Issue.record("\(directory) is not a directory")
+                continue
+            }
+            for case let file as URL in walk where file.pathExtension == "swift" {
+                guard file.lastPathComponent != "DebugToday.swift" else { continue }
+                scanned += 1
+                let source = try String(contentsOf: file, encoding: .utf8)
+                // Code only: this rule is worth naming in a doc comment, and
+                // `WidgetsView` and `DebugTodayBanner` now both name it.
+                let code = source
+                    .split(separator: "\n", omittingEmptySubsequences: false)
+                    .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+                    .joined(separator: "\n")
+                #expect(
+                    !code.contains("day(Date()"),
+                    "\(file.lastPathComponent) makes its own today rather than calling WeekCalendar.today()"
+                )
+            }
+        }
+        // A path that walked nothing would pass this test forever.
+        #expect(scanned > 30, "the scan found \(scanned) source files")
+    }
 }

@@ -9,9 +9,13 @@ import SwiftUI
 /// as it is set, in the same persistent shape `LowPowerBanner` uses for the
 /// other condition that changes what the app is showing.
 ///
-/// Two screens read it: This Week and History. Settings needs no banner,
-/// because the row that set it is on the screen. #204 named three, the third
-/// being Today, which came out with the per-day kind (#209).
+/// Two screens read it: This Week and Widgets. Settings needs no banner,
+/// because the row that set it is on the screen. #204 named three, and neither
+/// of the two it named besides This Week is still here — Today came out with
+/// the per-day kind (#209), and the Settings History screen went with #316. The
+/// Widgets tab is not one of them returning: it draws the shipping widget views
+/// against the same day, and until #439 it drew them against the real one while
+/// every other surface honoured the override.
 ///
 /// **One tap clears it**, rather than sending you back to Settings. Leaving the
 /// override on should never be more convenient than turning it off.

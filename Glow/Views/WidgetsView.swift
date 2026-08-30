@@ -41,6 +41,13 @@ import WidgetKit
 /// pictures of the same card, and a confidently wrong one is worse than a
 /// generic one.
 ///
+/// **So the page reads the debug day override, and says so** (#439). "Cannot
+/// drift" is a claim about every day the app is willing to believe it is, not
+/// only the real one, and the override is the one way the two can be made to
+/// differ on purpose. `DebugTodayBanner` comes with it, for `DebugToday`'s own
+/// reason: a screen that reads the override and does not admit it is the shape
+/// this tool is fenced against.
+///
 /// The glow is real here too, and unverifiable in the simulator like every
 /// other lit surface in this app.
 struct WidgetsView: View {
@@ -54,7 +61,17 @@ struct WidgetsView: View {
     /// The day the previews are drawn for. Same reason `WeeklyGridView` holds
     /// one: the open slot is defined as today, so today has to be re-read when
     /// the app comes back.
-    @State private var today = WeekCalendar.day(Date())
+    ///
+    /// **`WeekCalendar.today()`, not `WeekCalendar.day(Date())`** (#439). This
+    /// was the one surface in the app that established today from the clock
+    /// directly, so the debug day override reached every other screen and every
+    /// widget and not this page — which is the page whose whole claim is that
+    /// what it shows *cannot* drift from what is on the Home Screen. With an
+    /// override set, that was exactly what drifted: the placed widget honoured
+    /// it, the preview of it did not, and the two disagreed about which column
+    /// is today. See `DebugToday`, and the banner below, which is the other
+    /// half of what a screen that reads the override owes.
+    @State private var today = WeekCalendar.today()
 
     /// The week's first day, observed — the previews are widgets, and a widget
     /// draws seven columns from this. Read here for the same reason
@@ -82,10 +99,27 @@ struct WidgetsView: View {
                 // to whatever is left after the page's own margins.
                 let width = max(0, proxy.size.width - Self.margin * 2)
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 32) {
-                        instructions
-                        ForEach(groups) { group in
-                            card(group, width: width)
+                    // **Two stacks, and the outer one has no spacing** (#439).
+                    // `DebugTodayBanner` draws nothing while the override is
+                    // off, and a nothing inside a `spacing: 32` stack is still
+                    // a 32pt gap above the instructions on every ordinary
+                    // launch. The banner's own note says the same about padding
+                    // applied from outside: what it costs when it is not there
+                    // is the whole question. The 10pt below it is its own.
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Inside the scroll rather than fixed above it. This
+                        // page is one scroll from the instructions to the last
+                        // preview, and `TopFade` is what dissolves whatever
+                        // passes under the navigation bar — a strip pinned
+                        // above the scroll would sit inside that falloff and be
+                        // drawn half-dimmed. Its horizontal margin is the
+                        // stack's, so it is passed nothing of its own.
+                        DebugTodayBanner(horizontalPadding: 0)
+                        VStack(alignment: .leading, spacing: 32) {
+                            instructions
+                            ForEach(groups) { group in
+                                card(group, width: width)
+                            }
                         }
                     }
                     .padding(.horizontal, Self.margin)
@@ -108,11 +142,39 @@ struct WidgetsView: View {
         // nothing here is running. Same trigger `WeeklyGridView` uses.
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
-            today = WeekCalendar.day(Date())
+            refreshToday()
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
-            today = WeekCalendar.day(Date())
+            refreshToday()
         }
+        // And the debug override, which is a defaults key in the App Group
+        // rather than a scalar `@AppStorage` can bind to (#204). Settings is a
+        // sibling tab, so this view stays alive and unredrawn while the
+        // override moves — `WeeklyGridView` watches the same notification for
+        // the same reason, and without it this page would only catch up the
+        // next time the app was backgrounded and resumed.
+        .onReceive(
+            NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+        ) { _ in
+            refreshToday()
+        }
+        // **And once on the way in, which the notification cannot cover.**
+        // `onReceive` subscribes when this view appears, and this tab may never
+        // have appeared: the override is set in Settings, and a tab that has
+        // not been on screen yet was not listening when it moved. Screenshotted
+        // — the banner said Wednesday, drawn from its own read at construction,
+        // while the previews underneath it still drew Saturday's open ring.
+        // `DebugTodayBanner` carries the same pair for the same reason, and
+        // says so in its own note.
+        .task { refreshToday() }
+    }
+
+    /// Re-reads the day the previews are drawn for, from the one place the app
+    /// decides it. Assigning unconditionally would redraw four lit previews on
+    /// every defaults change in the App Group, most of which are not this.
+    private func refreshToday() {
+        let current = WeekCalendar.today()
+        if current != today { today = current }
     }
 
     /// The page's side margin. Wider than a list's, because the previews are
