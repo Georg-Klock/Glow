@@ -107,29 +107,80 @@ struct GlowWidget: Widget {
 }
 
 struct WeekProvider: AppIntentTimelineProvider {
+    /// **The gallery's picture, and the only fixture in the app** (#365).
+    ///
+    /// A placeholder is drawn before anything has been loaded, so it cannot
+    /// read the store — and it used to say so by returning `.empty` with no
+    /// month half at all, which the week families drew as "No habits yet" and
+    /// the small family drew as "Data unavailable", per its own rule that a
+    /// missing month half can only be a provider bug. Neither is a preview of
+    /// anything. See `WidgetPreviewSample`.
     func placeholder(in context: Context) -> WeekEntry {
-        let today = WeekCalendar.today()
-        return WeekEntry(
-            date: today,
-            week: WeekCalendar.week(containing: today),
-            habits: .empty
-        )
+        previewEntry(at: context.family)
     }
 
     func snapshot(for configuration: SelectWeekLayoutIntent, in context: Context) async -> WeekEntry {
+        // **The gallery gets the sample, not the store** (#365). Measured in
+        // the simulator: this is called with `isPreview` true once per install
+        // of the extension, and the render is cached — re-opening the gallery
+        // does not call it again. The commonest moment for that one call is
+        // before the app has ever been launched, when the container does not
+        // exist yet, so a store read froze "Data unavailable" into all three
+        // pages for the life of the install. That is this issue, both halves:
+        // the large family's stale drawing is the same cache, holding a
+        // picture an older build took.
+        if context.isPreview {
+            let entry = previewEntry(at: context.family)
+            // What was served, not what was read — nothing was read. The small
+            // family's content is the month half, so its count would always be
+            // the week half's zero. Counts only, per `WidgetTrace`.
+            let served = context.family == .systemSmall ? "month" : entry.habits.traced
+            WidgetTrace.record(
+                "week snapshot: preview=true, family=\(context.family), sample=\(served)"
+            )
+            return entry
+        }
         if context.family == .systemSmall {
             return monthEntry(for: configuration)
         }
         let entry = loadEntry(for: configuration)
-        // Traced to answer one question the trace could not: whether the widget
-        // gallery's preview is stale because WidgetKit never asks us, or
-        // because it asks and then shows something older. `isPreview` is what
-        // separates the gallery's call from a placed widget's. Counts only, per
+        // `isPreview` is what separates the gallery's call from a placed
+        // widget's, and it is still recorded on this branch so a preview
+        // arriving here at all would be visible. Counts only, per
         // `WidgetTrace`.
         WidgetTrace.record(
             "week snapshot: preview=\(context.isPreview), habits=\(entry.habits.traced)"
         )
         return entry
+    }
+
+    /// The sample week, or the sample month at the small family.
+    ///
+    /// Today is still `WeekCalendar.today()`: the render is taken at install
+    /// time and correct then, and a fixed weekday would be wrong immediately.
+    /// The rest day is read here, at the provider — the boundary — and handed
+    /// down, the way every other preference a rule depends on is.
+    private func previewEntry(at family: WidgetFamily) -> WeekEntry {
+        let today = WeekCalendar.today()
+        let week = WeekCalendar.week(containing: today)
+        let restDay = WeekPreferences.restDay
+        guard family != .systemSmall else {
+            return WeekEntry(
+                date: today,
+                week: week,
+                habits: .empty,
+                month: .loaded(
+                    WidgetPreviewSample.month(containing: today, restDay: restDay)
+                )
+            )
+        }
+        return WeekEntry(
+            date: today,
+            week: week,
+            habits: .loaded(
+                WidgetPreviewSample.rows(in: week, today: today, restDay: restDay)
+            )
+        )
     }
 
     /// One still entry and a midnight refresh — plus, after a tap, the few

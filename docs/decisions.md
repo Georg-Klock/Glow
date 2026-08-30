@@ -6957,3 +6957,66 @@ surface, not a cause.
 
 Three samples per cell is thin and is stated as such, and the simulator's render
 server is not a phone's — the ratios travel, the absolute numbers do not.
+
+## 2026-08-30 — The gallery's picture is taken once, so it draws a sample (#365)
+
+Every page of the system widget gallery was wrong: the large family showed a
+pre-neumorphic drawing dated to a weekday that was not today, and small and
+medium showed what read from a distance as WidgetKit's grey skeleton. Placed
+widgets on the same phone drew the current UI, so the render was never at
+fault.
+
+**Both halves are one mechanism, and it is not what the issue's first reading
+said.** The gallery does not fail to ask, and it does not ask for a placeholder
+and ignore the snapshot. It calls `snapshot(for:in:)` with `context.isPreview`
+true — and it calls it **once per install of the extension**, then caches the
+result.
+
+Measured on an iPhone 17 Pro, iOS 26.5, from `WidgetTrace` in the App Group.
+Fresh install, app never launched, gallery opened and all three pages scrolled:
+
+```
+week snapshot: preview=true, habits=unavailable
+week snapshot: preview=true, habits=unavailable
+```
+
+Then the app was launched and the curated set added, and the gallery re-opened.
+No third line: the sheet redrew the cached bitmaps, still saying "Data
+unavailable". Reinstall the extension over the top and it asks again — and the
+same gallery now drew the real week, from the same build.
+
+So the "grey skeleton" was never a skeleton. It was `WidgetUnavailableView`
+drawn unredacted at 155pt: an icon over two short lines, which is what a
+placeholder's bars look like from arm's length. A gallery preview is not
+rendered redacted here, which is worth stating because that was the other
+standing hypothesis and it is wrong on this OS.
+
+And the large family's stale drawing needs no second explanation. It is the
+same cache, holding the picture an older build took.
+
+**So the preview cannot be a store read.** The commonest moment for that single
+call is before the app has ever been launched, when there is no container to
+open — which is exactly the "unavailable" above, frozen for the life of the
+install. Reading the store later is no better: a real week is a claim about one
+day, and this bitmap outlives that day.
+
+`WidgetPreviewSample` draws it instead — `DefaultHabits.all`, the set the empty
+state already offers, over `SeededHistory`, the invented past the demo toggle
+already uses. Deterministic, bounded to the week or the month it draws, and
+today is left open, because the open slot is the one thing the widget is for.
+
+**This is a deliberate exception to one rule and not to another.** `WidgetsView`
+says *"the habits the previews draw — the person's own, not a fixture"*, and
+that page can re-read the store every time it appears. The gallery cannot: it
+is a bitmap the system took once. `SeededHistory` says invented history is
+"asked for, never assumed", and that is a rule about the person's own store —
+nothing here writes a completion.
+
+The placeholder had the same hole from the other side and is fixed with it: it
+returned `.empty` with no month half, which the week families draw as "No habits
+yet" and the small family draws as unavailable, per its own rule that a missing
+month half can only be a provider bug.
+
+A placed widget is untouched. On the same fresh install the gallery advertises
+the sample while the widget on the Home Screen still says "Data unavailable"
+until the app is opened — which is #282's rule holding exactly where it should.

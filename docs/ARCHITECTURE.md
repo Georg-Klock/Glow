@@ -796,6 +796,18 @@ choice never resolved when the provider ran. That was established on the Today
 widget's own intent, which is where the note used to sit; the symptom is on the
 surviving type in full.
 
+**The gallery's preview is a fixture, and nothing else in the app is** (#365).
+`WeekProvider` branches on `context.isPreview` before it reads anything, and so
+does `placeholder(in:)`; both return `WidgetPreviewSample`, which builds the
+curated `DefaultHabits.all` over `SeededHistory`'s invented past and lives in
+`Logic/` with the day and the rest day as parameters. The reason is measured
+and is in decisions.md: WidgetKit takes the gallery's picture by calling the
+provider once per install of the extension and caching the render, so a store
+read there freezes whatever the store said at that one moment — usually
+"unavailable", because the commonest moment is before the app has ever been
+launched. Everything below that branch is unchanged: a placed widget reads the
+store and keeps #282's three outcomes.
+
 ## What is deliberately absent
 
 - No network, no sync, no telemetry — **and enforced as an invariant rather
