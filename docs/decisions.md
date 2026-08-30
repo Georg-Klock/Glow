@@ -7020,6 +7020,7 @@ month half can only be a provider bug.
 A placed widget is untouched. On the same fresh install the gallery advertises
 the sample while the widget on the Home Screen still says "Data unavailable"
 until the app is opened — which is #282's rule holding exactly where it should.
+
 ## The halo comes out entirely (#394)
 
 **Supersedes** "The halo gets a switch, off by default (#313)" above, two days
