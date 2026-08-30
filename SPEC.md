@@ -522,6 +522,13 @@ announced by a persistent banner on every screen that reads it, with one tap on
 the banner to turn it off. It ships in every build, TestFlight included, for the
 reason demo history does: the phone is where this app is tested.
 
+**"The whole app" includes the Widgets tab's previews** (#439). It did not: that
+page established today from the clock directly, so with an override set the
+placed widget honoured the chosen day and the preview of that same widget drew
+the real one — on the one page whose claim is that it cannot drift from the Home
+Screen. This paragraph was right and the code was wrong; the page now reads the
+override like every other surface, and carries the banner because it does.
+
 **Nothing in the app sets a rest day any more** (#390). Settings' toggle and
 day picker are gone for MVP scope, and `WeekPreferences.retireRestDay()` clears
 one an older build stored, so on a real install `restDay` is nil and every
