@@ -573,8 +573,8 @@ leaving a stub in the air. A bar the window falls inside becomes two pieces; at
 either end it simply stops short. An open span keeps its raw, unclosed ends
 rather than closing into two rings — a straddling span is one span. A span
 falling entirely inside the window draws nothing. The subtraction is applied to
-the *shape*, before the glow is generated from it, so the halo wraps the new
-ends instead of being sliced flat at them.
+the *shape*, before the glow is generated from it, so the tile is masked to the
+shortened shape rather than to the full one.
 
 The grid draws the cut as one vertical line down the rest day's column, in the
 missed cross's grey — absence, which does not glow.
@@ -812,7 +812,7 @@ through to type. Editing is the one moment that reading stops being the useful
 one: nobody reordering a list is asking what they are due for, and half the
 names sitting at the unlit grey is half the list hard to read at exactly the
 wrong time. So the crossfade steps aside for a flat `GlowPalette.color` — the
-header's own white, not the halo, because the halo is the same claim an open
+header's own white, not the glow, because the glow is the same claim an open
 ring makes and wearing it on every row would say every habit is due at once. The
 due/not-due state itself is untouched: leaving edit mode returns each name to
 where the crossfade already was.
@@ -843,10 +843,11 @@ Each was verified in the simulator and is held by a test.
 The glow itself is confirmed on an iPhone 14 Pro: with it on screen the system's
 granted EDR headroom rises from 1.2 to 6.0, matching the 6x the renderer asked
 for when it was measured. The ask is a Settings slider now, 2x by default — see
-docs/glow.md — and the mechanism the measurement confirms is unchanged. The
-halo has its own switch beside the slider: **No halo**, off by default, removes
-the light a lit mark spreads onto the ground while the mark's own HDR fill
-stays (#313). Both are stored in the App Group, so the widgets obey them too.
+docs/glow.md — and the mechanism the measurement confirms is unchanged. A lit
+mark used to spread an SDR halo onto the ground around itself, with a **No
+halo** switch beside the slider (#313); both the halo and the switch are gone
+(#394), and a mark is now lit exactly as far as its own silhouette reaches. The
+slider is stored in the App Group, so the widgets obey it too.
 What no test and no measurement can answer is whether it *reads* as lit in a
 given room, which stays a matter of looking at it.
 

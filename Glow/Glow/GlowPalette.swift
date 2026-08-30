@@ -4,13 +4,13 @@ import WidgetKit
 /// Every colour and every effect in the grid.
 ///
 /// **One hex at three steps, and white above them** (#335, 2026-08-28). Light
-/// has two tiers (#334): `#FFFFFF` with an HDR halo *emits*, and everything
-/// below it reflects. The reflecting tier is `#D9D9D9`, at two strengths —
+/// has two tiers (#334): `#FFFFFF` with the HDR tile over it *emits*, and
+/// everything below it reflects. The reflecting tier is `#D9D9D9`, at two strengths —
 /// full for what is done or handled, half for what is at rest.
 ///
 /// | | |
 /// | --- | --- |
-/// | `#FFFFFF` + halo | emitting: still actionable |
+/// | `#FFFFFF` + HDR tile | emitting: still actionable |
 /// | `#D9D9D9` @ 100% | lit, not emitting: a completion, today handled |
 /// | `#D9D9D9` @ 50% | at rest: the rest of the week |
 ///
@@ -45,15 +45,6 @@ import WidgetKit
 /// derivations in `GlowShape`, `WidgetMetrics` and `SlotLayout`, are what the
 /// app draws. Where a value departs from the design file it says so in place.
 ///
-/// One cleanup worth doing when something else touches this file: `haloRadius`
-/// and `ringHaloRadius` differ only because the file draws the ring's halo
-/// softer. If the ring keeps its offset pair anyway, one radius would do.
-///
-/// Reading a radius here does not tell you what lands on screen: every drop
-/// shadow is multiplied by `GlowSettings.haloScale(peak)` — 0.2 at the shipping
-/// default of 2x, `maxHaloScale` at the top of the range. The ring's inner pair
-/// are the exception — they are baked into the stroke in `GlowImageView` and
-/// are not scaled.
 enum GlowPalette {
     // MARK: - The colours
 
@@ -183,99 +174,30 @@ enum GlowPalette {
 
     // MARK: - Glow reach
     //
-    // These are the design file's own shadow radii, not halved. The generated
-    // CSS doubles every one of them, and halving those already-doubled numbers
-    // — which this used to do — landed every glow at a quarter of its reach.
-    // The rule that avoids it: a Figma shadow radius is about half a CSS blur,
-    // and about the same number as a SwiftUI `.shadow(radius:)`.
+    // **There is none any more.** A lit mark used to cast an SDR drop shadow —
+    // the halo — and this section held its radii: one for a completion, three
+    // for the ring's offset pair, and two more for glowing text. All of them
+    // are gone with the halo itself (#394), along with the ring's unused inner
+    // radius that was documented as their exception. `GlowModifier` now draws
+    // the HDR tile masked to the silhouette and nothing else, so a mark is lit
+    // exactly as far as its own shape reaches.
     //
-    // "About the same number" is as far as it goes, and it was measured rather
-    // than assumed: rendering the same ring at the same radius in both, Figma's
-    // halo reaches 0.75x as far as SwiftUI's at half its edge brightness, and
-    // the kernels differ in shape — Figma is brighter near the source with a
-    // shorter tail. Matching a glow by eye in Figma will under-reach the app.
-    //
-    // What lands on screen is also not the number below. `GlowModifier`
-    // multiplies every drop shadow by `GlowSettings.haloScale(peak)` — 0.2 at
-    // the shipping default of 2x, so the dot's halo renders at 1.8 on a 17.455
-    // slot, not 9, and reaches 12.6 at the top of the range.
-    // `ringInnerRadius` is the exception: it is an inner shadow inside the
-    // stroke and the setting never touches it.
-
-    /// The halo around a completion, as a multiple of slot height. 9 on 17.5.
-    static let haloRadius: CGFloat = 9.0 / 17.5
-
-    /// The ring's halo: wider than the stroke suggests, offset above and below,
-    /// and drawn at half strength. 5 on 17.5, offset 1.25.
-    static let ringHaloRadius: CGFloat = 5.0 / 17.5
-    static let ringHaloOffset: CGFloat = 1.25 / 17.5
-    /// The offset as a fraction of the halo's own radius: 1.25 of 5.
-    static let ringHaloOffsetRatio: CGFloat = 1.25 / 5.0
-    static let ringHaloOpacity: Double = 0.5
-
-    /// The ring's inner pair, which thickens the stroke's apparent brightness at
-    /// top and bottom. 2.5 on 17.5, same offset.
-    static let ringInnerRadius: CGFloat = 2.5 / 17.5
+    // The rule the section existed to protect is still worth keeping if a
+    // reach ever comes back: a Figma shadow radius is about half a CSS blur
+    // and about the same number as a SwiftUI `.shadow(radius:)`. Halving an
+    // already-doubled CSS number is what once landed every glow at a quarter
+    // of its reach, and the value alone does not say which kind it is. See
+    // #63 and docs/decisions.md.
 
     // No `ringWash`. The design file gave the open ring a 1% white fill and this
     // type carried the token for it, declared and never applied through every
     // release so far — `GlowImageView` draws the ring with `strokeBorder`, which
     // paints a border and no fill. Deleted rather than wired up (#65): the
     // document that specified it no longer exists, the ring's interior is
-    // deliberately clear, and a 1% white is the wrong sign for the only problem
-    // that interior actually has — halo bleed from the neighbouring segments
-    // making it read grey, whose fix is black beneath the glow, not white
-    // inside it. See docs/decisions.md.
-
-    /// Halo reach for glowing text, in points. Tighter than a mark's and not
-    /// proportional to it: a glyph is thin, and a mark's halo turns a word into
-    /// a smear.
-    ///
-    /// **These two divide twice and the marks above divide not at all, and that
-    /// is correct** (#63). The difference is what kind of number the file was
-    /// read for, not an inconsistency:
-    ///
-    ///  - `haloRadius` and the ring's radii are *Figma shadow radii*, taken
-    ///    straight. A Figma radius is about a SwiftUI radius, so nothing is
-    ///    divided.
-    ///  - These two are *CSS blurs at 2x* — 3px and 4px. Halve for 1x, halve
-    ///    again because a CSS blur is about twice a Figma radius, and 0.75 and
-    ///    1.0 are the radii that fall out.
-    ///
-    /// Worth spelling out because the project has already paid for the opposite
-    /// slip once, halving numbers that were already halved and landing every
-    /// glow at a quarter of its reach. The check that separates the two cases is
-    /// whether the source number was a blur or a radius, and there is no way to
-    /// tell them apart from the value alone.
-    ///
-    /// A design document used to publish 1.5 and 2 for these rows, which is the
-    /// 1x CSS blur rather than the radius — the same column quoting two
-    /// different quantities. That document is gone (see docs/decisions.md, "The
-    /// code is the source of truth for design"), and these two lines are now the
-    /// only statement of the number.
-    ///
-    /// What would reopen it: 0.75pt against 1.5pt of blur on 12pt text is not a
-    /// difference the simulator can show, because it has no EDR headroom and the
-    /// halo is the part that needs it. If a due label ever reads under-lit on a
-    /// device, the thing to suspect is that the file's number was a radius after
-    /// all and one of these divisions is spurious.
-    ///
-    /// **Looked at, and it does not** (#101, claim 5). iPhone 14 Pro, iOS
-    /// 26.5.2, 2026-08-25, with `glowPeakHeadroom` at 12, the shipping default
-    /// that day — a due habit's name beside its own due mark, the label's halo
-    /// at 0.75pt against the mark's rendered 15.26pt. Georg: the name reads
-    /// lit.
-    ///
-    /// That is the observation this comment asked for, and it is worth being
-    /// exact about what it settles. It does **not** prove 0.75 is the number
-    /// the design file meant; nothing short of the file itself could. It closes
-    /// the specific failure named above — a label that reads under-lit next to
-    /// its mark, which is what a spurious division would produce and what four
-    /// halved-twice glows looked like the last time this trap was sprung. The
-    /// arithmetic in #63 and the device now agree, which is as much as this
-    /// number can be asked to carry.
-    static let labelHalo: CGFloat = 3.0 / 2 / 2
-    static let headerHalo: CGFloat = 4.0 / 2 / 2
+    // deliberately clear, and a 1% white was the wrong sign for the only problem
+    // that interior actually had — light bleeding in from the neighbouring
+    // segments and making it read grey, whose fix is black beneath the glow, not
+    // white inside it. See docs/decisions.md.
 
     // MARK: - Type
     //

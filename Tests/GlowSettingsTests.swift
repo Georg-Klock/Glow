@@ -23,41 +23,6 @@ struct GlowSettingsTests {
         #expect(GlowSettings.range.contains(GlowSettings.defaultValue))
     }
 
-    @Test("The halo vanishes at the bottom of the range and grows with intensity")
-    func haloScaling() {
-        // Without this the slider would do nothing visible on a screen with no
-        // headroom, and nothing at all in a screenshot.
-        #expect(GlowSettings.haloScale(for: GlowSettings.range.lowerBound) == 0)
-        // Pinned to 6x, not to the default. The halo is drawn in SDR and stops
-        // gaining anything long before the encode does — a claim about
-        // rendering, not the slider, which is why this reference has stood
-        // still while the default moved to the top of the range and back down
-        // to 2.
-        #expect(GlowSettings.haloScale(for: GlowSettings.haloReference) == 1)
-        // The top of the range is the largest halo anything can draw, and
-        // `maxHaloScale` is exactly that — recalibrated with the 8x ceiling,
-        // because anything reserving room for a halo reserves `maxHaloScale`
-        // and a cap no slider position reaches would reserve dead space (#91).
-        #expect(GlowSettings.haloScale(for: GlowSettings.range.upperBound) > 1)
-        #expect(GlowSettings.haloScale(for: GlowSettings.range.upperBound)
-            == GlowSettings.maxHaloScale)
-        // Out-of-range input clamps to the same ceiling rather than outgrowing
-        // the room reserved for it.
-        #expect(GlowSettings.haloScale(for: 400) == GlowSettings.maxHaloScale)
-    }
-
-    @Test("The halo ships on; the toggle stores its removal")
-    func haloShipsOn() {
-        // Nothing stored is the fresh install, and the fresh install draws
-        // the halo — the toggle's on state is the removal (#313), so absence
-        // must read as false.
-        #expect(GlowSettings.haloDisabled == false)
-        GlowSettings.store.set(true, forKey: GlowSettings.haloDisabledKey)
-        #expect(GlowSettings.haloDisabled)
-        GlowSettings.store.removeObject(forKey: GlowSettings.haloDisabledKey)
-        #expect(GlowSettings.haloDisabled == false)
-    }
-
     @Test("Intensity drives the encoded headroom", arguments: [2.0, 4.0, 8.0])
     func intensityReachesTheEncoder(peak: Double) throws {
         // The setting is only meaningful if it survives all the way into the

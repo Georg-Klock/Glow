@@ -120,7 +120,7 @@ struct GoalPopActivity: Widget {
                             // wrapping it into the region below.
                             .minimumScaleFactor(0.7)
                             .lineLimit(1)
-                            .glowing(halo: GlowPalette.labelHalo)
+                            .glowing()
                         // The Island is visible on a locked phone too, so the
                         // name is redacted here for the same reason. See #141.
                         Text(context.state.habitName)
@@ -138,7 +138,7 @@ struct GoalPopActivity: Widget {
                 Text(context.state.line)
                     .font(.system(size: PopType.compact, weight: .bold))
                     .minimumScaleFactor(0.6)
-                    .glowing(halo: GlowPalette.labelHalo)
+                    .glowing()
                     .lineLimit(1)
             } minimal: {
                 mark

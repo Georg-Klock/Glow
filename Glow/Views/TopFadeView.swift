@@ -16,9 +16,8 @@ import UIKit
 /// copy of a gradient whose every number was measured is a copy that drifts.
 ///
 /// Opaque through the safe area, so nothing is ever lit beside the Dynamic
-/// Island, and the falloff resolves below the bar rather than at it — the same
-/// "reserve past the falloff, do not clip at it" the halo's own reservation is
-/// built on.
+/// Island, and the falloff resolves below the bar rather than at it: reserve
+/// past the falloff, do not clip at it.
 ///
 /// **`ignoresSafeArea` is load-bearing, and it is not about the status bar.**
 /// Without it the overlay's top edge is the *content's* top edge, which a

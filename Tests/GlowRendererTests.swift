@@ -92,9 +92,9 @@ struct GlowRendererTests {
 
     @Test("The tile is uniform, so one image serves every slot")
     func tileIsUniform() throws {
-        // The shape comes from clipping and the halo from a shadow, so the
-        // encoded image carries neither. If this ever stops being flat, the
-        // single shared tile silently becomes wrong for most slot sizes.
+        // The shape comes from clipping, so the encoded image carries none of
+        // it. If this ever stops being flat, the single shared tile silently
+        // becomes wrong for most slot sizes.
         let image = try decoded(renderer.imageData(color: GlowPalette.components))
         #expect(image.width == renderer.tileSize)
         #expect(image.height == renderer.tileSize)

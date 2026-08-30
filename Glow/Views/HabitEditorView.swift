@@ -371,7 +371,7 @@ struct HabitEditorView: View {
                 // the lit part reading as a bare number.
                 Text("\(count.wrappedValue)x")
                     .monospacedDigit()
-                    .glowing(halo: GlowPalette.labelHalo)
+                    .glowing()
                 Text(" per week")
                     .foregroundStyle(.secondary)
             }

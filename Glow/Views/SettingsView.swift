@@ -50,13 +50,6 @@ struct SettingsView: View {
     @AppStorage(GlowSettings.key, store: GlowSettings.store)
     private var peak: Double = GlowSettings.defaultValue
 
-    /// On means off: the toggle stores the halo's *removal*, so a fresh
-    /// install — nothing stored — ships the halo, and flipping the switch on
-    /// is what takes it away (#313). The HDR fill is a separate layer and
-    /// stays either way.
-    @AppStorage(GlowSettings.haloDisabledKey, store: GlowSettings.store)
-    private var haloDisabled: Bool = false
-
     /// Low Power Mode switches the glow off, and this screen is where the glow
     /// is demonstrated — so the preview has to be able to say so (#396). Its
     /// own monitor: the grid holds one too, and an `@Observable` watching a
@@ -91,8 +84,8 @@ struct SettingsView: View {
         NavigationStack {
             form
             // True black under the whole screen rather than the grouped
-            // background, so the halo falls off into the same black the grid
-            // uses and there is no seam where the row would have been.
+            // background, so the preview sits on the same black the grid uses
+            // and there is no seam where the row would have been.
             .background(Color.black)
             // Everything that scrolls up to the top of the screen dissolves
             // into black before it gets there. See `TopFade`.
@@ -159,7 +152,8 @@ struct SettingsView: View {
                 // The preview is a row of the Form, so it scrolls with
                 // everything else (#109). It was pinned above the Form for one
                 // release because #91 measured its halo being cut and blamed
-                // the row; the row was innocent. See `previewHalo`.
+                // the row; the row was innocent, and there is no halo to cut
+                // any more (#394).
                 //
                 // `Color.clear`, not black: the Form already runs
                 // `.scrollContentBackground(.hidden)` over a black background,
@@ -170,7 +164,7 @@ struct SettingsView: View {
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-                // No section gap under it. The halo's own reservation is
+                // No section gap under it. The preview's own padding is
                 // already a band of black, and the Form's gap on top of that
                 // reads as the first section having drifted down the screen.
                 .listSectionSpacing(0)
@@ -226,19 +220,10 @@ struct SettingsView: View {
                     Text(readout)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-
-                    // "No halo", not "Halo": the row stores the removal, so
-                    // the switch reads on when the halo is off and a fresh
-                    // install shows it off — the shipped look unchanged
-                    // (#313). Explicit `controlTint`, because the root tint
-                    // is pure white and a `Toggle` filled with it disappears
-                    // (#124).
-                    Toggle("No halo", isOn: $haloDisabled)
-                        .tint(GlowPalette.controlTint)
                 } header: {
                     Text("Glow")
                 } footer: {
-                    Text("What the screen grants changes with ambient light, brightness and heat. No halo keeps the marks lit and stops them spreading light around themselves.")
+                    Text("What the screen grants changes with ambient light, brightness and heat.")
                 }
 
                 Section {
@@ -362,28 +347,25 @@ struct SettingsView: View {
     /// slider is judged against the real thing rather than a swatch that
     /// approximates it.
     ///
-    /// **Above the form, not inside it.** A `Form` row bounds its content, so a
-    /// halo drawn in one is clipped by the row's frame however much padding it
-    /// is given — padding only moves the edge. Measured: at exactly the
-    /// reserved 34.97pt the column stepped 33 → 0, which is a cut and not a
-    /// falloff, and a Gaussian has no end to reserve for anyway. Out here
-    /// nothing bounds it. The cost is that it no longer scrolls away, which is
-    /// the trade #91 names (#91).
+    /// **The band of black around it is now plain spacing** (#394). It used to
+    /// be a reservation, derived from the halo's own radius times the largest
+    /// scale the slider could ask for times a measured Gaussian reach — three
+    /// terms, none of them a spacing decision, all of them there because a
+    /// shadow painted well past the radius it was blurred by and #91 measured
+    /// the column stepping 33 → 0 where the row cut it. With no shadow to cut,
+    /// nothing derives this: a lit mark ends at its own silhouette, and what is
+    /// left is how much black the preview wants around it.
     ///
-    /// Which means its halo has to be the real thing too. It used to be cut a
-    /// third of the way through its falloff by a hand-typed 22pt of padding
-    /// inside a form row — and worst at the top of the slider, which is least
-    /// honest exactly where the setting matters most.
-    ///
-    /// **And under Low Power Mode there is nothing real to show** (#396). iOS
-    /// cuts the headroom the HDR tile needs, so `GlowImageView` tone-maps back
-    /// to ordinary white and the slider's one demonstration becomes a flat
-    /// white lozenge with nothing said about why — the notice that "reads
-    /// empty" this issue names. `LowPowerPreviewNotice` takes its place, in its
-    /// size and its capsule, and opens the explanation the grid already gives.
+    /// **Under Low Power Mode there is nothing real to show** (#396). iOS cuts
+    /// the headroom the HDR tile needs, so `GlowImageView` tone-maps back to
+    /// ordinary white and the slider's one demonstration becomes a flat white
+    /// lozenge with nothing said about why. `LowPowerPreviewNotice` takes its
+    /// place, in its size and its capsule, and opens the explanation the grid
+    /// already gives. That is untouched by the halo's removal: what the notice
+    /// replaces is the *tile*, which is still what carries the headroom.
     private var preview: some View {
         previewContent
-            .padding(.vertical, Self.previewHalo)
+            .padding(.vertical, Self.previewPadding)
             .frame(maxWidth: .infinity)
             .background(Color.black)
     }
@@ -399,35 +381,9 @@ struct SettingsView: View {
         }
     }
 
-    /// The preview slot, and the room its halo needs.
-    ///
-    /// **Derived, never typed.** `GlowModifier` casts the halo at
-    /// `height * GlowPalette.haloRadius`, multiplied by
-    /// `GlowSettings.haloScale(peak)` — which reaches `maxHaloScale` at the
-    /// top of the range, well above the shipping default of 2x, and the
-    /// reservation has to fit the slider's largest halo rather than the
-    /// default's. Reserving anything less cuts the light mid-falloff,
-    /// and reserving a constant means it drifts the next time `haloRadius`
-    /// moves. This is the same expression the halo is drawn from.
     private static let previewSize = CGSize(width: 120, height: 40)
-    private static var previewHalo: CGFloat {
-        previewSize.height * GlowPalette.haloRadius
-            * CGFloat(GlowSettings.maxHaloScale) * haloReach
-    }
-
-    /// How far past its radius a shadow is still visible.
-    ///
-    /// **This is the number #91 was missing**, and the reason its "correct"
-    /// reservation still clipped. `radius` is what `.shadow` blurs by, not how
-    /// far the light gets: a Gaussian is still painting well beyond its own
-    /// radius, and the row bounded the content at exactly the radius.
-    ///
-    /// Measured on screen at 12x, from the capsule's edge to the last pixel
-    /// above black: 237px at 3.0 px/pt is 79pt, against a 34.97pt radius —
-    /// 2.26x. Three is the usual reach quoted for a Gaussian, it is the next
-    /// round number above what was measured, and the cost of the margin is
-    /// black on black.
-    private static let haloReach: CGFloat = 3
+    /// Chosen by eye against the Form's own rhythm, not derived from anything.
+    private static let previewPadding: CGFloat = 24
 
     /// How much the Dynamic Island says.
     ///

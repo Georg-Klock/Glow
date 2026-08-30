@@ -40,8 +40,8 @@ import UIKit
 ///
 /// So the signature carries a second statistic that thinness cannot dilute.
 /// The app paints exactly two colours and no ramp between them (#111), which
-/// means every unlit mark deposits pixels at *one exact level* while the halo
-/// around a lit mark deposits a smooth gradient. That shows in a histogram as a
+/// means every mark deposits its interior pixels at *one exact level* while its
+/// antialiased edge deposits a smooth gradient. That shows in a histogram as a
 /// spike standing on a ramp, and the height of the spike above the ramp —
 /// `RenderSignature.toneExcess` — is a count of pixels, not an average, so it
 /// does not care how thin the mark is.
@@ -67,8 +67,8 @@ import UIKit
 ///   of a missed mark is a function of how much of the week is already behind
 ///   today, and one Tuesday can only ever draw the narrowest case.
 /// * **The glow.** Pinned to `GlowSettings.defaultValue` with the render cache
-///   cleared, because the halo is part of the picture and another suite is
-///   allowed to have turned it down.
+///   cleared, because the tile's encoded headroom changes what a mark renders
+///   as even in SDR, and another suite is allowed to have turned it down.
 /// * **The rest day.** Pinned to none, because `HabitRowView` reads it out of
 ///   the App Group rather than taking it as a parameter (#386). No widget
 ///   frame depends on it; the app's row does.
@@ -1053,7 +1053,7 @@ struct RenderSignature: Codable, Equatable {
     var exactBlackPercent: Double
     /// `side * side` mean brightness values, row-major, 0...255.
     var grid: [Int]
-    /// Level → how many pixels are painted flat at it, over and above the halo
+    /// Level → how many pixels are painted flat at it, over and above the edge
     /// gradient that passes through it. See `toneExcess`. Keyed by the levels in
     /// `RenderBaselineTests.flatTones` and by nothing else.
     var tones: [Int: Int]
@@ -1162,7 +1162,8 @@ struct RenderSignature: Codable, Equatable {
     /// gradient running through it.
     ///
     /// A flat-filled mark deposits every one of its interior pixels at exactly
-    /// one level; a halo deposits a ramp, one thin slice per level. So the
+    /// one level; an antialiased edge deposits a ramp, one thin slice per
+    /// level. So the
     /// count at a painted level stands well above its two neighbours, and the
     /// count at an unpainted one sits between them. Subtracting the neighbours'
     /// mean is what separates the two — and it is a **count**, which is the

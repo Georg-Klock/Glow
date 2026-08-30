@@ -105,7 +105,7 @@ dramatic outdoors and subtle in a dim room.
 ## Tuning
 
 `peakHeadroom` is a user setting now, not a constant: Settings has a slider over
-1x to 8x, stored in the App Group so the widget's halo scales with it too. The
+1x to 8x, stored in the App Group so the widget encodes the same tile. The
 default is **2x** — a quarter strength on purpose, while the visuals are being
 iterated on. That reverses the rule the default carried from 2026-08-25 to
 2026-08-26 — "the glow is the product; there is no reason for it to open at
@@ -135,12 +135,39 @@ render. It is not what anybody sees.
 | `edgeFalloff` | 0.62 | Edge brightness relative to centre |
 | `tileSize` | 16 | Edge of the uniform tile, in pixels |
 
-The halo has its own switch (#313): Settings' **No halo** toggle, off by
-default, stored in the App Group so the widget obeys it too. On, it removes the
-caster's drop shadows in `GlowModifier` — the SDR light a lit mark spreads onto
-the ground — while the HDR tile keeps drawing, so the mark itself stays lit.
-The ring's inner shadow pair is not behind the switch; it is the ring's own
-drawn thickness, not spread light.
+## The halo: built, switched, then removed
+
+A lit mark used to cast an SDR drop shadow underneath the tile — the halo, the
+light it threw onto the ground around itself. `GlowModifier` drew it as an
+ordinary SwiftUI `.shadow`, sized from `GlowPalette`'s reach constants and
+multiplied by a `GlowSettings.haloScale(peak)` that tied it to the intensity
+slider. The ring got a softer version: two passes offset above and below at half
+strength, which read as a tube of light rather than a disc behind a hole.
+
+It got a switch in #313 — Settings' **No halo** toggle, off by default — and
+then came out entirely on 2026-08-29 (#394), toggle included. Georg: "I don't
+want to have the halo in the code anywhere." A mark is now lit exactly as far as
+its own silhouette reaches.
+
+**The HDR tile is untouched by that**, which is the whole reason the removal
+does not reach SPEC §1. The emitting layer was always the image; the halo was
+only what it spilled. What a screen with headroom shows is a mark that still
+emits, with nothing around it.
+
+Three consequences worth having written down:
+
+- **A device with no EDR headroom now shows nothing at all.** The halo used to
+  be what such a screen drew *in place of* real emission, so on that hardware
+  the marks are flat white shapes.
+- **The same is true of a Tinted or Clear home screen**, where accented
+  rendering discards the tile's headroom (#53). That was already half true —
+  the halo did not survive accented rendering either.
+- **Two numbers lost the reason they were set to what they are**, and both were
+  deliberately left alone rather than adjusted in the same change:
+  `WidgetMetrics.rowGap`, set by how far a halo spilled out of a row, and
+  Settings' preview padding, derived from the halo's largest possible reach.
+  The first still matches the column gap; the second is now a plain spacing
+  choice.
 
 **PQ declares headroom as a property of the container, not of the pixels in
 it.** Encoding a 1x image into PQ still produced a file reporting nearly 5x, so

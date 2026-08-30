@@ -17,7 +17,7 @@ import Foundation
 /// widget's — and a rule written twice is a rule that drifts. The views turn a
 /// tier into a style and nothing else.
 enum TypeTier: Equatable, Sendable {
-    /// White with the HDR halo. Reserved for what is still actionable.
+    /// White with the HDR tile over it. Reserved for what is still actionable.
     case emitting
     /// `#D9D9D9` at full strength: lit, but not a source of light.
     case lit
