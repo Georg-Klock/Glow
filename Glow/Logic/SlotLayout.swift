@@ -86,6 +86,25 @@ enum SlotLayout {
         dailySlot(trackWidth: trackWidth)
     }
 
+    /// The track a given daily slot fills exactly — `dailySlot` run backwards.
+    ///
+    /// **The widget asks this when the height overrules the width** (#410). A
+    /// slot is as tall as a daily mark is wide, so a row block's height is the
+    /// frame's *width* by another name, and on a frame proportionally wider
+    /// than the design's the block outgrows the height it has to fit in. The
+    /// large family's fix is to take the smaller slot — and a smaller slot has
+    /// to bring its own column rhythm with it, or the marks would keep the
+    /// track's pitch and stop being round.
+    ///
+    /// So the widget re-derives one narrower track from the slot it settled on
+    /// and hands *that* to everything downstream: the gap, the column centres,
+    /// the spans and the rest day's line all divide the same number, and the
+    /// difference between it and the frame's own track lands at the trailing
+    /// edge. Written here beside its inverse so the two cannot drift.
+    static func trackWidth(dailySlot slot: CGFloat) -> CGFloat {
+        max(0, slot * (7 + 6 * gapRatio))
+    }
+
     static func slotSize(trackWidth: CGFloat, slotCount: Int) -> CGSize {
         CGSize(
             width: slotWidth(trackWidth: trackWidth, slotCount: slotCount),

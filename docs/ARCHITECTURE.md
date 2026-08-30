@@ -528,7 +528,11 @@ about the scheme's ordering, restated in `project.yml` — and they are now
 correct by construction.
 
 `GlowRenderTests` is a second test target: it renders the real `WeekWidgetView`
-at the design frame's own 338 × 354 and, once a design export is committed
+at the design frame's own 338 × 354 — and, since #410, at one frame a phone
+actually gives, 349.67 × 365, because a harness that renders only the design
+frame is a harness that cannot fail for a reason a device would: the large
+family lost a row on every phone and no signature moved. It also, once a design
+export is committed
 (`RenderTests/DesignReference/`), diffs the two and reports where they disagree
 (#6). Its own target because `GlowTests` reaches the app module and the
 widget's view is not in it — so it compiles the widget's sources directly, the

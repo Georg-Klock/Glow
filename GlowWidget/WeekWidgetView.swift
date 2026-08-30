@@ -76,15 +76,34 @@ struct WeekWidgetView: View {
         // same track by the same rule and the columns line up. Measured once
         // here rather than per row, which is also how the app does it.
         GeometryReader { proxy in
-            let track = max(0, proxy.size.width - labelWidth - labelGap)
-            let side = SlotLayout.slotHeight(trackWidth: track)
+            // **The frame's track, which is not always the one drawn on**
+            // (#410). A slot used to fall straight out of this, and a slot is a
+            // row's height as well as a mark's width — so the row block grew
+            // with the frame's width while the room for it grew with the
+            // frame's height. Every phone measured is proportionally wider than
+            // the design frame, so ten rows overran by half a point to two and
+            // the large widget silently drew nine.
+            //
+            // `rowLayout` lets the height overrule: the slot shrinks by under a
+            // percent until the design's rows fit, and the marks bring their
+            // column rhythm down with them rather than stretching. What is left
+            // over — 0.4 to 1.8pt — stays at the trailing edge, which is why
+            // the track drawn on is re-derived from the slot here and handed to
+            // every row, the header and the rest day's line alike.
+            let frameTrack = max(0, proxy.size.width - labelWidth - labelGap)
+            let rows = WidgetMetrics.rowLayout(
+                trackWidth: frameTrack,
+                contentHeight: proxy.size.height,
+                designRows: WidgetMetrics.designRowCount(family, hasHeader: showsHeader),
+                hasHeader: showsHeader
+            )
+            let side = rows.slot
+            let track = SlotLayout.trackWidth(dailySlot: side)
             // As many as fit, then a hard cut. A row spent saying how much
             // is missing is a row not showing a habit (docs/vision.md).
             // The app marks the boundary in its own grid, which is where
             // there is room to say it.
-            let capacity = WidgetMetrics.rowCapacity(
-                height: proxy.size.height, slot: side, hasHeader: showsHeader
-            )
+            let capacity = rows.capacity
             let shown = Array(habits.prefix(capacity))
             // **The widget's one read of the rest day** (#181). A widget
             // renders out of process from an archived surface, so there is

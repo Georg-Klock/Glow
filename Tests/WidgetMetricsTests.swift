@@ -160,6 +160,151 @@ struct WidgetMetricsTests {
         #expect(without == withHeader)
     }
 
+    // MARK: - The frames phones actually give (#410)
+
+    /// The three large frames WidgetKit was measured handing out, and the one
+    /// the design is drawn on.
+    ///
+    /// Read out of WidgetKit's own `snapshot-cache` archive path on each device
+    /// — it names the frame it renders into — and confirmed on the 17 Pro by
+    /// pixel-counting a placed widget at 3x. **None of them is 338 × 354**, and
+    /// every one is proportionally *wider* than it. That is the whole of the
+    /// bug: a slot is a row's height as well as a daily mark's width, so ten
+    /// rows outgrew the available height by 0.44pt (17e) to 1.97pt (17 Pro),
+    /// the floor division took nine, and a habit was missing from every large
+    /// widget on every phone.
+    ///
+    /// Written down as measurements rather than derived, because that is what
+    /// they are. They pin three phones, not the phone — `rowLayout` is written
+    /// against the *shape* of the problem rather than against these numbers,
+    /// and these are here to say the shape was real.
+    private static let measuredLargeFrames: [(String, CGSize)] = [
+        ("iPhone 15 Pro", CGSize(width: 344.67, height: 360)),
+        ("iPhone 17 Pro", CGSize(width: 349.67, height: 365)),
+        ("iPhone 17e", CGSize(width: 342, height: 358)),
+        ("the design frame", CGSize(width: 338, height: 354)),
+    ]
+
+    /// The layout a large `WeekWidgetView` reaches for a frame, by the route
+    /// the view itself takes: inset, then track, then `rowLayout`.
+    private func largeLayout(_ frame: CGSize) -> (rows: WidgetMetrics.RowLayout, track: CGFloat) {
+        let track = frame.width
+            - WidgetMetrics.padLeading - WidgetMetrics.padTrailing
+            - WidgetMetrics.labelWidth - WidgetMetrics.labelGap
+        return (
+            WidgetMetrics.rowLayout(
+                trackWidth: track,
+                contentHeight: frame.height - WidgetMetrics.padTop - WidgetMetrics.padBottom,
+                designRows: WidgetMetrics.designRowCount(.systemLarge, hasHeader: true),
+                hasHeader: true
+            ),
+            track
+        )
+    }
+
+    @Test("Every frame a phone was measured giving draws ten rows, not nine")
+    func measuredFramesDrawTenRows() {
+        // The regression this file could not have caught before: every
+        // assertion above is against 338 × 354, which is the one frame where
+        // the old derivation happened to fit. Nine was the answer everywhere
+        // else, and the render harness renders only at the design frame, so
+        // nothing said so.
+        for (name, frame) in Self.measuredLargeFrames {
+            #expect(largeLayout(frame).rows.capacity == 10, "\(name) draws nine rows")
+        }
+    }
+
+    @Test("The rows fill the height exactly, so the bottom margin is padBottom")
+    func measuredFramesFillTheHeight() {
+        for (name, frame) in Self.measuredLargeFrames {
+            let slot = largeLayout(frame).rows.slot
+            let available = frame.height - WidgetMetrics.padTop - WidgetMetrics.padBottom
+                - WidgetMetrics.headerHeight - WidgetMetrics.headerGap
+            let block = 10 * slot + 9 * WidgetMetrics.rowGap
+            // To the point, which is what makes the bottom margin `padBottom`
+            // and `rowsOffset` zero — the centring #410 reported was the
+            // ~31pt a missing row left behind, not a rule about tall frames.
+            #expect(abs(block - available) < 0.001, "\(name) does not fill its height")
+            #expect(WidgetMetrics.rowsOffset(
+                contentHeight: frame.height - WidgetMetrics.padTop - WidgetMetrics.padBottom,
+                slot: slot, rows: 10, hasHeader: true
+            ) < 0.001, "\(name) still centres a full grid")
+        }
+    }
+
+    @Test("What it costs is the track, and the cost is under two points")
+    func measuredFramesLeaveTheTrackShort() {
+        // The stated price of #410's fix, asserted rather than left to be
+        // discovered: the marks keep their proportion, so a slot small enough
+        // for ten rows draws a track narrower than the frame's, and the
+        // difference lands at the trailing edge. The right margin is
+        // `padTrailing` plus this, and is no longer exactly 14 on a phone.
+        for (name, frame) in Self.measuredLargeFrames {
+            let (rows, track) = largeLayout(frame)
+            let drawn = SlotLayout.trackWidth(dailySlot: rows.slot)
+            let leftover = track - drawn
+            #expect(leftover >= -0.001, "\(name) overruns its track")
+            #expect(leftover < 2, "\(name) leaves \(leftover)pt of track unused")
+            // And the marks shrink by well under a percent — a row that had to
+            // give up a tenth of its size to fit would be the wrong trade.
+            #expect(rows.slot > SlotLayout.slotHeight(trackWidth: track) * 0.99)
+        }
+    }
+
+    @Test("The design frame is untouched, which is why the baselines do not move")
+    func designFrameIsUnchanged() {
+        // The harness renders every frame at `size(of:)`, so this is the
+        // assertion that says the committed pictures are unaffected: at the one
+        // frame where the width's answer and the height's answer already agree,
+        // the slot is the same number it always was.
+        let frame = CGSize(width: WidgetMetrics.largeWidth, height: WidgetMetrics.largeHeight)
+        let (rows, track) = largeLayout(frame)
+        #expect(abs(rows.slot - SlotLayout.slotHeight(trackWidth: track)) < 0.001)
+        #expect(abs(SlotLayout.trackWidth(dailySlot: rows.slot) - track) < 0.001)
+        #expect(rows.capacity == WidgetMetrics.largeRowCapacity)
+    }
+
+    @Test("The medium family keeps every point of its track")
+    func mediumIsUntouched() {
+        // Medium has 14pt of slack on the design frame and more on a phone, so
+        // the height never overrules the width there and nothing about it
+        // changes. Asserted because the rule is applied to both families and
+        // "it only affects large" is a claim, not an argument.
+        #expect(WidgetMetrics.designRowCount(.systemMedium, hasHeader: false) == 4)
+        for (name, frame) in [
+            ("iPhone 15 Pro", CGSize(width: 344.67, height: 162.67)),
+            ("the design frame", CGSize(width: 338, height: 158)),
+        ] {
+            let track = frame.width
+                - WidgetMetrics.padLeading - WidgetMetrics.padTrailing
+                - WidgetMetrics.labelWidth - WidgetMetrics.labelGap
+            let rows = WidgetMetrics.rowLayout(
+                trackWidth: track,
+                contentHeight: frame.height - WidgetMetrics.padTop - WidgetMetrics.padBottom,
+                designRows: 4,
+                hasHeader: false
+            )
+            #expect(rows.capacity == 4, "\(name) medium no longer holds four")
+            #expect(abs(rows.slot - SlotLayout.slotHeight(trackWidth: track)) < 0.001,
+                    "\(name) medium shrank a slot it did not need to")
+        }
+    }
+
+    @Test("A frame too small for the design's rows falls back rather than vanishing")
+    func degenerateFramesFallBack() {
+        // A `GeometryReader` reports zero on its first pass often enough not to
+        // be theoretical, and a zero frame must not claim ten rows.
+        let zero = WidgetMetrics.rowLayout(
+            trackWidth: 0, contentHeight: 0, designRows: 10, hasHeader: true
+        )
+        #expect(zero.slot == 0)
+        #expect(zero.capacity == 0)
+        let noRows = WidgetMetrics.rowLayout(
+            trackWidth: 216, contentHeight: 330, designRows: 0, hasHeader: true
+        )
+        #expect(noRows.slot == SlotLayout.slotHeight(trackWidth: 216))
+    }
+
     @Test("Degenerate sizes give nothing rather than something negative")
     func degenerateSizes() {
         #expect(WidgetMetrics.rowCapacity(height: 354, slot: 0, hasHeader: false) == 0)
