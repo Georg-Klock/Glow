@@ -140,8 +140,10 @@ GATE
   # the measured noise and no more in the one place it was not. The reasoning,
   # the numbers and what it stops catching are all in the tool. See #431.
   local report verdict reasons
+  local settled="$actual.settled"
   if ! report="$(/usr/bin/python3 Tools/compare-signatures.py \
-                   --actual "$actual" --committed "$baseline")"; then
+                   --actual "$actual" --committed "$baseline" \
+                   --emit "$settled")"; then
     echo "error: could not compare $baseline against this run's render." >&2
     exit 1
   fi
@@ -182,7 +184,13 @@ GATE
     MOVED+=("$baseline")
     echo "    MOVED (not written, --check): $baseline"
   else
-    cp "$actual" "$baseline"
+    # Not `cp "$actual"`. A file that moved is written whole, and that used to
+    # carry every noisy cell's value from whichever run happened to approve it,
+    # so the committed number never settled and each diff carried a line of
+    # noise to recognise and dismiss (#443). The settled file is this run
+    # everywhere except the cells the comparison just classified as the
+    # renderer's own, which keep what is already committed.
+    cp "$settled" "$baseline"
     MOVED+=("$baseline")
     echo "    approved: $baseline"
   fi

@@ -113,6 +113,37 @@ def compare(actual: dict, committed: dict) -> tuple[str, list[str]]:
     return "same", []
 
 
+def settled(actual: dict, committed: dict) -> dict:
+    """The baseline to write: this run, except where only the renderer moved.
+
+    `compare` classifies the *file*, so a file that genuinely moved is written
+    whole — and that carries every noisy cell's value from whichever run did
+    the approving. The classification is per cell, so the write can be too:
+    a tone that moved no further than the renderer's own noise keeps the value
+    already committed, and everything else takes this run's.
+
+    Without this a noisy cell is re-rolled by every approval that touches the
+    file for any reason, so the committed number never settles and each diff
+    carries a line of noise for a reviewer to recognise and dismiss. See #443.
+    """
+    result = json.loads(json.dumps(actual))
+    baseline = committed.get("frames", {})
+
+    for name, frame in result.get("frames", {}).items():
+        theirs = baseline.get(name)
+        if theirs is None:
+            continue
+        their_tones = theirs.get("tones", {})
+        tones = frame.get("tones", {})
+        for level, here in list(tones.items()):
+            there = their_tones.get(level)
+            if there is None or here == there:
+                continue
+            if abs(here - there) <= TONE_NOISE:
+                tones[level] = there
+    return result
+
+
 # MARK: - The self-test
 #
 # A checker nobody checks can weaken silently, which is why the other five
@@ -212,7 +243,41 @@ def self_test() -> int:
     print(f"  {'ok  ' if ok else 'FAIL'}  a run with no committed baseline is a change")
     failures += 0 if ok else 1
 
-    print(f"compare-signatures: {len(cases) + 1 - failures}/{len(cases) + 1} self-tests passed")
+    # --- what gets written, not only what it is called (#443) ----------------
+    #
+    # `compare` classifies per cell but the write used to be per file, so a file
+    # that moved for any reason re-rolled every noisy cell in it. These check
+    # the write, which is the half that was missing.
+    written = 0
+
+    def check(name: str, ok: bool) -> None:
+        nonlocal failures, written
+        written += 1
+        print(f"  {'ok  ' if ok else 'FAIL'}  {name}")
+        if not ok:
+            failures += 1
+
+    kept = settled(
+        _baseline({"a": _signature({"124": 230, "255": 9999})}),
+        _baseline({"a": _signature({"124": 231, "255": 4097})}),
+    )["frames"]["a"]["tones"]
+    check("a noisy tone keeps its committed value", kept.get("124") == 231)
+    check("a tone past the noise takes this run's", kept.get("255") == 9999)
+
+    fresh = settled(
+        _baseline({"b": _signature({"124": 5})}),
+        _baseline({"a": _signature({"124": 231})}),
+    )
+    check("a frame the baseline has never seen is written as rendered",
+          fresh["frames"]["b"]["tones"].get("124") == 5)
+
+    source = _baseline({"a": _signature({"124": 230})})
+    settled(source, _baseline({"a": _signature({"124": 231})}))
+    check("settled() does not mutate what it was handed",
+          source["frames"]["a"]["tones"]["124"] == 230)
+
+    total = len(cases) + 1 + written
+    print(f"compare-signatures: {total - failures}/{total} self-tests passed")
     return 1 if failures else 0
 
 
@@ -220,6 +285,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--actual", help="the run's render-signatures-actual.json")
     parser.add_argument("--committed", help="the committed baseline for this runtime")
+    parser.add_argument(
+        "--emit",
+        help="write the settled baseline here: this run, except that a tone "
+             "inside the renderer's noise keeps its committed value (#443)",
+    )
     parser.add_argument("--self-test", action="store_true", dest="selftest")
     arguments = parser.parse_args()
 
@@ -248,6 +318,16 @@ def main() -> int:
         return 2
 
     verdict, reasons = compare(actual, committed)
+
+    if arguments.emit:
+        try:
+            with open(arguments.emit, "w") as file:
+                json.dump(settled(actual, committed), file, indent=2)
+                file.write("\n")
+        except OSError as error:
+            print(f"error: cannot write {arguments.emit}: {error}", file=sys.stderr)
+            return 2
+
     print(verdict)
     for reason in reasons:
         print(reason)
