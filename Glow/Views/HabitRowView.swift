@@ -12,15 +12,18 @@ import SwiftUI
 /// cannot disagree. If they did, the columns would stop lining up, which is
 /// the one thing the whole screen is for.
 ///
-/// **One departure is left, and this comment used to claim three.** It said
-/// text and the label column still grew with Dynamic Type and that rows never
-/// shrank below a tappable height; both went on 2026-08-24, when the screen
-/// became the widget times one factor (docs/decisions.md), and `init` below has
-/// said so ever since. The stale half of that sentence is where #405's claim
-/// that the screen and the widget can truncate a name differently came from —
-/// they cannot: the one factor scales `textSize` too, so `nameMaxWidth` is
-/// 6.125 text-sizes on both. What remains is the header, which carries dates
-/// under its letters where the widget has room only for the letters.
+/// **Every departure this comment has named is gone, and it once named three.**
+/// It said text and the label column still grew with Dynamic Type and that rows
+/// never shrank below a tappable height; both went on 2026-08-24, when the
+/// screen became the widget times one factor (docs/decisions.md), and `init`
+/// below has said so ever since. The stale half of that sentence is where
+/// #405's claim that the screen and the widget can truncate a name differently
+/// came from — they cannot: the one factor scales `textSize` too, so
+/// `nameMaxWidth` is 6.125 text-sizes on both. The third was the header, said
+/// here to carry a date under each letter where the widget had room only for
+/// the letter: the date line went when the screen was required to be a large
+/// widget scaled up, and `WeekdayHeader` has drawn the letter alone since. The
+/// sentence outlived it, which is how a stale line goes on being cited.
 struct RowGeometry: Equatable {
     /// The screen's width over the large widget's own.
     let scale: CGFloat
