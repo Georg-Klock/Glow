@@ -422,13 +422,16 @@ Pill widths are always `32n − 8`.
 | | Socket | Inner |
 | --- | --- | --- |
 | Circle | 24 × 24, r 12 | 22 × 22, r 11 |
-| Pill — done or open | h **14**, r 7 | h **12**, r 6 |
-| Pill — upcoming | h **12**, r 6 | none |
+| Pill — done or open | h **24**, r 12 | h **22**, r 11 |
+| Pill — upcoming | h **24**, r 12 | none |
 
-Every mark is centred in the 24pt row. **A pill that is asked for something is
-2pt taller than one that is not**, and its inner is exactly the size of the
-upcoming track it replaces — so the light fills the track, and the socket grows
-around it to hold the bevel.
+Every mark is centred in the 24pt row, and **every mark is the same 24pt recess
+holding the same 22pt inner** — a pill is a circle drawn long. #426 replaced the
+14/12 pill this section was transcribed with, and the file (node `248:12822`)
+still draws spanning marks thinner; the app deliberately does not follow it
+there. The two-tier rule that the pill height used to carry — an open pill 2pt
+taller than an upcoming one, its inner exactly the track it replaced — went with
+#332 and is not coming back.
 
 ### 8.4 Effects
 
@@ -501,7 +504,7 @@ Six deviations from an otherwise regular system, taken as slips:
 
 | Found in the file | Corrected to |
 | --- | --- |
-| Two long done pills drawn socket 12 / inner 10 (rows 2x and 1x) | socket 14 / inner 12, like every other done pill |
+| Two long done pills drawn socket 12 / inner 10 (rows 2x and 1x) | socket 14 / inner 12, like every other done pill — **socket 24 / inner 22 since #426**, which took every pill to the circles' height |
 | Weekday letter cells 17.455 wide — the *old* slot — on a 32pt pitch, landing 0.27 left of centre | 24 wide, on the column |
 | Name max width 84.5, derived from the old 15pt label gap, overrunning the track by 11 | 73.5 |
 | Socket fill `#D9D9D9 @ 1%` | no fill; the socket is its bevel |
@@ -516,7 +519,7 @@ so §8.3 carries the geometry and this adds only what the ring is:
 
 | | Socket | Ring |
 | --- | --- | --- |
-| Pill, 2 col | 56 × 14, r 7 | 54 × 12, r 6 |
+| Pill, 2 col | 56 × **24**, r 12 | 54 × **22**, r 11 |
 | Circle | 24 × 24, r 12 | 22 × 22, r 11 |
 
 | | |
@@ -548,7 +551,7 @@ Visual only; §"Seven changes" below covers the behavioural half.
 | Header → track | 13 | **4** |
 | Rows | 11 | **10** |
 | Unlit day | 3pt dot in the socket | **22pt disc** |
-| Unlit span | 2pt line | **10pt pill** |
+| Unlit span | 2pt line | **22pt lozenge** (10pt when transcribed; #332 then #426) |
 | Background | none, removed deliberately | **dark glass material** |
 | Resting grey | `#8D8D8D`, opaque | **`#D9D9D9` @ 50%** |
 

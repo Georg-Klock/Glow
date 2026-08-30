@@ -6715,3 +6715,48 @@ reachable from app code in the first place.
 moving it is the table above: render one unchanged commit repeatedly through
 `RenderBaselineTests.render` on the lane in question and read the spread. An
 Xcode or runtime bump is the event that could change it.
+## 2026-08-29 — A pill is a circle drawn long: one recess, 24pt, for every mark
+
+**#426.** "I changed my mind. Make the pills the same height as the circles. 24
+dips recess with a 22 dip filling."
+
+`GlowShape.pillHeight` goes from `14 / 24` to `1`. That is the whole change: a
+spanning socket is now the slot's own height, which is what a single-day socket
+always was, and the 22pt inner falls out of `socketInset = 1` on both — `24 − 2`
+— so that constant does not move. `SlotMarkView.socket(_:circle:)` applies its
+`.frame(height:)` only to the capsule, so raising the fraction reaches the pills
+and leaves every circle untouched.
+
+**This is the third value the constant has held**, and the second reversal, so
+it is written down rather than edited around. It was two numbers — 12 for an
+upcoming pill, 14 for a lit one, chosen so a lit ring's inner was exactly the
+outer of the track it replaced. #332 collapsed both to 14 on the grounds that
+"one constant rather than two that happen to be equal" is what stops a 2pt
+difference nobody asked for coming back. #426 keeps that argument and moves the
+number: one constant, now equal to the slot.
+
+**What it is for is the row's read at a glance.** A five-day span used to carry
+less weight per column than the day marks beside it — a thinner bar against full
+circles — so a row's silhouette said something about span length that the layout
+had already said. At one height the shapes differ only in how many columns they
+cover, which is invariant 1 of `docs/week-marks.md` drawn rather than described.
+
+**It is a deliberate divergence from the design file, not a bug.** Node
+`248:12822` draws spanning marks visibly thinner than the circles, and after
+this the app will not match it. The file is the stale one; whoever finds the
+difference later should not "fix" the code back toward it.
+
+**The constant is kept at 1 rather than deleted.** With `pillHeight` at 1 the
+`height` parameter on `socket(_:circle:)` is arithmetically vestigial, and the
+two branches of `.ring` in `GlowImageView` resolve to the same 22pt inner. They
+stay because the height being *derived from a named constant* is what made this
+change one line, in either direction; collapsing them would trade that for a
+tidier read of code nobody is currently asking a question about.
+
+**Nothing reflows.** The slot is still 24 and the row gap still 8 — only the
+mark inside the slot grew. The halo is unaffected too: `GlowImageView` takes its
+reach from `size.height`, the slot, not from `pillHeight`, so a taller pill
+casts the same light and `rowGap`'s 8pt spill argument is untouched.
+
+`docs/week-marks.md` §8.3, §8.6, §8.7 and §8.8 carried the 14/12 pill and were
+rewritten with it.

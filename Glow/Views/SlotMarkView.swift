@@ -36,13 +36,16 @@ struct SlotMarkView: View {
         switch mark {
         case .rest, .missed:
             EmptyView()
-        // **One socket, at one height.** These were two branches: an upcoming
-        // pill stood 2pt shorter so a lit ring's inner matched its outer
-        // exactly, and the light filled the track while the socket grew around
-        // it. Both are 14 now — the recess is the same whatever the day says,
-        // and only what sits inside it differs. An upcoming pill still has no
-        // inner shape at all: it *is* the socket, and its bevel is the mark.
-        // See `GlowShape.pillHeight`.
+        // **One socket, at one height — and the height is the slot's** (#426).
+        // These were two branches: an upcoming pill stood 2pt shorter so a lit
+        // ring's inner matched its outer exactly, and the light filled the
+        // track while the socket grew around it. #332 made both 14; #426 makes
+        // both 24, which is what a circle already was. A pill and a circle are
+        // now the same 24pt recess holding the same 22pt inner, so the recess
+        // is the same whatever the day says *and* whatever the span is, and
+        // only what sits inside it differs. An upcoming pill still has no inner
+        // shape at all: it *is* the socket, and its bevel is the mark. See
+        // `GlowShape.pillHeight`.
         case .upcoming, .openToday, .doneToday, .donePast:
             sized(socket(size.height * GlowShape.pillHeight, circle: !spansDays))
                 .restWindowRemoved(restWindow)
@@ -134,9 +137,10 @@ struct SlotMarkView: View {
                         height: size.height * GlowShape.pillHeight
                             - GlowShape.socketInset * 2
                     )
-                    // Both axes, like `.dot`'s `.padding(socketInset)`. The
-                    // height is spelled out because it comes off the pill
-                    // rather than off the slot; the width was simply missing.
+                    // Both axes, like the circle's `.padding(socketInset)`. The
+                    // width was simply missing; the height stays spelled out
+                    // so it keeps coming from `pillHeight` rather than from the
+                    // padding, even though the two now agree (#426).
                     .padding(.horizontal, GlowShape.socketInset)
             )
             .restWindowRemoved(restWindow)
@@ -220,16 +224,15 @@ struct SlotMarkView: View {
 
     /// A day, or a run of days, with nothing asked of it yet.
     ///
-    /// **The socket's own shape, filled at the resting step** (#332). It was a
-    /// 3pt dot and a 2pt line floating in the slot; it is a 22pt disc and a
-    /// 12pt track now, so an upcoming day occupies its column instead of
-    /// marking a point in it.
+    /// **The socket's own shape** (#332). It was a 3pt dot and a 2pt line
+    /// floating in the slot; it is the 24pt recess itself now, circle or
+    /// lozenge, so an upcoming day occupies its column instead of marking a
+    /// point in it.
     ///
-    /// An upcoming pill has **no inner shape** — the 12pt track *is* the
-    /// socket, where a lit or open pill is a 14pt socket holding a 12pt inner.
-    /// That is what makes a lit pill 2pt taller than the one it replaces: the
-    /// light fills the track and the socket grows around it to hold the bevel.
-    /// **Nothing.** The socket behind it is the whole mark.
+    /// An upcoming mark has **no inner shape**. **Nothing.** The socket behind
+    /// it is the whole mark — and since #426 that socket is the slot at every
+    /// width, so an upcoming span and an upcoming day are one recess drawn
+    /// long and one drawn round.
     ///
     /// §8.3: "the socket has no fill at all — it is drawn entirely by its
     /// bevel", and the upcoming row of its table gives `Inner: none`. §8.6
