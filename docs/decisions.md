@@ -6888,3 +6888,72 @@ the two-year and ten-year rows are an order of magnitude.
 That is its own change, because it rests on SwiftData maintaining the inverse
 from `Completion.habit` alone, which is a claim about the framework and wants
 an assertion of its own rather than a comment.
+
+## The tap stops faulting every completion the habit has (#318)
+
+**Question.** The entry above bounds the tap's day lookup and says what it did
+not reach: un-marking still cost around half a second at ten years and the
+lookup was never most of it. The rest is `setCompletion` keeping
+`habit.completions` in step by hand — `?.removeAll` on a delete, `?.append` on
+an insert. `Habit.completions` is a `@Relationship` to-many, so reaching it at
+all faults every completion the habit has ever had: two lines that existed to
+keep an in-memory array tidy were, between them, the largest single cost in a
+tap.
+
+**Decision** (2026-08-29). Remove them, from `setCompletion` only, and hold the
+framework to the behaviour that makes it correct. SwiftData maintains the
+inverse from `Completion.habit` — which `Completion.init` sets and
+`context.delete` clears — so the by-hand version was doing the same work twice
+and only one of the two had to read the array to do it.
+
+**That is a claim about SwiftData rather than about this app**, which is why it
+is asserted rather than commented: `theInverseIsMaintainedWithoutBeingTold`
+reads the array *before* the write so that what it checks is the in-memory copy
+being kept up to date, and `togglingKeepsTheArrayAgreeingWithTheStore` does the
+same through the write path a tap takes. Nothing on a live store reads the
+cached array anyway — `Habit.liveCompletions` fetches, and falls back to the
+array only for a model object that was never inserted — but "nothing reads it"
+is the weaker guarantee and the tests are for the stronger one.
+
+**Scope is one method on purpose.** `addCompletion`, `clearDay`,
+`resetToDefaults` and `clearHistory` keep their by-hand mutation. None of them
+is on the tap, and widening this would spend the same judgement on paths that
+are not paying for it.
+
+**Measured** on the harness the entry above describes, un-marking:
+
+| history | bounded fetch only | this |
+| --- | --- | --- |
+| 70 days | 15.6 / 13.0ms | 4.1 / 13.9ms |
+| 730 days | 92.9 / 105.7ms | 9.1 / 9.2ms |
+| 3650 days | 493.8 / 536.4ms | 33.0 / 42.5ms |
+
+**And on a running app, which is the half neither of those two entries had.**
+An instrumented Release build on the iPhone 17 Pro simulator — three timestamps
+in `WeeklyGridView.toggle`, the last a `CATransaction` completion, so the number
+is tap to pixels rather than tap to store. Eight rows and ten weeks of demo
+history, the same planted store for every build, back to back on one phone at
+load 10.9–12.2. Un-marking, three samples each after a dropped cold tap:
+
+| build | tap to pixels |
+| --- | --- |
+| `main` | 57.5 / 65.1 / 69.6ms |
+| `main` + #442's `.drawingGroup()` | 52.5 / 54.9 / 57.1ms |
+| `main` + this and #447 | 30.7 / 31.0 / 33.4ms |
+
+Three findings in that table, and the first two are the ones to keep.
+
+**A tap on `main` is about 65ms to pixels at a realistic store size, and the
+store is about a fifth of it** — 11.8ms of median store call inside a 68.4ms
+median to pixels. The rest is SwiftUI's update and the render server. Marking
+costs more than un-marking on every build — 53–61ms against 31ms on the fixed
+one — and that difference is `InAppPop` arriving with a transition, which is a
+deliberate flourish rather than lag.
+
+**#402's answer for scroll is not the answer for tap.** Flattening the socket
+bought scrolling 4.6×; on a tap it is about 15%, because a tap re-rasterises the
+sockets once where a scroll re-rasterises them every frame. The two share a
+surface, not a cause.
+
+Three samples per cell is thin and is stated as such, and the simulator's render
+server is not a phone's — the ratios travel, the absolute numbers do not.

@@ -128,6 +128,17 @@ predicate shape the reads do, the day's `dayKey` **or** an empty one, which is
 what keeps a row whose day is inferred rather than recorded (#130). Like the
 reads, it needs no way to ask whether a store has been through the backfill.
 
+**And the tap stopped reading the habit's own array at all.** `setCompletion`
+kept `habit.completions` in step by hand on both arms of the write. That is a
+to-many relationship: reaching it faults every completion the habit has ever
+had, so a tap paid for the whole record before it had written anything. The
+lines are gone and SwiftData maintains the inverse from `Completion.habit`,
+which the initializer sets and `context.delete` clears —
+`PersistenceTests` asserts that rather than assuming it, because it is a claim
+about the framework. Nothing reads the cached array on a live store anyway:
+`Habit.liveCompletions` fetches, and falls back to the array only for a model
+object that was never inserted.
+
 The snapshot it hands back therefore holds only those days, which is the one
 thing to know before passing one on. Everything week-shaped asks only about days
 inside the week it was given, so a week's worth is all a week's row needs;

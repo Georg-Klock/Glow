@@ -50,6 +50,58 @@ struct PersistenceTests {
         #expect(habit.completedDays(in: calendar).isEmpty)
     }
 
+    /// **The assumption #318 removed a hot line on, held to explicitly.**
+    ///
+    /// `setCompletion` used to keep `habit.completions` in step by hand —
+    /// `?.append` on an insert, `?.removeAll` on a delete. That is a to-many
+    /// relationship, and reading it faults every completion the habit has ever
+    /// had, which is why a tap cost the whole record. The lines went on the
+    /// grounds that SwiftData maintains the inverse from `Completion.habit`
+    /// alone, which the initializer sets and `context.delete` clears.
+    ///
+    /// That is a claim about the framework rather than about this app, so it
+    /// is asserted rather than trusted: if a future SwiftData stops
+    /// maintaining the inverse in memory, this fails here rather than showing
+    /// up as a stale array somewhere that reads one.
+    @Test("The inverse relationship is maintained without being told")
+    func theInverseIsMaintainedWithoutBeingTold() throws {
+        let context = try makeContext()
+        let habit = Habit(
+            name: "Walk", icon: "🚶", frequency: .daily, createdAt: today, sortOrder: 0
+        )
+        context.insert(habit)
+        try context.save()
+        // Read before the write, so what follows is the in-memory array being
+        // kept up to date rather than a first read of the store.
+        #expect(habit.completions?.isEmpty == true)
+
+        let completion = Completion(day: today, habit: habit, calendar: calendar)
+        context.insert(completion)
+        try context.save()
+        #expect(habit.completions?.count == 1)
+        #expect(habit.completions?.first?.id == completion.id)
+
+        context.delete(completion)
+        try context.save()
+        #expect(habit.completions?.isEmpty == true)
+    }
+
+    /// And the same thing through the write path the tap actually takes.
+    @Test("A toggle leaves the habit's own array agreeing with the store")
+    func togglingKeepsTheArrayAgreeingWithTheStore() throws {
+        let context = try makeContext()
+        let store = makeStore(context)
+        let habit = try store.addHabit(name: "Walk", icon: "🚶", frequency: .daily)
+        #expect(habit.completions?.isEmpty == true)
+
+        #expect(try store.toggleCompletion(for: habit, on: today) == .completed)
+        #expect(habit.completions?.count == 1)
+        #expect(habit.completions?.first?.dayID == DayID(today, calendar: calendar))
+
+        #expect(try store.toggleCompletion(for: habit, on: today) == .uncompleted)
+        #expect(habit.completions?.isEmpty == true)
+    }
+
     @Test("Two taps on the same day never store two completions")
     func noDuplicateCompletionsPerDay() throws {
         let context = try makeContext()
