@@ -5,8 +5,9 @@ import Testing
 import UIKit
 
 /// A committed, reviewed picture of what every widget family looks like — and,
-/// since #386, of the rows the app draws for itself — and a gate that goes red
-/// when one of them changes without anyone approving it.
+/// since #386, of the rows and the weekday header the app draws for itself —
+/// and a gate that goes red when one of them changes without anyone approving
+/// it.
 ///
 /// #138. The render tests next door already sample pixels, and they already
 /// print numbers: `bg-audit: week small exact-black 97.3%`. Printing is not a
@@ -431,7 +432,94 @@ struct RenderBaselineTests {
             Frame(name: "grid rows", size: GridRows.size,
                   view: AnyView(GridRows(entry: week)),
                   insets: GridRows.insets),
+            // **The same nine rows with the list fanned open** (#386).
+            //
+            // Edit mode is the row's third rendering and it was drawn by
+            // nothing. `EditModeTests` reads `WeeklyGridView.swift` and
+            // `HabitRowView.swift` as *text* — it scans for where
+            // `@Environment(\.editMode)` may be declared, which is a real
+            // check about where a declaration sits and is not a picture of
+            // anything. So what #206 settled had no gate at all: while editing,
+            // the marks go, the track's width returns to the label, the name
+            // sits between the system's own controls, and both light steps
+            // stand aside for a flat `GlowPalette.color` — a title's white,
+            // which says legible rather than lit. Every one of those could
+            // move without a signature moving.
+            //
+            // **What it does not hold is the controls the room is being made
+            // for.** The delete circle and the reorder handle are the `List`'s,
+            // laid out against the `List`'s own bounds (#400), and there is no
+            // `List` here — see `GridRows` for why. This frame is the row's
+            // half of edit mode and only that.
+            Frame(name: "grid rows editing", size: GridRows.size,
+                  view: AnyView(GridRows(entry: week, mode: .active)),
+                  insets: GridRows.insets),
+            // **The app's weekday header, and the emitting tier** (#386).
+            //
+            // `WeekdayHeader` is a real app view — extracted to its own file so
+            // this target can compile it without `WeeklyGridView` — and it was
+            // named by no test at all beyond a doc comment. It carries the one
+            // rule CLAUDE.md opens with that no committed picture held: today's
+            // letter *emits* while any habit is still open, and the other six
+            // rest. Both branches are in this frame; the third is below.
+            Frame(name: "weekday header", size: WeekdayHeaderFrame.size,
+                  view: AnyView(WeekdayHeaderFrame(entry: week)),
+                  insets: GridRows.insets),
+            // **The middle step of the same rule** (#334, #335 §8.5).
+            //
+            // `TypeTier.weekday` answers `.emitting` for today with something
+            // open and `.lit` for today with everything handled — a day that is
+            // still plainly today and has stopped asking. One frame cannot hold
+            // both, and with only the frame above, moving `.lit` to `.emitting`
+            // — or deleting the distinction — would move no committed pixel.
+            // The two frames differ in exactly one letter's tone, which is the
+            // whole of what this pair claims.
+            Frame(name: "weekday header handled", size: WeekdayHeaderFrame.size,
+                  view: AnyView(WeekdayHeaderFrame(entry: Fixture.handledWeek())),
+                  insets: GridRows.insets),
         ]
+    }
+
+    // MARK: - The app's own weekday header (#386)
+
+    /// The seven letters as **the app** draws them, at the app's own width.
+    ///
+    /// **What this commits to.** The real `WeekdayHeader`, over the real
+    /// `RowGeometry`, for the pinned week: the letters' type size, the column
+    /// arithmetic that stands each one over its slot, and which of `TypeTier`'s
+    /// three steps each letter takes.
+    ///
+    /// **What it does not.** The header's place on the screen. In
+    /// `WeeklyGridView` it is an ordinary `List` row (#398) with its own top,
+    /// leading, trailing and bottom padding, and none of that is here — the
+    /// surround below is the widget's insets, the same frame `GridRows` holds
+    /// its rows still with, and a claim about the letters rather than about
+    /// where the list puts them.
+    struct WeekdayHeaderFrame: View {
+        let entry: WeekEntry
+
+        /// Derived, like `GridRows.size`: the header's own height inside the
+        /// insets `render` lays it in.
+        static var size: CGSize {
+            let geometry = GridRows.geometry
+            let height = GridRows.insets.top + geometry.headerHeight
+                + GridRows.insets.bottom
+            return CGSize(width: GridRows.panelWidth, height: height.rounded(.up))
+        }
+
+        var body: some View {
+            let geometry = GridRows.geometry
+            WeekdayHeader(
+                geometry: geometry,
+                week: entry.week,
+                today: entry.date,
+                snapshots: entry.habits.value ?? []
+            )
+            // Not editing, for `GridRows`' reason and stated the same way: the
+            // header fades to nothing while the list is fanned open, so a
+            // default that moved would empty this frame rather than change it.
+            .environment(\.editMode, .constant(.inactive))
+        }
     }
 
     // MARK: - The app's own rows (#386)
@@ -453,11 +541,34 @@ struct RenderBaselineTests {
     /// were gated only at the widget's.
     ///
     /// It is **not** `WeeklyGridView`. The `List` around these rows — its row
-    /// insets, the panel and its rounded ends, the weekday header, the pager,
-    /// the widget-boundary hairline, edit mode — is still rendered by nothing.
-    /// That screen builds a `NavigationStack` over a `@Query` and needs a model
-    /// container to exist at all, which is the harder half the issue names and
-    /// this does not attempt. Nor is `WidgetsView` covered.
+    /// insets, the panel and its rounded ends, the pager, the widget-boundary
+    /// hairline, and the delete and reorder controls edit mode brings — is
+    /// rendered by nothing. Nor is `WidgetsView`.
+    ///
+    /// **Neither screen can go through this harness at all, and that is
+    /// measured rather than assumed** (#386). Both build a `NavigationStack`,
+    /// which SwiftUI implements as a UIKit container:
+    /// `ImageRenderer` cannot flatten it, and rather than failing it
+    /// substitutes SwiftUI's own invalid-configuration placeholder — a plain
+    /// yellow field with a red no-entry sign. `WeeklyGridView` and
+    /// `WidgetsView`, each rendered at 393 × 852 over a seeded in-memory
+    /// container, came back as **byte-identical** copies of that placeholder,
+    /// with the console line
+    /// `Unable to render flattened version of`
+    /// `PlatformViewControllerRepresentableAdaptor<NavigationStackRepresentable>`
+    /// beside them. A signature taken from that render is a committed picture
+    /// of an error icon, and it would pass forever.
+    ///
+    /// So the screens are covered here by the app views they are built from —
+    /// this one, and `WeekdayHeaderFrame` below — and the rest waits on a
+    /// second rendering path. That path is hosting in a `UIWindow` and
+    /// snapshotting the layer, which `EmptyStateAccessibilityTests` already
+    /// does half of, and it is a bigger decision than it looks: a hosted render
+    /// inherits the scene's safe area and the device's own scale, so a baseline
+    /// taken that way is a picture of one simulator model rather than of one
+    /// runtime. `WeeklyGridView` also has no seam for "today" — it reads
+    /// `WeekCalendar.today()` into `@State` — so a hosted frame over this
+    /// fixture would draw whichever weekday the run happened on.
     ///
     /// The stack below is therefore **the test's surround, not the screen's**:
     /// one row gap between rows and the widget's inset around the block, which
@@ -481,6 +592,9 @@ struct RenderBaselineTests {
     /// three steps of #335's scale are painted in the one frame.
     struct GridRows: View {
         let entry: WeekEntry
+        /// Which of the two pictures this is. See the `grid rows editing`
+        /// frame.
+        var mode: EditMode = .inactive
 
         /// The panel the grid sits on: a 6.1" phone's width, less the margin
         /// `WeeklyGridView` insets the panel by. The widget frames pin
@@ -537,8 +651,9 @@ struct RenderBaselineTests {
             }
             // Stated rather than inherited. `editMode` is nil in a rendered
             // tree, which already means "not editing" — writing it down is what
-            // stops a later default from moving this frame without a diff.
-            .environment(\.editMode, .constant(.inactive))
+            // stops a later default from moving this frame without a diff, and
+            // it is the one value the `grid rows editing` frame changes.
+            .environment(\.editMode, .constant(mode))
         }
     }
 
@@ -717,6 +832,29 @@ struct RenderBaselineTests {
                 week: base.week,
                 habits: .loaded(WidgetRows.rows(from: all, chosen: chosen))
             )
+        }
+
+        /// The same week with every day of it logged, for the second header
+        /// frame.
+        ///
+        /// **A reading of the pinned week, not a second scene.** The nine rows,
+        /// their names, icons and cadences are `week()`'s; what changes is that
+        /// nothing is left open, which is the one input
+        /// `TypeTier.weekday(isToday:anyHabitOpen:)` takes. Every day rather
+        /// than just the anchor, because "handled" has to be true of the whole
+        /// week for no row to be open: a 7x habit with only today logged is
+        /// still open for the rest of it.
+        static func handledWeek() -> WeekEntry {
+            let base = week()
+            let every = Set(base.week.days)
+            let all = (base.habits.value ?? []).map { snapshot in
+                HabitSnapshot(
+                    id: snapshot.id, name: snapshot.name, icon: snapshot.icon,
+                    frequency: snapshot.frequency, completedDays: every,
+                    isSpacer: snapshot.isSpacer
+                )
+            }
+            return WeekEntry(date: base.date, week: base.week, habits: .loaded(all))
         }
 
         static func month() -> MonthEntry {

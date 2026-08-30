@@ -97,7 +97,13 @@ struct EditModeTests {
         // the letters over the columns. They fade together, on one timing, so
         // they have to agree about when — which means each reads the value
         // rather than being told.
-        for name in ["HabitRowView.swift", "WeeklyGridView.swift"] {
+        //
+        // The header's file is `WeekdayHeader.swift` since #386, not
+        // `WeeklyGridView.swift` — it was extracted so the render gate could
+        // compile it. Naming the file it moved to rather than the one it left
+        // is the whole of that change here: `WeeklyGridView` *owns* the mode
+        // and must not read it, which is the test above.
+        for name in ["HabitRowView.swift", "WeekdayHeader.swift"] {
             let text = try String(
                 contentsOf: root.appendingPathComponent(name), encoding: .utf8
             )

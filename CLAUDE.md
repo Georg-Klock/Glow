@@ -463,6 +463,19 @@ actual bug. Every line here is something that already happened.
   interpolated form.
 - **`navigationDestination` attached to the `NavigationStack` itself** compiles,
   renders nothing, and leaves a dead tap target. It must be *inside*.
+- **`ImageRenderer` will not draw a `NavigationStack`, and it does not say so by
+  failing** (#386). SwiftUI implements the stack as a UIKit container, so the
+  renderer substitutes its own invalid-configuration placeholder — a yellow
+  field with a red no-entry sign — and logs `Unable to render flattened version
+  of PlatformViewControllerRepresentableAdaptor<NavigationStackRepresentable>`.
+  `cgImage` comes back non-nil at exactly the size asked for, so every guard in
+  the render harness passes: `WeeklyGridView` and `WidgetsView` rendered at
+  393 × 852 over a seeded container came back **byte-identical to each other**,
+  because both were the placeholder. A baseline approved from that is a
+  committed picture of an error icon, and it agrees with itself forever. Gate
+  the views a screen is built from, not the screen; a whole screen needs
+  hosting in a `UIWindow`, which is a different rendering path with the
+  device's own safe area and scale in it.
 - **`@Environment(\.editMode)` read by a view that *contains* the
   `NavigationStack` is always inactive.** `EditButton` toggles the value in the
   stack's own environment, below where the outer view reads, so the button
