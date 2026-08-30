@@ -8,7 +8,8 @@ reconciled against the code.
 **§1–§5 and §7 have shipped.** #339–#342, #344 and #345 landed as #350–#354; the
 behaviour those sections describe is `main`, not a target, and `SPEC.md` should
 be read alongside them rather than in place of them. §6 (creation credit, #343)
-is open as PR #355, CI in flight. §8 is unbuilt in full — #331, #332, #333 and
+landed as #355, and #415 corrected its formula for a week with a completion
+before the creation day. §8 is unbuilt in full — #331, #332, #333 and
 #335 are open issues, tracked under #338 — and remains **a target, not shipped
 behaviour**: while it is unbuilt, the code's existing dot-and-bar marks are what
 the widget draws. Landing any part of §8 still requires the `docs/decisions.md`
@@ -291,7 +292,9 @@ A habit made on Friday has not failed the Monday it did not exist for. It is
 granted **the minimum credit that avoids a ✕, and not one more**:
 
 ```
-credit = max(0, target − days from the creation day to the end of the week)
+capacity = days from the creation day to the end of the week
+         + days before it that already carry a completion
+credit   = max(0, target − capacity)
 ```
 
 The minimum matters. Granting every pre-creation day would collapse the
@@ -304,6 +307,39 @@ remaining reps into one wide pill, which reads as slack the habit does not have:
 ```
 
 Credit marks are unlit. They are arithmetic, not a claim that anything was done.
+
+**A day before creation that carries a completion is not a day that was
+forgiven** (#415). It is a day a rep landed on, so it counts toward what the
+target can be met out of exactly as a remaining day does — which is why
+`capacity` has two terms rather than one. Back-filling one is reachable:
+`DemoHistory.seed` hands every habit to `SeededHistory.completions` with no
+bound from `createdDay`, so the demo writes ten weeks of past onto a habit made
+this morning, and #265 leaves a daily row's pre-creation day tappable on purpose.
+
+Counting it is not politeness, it is what makes the row fit. `credit` is at most
+the creation day's column — `target ≤ 7` is the whole proof — so the grant's marks
+take the columns before creation and the completions take the ones after, and
+the open mark still reaches today. A completion *before* creation puts one more
+mark into the columns the grant has already claimed, and §4.1's step 4 clamps a
+mark's end **up** as well as down, because a mark cannot end before the marks
+ahead of it have somewhere to be. Six a week made on Wednesday with Monday and
+Tuesday logged drew:
+
+```
+6x created Wednesday, credit 1    [·][█][█][○][·][·  ·]   the ring on Thursday
+6x created Wednesday, credit 0    [█][█][○][·][·][·  ·]   today is Wednesday
+```
+
+— breaking §3 invariant 4 and §4.2 while `actionDay` stayed on today, so a tap
+did the right thing and only the drawing lied. Capacity there is seven against a
+target of six: nothing was unavoidable, so the minimum grant was none.
+
+The smaller grant can let a ✕ through that the over-grant was hiding, and it is a
+true one. Three a week made on Saturday with Monday logged has capacity three
+and is granted nothing; on Sunday the blank Saturday is a day the week genuinely
+broke on, and the ✕ lands there. A habit is still never born already failing:
+what is owed on the creation day is at most `capacity` minus what is already
+done, which is at most the days it has left.
 
 **Credit is frozen at creation, and can only shrink.** On any target edit:
 

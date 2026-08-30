@@ -35,11 +35,16 @@ struct CreationCreditTests {
         )
     }
 
-    private func shape(_ habit: HabitSnapshot, target: Int, today: Int) -> String {
+    private func spans(_ habit: HabitSnapshot, target: Int, today: Int) -> [SlotSpan] {
         WeekSpans.spans(
             for: habit, in: week, today: week.days[today], target: target,
             editing: .todayOnly, restDay: nil, calendar: calendar
-        ).map { "\($0.state.rawValue):\($0.firstDay)-\($0.lastDay)" }.joined(separator: " ")
+        )
+    }
+
+    private func shape(_ habit: HabitSnapshot, target: Int, today: Int) -> String {
+        spans(habit, target: target, today: today)
+            .map { "\($0.state.rawValue):\($0.firstDay)-\($0.lastDay)" }.joined(separator: " ")
     }
 
     // MARK: - §6's own figures
@@ -126,6 +131,88 @@ struct CreationCreditTests {
             #expect(!row.contains("missed"), "target \(target): \(row)")
             // Every mark is owed, none granted: the open one plus the rest.
             #expect(row.components(separatedBy: " ").count == target, "target \(target): \(row)")
+        }
+    }
+
+    // MARK: - A completion on a day before the habit existed (#415)
+
+    @Test("A day before creation that was logged is not a day that was forgiven")
+    func aBackfilledDayIsNotForgiven() {
+        // Six a week made on Wednesday, with Monday and Tuesday logged —
+        // `DemoHistory.seed` writes exactly this, because it hands every habit
+        // to `SeededHistory.completions` with no bound from `createdDay`, and
+        // #265 lets a daily row back-fill one by hand.
+        //
+        // Capacity is seven against a target of six: five days from Wednesday,
+        // plus the two days that already carried a rep. Nothing is unavoidable,
+        // so **the minimum credit that avoids a ✕ is none**, and the row is an
+        // ordinary one — two done, one open on Wednesday, three still to come.
+        let backfilled = habit(target: 6, createdOn: 2, done: [0, 1])
+        #expect(shape(backfilled, target: 6, today: 2)
+            == "filled:0-0 filled:1-1 open:2-2 inactive:3-3 inactive:4-4 inactive:5-6")
+
+        // Without the back-fill the same habit is granted one, because then the
+        // five days it has really are all it has.
+        #expect(shape(habit(target: 6, createdOn: 2), target: 6, today: 2)
+            == "inactive:0-1 open:2-2 inactive:3-3 inactive:4-4 inactive:5-5 inactive:6-6")
+    }
+
+    @Test("An over-granted credit mark pushes the ring off today")
+    func theOverGrantMovedTheRing() {
+        // What #415 reported, and why the over-grant is not merely arithmetic.
+        // The grant is a *mark*: it takes column 0, so Monday's completion
+        // clamps up to column 1 and Tuesday's to column 2, and by the time
+        // `assignColumns` reaches the open mark the lowest column left is
+        // Thursday. The ring came out on a day that is not today — §3
+        // invariant 4 and §4.2 — while `actionDay` stayed on Wednesday, so a
+        // tap still did the right thing and only the drawing lied.
+        let made = habit(target: 6, createdOn: 2, done: [0, 1])
+        let row = spans(made, target: 6, today: 2)
+        let open = row.first { $0.state == .open }
+        let what = Comment(rawValue: shape(made, target: 6, today: 2))
+        #expect(open?.firstDay == 2, what)
+        #expect(open?.lastDay == 2, what)
+        #expect(open?.actionDay == week.days[2], what)
+    }
+
+    @Test("A backfilled week never moves the ring off today")
+    func theRingStaysOnTodayThroughEveryBackfill() {
+        // The whole space this suite can reach: every target, every one of the
+        // 128 completion patterns, every today, and every creation day up to
+        // it, made with the target it still has. `Glow/Logic/` compiles
+        // standalone, so #415 swept the wider space — `targetAtCreation` free
+        // as well, 250,880 rows — and found 491 rows whose open mark did not
+        // contain today. Every one of them had a creation day inside the week,
+        // a completion before it, and a non-zero grant.
+        for target in 1...7 {
+            for pattern in 0..<128 {
+                let done = (0...6).filter { pattern & (1 << $0) != 0 }
+                for todayColumn in 0...6 {
+                    for created in 0...todayColumn {
+                        let row = spans(
+                            habit(target: target, createdOn: created, done: done),
+                            target: target, today: todayColumn
+                        )
+                        let what = Comment(rawValue:
+                            "\(target)x, today \(todayColumn), made \(created), done \(done): "
+                                + row.map { "\($0.state.rawValue):\($0.firstDay)-\($0.lastDay)" }
+                                    .joined(separator: " "))
+                        // Invariants 1, 2 and 3, which a changed grant changes
+                        // the shape through.
+                        #expect(row.count == target, what)
+                        #expect(row.first?.firstDay == 0 && row.last?.lastDay == 6, what)
+                        for (a, b) in zip(row, row.dropFirst()) {
+                            #expect(b.firstDay == a.lastDay + 1, what)
+                        }
+                        // Invariant 4, and §4.2.
+                        let open = row.filter { $0.state == .open }
+                        #expect(open.count <= 1, what)
+                        guard let mark = open.first else { continue }
+                        #expect(mark.firstDay <= todayColumn && todayColumn <= mark.lastDay, what)
+                        #expect(mark.lastDay == todayColumn || mark.id == row.last?.id, what)
+                    }
+                }
+            }
         }
     }
 

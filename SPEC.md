@@ -381,11 +381,20 @@ there is nothing after it to divide.
 
 **A habit made part-way into the week is granted credit** (#343). It has not
 failed the Monday it did not exist for, so it is given **the minimum number of
-reps that avoids a ✕, and not one more**:
-`credit = max(0, target − days from the creation day to the end of the week)`.
-The minimum matters — granting every pre-creation day would collapse the reps
-still owed into one wide pill, which reads as slack the habit does not have.
-Credit marks are unlit: they are arithmetic, not a claim that anything was done.
+reps that avoids a ✕, and not one more**: `credit = max(0, target − capacity)`,
+where capacity is the days from the creation day to the end of the week **plus
+the days before it that already carry a completion** (#415). The minimum matters
+— granting every pre-creation day would collapse the reps still owed into one
+wide pill, which reads as slack the habit does not have. Credit marks are unlit:
+they are arithmetic, not a claim that anything was done.
+
+A day before creation that was logged is a day a rep landed on, not a day that
+was forgiven, so it counts toward the target like a remaining day does — and
+counting it is what keeps the row fitting. Over-granting puts an extra mark into
+the columns the grant has already claimed, and since a mark's end clamps up as
+well as down, the open mark was pushed off today: six a week made on Wednesday
+with Monday and Tuesday back-filled drew its ring on Thursday. `DemoHistory`
+writes exactly that week.
 
 **The grant is frozen at creation and can only shrink.** `Habit.targetAtCreation`
 stores the target the habit was made with, so an *upward* edit gets no amnesty —
