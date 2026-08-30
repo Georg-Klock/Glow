@@ -217,8 +217,7 @@ struct DebugTodayTests {
                     .joined(separator: "\n")
                 #expect(
                     !code.contains("day(Date()"),
-                    "\(file.lastPathComponent) makes its own today; "
-                        + "call WeekCalendar.today() so the override reaches it"
+                    "\(file.lastPathComponent) makes its own today rather than calling WeekCalendar.today()"
                 )
             }
         }
