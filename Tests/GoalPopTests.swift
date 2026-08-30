@@ -75,38 +75,47 @@ struct GoalPopTests {
 
     // MARK: - The line
 
-    @Test("The same completion always says the same thing", arguments: [GoalPop.Register.logged, .goal])
-    func lineIsStable(register: GoalPop.Register) {
+    @Test("The same completion always says the same thing")
+    func lineIsStable() {
         // A Live Activity's content can be re-read, and a phrase that changed
         // under the reader would look like a glitch.
         let id = UUID()
-        let first = GoalPop.line(habitID: id, on: day(4), register: register, calendar: calendar)
+        let first = GoalPop.line(habitID: id, on: day(4), calendar: calendar)
         for _ in 0..<50 {
-            #expect(
-                GoalPop.line(habitID: id, on: day(4), register: register, calendar: calendar)
-                    == first
-            )
+            #expect(GoalPop.line(habitID: id, on: day(4), calendar: calendar) == first)
         }
-        #expect(GoalPop.lines(for: register).contains(first))
+        #expect(GoalPop.lines.contains(first))
     }
 
-    @Test("Each vocabulary is short, clean and fully reachable", arguments: [GoalPop.Register.logged, .goal])
-    func vocabulary(register: GoalPop.Register) {
-        let vocabulary = GoalPop.lines(for: register)
-        #expect(!vocabulary.isEmpty)
-        // Short is a hard constraint: a compact Island state truncates rather
-        // than wraps.
-        #expect(vocabulary.allSatisfy { $0.count <= 16 })
-        #expect(vocabulary.allSatisfy { !$0.isEmpty })
-        // Every line is reachable — a hash that collapsed onto one would make
-        // the set a lie.
-        var seen = Set<String>()
-        for i in 0..<400 {
-            seen.insert(GoalPop.line(
-                habitID: UUID(), on: day(i % 7), register: register, calendar: calendar
-            ))
+    @Test("Two habits on one day usually differ, and one habit across days does")
+    func theSeedUsesBothHalves() {
+        // Both halves of the seed have to reach the index, or the pool is 173
+        // phrases with six of them ever spoken. A day that moved and a habit
+        // that changed both have to be able to change the line.
+        let id = UUID()
+        var acrossDays = Set<String>()
+        for column in 0..<7 {
+            acrossDays.insert(GoalPop.line(habitID: id, on: day(column), calendar: calendar))
         }
-        #expect(seen.count == vocabulary.count)
+        #expect(acrossDays.count > 1, "one habit says the same thing all week")
+
+        var acrossHabits = Set<String>()
+        for _ in 0..<40 {
+            acrossHabits.insert(GoalPop.line(habitID: UUID(), on: day(2), calendar: calendar))
+        }
+        #expect(acrossHabits.count > 1, "every habit says the same thing on one day")
+    }
+
+    @Test("Every line in the pool is reachable")
+    func everyLineIsReachable() {
+        // A hash that collapsed onto part of the list would make the count a
+        // lie. 20,000 draws over 173 phrases leaves the chance of missing any
+        // one of them at e^-115.
+        var seen = Set<String>()
+        for i in 0..<20_000 {
+            seen.insert(GoalPop.line(habitID: UUID(), on: day(i % 7), calendar: calendar))
+        }
+        #expect(seen.count == GoalPop.lines.count)
     }
 
     // MARK: - The switch
@@ -150,57 +159,80 @@ struct GoalPopTests {
     }
 
     @Test("Each level allows exactly what it says")
-    func levelsAllowTheRightRegisters() {
-        #expect(!PopPreferences.allows(.logged, at: .off))
-        #expect(!PopPreferences.allows(.goal, at: .off))
+    func levelsAllowTheRightTaps() {
+        // The switch is unchanged by #420 — it never depended on the two
+        // vocabularies, only on whether this tap met the goal.
+        #expect(!PopPreferences.allows(justMetGoal: false, at: .off))
+        #expect(!PopPreferences.allows(justMetGoal: true, at: .off))
 
-        #expect(!PopPreferences.allows(.logged, at: .goals))
-        #expect(PopPreferences.allows(.goal, at: .goals))
+        #expect(!PopPreferences.allows(justMetGoal: false, at: .goals))
+        #expect(PopPreferences.allows(justMetGoal: true, at: .goals))
 
-        #expect(PopPreferences.allows(.logged, at: .everything))
-        #expect(PopPreferences.allows(.goal, at: .everything))
+        #expect(PopPreferences.allows(justMetGoal: false, at: .everything))
+        #expect(PopPreferences.allows(justMetGoal: true, at: .everything))
 
         // Unset is everything, everywhere it is asked (#185).
-        #expect(PopPreferences.allows(.logged, at: .unset))
-        #expect(PopPreferences.allows(.goal, at: .unset))
+        #expect(PopPreferences.allows(justMetGoal: false, at: .unset))
+        #expect(PopPreferences.allows(justMetGoal: true, at: .unset))
     }
 
-    // MARK: - Two vocabularies
-
-    @Test("The routine line and the goal's are different words")
-    func vocabulariesDoNotOverlap() {
-        // The whole reason there are two: sharing a list would make the goal
-        // indistinguishable from the twelfth glass of water, which is what the
-        // old restriction was really guarding against.
-        #expect(Set(GoalPop.lines).isDisjoint(with: Set(GoalPop.goalLines)))
-        #expect(!GoalPop.lines.isEmpty)
-        #expect(!GoalPop.goalLines.isEmpty)
+    @Test("Goals is the only level that reads the goal at all")
+    func onlyGoalsDependsOnTheTap() {
+        // Off and Everything answer the same for both taps; Goals is where the
+        // boolean does any work. Written as the shape rather than the values,
+        // because it is the shape that "Never / Goals / Everything" means.
+        for level in [PopPreferences.Level.off, .everything, .unset] {
+            #expect(
+                PopPreferences.allows(justMetGoal: true, at: level)
+                    == PopPreferences.allows(justMetGoal: false, at: level),
+                "\(level) should not care whether the tap met the goal"
+            )
+        }
+        #expect(
+            PopPreferences.allows(justMetGoal: true, at: .goals)
+                != PopPreferences.allows(justMetGoal: false, at: .goals)
+        )
     }
 
-    @Test("Both vocabularies fit a compact Island state")
+    // MARK: - The pool
+
+    @Test("The pool is 173 phrases with no duplicates")
+    func thePoolIsWhatItSaysItIs() {
+        // The count is the point of #420: six phrases were exhausted inside a
+        // week by anybody logging twice a day. A duplicate would quietly make
+        // one phrase twice as likely and the pool one shorter than it reads.
+        #expect(GoalPop.lines.count == 173)
+        #expect(Set(GoalPop.lines).count == GoalPop.lines.count)
+    }
+
+    @Test("Every line fits the compact Island without leaning on the scale floor")
     func linesStayShort() {
-        // Not a style preference: anything that does not fit is truncated by
-        // the system rather than wrapped.
-        for line in GoalPop.lines + GoalPop.goalLines {
-            #expect(line.count <= 16, "\(line) is \(line.count) characters")
-            #expect(line == line.lowercased(), "\(line) is not in the app's voice")
+        // Not a style preference. #310 measured the compact trailing region
+        // against "that's the week" and found it cannot carry fifteen
+        // characters at any pushed size — that line survived only on
+        // `minimumScaleFactor(0.6)`. Fourteen is the budget, and this is the
+        // guard against the next batch of phrases putting the problem back.
+        #expect(GoalPop.maximumLineLength == 14)
+        for line in GoalPop.lines {
+            #expect(
+                line.count <= GoalPop.maximumLineLength,
+                "\(line) is \(line.count) characters"
+            )
+            #expect(!line.isEmpty)
         }
     }
 
-    @Test("The pair for one tap reads as one moment")
-    func registersShareASeed() {
-        // Same index, different list — so the routine line and the goal line a
-        // single tap produces are the same *position* in two vocabularies
-        // rather than two unrelated phrases.
-        let id = UUID()
-        for i in 0..<7 {
-            let routine = GoalPop.line(habitID: id, on: day(i), register: .logged, calendar: calendar)
-            let goal = GoalPop.line(habitID: id, on: day(i), register: .goal, calendar: calendar)
-            let a = GoalPop.lines.firstIndex(of: routine)
-            let b = GoalPop.goalLines.firstIndex(of: goal)
-            #expect(a == b)
+    @Test("Every line is in the app's voice")
+    func linesAreLowercase() {
+        for line in GoalPop.lines {
+            #expect(line == line.lowercased(), "\(line) is not in the app's voice")
+            #expect(
+                line.trimmingCharacters(in: .whitespaces) == line,
+                "\(line) has whitespace at an end"
+            )
         }
     }
+
 }
 
 /// #102: two goals met inside one pop's two seconds.
@@ -234,41 +266,86 @@ struct PopWindowTests {
 }
 
 
-/// PR #275: the app pops too, so both surfaces decide *what* to say in one place.
-@Suite("The pop's registers")
-struct PopRegisterTests {
-    @Test("A routine log says one thing; the tap that meets the goal says two")
-    func registersFollowTheGoal() {
-        #expect(GoalPop.registers(justMetGoal: false) == [.logged])
-        #expect(GoalPop.registers(justMetGoal: true) == [.logged, .goal])
+/// #420: one tap, one pop. The double-fire this replaced was the only one in
+/// the app, and it lived at two call sites rather than in a type — so this is
+/// where the removal is held.
+@Suite("One pop per tap")
+struct OnePopPerTapTests {
+    /// **The load-bearing part is that `allows` returns one answer.**
+    ///
+    /// It used to return a *sequence*: `GoalPop.registers(justMetGoal:)` handed
+    /// back `[.logged, .goal]` for the tap that met the goal, and both call
+    /// sites played it — pop, sleep `GoalPop.handover`, pop again. A `Bool`
+    /// cannot express two pops, so the shape of the API is the guard, and this
+    /// test says so out loud rather than trusting the signature to stay.
+    @Test("The switch answers one tap with one verdict")
+    func theVerdictIsOneAnswer() {
+        let verdict: Bool = PopPreferences.allows(justMetGoal: true, at: .everything)
+        #expect(verdict)
+        // And the goal-completing tap draws from the same pool as any other:
+        // there is no second list for it to reach.
+        let id = UUID()
+        let calendar = TestCalendar.monday
+        let day = TestCalendar.date(2026, 8, 21)
+        #expect(GoalPop.lines.contains(GoalPop.line(habitID: id, on: day, calendar: calendar)))
     }
 
-    /// The order is the sequence both surfaces play: the routine line first,
-    /// then the goal's after `GoalPop.handover`. Reversing it would say "you
-    /// did it" and then take it back to "logged".
-    @Test("The goal's line comes second, never first")
-    func theGoalLineIsSecond() {
-        let both = GoalPop.registers(justMetGoal: true)
-        #expect(both.first == .logged)
-        #expect(both.last == .goal)
+    /// The two call sites are a `@MainActor` view and an ActivityKit wrapper,
+    /// so neither can be driven from here. What can be checked is that neither
+    /// still schedules a *second* thing to say: a handover needs a sleep, and
+    /// the only sleep either file is allowed is the one that ends the pop.
+    ///
+    /// A source scan for the same reason `WidgetPlacementTests` uses them —
+    /// the behaviour is in code no test in this process reaches.
+    @Test("Neither call site sleeps for anything but the pop's own end")
+    func noCallSiteSchedulesASecondLine() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sites = [
+            root.appendingPathComponent("Glow/Store/GoalPopCentre.swift"),
+            root.appendingPathComponent("Glow/Views/WeeklyGridView.swift"),
+        ]
+
+        var sleeps = 0
+        for file in sites {
+            let source = try String(contentsOf: file, encoding: .utf8)
+            #expect(!source.isEmpty, "\(file.lastPathComponent) is empty")
+            for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
+                let code = line.trimmingCharacters(in: .whitespaces)
+                // The doc comments in both files describe the handover that was
+                // removed, which is the point of keeping them.
+                guard !code.hasPrefix("//") && !code.hasPrefix("///") else { continue }
+                guard code.contains("Task.sleep(for:") else { continue }
+                sleeps += 1
+                #expect(
+                    code.contains("GoalPop.duration"),
+                    """
+                    \(file.lastPathComponent) sleeps for something other than \
+                    GoalPop.duration; a second line inside one pop's window is \
+                    the double-fire #420 removed: \(code)
+                    """
+                )
+            }
+        }
+        // One end per call site. A scan that matched nothing would pass while
+        // saying nothing.
+        #expect(sleeps == 2, "the pop-sleep scan matched \(sleeps) calls, expected 2")
     }
 
-    /// Preferences filter the list rather than changing it, which is what lets
-    /// "Goals" show the goal line alone — the second register surviving when
-    /// the first does not is the case that would break a sequence built as
-    /// "first, then maybe second".
-    @Test("Goals-only leaves the goal line and drops the routine one")
-    func goalsOnlyKeepsTheSecond() {
-        let both = GoalPop.registers(justMetGoal: true)
-        #expect(both.filter { PopPreferences.allows($0, at: .goals) } == [.goal])
-        let routine = GoalPop.registers(justMetGoal: false)
-        #expect(routine.filter { PopPreferences.allows($0, at: .goals) }.isEmpty)
+    /// Preferences gate the pop rather than selecting words, which is the whole
+    /// of what the register was doing that anybody wanted.
+    @Test("Goals speaks for the goal-completing tap and for nothing else")
+    func goalsOnlySpeaksOnce() {
+        #expect(PopPreferences.allows(justMetGoal: true, at: .goals))
+        #expect(!PopPreferences.allows(justMetGoal: false, at: .goals))
     }
 
-    @Test("Off drops both, everything keeps both")
+    @Test("Off says nothing, everything says one thing either way")
     func theOtherTwoLevels() {
-        let both = GoalPop.registers(justMetGoal: true)
-        #expect(both.filter { PopPreferences.allows($0, at: .off) }.isEmpty)
-        #expect(both.filter { PopPreferences.allows($0, at: .everything) } == [.logged, .goal])
+        #expect(!PopPreferences.allows(justMetGoal: true, at: .off))
+        #expect(!PopPreferences.allows(justMetGoal: false, at: .off))
+        #expect(PopPreferences.allows(justMetGoal: true, at: .everything))
+        #expect(PopPreferences.allows(justMetGoal: false, at: .everything))
     }
 }

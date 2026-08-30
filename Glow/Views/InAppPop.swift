@@ -15,8 +15,9 @@ import SwiftUI
 ///
 /// It is the Live Activity's Lock Screen presentation, not a new design: the
 /// same mark, the same glowing line, the same habit name in grey, at the same
-/// metrics. Two surfaces saying one thing the same way — and `GoalPop.registers`
-/// is shared with `GoalPopCentre` so they cannot drift on *what* is said either.
+/// metrics. Two surfaces saying one thing the same way — and `GoalPop.lines`
+/// and `PopPreferences.allows` are shared with `GoalPopCentre` so they cannot
+/// drift on *what* is said, or on whether it is said at all.
 struct InAppPop: View {
     let content: PopContent
 

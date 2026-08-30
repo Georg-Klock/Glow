@@ -38,13 +38,19 @@ struct GoalPopActivity: Widget {
     /// different in kind: compact truncates what does not fit, expanded wraps
     /// it, the banner shares its row with the habit's name. Measured in the
     /// simulator (iPhone 17 Pro, iOS 26.5) against the longest line the app
-    /// writes — "that's the week", `GoalPop` — and the device look is the
-    /// final word:
+    /// wrote at the time — "that's the week", 15 characters — and the device
+    /// look is the final word:
     ///
     ///  - compact: 16 and bold truncated ("that's the…"), 12 clipped its first
     ///    glyph — the region cannot carry fifteen characters at any pushed
     ///    size, so the line *scales to fit* from 16: short lines render the
     ///    full size, the longest shrinks and survives whole.
+    ///
+    /// **That fifteenth character is now a budget, not a survivor** (#420).
+    /// `GoalPop.maximumLineLength` is 14 and the pool is held to it by test,
+    /// so nothing the app writes reaches the scale factor below. It stays as
+    /// the guard it always was for a narrower island, rather than as the thing
+    /// one phrase depended on.
     ///  - pop: 32 fills the width unwrapped; the scale factor at each site is
     ///    the guard for narrower islands, not the plan.
     ///
