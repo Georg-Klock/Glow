@@ -6868,15 +6868,23 @@ one before-reading is lower than either after-reading — and nothing should be
 read into that either way.
 
 **What it does not fix, and the more interesting half.** Un-marking still costs
-~0.5s at ten years after this, against 0.67s before, so the day lookup was
-never where most of that went. Measured on the same harness with the same
-discipline, a third arm with `setCompletion`'s two `habit.completions?`
-mutations removed: **4.1ms, 9.1ms and 33.0ms** to un-mark at ten weeks, two
-years and ten years, against 15.6ms, 92.9ms and 493.8ms for this change alone.
+around half a second at ten years after this, against two thirds before — so
+the day lookup was never where most of that went. A second alternating session
+on the same harness, this change against this change plus `setCompletion`'s two
+`habit.completions?` mutations removed, un-marking:
+
+| history | bounded fetch | + no relationship mutation |
+| --- | --- | --- |
+| 70 days | 15.6 / 13.0ms | 4.1 / 13.9ms |
+| 730 days | 92.9 / 105.7ms | 9.1 / 9.2ms |
+| 3650 days | 493.8 / 536.4ms | 33.0 / 42.5ms |
+
 `habit.completions` is a to-many relationship and reading it faults every
 completion the habit has ever had, so keeping it in step by hand made a tap
-cost the whole record — including at the ten-week depth a real store is at
-today, where it is four times the whole rest of the write. That is its own
-change, because it rests on SwiftData maintaining the inverse from
-`Completion.habit` alone, which is a claim about the framework and wants an
-assertion of its own.
+cost the whole record. The ten-week row is the noisiest here and is the one to
+read most carefully — 4.1 against 13.9 in two readings of the same arm — but
+the two-year and ten-year rows are an order of magnitude.
+
+That is its own change, because it rests on SwiftData maintaining the inverse
+from `Completion.habit` alone, which is a claim about the framework and wants
+an assertion of its own rather than a comment.
