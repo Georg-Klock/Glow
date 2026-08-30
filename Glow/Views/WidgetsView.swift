@@ -158,6 +158,15 @@ struct WidgetsView: View {
         ) { _ in
             refreshToday()
         }
+        // **And once on the way in, which the notification cannot cover.**
+        // `onReceive` subscribes when this view appears, and this tab may never
+        // have appeared: the override is set in Settings, and a tab that has
+        // not been on screen yet was not listening when it moved. Screenshotted
+        // — the banner said Wednesday, drawn from its own read at construction,
+        // while the previews underneath it still drew Saturday's open ring.
+        // `DebugTodayBanner` carries the same pair for the same reason, and
+        // says so in its own note.
+        .task { refreshToday() }
     }
 
     /// Re-reads the day the previews are drawn for, from the one place the app
