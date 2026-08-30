@@ -30,9 +30,9 @@
 # single pixel of the iOS 18.5 renderer's own noise moves the count by one in
 # either direction — measured, over 60 renders on two devices, against 48
 # bit-identical ones on iOS 26.5. No cell mean and no ground share moved in any
-# of them. A difference that small is reported and not
-# written: whichever of the two values were committed, half the later runs on
-# that lane would render the other. See #431 and the tool's own header.
+# of them. A difference that small is reported and not written: whichever of
+# the two values were committed, half the later runs on that lane would render
+# the other. See #431 and the tool's own header.
 #
 # GLOW_MIN_IOS_MAJOR overrides the minimum major (default 18); it has to match
 # the major the CI lane pins, or this approves a file that lane never reads.
@@ -136,10 +136,9 @@ GATE
   # 60 renders across ten processes on two devices differ by up to 601 pixels,
   # all of it single-level noise, most of it in the material the surface is
   # drawn on, and the one statistic a single pixel can move is the tone census.
-  # So the
-  # comparison is exact everywhere that was measured exact, and allows the
-  # measured noise and no more in the one place it was not. The reasoning, the
-  # numbers and what it stops catching are all in the tool. See #431.
+  # So the comparison is exact everywhere that was measured exact, and allows
+  # the measured noise and no more in the one place it was not. The reasoning,
+  # the numbers and what it stops catching are all in the tool. See #431.
   local report verdict reasons
   if ! report="$(/usr/bin/python3 Tools/compare-signatures.py \
                    --actual "$actual" --committed "$baseline")"; then
