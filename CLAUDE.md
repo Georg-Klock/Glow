@@ -172,6 +172,30 @@ contradiction left standing reads as an instruction to whoever finds it next.
   red `GlowRenderTests` verdict outranks the comparison either way. The gate's
   own tolerances are untouched — it was never the gate that failed.
 
+  **A green `--check` is a statement about your tree, not about the merge.**
+  Both baselines are measured against whatever `main` was when the branch was
+  cut, and "up to date before merging" is deliberately off, so a pull request
+  whose signatures are current can still land a stale baseline if another
+  baseline-moving change merged in between. That is not hypothetical: on
+  2026-08-30 #429 added a frame measured before #421's icon change, #421 landed
+  first, and `main` went red on the merge that followed — with both pull
+  requests green. **An additive baseline diff is not evidence of freshness**:
+  the staleness lives *inside* the added frame, where a diff against a stale
+  base cannot show it. The check that does work is diffing the branch's
+  baselines against **current** `main` and finding zero *removed* lines — that
+  says every frame the branch shares with `main` still matches. So when two
+  open pull requests both touch a baseline, land them one at a time and re-run
+  the second one's checks after the first merges.
+
+  **And a frame added after your branch was cut is a frame you have never
+  tested against.** That is the same hole from the other side, and it cost a
+  third run the same night: #430 was branched before #429 added the `grid rows`
+  frame, so its own honest `L1 <n>/<n>` never rendered the one frame its row
+  change moves, and it failed on `main` at a signature it had no way to see.
+  The rule that covers all three: **rebase onto `main` and re-approve before
+  reading a render verdict as current**, because a verdict is only about the
+  tree it ran on, and the gate's frames are not fixed.
+
 - **Regenerate the symbol picker catalog:** `Tools/make-symbol-catalog.py`
 - **Render the website's HDR word images:** `Tools/make-glow-word.swift`
 
@@ -369,6 +393,13 @@ actual bug. Every line here is something that already happened.
   right is not evidence.
 - **`simctl launch` on an already-running app does not reload it.** Terminate
   first, or you will screenshot the previous build and believe it.
+- **A placed widget does not re-render on install alone.** Installing a new
+  build leaves the widget on the Home Screen drawing what the *previous* build
+  put there, so an "after" screenshot comes back pixel-identical to the
+  "before" and reads as a change that did nothing. It re-renders once the app
+  has launched and `WidgetRefresh.invalidate()` has run. Found while measuring
+  #410, where the first after-shot was byte-identical and would have been
+  believed.
 - **Confirm your file writes happened.** A Python heredoc whose `assert` fails
   skips the write and exits quietly; twice, a change was reported as done that
   never touched the file.
