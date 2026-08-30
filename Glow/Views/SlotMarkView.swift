@@ -41,12 +41,23 @@ struct SlotMarkView: View {
     /// through WidgetKit's archiver rather than through this process — a
     /// rasterising modifier there is untested risk for no gain.
     ///
-    /// **It is not pixel-identical, and that is measured.** Against the same
-    /// screen from the same build without it: 15.4% of the screen's pixels
-    /// differ, 94% of them by one level out of 255 and none by more than 11,
-    /// all of it inside the bevel's own gradient. `.extendedLinear` is further
-    /// off, not closer — 33 — so the difference is the rasteriser's blur, not
-    /// its colour space.
+    /// **It is not pixel-identical, and that is measured.** Captured off the
+    /// simulator through the real compositor, the same store planted in both
+    /// builds: 7.24% of the screen's pixels differ, every one of them inside
+    /// the grid, 92% of them by one level out of 255 and none by more than 12.
+    /// The magnitude is where it matters — of the pixels that move, only 645
+    /// sit at or above level 100, and **none of those moves by more than 2**.
+    /// Everything larger is below level 100, inside the bevel's own gradient.
+    /// `.extendedLinear` is further off, not closer, so what moves is the
+    /// rasteriser's blur rather than its colour space.
+    ///
+    /// **The render baseline sees it too**, which it did not when this was
+    /// first measured. `grid rows` is an app frame rather than a widget family
+    /// (#429), and it renders exactly the surface this modifier changes: six
+    /// of its row-profile cells move by one level, on both committed runtimes.
+    /// No tone count moves — 124, 217 and 255 hold at 218, 700 and 4,200 — so
+    /// nothing crosses a step of the palette; only the bevel's gradient shifts
+    /// under it. Both baselines are approved for that.
     var flattensSocket = false
 
     /// How far this mark's anchor column sits from the centre of its own
