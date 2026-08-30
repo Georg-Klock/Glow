@@ -6715,3 +6715,108 @@ reachable from app code in the first place.
 moving it is the table above: render one unchanged commit repeatedly through
 `RenderBaselineTests.render` on the lane in question and read the spread. An
 Xcode or runtime bump is the event that could change it.
+## 2026-08-29 — A pill is a circle drawn long: one recess, 24pt, for every mark
+
+**#426.** "I changed my mind. Make the pills the same height as the circles. 24
+dips recess with a 22 dip filling."
+
+`GlowShape.pillHeight` goes from `14 / 24` to `1`. That is the whole change: a
+spanning socket is now the slot's own height, which is what a single-day socket
+always was, and the 22pt inner falls out of `socketInset = 1` on both — `24 − 2`
+— so that constant does not move. `SlotMarkView.socket(_:circle:)` applies its
+`.frame(height:)` only to the capsule, so raising the fraction reaches the pills
+and leaves every circle untouched.
+
+**This is the third value the constant has held**, and the second reversal, so
+it is written down rather than edited around. It was two numbers — 12 for an
+upcoming pill, 14 for a lit one, chosen so a lit ring's inner was exactly the
+outer of the track it replaced. #332 collapsed both to 14 on the grounds that
+"one constant rather than two that happen to be equal" is what stops a 2pt
+difference nobody asked for coming back. #426 keeps that argument and moves the
+number: one constant, now equal to the slot.
+
+**What it is for is the row's read at a glance.** A five-day span used to carry
+less weight per column than the day marks beside it — a thinner bar against full
+circles — so a row's silhouette said something about span length that the layout
+had already said. At one height the shapes differ only in how many columns they
+cover, which is invariant 1 of `docs/week-marks.md` drawn rather than described.
+
+**It is a deliberate divergence from the design file, not a bug.** Node
+`248:12822` draws spanning marks visibly thinner than the circles, and after
+this the app will not match it. The file is the stale one; whoever finds the
+difference later should not "fix" the code back toward it.
+
+**The constant is kept at 1 rather than deleted.** With `pillHeight` at 1 the
+`height` parameter on `socket(_:circle:)` is arithmetically vestigial, and the
+two branches of `.ring` in `GlowImageView` resolve to the same 22pt inner. They
+stay because the height being *derived from a named constant* is what made this
+change one line, in either direction; collapsing them would trade that for a
+tidier read of code nobody is currently asking a question about.
+
+**Nothing reflows.** The slot is still 24 and the row gap still 8 — only the
+mark inside the slot grew. The halo is unaffected too: `GlowImageView` takes its
+reach from `size.height`, the slot, not from `pillHeight`, so a taller pill
+casts the same light and `rowGap`'s 8pt spill argument is untouched.
+
+`docs/week-marks.md` §8.3, §8.6, §8.7 and §8.8 carried the 14/12 pill and were
+rewritten with it.
+
+## 2026-08-29 — The socket takes a fill, and the well moves to the ✕ (#427)
+
+A visual pass on the open and missed indicators, node
+[`260:2819`](https://www.figma.com/design/0m9qFcvvUrIgLmqIxE0jtj/Glow-Up?node-id=260-2819&m=dev),
+read out of the SVG's own filter definitions rather than off a screenshot.
+Ground in the frame is `#1F1F1F`. **Two of the four changes reverse reasoning
+that was in the source**, which is why this entry exists rather than an edit
+that quietly replaces the paragraphs.
+
+**The socket gains `#000000 @ 15%`.** `SlotMarkView` carried #332's rule —
+"the socket has no fill at all — it is drawn entirely by its bevel" — and
+`docs/week-marks.md` §8.6 dropped the file's `#D9D9D9 @ 1%` socket fill as a
+slip for the same reason. That reasoning is now superseded by the visual pass,
+not refuted by an argument, and the two are not the same value: 15% black
+darkens the recess where 1% near-white would have lifted it. A socket is its
+bevel *over a shade*, and the shade is what the bevel is cut into. The bevel
+pair itself was already exact — `bevel(slot) = slot / 16` is 1.5 at 24, and the
+13% and 100% opacities match the file — so nothing there moved.
+
+**The well shadow leaves the open socket.** §8.4's track container — black 25%,
+`dy 6`, `blur 6` — was composited onto every socket, and `260:2819` draws no
+third inner shadow on the open mark at all. It stays on a completion's lit fill,
+where the small widget's export still shows it, and it arrives on the ✕ at 48%
+with a different geometry: `dy 4`, `blur 3`. **That asymmetry is deliberate and
+is the thing most likely to be "cleaned up" later** — one well at one strength
+looks like the tidy answer, and it is not what the file draws. An open slot is
+waiting; a dead one is a hole, and it is deeper.
+
+**The ✕ becomes a socket at its own weight, and grows to 22pt.** It takes the
+same 15% fill, its bevel pair moves from `1/32` of the slot to `0.0352`, and it
+gains the third shadow above. Its geometry is measured off the path rather than
+estimated: `22.0007 × 22.0006`, centred dead in the 24pt slot, on a bar `6.7592`
+thick with a `0.8450` corner. 22 is `11/12` of the slot and **the same inner
+#426 just gave every other mark**, so the ✕ stops being an exception: 24pt
+recess, 22pt inner, everywhere.
+
+**One number used twice.** The corner radius computes to `0.8450` and the ✕'s
+inner-shadow offset in the same node is `0.844815`. Two independent values do
+not agree to four figures; they are one, and `GlowShape.missedCorner` is now
+that one, with `missedBevel` gone. `9/32` is taken for the bar thickness — it
+fits the file's `6.7592` to 0.009pt — and `11/12` for the span.
+
+**`missedLength` was replaced by `missedSpan`, and its old comment was wrong.**
+The constant described the bar *before* it is crossed, and claimed that
+`(length + thickness) / √2` put the ✕ at 0.795 of the slot. That formula ignores
+the corner radius, which pulls the extreme point in: the shipped cross measures
+**18.4706pt in a 24pt slot**, not 19.08. The span is what the design file can be
+measured for, so it is the input now, and `CrossShape` derives the bar length
+from it — for a rounded bar turned 45° the half-span is
+`(L/2 + T/2 − 2r) / √2 + r`, inverted. Flattening the resulting `CGPath` at 100
+samples per curve measures **22.0000 × 22.0000 centred at (12, 12)** in a 24pt
+slot and 14.6667 in the month's 16pt cell — the file's own numbers to within
+0.0007pt, and still one rule at both sizes.
+
+**What this does not settle.** These are SDR fills and inner shadows, so the
+simulator can show them and the render baselines can hold them — but the socket
+bevel's black is drawn against `GlowPalette.widgetSurface`, which #338 already
+flags as wanting a real screen. The final weight of a 15% fill against dark
+glass, and against the HDR marks beside it, is a device question.

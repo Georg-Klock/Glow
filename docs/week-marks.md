@@ -414,38 +414,63 @@ its contents — see §8.4.
 ### 8.3 Marks
 
 Every mark is a **socket**, optionally with an **inner shape** inside it. The
-socket has no fill at all — it is drawn entirely by its bevel. The inner shape
-is the socket inset 1pt on all four sides with its radius reduced by 1, and it
-is what carries the state: filled for a completion, stroked for an open slot.
-Pill widths are always `32n − 8`.
+socket is a `#000000 @ 15%` fill under its bevel — #427 supersedes the "no fill
+at all" this section was written with, and §8.6 with it. The inner shape is the
+socket inset 1pt on all four sides with its radius reduced by 1, and it is what
+carries the state: filled for a completion, stroked for an open slot. Pill
+widths are always `32n − 8`.
 
 | | Socket | Inner |
 | --- | --- | --- |
 | Circle | 24 × 24, r 12 | 22 × 22, r 11 |
-| Pill — done or open | h **14**, r 7 | h **12**, r 6 |
-| Pill — upcoming | h **12**, r 6 | none |
+| Pill — done or open | h **24**, r 12 | h **22**, r 11 |
+| Pill — upcoming | h **24**, r 12 | none |
 
-Every mark is centred in the 24pt row. **A pill that is asked for something is
-2pt taller than one that is not**, and its inner is exactly the size of the
-upcoming track it replaces — so the light fills the track, and the socket grows
-around it to hold the bevel.
+Every mark is centred in the 24pt row, and **every mark is the same 24pt recess
+holding the same 22pt inner** — a pill is a circle drawn long. #426 replaced the
+14/12 pill this section was transcribed with, and the file (node `248:12822`)
+still draws spanning marks thinner; the app deliberately does not follow it
+there. The two-tier rule that the pill height used to carry — an open pill 2pt
+taller than an upcoming one, its inner exactly the track it replaced — went with
+#332 and is not coming back.
+
+**The dead mark is the same 22pt inner.** Its ✕ measures `22.0007 × 22.0006`
+in node `260:2819`, centred dead in the slot — `11/12` — so it is an instance of
+the one-inner rule rather than an exception to it (#427). The bar is `6.7592`
+thick (`9/32`) with a `0.8450` corner radius, and that radius is the same number
+as the ✕'s own bevel offset.
 
 ### 8.4 Effects
 
 Four recipes, and nothing else in the frame — no blurs, no blend modes.
 
 ```
-Socket          inner  0 / −1.5  blur 1.5  #FFFFFF @ 13%
+Socket          fill                       #000000 @ 15%
+                inner  0 / −1.5  blur 1.5  #FFFFFF @ 13%
                 inner  0 / +1.5  blur 1.5  #000000 @ 100%
 
 Lit fill        inner  0 / +1    blur 1    #FFFFFF @ 100%
                 inner  0 / −1    blur 1    #000000 @ 30%
+
+Missed ✕        fill                       #000000 @ 15%
+                inner  0 / +0.845 blur 0.845  #000000 @ 100%
+                inner  0 / −0.845 blur 0.845  #FFFFFF @ 25%
+                inner  0 / +4    blur 3     #000000 @ 48%
 
 Emitting        drop   0 / 0     blur 1                #FFFFFF @ 100%
                 inner  0 / 0     blur 1   spread −1    #FFFFFF @ 100%
 
 Track container inner  0 / +6    blur 6    #000000 @ 25%
 ```
+
+**The socket's fill and the ✕'s three shadows are #427**, read out of node
+`260:2819`'s own SVG filter definitions rather than off a screenshot. Two of
+them are reversals of what this section shipped with: the socket gained a fill
+where §8.6 called one a slip, and the track container's shade *left* the socket
+— `260:2819` draws no third inner shadow on an open mark. It stays on a
+completion's lit fill and arrives on the ✕ at 48% rather than 25%. That
+asymmetry is the file's; `docs/decisions.md` records it so the obvious later
+cleanup does not unify them back.
 
 The emitting pair is a tight white bloom either side of a 1pt stroke, and it is
 for **marks only** — emitting text takes none of it (§8.5). Figma's stand-in for
@@ -501,10 +526,10 @@ Six deviations from an otherwise regular system, taken as slips:
 
 | Found in the file | Corrected to |
 | --- | --- |
-| Two long done pills drawn socket 12 / inner 10 (rows 2x and 1x) | socket 14 / inner 12, like every other done pill |
+| Two long done pills drawn socket 12 / inner 10 (rows 2x and 1x) | socket 14 / inner 12, like every other done pill — **socket 24 / inner 22 since #426**, which took every pill to the circles' height |
 | Weekday letter cells 17.455 wide — the *old* slot — on a 32pt pitch, landing 0.27 left of centre | 24 wide, on the column |
 | Name max width 84.5, derived from the old 15pt label gap, overrunning the track by 11 | 73.5 |
-| Socket fill `#D9D9D9 @ 1%` | no fill; the socket is its bevel |
+| Socket fill `#D9D9D9 @ 1%` | no fill; the socket is its bevel — **superseded by #427**, which gives it `#000000 @ 15%`. Not this slip returning: black at 15% presses the recess in where near-white at 1% would lift it out |
 | Icon pure white beside a `#D9D9D9` name | icon takes the name's value |
 | Four zero-size boolean nodes; one fully authored but hidden row | file detritus, dropped |
 
@@ -516,7 +541,7 @@ so §8.3 carries the geometry and this adds only what the ring is:
 
 | | Socket | Ring |
 | --- | --- | --- |
-| Pill, 2 col | 56 × 14, r 7 | 54 × 12, r 6 |
+| Pill, 2 col | 56 × **24**, r 12 | 54 × **22**, r 11 |
 | Circle | 24 × 24, r 12 | 22 × 22, r 11 |
 
 | | |
@@ -548,7 +573,7 @@ Visual only; §"Seven changes" below covers the behavioural half.
 | Header → track | 13 | **4** |
 | Rows | 11 | **10** |
 | Unlit day | 3pt dot in the socket | **22pt disc** |
-| Unlit span | 2pt line | **10pt pill** |
+| Unlit span | 2pt line | **22pt lozenge** (10pt when transcribed; #332 then #426) |
 | Background | none, removed deliberately | **dark glass material** |
 | Resting grey | `#8D8D8D`, opaque | **`#D9D9D9` @ 50%** |
 

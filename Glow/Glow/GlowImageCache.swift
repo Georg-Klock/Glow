@@ -83,48 +83,74 @@ enum GlowShape: Equatable {
 
     /// **A mark is a socket with an inner shape** (#332, §8.3).
     ///
-    /// The socket has no fill at all — it is drawn entirely by its bevel. The
-    /// inner shape is the socket inset by this on all four sides with its
+    /// The inner shape is the socket inset by this on all four sides with its
     /// radius reduced by the same, and it is what carries the state: filled for
     /// a completion, stroked for an open slot, absent for an upcoming pill.
+    ///
+    /// The socket itself is a 15% black fill under its bevel since #427; §8.3's
+    /// "no fill at all" is superseded and `SlotMarkView.socket(_:circle:)`
+    /// carries the reasoning.
     static let socketInset: CGFloat = 1
 
     /// The socket's height, as a fraction of the slot: **one height for every
-    /// pill**, 14pt at a 24pt slot, with the ring's 1pt inside-aligned stroke
-    /// leaving a 12pt inner.
+    /// mark**, spanning or not — the slot's own, 24pt at a 24pt slot, with
+    /// `socketInset` leaving the 22pt inner every circle already had.
     ///
-    /// **It used to be two.** An upcoming pill was 12 and a lit one 14, so that
-    /// the lit ring's inner was exactly the outer of the upcoming track it
-    /// replaced — the light filled the track and the socket grew around it to
-    /// hold the bevel. That relationship is what the single height gives up:
-    /// an empty pill and a lit one are now the same outer size, flush rather
-    /// than nested, and the ring's 12pt inner sits inside the empty pill's 14
-    /// rather than matching it.
+    /// **It has been three numbers.** An upcoming pill was 12 and a lit one 14,
+    /// so the lit ring's inner was exactly the outer of the upcoming track it
+    /// replaced; #332 collapsed both to 14, "one constant rather than two that
+    /// happen to be equal". #426 takes it to the slot: a pill and a circle are
+    /// the same recess with the same inner, so a five-day span carries the same
+    /// weight per column as the day marks beside it rather than reading as a
+    /// lighter bar.
     ///
-    /// One constant rather than two that happen to be equal, so nothing can
-    /// drift back to a 2pt difference nobody asked for.
-    static let pillHeight: CGFloat = 14.0 / 24.0
+    /// It is kept as a named constant at 1 rather than deleted, so that "one
+    /// height for every mark" stays something the code says out loud and both
+    /// shapes stay derivable from one number.
+    ///
+    /// **This is a deliberate divergence from the design file.** Node
+    /// `248:12822` draws spanning marks visibly thinner than the circles; after
+    /// #426 the app does not, and the file is the stale one. See
+    /// `docs/decisions.md`.
+    static let pillHeight: CGFloat = 1
 
-    /// The missed ✕, as fractions of the slot — **not** of 17.5.
+    /// The missed ✕, as fractions of the slot, measured off the cross path in
+    /// node `260:2819` (#427).
     ///
-    /// Those denominators were the old slot width, and the ✕ was the one mark
-    /// #331 did not rescale when the grid went to 24: it stayed a hairline
-    /// where the file draws a bar a quarter of the slot thick. Measured off the
-    /// cross path in node `234:11216`, whose 16pt cell carries a 4.0 bar on a
-    /// 12.73 span — a quarter and seven eighths, which is what these are.
+    /// **`missedSpan` is the ✕'s bounding box, not a bar length** — the number
+    /// the design file can be measured for directly. Flattening that node's
+    /// path to 100 samples per curve gives `22.0007 × 22.0006` centred dead in
+    /// the 24pt slot, which is `11/12`: **the same 22pt inner every other mark
+    /// takes** since #426, so the ✕ is not an exception to that rule but an
+    /// instance of it. It replaces a `missedLength` of `7/8` that described the
+    /// bar *before* it was crossed, and which the two `CrossShape` bars turned
+    /// into a span of 0.77 rather than the 0.795 its comment claimed — a
+    /// quantity nothing in the file could be held against.
     ///
-    /// `missedLength` is the bar *before* it is crossed: two of them at ±45°,
-    /// and `(length + thickness) / √2` is the span they occupy, so 7/8 and 1/4
-    /// give 0.795 of the slot exactly as the file does.
-    static let missedThickness: CGFloat = 1.0 / 4.0
-    static let missedLength: CGFloat = 7.0 / 8.0
-    static let missedCorner: CGFloat = 1.0 / 32.0
+    /// `missedThickness` is `6.7592` in the file: the straight end-cap
+    /// (`5.0692`, between the two corner arcs at a tip) plus both corner radii.
+    /// `9/32` fits that to 0.009pt and is taken as the intent.
+    static let missedSpan: CGFloat = 11.0 / 12.0
+    static let missedThickness: CGFloat = 9.0 / 32.0
 
-    /// The ✕'s own bevel, half the socket's. It is **pressed in like a socket,
-    /// not painted like a glyph**: the file gives it no fill and two inner
-    /// shadows — black at full strength below, white at 25% above — where the
-    /// code drew a flat grey cross.
-    static let missedBevel: CGFloat = 1.0 / 32.0
+    /// **The corner radius and the bevel offset are one number, used twice.**
+    /// The file's corner radius computes to `0.8450` and its inner-shadow
+    /// offset and blur are `0.844815`, which is a coincidence only if you
+    /// expect two independent values to agree to four figures. Held as one
+    /// constant so they cannot drift apart; `0.0352` of the slot is `0.8448` at
+    /// 24 and was `1/32` — `0.75` — before #427.
+    ///
+    /// The ✕ is **pressed in like a socket, not painted like a glyph**: no
+    /// stroke, no grey, a 15% black fill and three inner shadows.
+    static let missedCorner: CGFloat = 0.0352
+
+    /// The ✕'s deep well — black at 48%, `dy 4` and `blur 3` at a 24pt slot
+    /// (#427). The open socket's well *left* in the same pass; this one
+    /// arrived, and at nearly twice the strength. That asymmetry is what the
+    /// file draws and is deliberate: see `docs/decisions.md` before unifying
+    /// the two back into one number.
+    static let missedWellOffset: CGFloat = 1.0 / 6.0
+    static let missedWellBlur: CGFloat = 1.0 / 8.0
 
     /// **No longer the grid's marks** (#332). Both were: a completion was a 3pt
     /// dot and a run of them a 2pt line, floating in a 17.455pt socket. A
@@ -368,15 +394,16 @@ struct GlowImageView: View {
     /// measured by `SlotLayout` and want a fixed width, but the widget's are
     /// distributed by an HStack and must not be pinned.
     var fillsWidth = false
-    /// Whether this mark runs across several days, which is what decides how
-    /// tall its socket is — and therefore how tall its inner may be.
+    /// Whether this mark runs across several days, which is what decides its
+    /// *shape* — a capsule rather than a circle.
     ///
-    /// `SlotMarkView.socket(_:circle:)` ignores the height it is handed when
-    /// the shape is a circle, so a single-day socket is the whole slot and its
-    /// inner is the slot inset by `socketInset`. A spanning socket is
-    /// `pillHeight` of the slot, and its inner has to come off *that* — which
-    /// is what this says. Without it a spanning ring was drawn at slot size and
-    /// came out larger than the socket it sits in.
+    /// It used to decide its height as well: a spanning socket was `pillHeight`
+    /// of the slot where a single day's was all of it, so a spanning inner had
+    /// to come off the pill rather than off the slot. `pillHeight` is 1 since
+    /// #426 and both sockets are the slot, so the two branches below now differ
+    /// only in which axes the inset is spelled out on — kept apart because the
+    /// capsule's height is stated explicitly and the circle's comes from
+    /// `.padding` alone.
     var spansDays = false
     /// The rest day's column, in this view's own coordinates, taken out of the
     /// shape. See `RestWindow`.
@@ -414,10 +441,12 @@ struct GlowImageView: View {
             // thicken it is gone with the fraction it was scaled by: a
             // constant-weight ring needs no help reading at the small end,
             // because it no longer gets thinner there.
-            // Inset from the socket by `socketInset` on all four sides — and
-            // which socket that is depends on the shape. A spanning mark's is
-            // `pillHeight`, so the ring's height comes off the pill; a single
-            // day's socket is the whole slot, so the padding alone does it.
+            // Inset from the socket by `socketInset` on all four sides. Both
+            // sockets are the slot now (#426), so both branches resolve to the
+            // same 22pt inner in a 24pt recess. They are kept apart so the
+            // spanning height stays *derived from* `pillHeight` rather than
+            // falling out of the padding — which is what makes the height one
+            // constant to move, in either direction.
             Group {
                 if spansDays {
                     Capsule(style: .continuous)
