@@ -292,20 +292,34 @@ enum WidgetMetrics {
     /// is untouched.
     static let iconSize: CGFloat = textSize - 2
 
-    /// How far a habit name may run before it is truncated.
+    /// How far a habit name may run before it is truncated: the label column,
+    /// less the icon and the gap on each side of the name.
     ///
-    /// Not the label column — a name is allowed to overflow it and use the gap
-    /// before the track, which is how the design fits "Watch Sunset". The limit
-    /// is where the track begins, so a name can never collide with the grid:
+    ///     label 98 − icon 24 − iconGap 4.5 − iconGap 4.5 = 65
     ///
-    ///     (label 98 + gap 4) − icon 24 − iconGap 4.5 = 73.5
+    /// This constant used to read `(labelWidth + labelGap) - iconWidth -
+    /// iconGap` = 73.5, and described a name as "allowed to overflow the label
+    /// column and use the gap before the track". **The app never did that**
+    /// (#412). Both surfaces that draw a name hold the whole label to the
+    /// label column — `HabitRowView`'s `.frame(width: labelWidth)` and
+    /// `WeekWidgetView`'s — and inside that column sit the icon, the name and
+    /// a trailing `Spacer`, with `iconGap` between each pair. So the name is
+    /// granted the column less the icon and less *both* gaps, and the
+    /// `.frame(maxWidth: nameMaxWidth)` on the name never bound: at 73.5 it
+    /// was 8.5pt larger than anything the row could hand it.
     ///
-    /// The longest name in the design measures 79, which now *does* reach it —
-    /// "Watch Sunset" truncates where it used to fit. That is the cost of the
-    /// tighter label gap and it is the design's own number (§8.5), not a
-    /// regression to correct by widening the limit: the limit is where the
-    /// track begins, and a name past it collides with the grid.
-    static let nameMaxWidth: CGFloat = (labelWidth + labelGap) - iconWidth - iconGap
+    /// Measured rather than derived: on a 390pt device (panel 350, scale
+    /// 1.03551) the row grants the name 67.31pt, and 65 × 1.03551 = 67.31.
+    /// "Watch Sunset Every Evening" reads `Watch Su…` on This Week and in the
+    /// week widget alike; at 73.5 it would read `Watch Sun…`.
+    ///
+    /// So this is the arrangement's own number, not the design's target. The
+    /// design's 73.5 — a name reaching into `labelGap`, which is how the file
+    /// fits "Watch Sunset" — is a thing the app does not do, and #412 records
+    /// the choice to say what the row grants rather than what the design
+    /// wanted. Changing this constant alone will not widen a name: the frame
+    /// is what binds, so reaching 73.5 means changing the arrangement.
+    static let nameMaxWidth: CGFloat = labelWidth - iconWidth - iconGap - iconGap
 
     /// The weekday header's own row: shorter than a slot row, and its cells are
     /// wider than a slot with almost no gap, because a letter needs the width

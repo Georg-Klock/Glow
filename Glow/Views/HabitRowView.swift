@@ -88,7 +88,7 @@ struct RowGeometry: Equatable {
     /// it is −13.5pt, which SwiftUI reports as
     /// `Invalid frame dimension (negative or non-finite)` — a line the suite
     /// has been logging at test-host startup.
-    var nameMaxWidth: CGFloat { max(0, labelWidth + labelGap - iconWidth - iconGap) }
+    var nameMaxWidth: CGFloat { max(0, labelWidth - iconWidth - iconGap - iconGap) }
 
     /// A width this can actually divide up.
     ///
