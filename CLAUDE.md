@@ -160,6 +160,18 @@ contradiction left standing reads as an instruction to whoever finds it next.
   nothing, exiting non-zero if either is out of date; that is the pre-pull-request
   check, because the lane that would otherwise catch it now reports after merge.
 
+  **"Out of date" is `Tools/compare-signatures.py`'s answer, not `cmp`'s**
+  (#431). Size, ground share and all 256 cell means are compared exactly, on
+  both lanes. Tone counts are not: iOS 18.5 does not render the same picture
+  twice — 60 renders of one unchanged commit on two devices differ by up to 601
+  pixels, every one of them by a single level, against 48 bit-identical renders
+  on iOS 26.5 — and a tone count is a count of pixels at one exact level, so
+  one pixel of that noise moves it by one. A tone that moves that far is
+  reported and **not written**, in either mode: whichever of the two values
+  were committed, half the later runs on that lane would render the other. A
+  red `GlowRenderTests` verdict outranks the comparison either way. The gate's
+  own tolerances are untouched — it was never the gate that failed.
+
 - **Regenerate the symbol picker catalog:** `Tools/make-symbol-catalog.py`
 - **Render the website's HDR word images:** `Tools/make-glow-word.swift`
 
@@ -227,9 +239,9 @@ contradiction left standing reads as an instruction to whoever finds it next.
   allowed to say what used to be true. See #288.
 - **Check the gates themselves:** `--self-test` on
   `Tools/check-workflows.py`, `Tools/validate-test-result.py`,
-  `Tools/check-release-build.py`, `Tools/check-project.py` and
-  `Tools/check-docs.py`. All five run on every push, on a Linux runner: a
-  checker nobody checks can weaken silently.
+  `Tools/check-release-build.py`, `Tools/check-project.py`,
+  `Tools/check-docs.py` and `Tools/compare-signatures.py`. All six run on every
+  push, on a Linux runner: a checker nobody checks can weaken silently.
 
 CI runs the tests on every pull request and on merges to `main`
 (`.github/workflows/ci.yml`), on a pinned macOS runner — pinned rather than

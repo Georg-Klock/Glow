@@ -78,6 +78,32 @@ import UIKit
 /// on every machine this runs on; a machine with another one is a legitimate
 /// failure of this gate and its message says so.
 ///
+/// **What the scene cannot pin: iOS 18.5 does not render the same picture
+/// twice** (#431). One unchanged commit rendered 48 times across eight
+/// processes on iOS 26.5 came back bit-identical every time. The same commit
+/// rendered 60 times on two iOS 18.5 devices differed by up to 601 pixels,
+/// every one of them by a single level, and most of them in the
+/// `.ultraThinMaterial` the surface is drawn on: the same scene rendered over
+/// plain black instead holds `week medium` and `week large` bit-identical and
+/// takes `grid rows` from ~450 differing pixels to ~85, so the material is the
+/// larger source and not the only one. The magnitude tracks how much of the
+/// frame it covers — the two smallest frames were identical in all 132.
+///
+/// The tolerances below already absorb it: no cell mean moved in any of those
+/// 132 renders, and neither did the ground share. The one statistic it reaches
+/// is `tones`, because that is a *count* of pixels at one exact level — the
+/// property that makes it blind to a mark's thinness (#199) is the property
+/// that makes one pixel move it. It moves by exactly one, in both directions:
+/// `week large` at 255 is 4097 or 4098, `grid rows` at 124 is 230 or 231.
+/// `week large` is the clearest reading of the mechanism — the count *at* 255
+/// was 4106 in all 132 renders, and what oscillates is the neighbour
+/// `toneExcess` subtracts.
+///
+/// So a one-pixel disagreement on that lane is the renderer, not an
+/// unapproved change, and it is not a reason to approve anything:
+/// `Tools/compare-signatures.py` reports it and refuses to write it. See
+/// `docs/decisions.md`.
+///
 /// ## Approving a change
 ///
 /// The manifest of what was actually rendered is attached to every run, passing

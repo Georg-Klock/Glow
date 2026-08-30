@@ -25,6 +25,15 @@
 #   Tools/approve-baseline.sh --check    render both, write nothing, exit 1
 #                                        if either baseline is out of date
 #
+# "Out of date" is `Tools/compare-signatures.py`'s answer, not `cmp`'s. Every
+# number in a signature is compared exactly except the tone counts, where a
+# single pixel of the iOS 18.5 renderer's own noise moves the count by one in
+# either direction — measured, over 60 renders on two devices, against 48
+# bit-identical ones on iOS 26.5. No cell mean and no ground share moved in any
+# of them. A difference that small is reported and not written: whichever of
+# the two values were committed, half the later runs on that lane would render
+# the other. See #431 and the tool's own header.
+#
 # GLOW_MIN_IOS_MAJOR overrides the minimum major (default 18); it has to match
 # the major the CI lane pins, or this approves a file that lane never reads.
 
@@ -102,6 +111,18 @@ PY
     exit 1
   fi
 
+  # Whether the gate itself went red on this lane, read here and kept apart
+  # from the reading of the file below, so that it can outrank it.
+  local RENDER_GATE
+  RENDER_GATE="$(/usr/bin/python3 - "$run/validation.json" <<'GATE'
+import json, sys
+
+verdict = json.load(open(sys.argv[1]))
+red = any(failure.startswith("GlowRenderTests: ") for failure in verdict["failures"])
+print("red" if red else "green")
+GATE
+)"
+
   local actual
   actual="$(ls "$run"/attachments/named/render-signatures-actual*.json 2>/dev/null | head -1)"
   if [ -z "$actual" ]; then
@@ -110,10 +131,51 @@ PY
     exit 1
   fi
 
-  if [ -f "$baseline" ] && cmp -s "$actual" "$baseline"; then
-    UNCHANGED+=("$baseline")
-    echo "    unchanged: $baseline"
-    return
+  # Was `cmp`, and on the current runtime `cmp` was right — 48 renders across
+  # eight processes on iOS 26.5 are bit-identical. On iOS 18.5 they are not:
+  # 60 renders across ten processes on two devices differ by up to 601 pixels,
+  # all of it single-level noise, most of it in the material the surface is
+  # drawn on, and the one statistic a single pixel can move is the tone census.
+  # So the comparison is exact everywhere that was measured exact, and allows
+  # the measured noise and no more in the one place it was not. The reasoning,
+  # the numbers and what it stops catching are all in the tool. See #431.
+  local report verdict reasons
+  if ! report="$(/usr/bin/python3 Tools/compare-signatures.py \
+                   --actual "$actual" --committed "$baseline")"; then
+    echo "error: could not compare $baseline against this run's render." >&2
+    exit 1
+  fi
+  verdict="$(printf '%s\n' "$report" | head -1)"
+  reasons="$(printf '%s\n' "$report" | tail -n +2)"
+
+  # A red gate outranks the comparison. `framesMatchBaseline` failing means the
+  # picture moved by more than the gate allows, and no reading of the file is
+  # allowed to talk that away.
+  if [ "$RENDER_GATE" = "red" ]; then
+    verdict="moved"
+  fi
+
+  case "$verdict" in
+    same)
+      UNCHANGED+=("$baseline")
+      echo "    unchanged: $baseline"
+      return
+      ;;
+    noise)
+      # Deliberately not written, in either mode. Whichever of the two values
+      # is committed, about half the runs on that lane render the other one, so
+      # writing here commits a coin flip and moves the disagreement rather than
+      # settling it. That is the specific mistake #431 was filed to prevent.
+      UNCHANGED+=("$baseline")
+      echo "    unchanged: $baseline"
+      echo "        inside the renderer's measured noise, so nothing is written:"
+      printf '%s\n' "$reasons" | sed 's/^/          /'
+      return
+      ;;
+  esac
+
+  if [ -n "$reasons" ]; then
+    printf '%s\n' "$reasons" | sed 's/^/        /'
   fi
 
   if [ "$CHECK_ONLY" = "1" ]; then

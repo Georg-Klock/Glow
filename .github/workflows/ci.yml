@@ -83,6 +83,12 @@ jobs:
           python3 Tools/check-docs.py --self-test
           python3 Tools/check-docs.py
 
+      # #431: the baseline comparison carries a measured noise floor, which is
+      # the kind of constant that goes stale quietly. This proves it still
+      # calls a one-pixel tone move noise and everything larger a change.
+      - name: The baseline comparison rejects what it claims to reject
+        run: python3 Tools/compare-signatures.py --self-test
+
   build-and-test:
     name: Build and test
     # Pinned rather than macos-latest: the test suite reads gain-map metadata,
