@@ -853,15 +853,36 @@ on the medium widget's cut, is answered by *which* rows alone. A real ordering
 surface would be the in-app screen #188 names as its fallback, where the order
 would be visible while being chosen.
 
-The hard cut is unchanged and is not configurable: a medium widget shows five
-rows and a person configuring six gets the first five. There is no per-family
-row count stored anywhere — `WeekWidgetView` measures its own frame and
-applies `WidgetMetrics.rowCapacity` to it, because a widget's point size
-differs by phone. `largeRowCapacity` exists for the app's own use and is now
-a narrower claim: it is where an *unconfigured* large widget stops, which is
-what the grid's boundary hairline marks and where its rest-day cut ends. No
-line in a scrolling list can stand for several differently-configured widgets
-at once, and the app does not try.
+The hard cut is unchanged and is not configurable: a medium widget shows four
+rows and a person configuring five gets the first four. (Five until #331 took
+the slot from 17.455 to 24; the sentence here said five until #410 read it
+against the code.) There is no per-family row count stored anywhere —
+`WeekWidgetView` measures its own frame and applies `WidgetMetrics.rowLayout`
+to it, because a widget's point size differs by phone. `largeRowCapacity`
+exists for the app's own use and is now a narrower claim: it is where an
+*unconfigured* large widget stops, which is what the grid's boundary hairline
+marks and where its rest-day cut ends. No line in a scrolling list can stand
+for several differently-configured widgets at once, and the app does not try.
+
+**The design specifies a row count; the phone supplies a frame** (#410). A slot
+is a row's height as well as a daily mark's width, so until #410 a row block's
+height grew with the frame's *width* while the room for it grew with the frame's
+*height*. The large family's ten rows fill the design frame — 338 × 354 — with
+zero slack, and every phone measured is proportionally wider than it: 344.67 ×
+360 on an iPhone 15 Pro, 349.67 × 365 on a 17 Pro, 342 × 358 on a 17e, read out
+of WidgetKit's own snapshot-cache archive path. So ten rows overran the height by
+0.44 to 1.97 points out of ~320, the capacity's floor division took **nine**, and
+one habit was silently missing from every large widget on every device.
+
+The slot now takes the smaller of the track's answer and the largest slot at
+which the design's rows still fill the height, so ten rows are drawn on any of
+those frames and the bottom margin is the design's 14 exactly. What it costs is
+the right margin: the marks stay round and bring their column rhythm down with
+them, so 0.4 to 1.8 points of track are left unused at the trailing edge and the
+right margin is no longer exactly 14. Of the three things that cannot all hold
+on a frame whose aspect differs from the design's — round marks, a track filled
+exactly, a height filled exactly — the one given up is the one the design file
+does not specify.
 
 **The Today widget is not in this build** (#209). It was small and medium —
 one configurable habit's ring, and the first three per-day habits — and it went

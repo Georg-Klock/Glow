@@ -6386,3 +6386,86 @@ of the process and never releases it, and `EmptyStateAccessibilityTests` is the
 only suite in the repository that hosts a live view, so it is the only one that
 ever registers such an observer. Every other suite builds and drops containers
 freely and always has.
+
+## 2026-08-29 — The design specifies the row count, the phone supplies the frame (#410)
+
+**The large widget drew nine rows on every phone, not ten.** A habit was
+silently missing from it, and had been since #331 made the fit exact.
+
+The mechanism is one line of geometry. A slot is as tall as a daily mark is
+wide — `SlotLayout.slotHeight` is `dailySlot` — so a row block's height is a
+function of the frame's **width**, while the room for that block is a function
+of the frame's **height**. Ten rows fill the design frame exactly: `10 × 24 +
+9 × 8 = 312`, and `354 − 10 − 14 − (14 + 4) = 312`. Not 312 of 313.
+`WidgetMetricsTests.largeCapacityHasNoSlack` pinned that as a property worth
+keeping.
+
+Every phone measured is proportionally *wider* than 338 × 354, read out of
+WidgetKit's own `snapshot-cache` archive path and confirmed by pixel-counting a
+placed widget at 3x:
+
+| frame | track | slot | 10 rows need | available | verdict |
+| --- | --- | --- | --- | --- | --- |
+| 338 × 354 design | 216.00 | 24.000 | 312.00 | 312.00 | fits, exactly |
+| 344.67 × 360 iPhone 15 Pro | 222.67 | 24.741 | 319.41 | 318.00 | short by 1.41 |
+| 349.67 × 365 iPhone 17 Pro | 227.67 | 25.297 | 324.97 | 323.00 | short by 1.97 |
+| 342 × 358 iPhone 17e | 220.00 | 24.444 | 316.44 | 316.00 | short by 0.44 |
+
+Under half a point to two points, out of ~320. `rowCapacity`'s floor division
+took nine and `rowsOffset` split the ~31pt that left — so **the centring a large
+widget appeared to have was the missing row**, not a rule about tall frames.
+
+**Three things cannot all hold on a frame whose aspect differs from the
+design's**: the mark is round, the seven marks fill the track exactly (which is
+what makes the right margin exactly `padTrailing`), and the rows fill the height
+exactly (which is what makes the bottom margin exactly `padBottom`). The design
+file does not say which gives.
+
+**Decision: the height gets a say in the slot, and the track is what gives.**
+`WidgetMetrics.rowLayout` takes the smaller of the track's own answer and the
+largest slot at which the design's row count still fills the height. The marks
+keep their proportion and bring a slightly narrower column rhythm down with
+them, so what is left over lands at the trailing edge:
+
+| frame | slot before | slot after | shrink | unused track | bottom margin |
+| --- | --- | --- | --- | --- | --- |
+| 338 × 354 design | 24.000 | 24.000 | 0.00% | 0.00 | 14 |
+| 344.67 × 360 | 24.741 | 24.600 | 0.57% | 1.27 | 14 |
+| 349.67 × 365 | 25.297 | 25.100 | 0.78% | 1.77 | 14 |
+| 342 × 358 | 24.444 | 24.400 | 0.18% | 0.40 | 14 |
+
+So the right margin is 14.4 to 15.8 rather than exactly 14, and that is the
+price. It is the right one to pay: a row count is a *product* fact — ten habits
+reach the Home Screen — where an exactly-filled track is a consequence of one
+frame's arithmetic. And the alternative that keeps the track exact keeps nine
+rows, which is the bug.
+
+**Where the design's row count is declared.** In `WidgetMetrics`, as
+`designRowCount(_:hasHeader:)` — the capacity of the *design frame*, computed,
+not a literal. The frame itself is already written down there (node `83:1676`,
+338 × 354 at 1x), and the row count is nothing more than what that frame holds
+at the design's own slot, gap and insets. A literal `10` beside it would be a
+second spelling of a number this file can already derive, and this project has
+lost two documents and several constants to exactly that. There is no
+design-system document to put it in, on purpose.
+
+`largeRowCapacity` is unchanged at ten and did not need changing. What changed
+is that it is now **true**: the app's widget-boundary hairline
+(`WeeklyGridView`) and the picker's cap (`WidgetRowLimit.large`) both claimed
+ten rows reach the Home Screen while nine did, and both are correct again
+without being touched.
+
+**The harness rendered the one frame where the fit held.** Every widget frame in
+`RenderBaselineTests` is `WidgetMetrics.size(of:)` — 338 × 354 — so the
+committed baselines were pictures of a widget that exists on no device, and no
+signature could move for a reason a device would. One frame is added at
+349.67 × 365, the widest measured, with a tenth row in the scene, because a
+nine-row scene passes straight through this bug. Pinning one phone is pinning
+one phone (#367's standing objection); the arithmetic for all three measured
+frames is asserted in `WidgetMetricsTests` instead, where it needs no renderer,
+and the render frame is there so that *some* committed picture is of the widget
+a person actually looks at.
+
+**Medium is untouched**, and that is asserted rather than assumed: it has 14pt
+of slack on the design frame and more on a phone, so the height never overrules
+the width there.

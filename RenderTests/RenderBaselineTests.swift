@@ -367,6 +367,38 @@ struct RenderBaselineTests {
                       entry: Fixture.week(today: Fixture.sundayAnchor),
                       familyOverride: .systemLarge
                   ))),
+            // **A frame a phone actually gives, and the only one** (#410).
+            //
+            // Every other widget frame here is `WidgetMetrics.size(of:)` —
+            // 338 × 354, the design file's own frame, and a size no device was
+            // ever measured handing out. That is why nothing caught the large
+            // family losing a row: ten rows fit the design frame with zero
+            // slack, every phone measured is proportionally wider than it, and
+            // the harness rendered only the one aspect ratio where the fit
+            // holds. A baseline of a widget that exists on no device cannot
+            // fail for a reason a device would.
+            //
+            // 349.67 × 365 is the iPhone 17 Pro's, read out of WidgetKit's own
+            // snapshot-cache archive path and confirmed by pixel-counting a
+            // placed widget at 3x. It is the widest of the three measured, so
+            // it is the frame the height has to overrule hardest — 1.97pt of
+            // overrun out of ~320 before the fix.
+            //
+            // **Pinning one phone is pinning one phone**, and that objection
+            // is real (#367). It is answered rather than dodged: the arithmetic
+            // for all three measured frames is asserted in
+            // `WidgetMetricsTests`, where it costs nothing and needs no
+            // renderer, and this frame is here so that *some* committed picture
+            // is of the widget a person actually looks at.
+            //
+            // Ten rows, because nine is the number this bug produced and a
+            // nine-row scene would have passed straight through it. The tenth
+            // is a habit rather than a blank row: a spacer draws nothing, and
+            // a row that draws nothing cannot show that it was drawn.
+            Frame(name: "week large device", size: Fixture.deviceFrame,
+                  view: AnyView(WeekWidgetView(
+                      entry: Fixture.deviceWeek(), familyOverride: .systemLarge
+                  ))),
             Frame(name: "month small", size: WidgetMetrics.size(of: .systemSmall),
                   view: AnyView(MonthWidgetView(entry: month))),
             // **The app, not the widget** (#386). See `GridRows`.
@@ -608,6 +640,27 @@ struct RenderBaselineTests {
                     habit(9, "Piano", "pianokeys", .timesPerWeek(4), done: [monday, tuesday]),
                 ])
             )
+        }
+
+        /// The large frame an iPhone 17 Pro was measured giving (#410), rather
+        /// than the design file's 338 × 354.
+        static let deviceFrame = CGSize(width: 349.67, height: 365)
+
+        /// The pinned week with a tenth row, for the frame above.
+        ///
+        /// **Appended rather than added to `week()`**, which would move three
+        /// committed signatures to make a point about a fourth. The tenth row
+        /// is what the large family holds and what every phone was drawing one
+        /// short of, so this scene is the one where a lost row is visible at
+        /// all.
+        static func deviceWeek() -> WeekEntry {
+            let base = week()
+            var all = base.habits.value ?? []
+            all.append(HabitSnapshot(
+                id: id(10), name: "Read", icon: "book.closed",
+                frequency: .daily, completedDays: [base.week.days[0]]
+            ))
+            return WeekEntry(date: base.date, week: base.week, habits: .loaded(all))
         }
 
         /// The same week, as a widget somebody configured: four rows in an

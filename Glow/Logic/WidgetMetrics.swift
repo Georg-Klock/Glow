@@ -62,17 +62,130 @@ enum WidgetMetrics {
         return max(1, Int(largeWidth / width))
     }
 
+    /// How many rows the design's own frame holds, for a family.
+    ///
+    /// **This is where "the design's row count" is declared** (#410), and it is
+    /// declared as a *derivation from the design frame* rather than as a
+    /// literal. The frame is already written down here — 338 × 354 read off
+    /// node `83:1676` — and the row count is nothing more than what that frame
+    /// holds at the design's own slot, gap and insets. A literal `10` beside it
+    /// would be a second spelling of a number this file can already compute,
+    /// and every constant in this type that was ever written down twice has
+    /// drifted at least once.
+    ///
+    /// What is new is that the answer is now *used at runtime*, not only
+    /// reported: `rowLayout` shrinks a real frame's slot until this many rows
+    /// fit it. So the design specifies a row count and the frame supplies a
+    /// size, which is the direction that reads right — a phone that is 3%
+    /// wider than the design file is not a phone that shows fewer habits.
+    ///
+    /// `hasHeader` is the view's call — only the large family spends a row on
+    /// the weekday letters — so it is asked for rather than re-decided here.
+    static func designRowCount(_ family: WidgetFamily, hasHeader: Bool) -> Int {
+        let frame = size(of: family)
+        let track = frame.width
+            - padLeading(for: family) - padTrailing(for: family)
+            - labelWidth - labelGap
+        return rowCapacity(
+            height: frame.height - padTop - padBottom,
+            slot: SlotLayout.slotHeight(trackWidth: track),
+            hasHeader: hasHeader
+        )
+    }
+
     /// How many rows a large widget shows.
     ///
     /// Ten since #331, and derived rather than written down — every input to it
     /// has moved at least once. The app reads this to mark where its grid stops
     /// being visible on the home screen.
+    ///
+    /// **It is true on every frame since #410, and was true only on the design
+    /// frame before it.** The number itself has not moved; what moved is the
+    /// widget under it. Ten rows fit `338 × 354` with zero slack, and every
+    /// phone measured is proportionally *wider* than that, so the row block
+    /// outgrew the height by half a point to two points and the widget drew
+    /// nine — while this constant went on saying ten to the app's boundary
+    /// hairline and to `WidgetRowLimit.large`. `rowLayout` is what makes the
+    /// promise good: the slot gives way to the height, so `designRowCount` rows
+    /// are drawn on any frame in this neighbourhood rather than on one.
     static var largeRowCapacity: Int {
-        let track = largeWidth - padLeading - padTrailing - labelWidth - labelGap
-        return rowCapacity(
-            height: largeHeight - padTop - padBottom,
-            slot: SlotLayout.slotHeight(trackWidth: track),
-            hasHeader: true
+        designRowCount(.systemLarge, hasHeader: true)
+    }
+
+    /// The row block for a frame the system actually handed the widget: the
+    /// slot every row is drawn at, and how many rows fit at it.
+    struct RowLayout {
+        /// A row's height — and a daily mark's width, because the two are one
+        /// number. The track the marks divide is `SlotLayout.trackWidth(
+        /// dailySlot:)` of this, which is at most the track the frame offers.
+        let slot: CGFloat
+        /// How many rows to draw. Never below the design's own count, because
+        /// the slot was chosen to make that many fit.
+        let capacity: Int
+    }
+
+    /// The slot and the capacity for a real frame, as one answer (#410).
+    ///
+    /// **The two used to be derived apart, and that is what lost a row.**
+    /// `SlotLayout.slotHeight` answers from the track alone — a row is as tall
+    /// as a daily mark is wide — so a row block's height grows with the frame's
+    /// *width* while the space for it grows with the frame's *height*. On the
+    /// design frame those balance to the point: ten rows are 312 of 312, which
+    /// `WidgetMetricsTests.largeCapacityHasNoSlack` pins deliberately. Every
+    /// phone measured is proportionally wider than the design frame, so ten
+    /// rows overran the height by 0.44pt (iPhone 17e) to 1.97pt (17 Pro) out of
+    /// ~320, the floor division took nine, and a habit was silently missing
+    /// from every large widget on every device. `rowsOffset` then split the
+    /// leftover, which is why the grid also read as floating — a consequence of
+    /// the lost row rather than a second fault.
+    ///
+    /// So the height gets a say. The slot is the smaller of the track's answer
+    /// and the largest slot at which `designRows` rows still fill the height
+    /// exactly: 24.60 rather than 24.74 on an iPhone 15 Pro, 25.10 rather than
+    /// 25.30 on a 17 Pro, 24.40 rather than 24.44 on a 17e — 0.2% to 0.8%
+    /// smaller. Ten rows are drawn, the block fills the height exactly so
+    /// `rowsOffset` is zero, and the bottom margin is `padBottom` on the point.
+    ///
+    /// **What it costs is the track.** The marks keep their proportion — round
+    /// is the one thing a mark cannot give up — so the narrower slot brings a
+    /// narrower column rhythm with it, and 0.40pt (17e) to 1.77pt (17 Pro) of
+    /// the frame's track is left unused at the trailing edge. The right margin
+    /// stops being exactly `padTrailing` on a real phone. Of the three things
+    /// that cannot all hold on a frame whose aspect differs from the design's —
+    /// round marks, a track filled exactly, a height filled exactly — this
+    /// gives up the one the design file does not specify.
+    ///
+    /// The capacity is `max`'d with `designRows` rather than trusted from the
+    /// division: a slot chosen to fit exactly divides to a whole number in real
+    /// arithmetic and can land a hair under it in floating point, and this row
+    /// is the row the issue is about. Where the frame is proportionally *taller*
+    /// than the design the cap does not bind, the division is the only answer,
+    /// and it is the one that is used.
+    static func rowLayout(
+        trackWidth: CGFloat, contentHeight: CGFloat, designRows: Int, hasHeader: Bool
+    ) -> RowLayout {
+        let fromTrack = SlotLayout.slotHeight(trackWidth: trackWidth)
+        let available = contentHeight - (hasHeader ? headerHeight + headerGap : 0)
+        let fromHeight = designRows > 0
+            ? (available - CGFloat(designRows - 1) * rowGap) / CGFloat(designRows)
+            : 0
+        // A frame too small to hold the design's rows at any positive slot is a
+        // layout artifact — a `GeometryReader` reporting zero on its first pass
+        // is the common one — and it takes the track's answer and whatever
+        // capacity that yields, which is what this did before #410.
+        guard fromHeight > 0, fromHeight < fromTrack else {
+            return RowLayout(
+                slot: fromTrack,
+                capacity: rowCapacity(
+                    height: contentHeight, slot: fromTrack, hasHeader: hasHeader
+                )
+            )
+        }
+        return RowLayout(
+            slot: fromHeight,
+            capacity: max(designRows, rowCapacity(
+                height: contentHeight, slot: fromHeight, hasHeader: hasHeader
+            ))
         )
     }
 
@@ -206,9 +319,15 @@ enum WidgetMetrics {
     /// is the mirror-copy failure the working rules name.
     ///
     /// Zero when the rows fill the family, which is why a large widget at
-    /// capacity is untouched by centring. Never negative: an overfull block is
-    /// cut by `rowCapacity` before it reaches here, and clamping rather than
-    /// trusting that keeps the two independent.
+    /// capacity is untouched by centring. **That was true of the design frame
+    /// and of no phone until #410** — the row block came up a row short on
+    /// every real frame, and this split the resulting ~31pt above and below,
+    /// which is what a large widget's centred grid actually was. `rowLayout`
+    /// makes the block fill the height again, so the offset is zero at capacity
+    /// on any frame and this is once more only the short-list case it was
+    /// written for. Never negative: an overfull block is cut by `rowCapacity`
+    /// before it reaches here, and clamping rather than trusting that keeps the
+    /// two independent.
     ///
     /// `contentHeight` is the content box, inside the vertical padding — the
     /// same input `rowCapacity` takes.
