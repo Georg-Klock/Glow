@@ -82,8 +82,12 @@ import UIKit
 /// twice** (#431). One unchanged commit rendered 48 times across eight
 /// processes on iOS 26.5 came back bit-identical every time. The same commit
 /// rendered 60 times on two iOS 18.5 devices differed by up to 601 pixels,
-/// every one of them by a single level, in the `.ultraThinMaterial` the
-/// surface is drawn on — and only in the three frames taller than 316 points.
+/// every one of them by a single level, and most of them in the
+/// `.ultraThinMaterial` the surface is drawn on: the same scene rendered over
+/// plain black instead holds `week medium` and `week large` bit-identical and
+/// takes `grid rows` from ~450 differing pixels to ~85, so the material is the
+/// larger source and not the only one. The magnitude tracks how much of the
+/// frame it covers — the two smallest frames were identical in all 132.
 ///
 /// The tolerances below already absorb it: no cell mean moved in any of those
 /// 132 renders, and neither did the ground share. The one statistic it reaches

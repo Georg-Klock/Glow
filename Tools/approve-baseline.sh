@@ -29,7 +29,8 @@
 # number in a signature is compared exactly except the tone counts, where a
 # single pixel of the iOS 18.5 renderer's own noise moves the count by one in
 # either direction — measured, over 60 renders on two devices, against 48
-# bit-identical ones on iOS 26.5. A difference that small is reported and not
+# bit-identical ones on iOS 26.5. No cell mean and no ground share moved in any
+# of them. A difference that small is reported and not
 # written: whichever of the two values were committed, half the later runs on
 # that lane would render the other. See #431 and the tool's own header.
 #
@@ -133,8 +134,9 @@ GATE
   # Was `cmp`, and on the current runtime `cmp` was right — 48 renders across
   # eight processes on iOS 26.5 are bit-identical. On iOS 18.5 they are not:
   # 60 renders across ten processes on two devices differ by up to 601 pixels,
-  # all of it single-level noise in the material the surface is drawn on, and
-  # the one statistic a single pixel can move is the tone census. So the
+  # all of it single-level noise, most of it in the material the surface is
+  # drawn on, and the one statistic a single pixel can move is the tone census.
+  # So the
   # comparison is exact everywhere that was measured exact, and allows the
   # measured noise and no more in the one place it was not. The reasoning, the
   # numbers and what it stops catching are all in the tool. See #431.

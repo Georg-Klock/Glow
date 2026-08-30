@@ -6627,10 +6627,25 @@ behaviour. It is not the load either; the bit-exact runs were taken at load 30
 to 45 and the noisy ones at 27 and again at 156.
 
 Every differing pixel differs by **one level in one channel** — `53,53,53` to
-`53,53,54`, `30,31,31` to `30,30,31` — and the frames that move are the three
-tall ones. `week medium` (676 × 316) and `month small` (316 × 316) were
-identical in all 132 renders; `week large` and `week large sunday` (676 × 708)
-and `grid rows` (706 × 636) were not.
+`53,53,54`, `30,31,31` to `30,30,31` — and the magnitude tracks frame area.
+`week medium` (676 × 316) and `month small` (316 × 316) were identical in all
+132 renders; `week large` and `week large sunday` (676 × 708) moved by up to
+48, and `grid rows` (706 × 636) by up to 601.
+
+**Most of it is the material, and not all of it.** Rendering the same scene
+over `GlowPalette.widgetBackground` — plain black — instead of
+`GlowPalette.widgetSurface`, five renders each, iOS 18.5:
+
+| frame | over the material | over plain black |
+| --- | --- | --- |
+| `week medium` | 0 – 7 | 0 |
+| `week large` | 0 – 3 | 0 |
+| `grid rows` | 391 – 574 | 58 – 95 |
+
+So the `.ultraThinMaterial` carries most of the noise, and `grid rows` keeps a
+residue without it. That frame is also the only one drawing the app's recessed
+track, whose inner shadow is the scene's other blur — the same suspect, not a
+second kind of one. The current runtime renders both deterministically.
 
 **What that noise does to the signature, and what it does not.** The 16 × 16
 cell grid averages roughly 1,800 pixels per cell, so several hundred
@@ -6688,11 +6703,12 @@ over a spread of 1, not a slackening chosen to make a failure go away — and
 
 **What was rejected.** *Widening the gate's own tolerance*: it was never the
 gate that failed. *Approving one of the two values*: that is the mistake this
-issue was filed to prevent. *Making the render deterministic*: the noise is in
-`.ultraThinMaterial`, which `GlowPalette.widgetSurface` draws and the widget
-ships — removing it from the harness would make the baseline a picture of
-something the app does not draw, which is the objection `widgetSurface`'s own
-comment already records.
+issue was filed to prevent. *Making the render deterministic*: the two things that
+carry the noise are the material `GlowPalette.widgetSurface` draws and the
+track's shadow, both of which the app ships. Taking either out of the harness
+would make the baseline a picture of something the app does not draw — the
+objection `widgetSurface`'s own comment already records — and neither is
+reachable from app code in the first place.
 
 **Re-measuring it.** The constant is `TONE_NOISE` in
 `Tools/compare-signatures.py`, and what would have to be re-measured before

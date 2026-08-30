@@ -8,8 +8,10 @@ in that file is a real one.
 
 On iOS 18.5 it is not. Sixty renders across ten processes on two different
 iOS 18.5 devices differ from each other by up to 601 pixels — every one of them
-by a single level, in the `.ultraThinMaterial` the widget surface is drawn on.
-See #431 and `docs/decisions.md`.
+by a single level, and most of them in the `.ultraThinMaterial` the widget
+surface is drawn on: rendering the same scene over plain black instead drops
+two of the three moving frames to zero and the third from ~450 differing pixels
+to ~85. See #431 and `docs/decisions.md`.
 
 Almost all of that noise is invisible to a signature. A 16 x 16 cell mean
 averages roughly 1,800 pixels, so a few hundred single-level flips move it by
