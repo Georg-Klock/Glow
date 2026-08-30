@@ -38,6 +38,32 @@ enum WidgetMetrics {
     /// Sizes do vary by device; this is the phone the design is authored
     /// against, and the previews scale from here rather than measuring the
     /// screen they are on.
+    ///
+    /// **No phone measured gives these numbers** (#367). WidgetKit names the
+    /// frame it renders into in the archive path it hands the extension, and
+    /// three devices name three different ones — read out of Glow's own
+    /// `snapshot-cache` and confirmed by pixel-counting a placed widget at 3x
+    /// on two of them:
+    ///
+    /// | device | medium | large |
+    /// | --- | --- | --- |
+    /// | iPhone 15 Pro | 344.67 × 162.67 | 344.67 × 360.00 |
+    /// | iPhone 17 Pro | 349.67 × 164.33 | 349.67 × 365.00 |
+    /// | iPhone 17e | 342.00 × 162.00 | 342.00 × 358.00 |
+    ///
+    /// **For the large family that gap cost a row**, which is #410 and the
+    /// `rowLayout` above. **For the medium family it costs nothing**, and the
+    /// reason is slack rather than luck: ten rows fill the design's large frame
+    /// exactly, while four rows fill 120 of a medium's 134pt of content. The
+    /// division that counts them lands at 4.4375 on the design frame and at
+    /// 4.45–4.50 on all three phones, so the design frame is the *tightest*
+    /// medium fit of the four rather than the one the fit held on — the mirror
+    /// image of the large family. `WidgetMetricsTests` pins that ordering.
+    ///
+    /// So what a wrong constant still misinforms here is the harness and the
+    /// previews: both draw four rows, a percent or two small. Replacing these
+    /// numbers with one phone's would pin a phone rather than pin none, and it
+    /// moves both committed render baselines — a decision, not a repair.
     static func size(of family: WidgetFamily) -> CGSize {
         switch family {
         case .systemMedium: CGSize(width: largeWidth, height: smallSide)

@@ -264,29 +264,102 @@ struct WidgetMetricsTests {
         #expect(rows.capacity == WidgetMetrics.largeRowCapacity)
     }
 
-    @Test("The medium family keeps every point of its track")
-    func mediumIsUntouched() {
-        // Medium has 14pt of slack on the design frame and more on a phone, so
-        // the height never overrules the width there and nothing about it
-        // changes. Asserted because the rule is applied to both families and
-        // "it only affects large" is a claim, not an argument.
-        #expect(WidgetMetrics.designRowCount(.systemMedium, hasHeader: false) == 4)
-        for (name, frame) in [
-            ("iPhone 15 Pro", CGSize(width: 344.67, height: 162.67)),
-            ("the design frame", CGSize(width: 338, height: 158)),
-        ] {
-            let track = frame.width
-                - WidgetMetrics.padLeading - WidgetMetrics.padTrailing
-                - WidgetMetrics.labelWidth - WidgetMetrics.labelGap
-            let rows = WidgetMetrics.rowLayout(
+    /// The three medium frames WidgetKit was measured handing out, and the one
+    /// the design is drawn on (#367).
+    ///
+    /// Same source as `measuredLargeFrames`: WidgetKit names the frame it
+    /// renders into in the archive path it hands the extension, and Glow's own
+    /// `snapshot-cache` on each device carries all three. Confirmed by
+    /// pixel-counting a *placed* medium widget at 3x on two of them — 1026 ×
+    /// 486px on an iPhone 17e and 1049 × 493px on a 17 Pro, which are these
+    /// numbers exactly, read off the panel's own edges because
+    /// `containerBackground` covers the whole frame.
+    ///
+    /// **None of them is 338 × 158 either, and for medium that costs nothing.**
+    /// That is the finding, and it is the opposite shape to the large family's:
+    /// see `designFrameIsTheTightestMediumFit` below for why.
+    private static let measuredMediumFrames: [(String, CGSize)] = [
+        ("iPhone 15 Pro", CGSize(width: 344.67, height: 162.67)),
+        ("iPhone 17 Pro", CGSize(width: 349.67, height: 164.33)),
+        ("iPhone 17e", CGSize(width: 342, height: 162)),
+        ("the design frame", CGSize(width: 338, height: 158)),
+    ]
+
+    /// The layout a medium `WeekWidgetView` reaches for a frame, by the route
+    /// the view itself takes. The large family's twin, less the header.
+    private func mediumLayout(_ frame: CGSize) -> (rows: WidgetMetrics.RowLayout, track: CGFloat) {
+        let track = frame.width
+            - WidgetMetrics.padLeading - WidgetMetrics.padTrailing
+            - WidgetMetrics.labelWidth - WidgetMetrics.labelGap
+        return (
+            WidgetMetrics.rowLayout(
                 trackWidth: track,
                 contentHeight: frame.height - WidgetMetrics.padTop - WidgetMetrics.padBottom,
-                designRows: 4,
+                designRows: WidgetMetrics.designRowCount(.systemMedium, hasHeader: false),
                 hasHeader: false
-            )
-            #expect(rows.capacity == 4, "\(name) medium no longer holds four")
+            ),
+            track
+        )
+    }
+
+    @Test("Every frame a phone was measured giving draws four medium rows")
+    func measuredMediumFramesDrawFourRows() {
+        // The question #367 was open on: the constant is wrong for medium too,
+        // so does medium lose a row the way large did? It does not, on any
+        // frame measured — and a placed widget on the 17e and the 17 Pro draws
+        // Gratitude, Stretch, Read Book and one blank spacer, which is four.
+        #expect(WidgetMetrics.designRowCount(.systemMedium, hasHeader: false) == 4)
+        for (name, frame) in Self.measuredMediumFrames {
+            #expect(mediumLayout(frame).rows.capacity == 4, "\(name) medium no longer holds four")
+        }
+    }
+
+    @Test("The medium family keeps every point of its track")
+    func mediumIsUntouched() {
+        // The height never overrules the width at this family, so #410's rule
+        // is inert here and the marks fill the frame's own track exactly —
+        // which is why a medium widget's right margin is still `padTrailing` on
+        // the point where a large one's is not. Asserted because the rule is
+        // applied to both families and "it only affects large" is a claim, not
+        // an argument.
+        for (name, frame) in Self.measuredMediumFrames {
+            let (rows, track) = mediumLayout(frame)
             #expect(abs(rows.slot - SlotLayout.slotHeight(trackWidth: track)) < 0.001,
                     "\(name) medium shrank a slot it did not need to")
+            #expect(abs(SlotLayout.trackWidth(dailySlot: rows.slot) - track) < 0.001,
+                    "\(name) medium leaves track unused")
+        }
+    }
+
+    @Test("The design frame is the tightest medium fit, not the loosest")
+    func designFrameIsTheTightestMediumFit() {
+        // **This is the whole reason #367 costs the medium family nothing**,
+        // and it is worth pinning rather than restating, because it inverts the
+        // large family's arithmetic.
+        //
+        // Ten rows fill the design's large frame with zero slack, so a frame
+        // proportionally wider than it overran the height and lost a row.
+        // Four rows fill only 120 of a medium's 134pt of content, and the
+        // division that counts them lands at 4.4375 on the design frame against
+        // 4.45–4.50 on the three phones. Every phone measured is therefore
+        // *slacker* than the frame the render harness draws, so the harness is
+        // conservative here rather than blind — the mirror image of #410, where
+        // it was the one frame the fit held on.
+        //
+        // Written as a comparison rather than as four literals: what matters is
+        // the ordering, and the ordering is what would have to change for a
+        // wrong constant to start costing this family a row.
+        func headroom(_ frame: CGSize) -> CGFloat {
+            let (rows, _) = mediumLayout(frame)
+            let available = frame.height - WidgetMetrics.padTop - WidgetMetrics.padBottom
+            // How many rows the floor division was dividing, before the floor.
+            return (available + WidgetMetrics.rowGap) / (rows.slot + WidgetMetrics.rowGap)
+        }
+        let design = headroom(CGSize(width: WidgetMetrics.largeWidth, height: WidgetMetrics.smallSide))
+        #expect(design > 4, "the design frame no longer holds four medium rows")
+        for (name, frame) in Self.measuredMediumFrames where name != "the design frame" {
+            #expect(headroom(frame) > design,
+                    "\(name) is a tighter medium fit than the design frame")
         }
     }
 
