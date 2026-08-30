@@ -377,6 +377,97 @@ struct DayIdentityTests {
         #expect(habit.completedDays(in: berlin) == [wednesday.date(in: berlin)])
     }
 
+    // MARK: - Writing over a legacy row
+
+    /// An unstamped row and a habit that carries it, in Los Angeles.
+    @MainActor
+    private func habitWithLegacyRow(
+        in context: ModelContext
+    ) throws -> (HabitStore, Habit) {
+        let store = HabitStore(context: context, calendar: losAngeles, restDay: nil)
+        let habit = try store.addHabit(
+            name: "Read", icon: "📖", frequency: .daily,
+            now: midday(2026, 8, 19, in: losAngeles)
+        )
+        let row = Completion(
+            day: wednesday.date(in: losAngeles), habit: habit, calendar: losAngeles
+        )
+        context.insert(row)
+        habit.completions?.append(row)
+        // What a store written before this column existed holds.
+        row.dayKey = ""
+        try context.save()
+        return (store, habit)
+    }
+
+    /// **The write path bounds its fetch by `dayKey` since #318, and this is
+    /// what that bound must not lose.**
+    ///
+    /// `HabitStore.completions(of:on:)` used to fetch every completion a habit
+    /// had and pick the day's out in memory. It now asks the store for the
+    /// day's key *or* an empty one, which is the only form of the bound that
+    /// keeps a row whose day is inferred rather than recorded. A predicate on
+    /// the key alone would find nothing here, report the day as open, and log a
+    /// second completion beside the one already on it — #130's double row,
+    /// remade by the fix for a different issue.
+    @MainActor
+    @Test("A tap on an unstamped day removes its row rather than logging a second one")
+    func togglingFindsAnUnstampedRow() throws {
+        let context = try makeContext()
+        let (store, habit) = try habitWithLegacyRow(in: context)
+
+        #expect(
+            try store.toggleCompletion(
+                for: habit, on: midday(2026, 8, 19, in: losAngeles)
+            ) == .uncompleted
+        )
+        #expect(try context.fetch(FetchDescriptor<Completion>()).isEmpty)
+        #expect(habit.completionDayCounts == [:])
+    }
+
+    /// The same bound, from the other side: a day the store has nothing for
+    /// still reads as open when an unstamped row sits on a *different* day.
+    @MainActor
+    @Test("An unstamped row on another day does not make today look done")
+    func anUnstampedRowElsewhereIsNotThisDay() throws {
+        let context = try makeContext()
+        let (store, habit) = try habitWithLegacyRow(in: context)
+
+        #expect(
+            try store.toggleCompletion(
+                for: habit, on: midday(2026, 8, 18, in: losAngeles)
+            ) == .completed
+        )
+        #expect(
+            habit.completionDayCounts == [wednesday: 1, DayID(year: 2026, month: 8, day: 18): 1]
+        )
+    }
+
+    /// #130's own residue: two rows on one civil day, one stamped and one not.
+    /// Un-marking means the day is not marked, so both go — the guarantee
+    /// `toggleCompletion` makes, over a fetch that now has to reach two
+    /// different shapes of row to keep it.
+    @MainActor
+    @Test("Un-marking a day takes the stamped row and the unstamped one together")
+    func unmarkingTakesBothShapesOfRow() throws {
+        let context = try makeContext()
+        let (store, habit) = try habitWithLegacyRow(in: context)
+        let stamped = Completion(
+            day: wednesday.date(in: losAngeles), habit: habit, calendar: losAngeles
+        )
+        context.insert(stamped)
+        habit.completions?.append(stamped)
+        try context.save()
+        #expect(try context.fetch(FetchDescriptor<Completion>()).count == 2)
+
+        #expect(
+            try store.toggleCompletion(
+                for: habit, on: midday(2026, 8, 19, in: losAngeles)
+            ) == .uncompleted
+        )
+        #expect(try context.fetch(FetchDescriptor<Completion>()).isEmpty)
+    }
+
     // MARK: - The backfill
 
     /// A store on a real file holding `count` completions with no `dayKey`,
