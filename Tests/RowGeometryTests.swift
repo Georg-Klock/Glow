@@ -35,6 +35,9 @@ struct RowGeometryTests {
             ("iconWidth", geometry.iconWidth),
             ("iconGap", geometry.iconGap),
             ("nameMaxWidth", geometry.nameMaxWidth),
+            ("contentWidth", geometry.contentWidth),
+            ("editControlOverhang", geometry.editControlOverhang),
+            ("editingNameMaxWidth", geometry.editingNameMaxWidth),
             ("slotHeight", geometry.slotHeight),
             ("panelHeight(0)", geometry.panelHeight(rows: 0)),
             ("panelHeight(1)", geometry.panelHeight(rows: 1)),
@@ -186,6 +189,56 @@ struct RowGeometryTests {
         // would inset by nothing and the panel would be drawn edge to edge.
         #expect(GridMetrics.editControlInset > 0)
         #expect(GridMetrics.rowPadding > 0)
+    }
+
+    /// #440: while the list is being edited the row is not a label column and
+    /// a track, it is one width with a centred name in it — so the cap on the
+    /// name is a different number, and it is the one the row grants.
+    ///
+    /// Summed here from the primitives `HabitRowView` actually lays out, so
+    /// that this is a second opinion about the arrangement rather than the same
+    /// expression written twice: the editing `HStack` is a spacer, the label
+    /// and a spacer with `labelGap` between each pair, the label is the icon's
+    /// column, `iconGap` and the name, and each end reserves the part of the
+    /// row the system's edit controls cover.
+    @Test("Editing measures the name against the row, not against the track")
+    func editingNameRunIsTheRowsOwnWidth() {
+        for width in [200, 320, 338, 353, 393, 402, 430, 1024] as [CGFloat] {
+            let g = RowGeometry(totalWidth: width)
+            let summed = g.contentWidth
+                - g.editControlOverhang - g.labelGap
+                - g.iconWidth - g.iconGap
+                - g.labelGap - g.editControlOverhang
+            #expect(
+                abs(g.editingNameMaxWidth - summed) < 1e-9,
+                "editing grants \(g.editingNameMaxWidth) at width \(width), not \(summed)"
+            )
+            // And it is the larger of the two, which is the whole of the bug:
+            // the track's width comes back to the name, so the editing cap
+            // cannot be the one measured against a track that is not drawn.
+            #expect(
+                g.editingNameMaxWidth > g.nameMaxWidth,
+                "editing grants \(g.editingNameMaxWidth) against \(g.nameMaxWidth) at \(width)"
+            )
+            // The label it caps still fits the row it is centred in, which is
+            // what keeps both spacers non-negative.
+            #expect(
+                g.editingNameMaxWidth + g.iconWidth + g.iconGap <= g.contentWidth
+            )
+        }
+    }
+
+    /// The controls stand *over* the row, so the clearance is a difference and
+    /// a narrow proposal drives it negative — `nameMaxWidth`'s failure, at a
+    /// different property. Covered by `everyWidthIsAWidth` as well; named here
+    /// because the degenerate end is where a difference goes wrong.
+    @Test("A row narrower than the controls still grants a width")
+    func editingNameRunIsNeverNegative() {
+        for width in [0, 1, 10, 40, 100] as [CGFloat] {
+            let g = RowGeometry(totalWidth: width)
+            #expect(g.editingNameMaxWidth >= 0)
+            #expect(g.editControlOverhang >= 0)
+        }
     }
 
     @Test("A non-finite proposal is treated as no width, not as a huge one")

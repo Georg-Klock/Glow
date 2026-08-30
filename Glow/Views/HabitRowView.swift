@@ -93,6 +93,63 @@ struct RowGeometry: Equatable {
     /// has been logging at test-host startup.
     var nameMaxWidth: CGFloat { max(0, labelWidth - iconWidth - iconGap - iconGap) }
 
+    /// Everything between the row's own edges: the label column, the gap after
+    /// it and the track. What the `List` proposes to a row, and — once the
+    /// track has gone — the whole of what edit mode has to divide up.
+    var contentWidth: CGFloat { labelWidth + labelGap + trackWidth }
+
+    /// How far past the row's own edge the system's edit controls reach,
+    /// whichever end reaches further.
+    ///
+    /// The delete circle and the reorder handle are laid out against the
+    /// `List`'s bounds and ignore `listRowInsets` (#400), so they stand *over*
+    /// the row rather than beside it: the row's leading edge is
+    /// `rowPadding + padLeading` inside the `List` and the controls come
+    /// `GridMetrics.editControlReach` in, and the difference is the part of the
+    /// row they cover. `padLeading` is the smaller inset, so the leading end is
+    /// the one that reaches further and `min` is what picks it.
+    ///
+    /// Floored at zero for `nameMaxWidth`'s reason: it is a difference, and a
+    /// wide enough proposal makes the row's own insets larger than the reach.
+    var editControlOverhang: CGFloat {
+        max(0, GridMetrics.editControlReach - GridMetrics.rowPadding - min(padLeading, padTrailing))
+    }
+
+    /// How far a name may run **while the list is being edited** (#440).
+    ///
+    /// Not `nameMaxWidth`, and that is the whole of the bug it fixes. That
+    /// number is the label column less the icon and both gaps, and the label
+    /// column is a thing edit mode does not draw: the marks go, the track's
+    /// width comes back to the name, and `HabitRowView` already drops the
+    /// trailing `Spacer` and the `labelWidth` frame for exactly that reason.
+    /// The `.frame(maxWidth:)` on the name was the third and it was not
+    /// dropped, so a name went on truncating where the track used to begin
+    /// with half the row empty either side — "Touch Grass" as `Touch Gr…`.
+    ///
+    /// **Capped rather than uncapped.** Uncapped, a long enough name pushes
+    /// both spacers to zero and stops being centred, which is a different
+    /// picture from the one being fixed. This is the row's own width less
+    /// everything that genuinely stands beside the name in it:
+    ///
+    ///  - the two `labelGap`s the editing `HStack` puts on either side of the
+    ///    label, between it and the spacers;
+    ///  - the icon's column and the gap after it, which are inside the label;
+    ///  - `editControlOverhang` at each end, so a name at full extension stops
+    ///    short of the system's controls instead of running under them. Taken
+    ///    symmetrically because the label is centred: reserving one end only
+    ///    would move the centre.
+    ///
+    /// On a 402pt screen that is 256.3pt against `nameMaxWidth`'s 69.6, and a
+    /// label at full extension spans 53.3–340.2 against a delete circle that
+    /// ends at 48.7 and a handle that starts at 353.0 — both sampled on an
+    /// iPhone 17 Pro / iOS 26.5.
+    var editingNameMaxWidth: CGFloat {
+        max(
+            0,
+            contentWidth - 2 * (editControlOverhang + labelGap) - iconWidth - iconGap
+        )
+    }
+
     /// A width this can actually divide up.
     ///
     /// A `GeometryReader` proposes zero on its first pass, and `.infinity` and
@@ -193,6 +250,24 @@ enum GridMetrics {
     /// which is what keeps the grid where it was; `RowGeometryTests` asserts
     /// it rather than leaving it to the two call sites to stay in step.
     static var rowPadding: CGFloat { horizontalPadding - editControlInset }
+
+    /// How far in from the `List`'s own edge the system's edit controls reach.
+    ///
+    /// The same sample `editControlInset` was taken from, read the other way
+    /// round: on an iPhone 17 Pro / iOS 26.5 against a 402pt screen and an
+    /// un-inset `List`, the delete circle lands at 17.0–38.7 and the reorder
+    /// handle at 363.0–384.0 — 17pt and 18pt of the system's own margin, and a
+    /// control a little over 21pt wide on top of it. So each reaches within
+    /// 39pt of the `List`'s edge, and 39 is the pair rounded up to one number
+    /// rather than two that differ by three tenths of a point.
+    ///
+    /// **A clearance, not a position.** Nothing is drawn at this offset and
+    /// nothing is moved to it; `RowGeometry.editControlOverhang` subtracts it
+    /// so that a name at full extension while editing stops short of the
+    /// controls. Getting it wrong truncates a very long name a little early or
+    /// a little late, which is why it is a rounded measurement rather than a
+    /// derivation — the controls are the system's and it owns their size.
+    static let editControlReach: CGFloat = 39
 }
 
 /// One habit: icon and name on the left, a fixed-width status track on the right.
@@ -530,14 +605,30 @@ struct HabitRowView: View {
             // component reads "the name ... truncates at 84.5, which is exactly
             // where the track begins", and the frame's width is derived to land
             // exactly there. Dropping `fixedSize` is what lets it.
+            //
+            // **The cap is the row's, and while editing the row is wider**
+            // (#440). `nameMaxWidth` is the label column less the icon and both
+            // gaps, and edit mode does not draw a label column — so it truncated
+            // where a track that is not there would have begun, with half the
+            // row empty either side. `editingNameMaxWidth` is the same rule
+            // measured against what edit mode actually grants. It is the third
+            // of the three things that hold this name in a label-shaped column;
+            // the other two are already conditional, two lines below and at the
+            // end of this view.
             Text(snapshot.name)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .frame(maxWidth: geometry.nameMaxWidth, alignment: .leading)
-            // The spacer and the column width below are what hold the name at
-            // the leading edge, so editing drops both: a label still filling a
-            // label-shaped column would centre that column rather than the
-            // name in it, which is not the thing being centred.
+                .frame(
+                    maxWidth: isEditing
+                        ? geometry.editingNameMaxWidth : geometry.nameMaxWidth,
+                    alignment: .leading
+                )
+            // This spacer and the column width below are the other two things
+            // that hold the name at the leading edge, so editing drops both: a
+            // label still filling a label-shaped column would centre that
+            // column rather than the name in it, which is not the thing being
+            // centred. The frame above was the one that was not dropped with
+            // them, which is #440.
             if !isEditing { Spacer(minLength: 0) }
         }
         .font(.system(size: geometry.textSize))

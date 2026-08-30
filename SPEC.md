@@ -772,6 +772,19 @@ in the vacated track, which would leave them a third of the way across. A blank
 row has nothing to fade and nothing to centre; it shows the two controls and the
 gap it stands for. Reduce Motion snaps the change rather than shortening it.
 
+**And the name is measured against the row it is now in** (#440). The width the
+week gives back is only given back if the name is allowed to use it: the cap on
+a name is the label column less the icon and both gaps, and edit mode draws no
+label column, so a name went on being cut where the track would have begun with
+half the row empty either side — "Touch Grass" as "Touch Gr…" beside eight
+columns of nothing. While editing the cap is the row's own width instead, less
+the gaps either side of the label, less the icon column, and less the part of
+the row the system's two controls cover — they are laid out against the `List`'s
+bounds, so they stand over the row rather than beside it, and a name granted the
+whole width would end underneath them. On a 402pt screen that is 256.3pt of name
+against 69.6pt outside edit mode. It is still a truncation and it is still at
+the tail; what moved is where the row says it runs out.
+
 **The edit controls stand off the panel's edge, and the panel does not move to
 let them** (#400). The delete circle and the reorder handle are the system's,
 laid out against the `List`'s own bounds — they ignore `listRowInsets`, so the
