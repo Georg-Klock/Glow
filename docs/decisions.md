@@ -6601,3 +6601,101 @@ Live Activity's content can be re-read and a phrase that changed under the
 reader would read as a glitch. The complaint that reaches for "make it random"
 is ever seeing the same phrase, and 173 is what answers it. Widen the pool;
 keep the seed.
+## 2026-08-29 — iOS 18.5 does not render the same picture twice (#431)
+
+**Question.** Three cells of the iOS 18 render baseline oscillate between two
+values, one pixel apart, bidirectionally: `week large` at level 255 between
+4097 and 4098, `week large sunday` at 255 between 7233 and 7234, `grid rows` at
+124 between 230 and 231. The same commit reproduces its committed value on the
+current runtime every time. Why, and what is the fix that keeps the gate exact?
+
+**Measured** — 132 renders of one unchanged commit (`d4b531d`), through the
+harness's own `RenderBaselineTests.render`, on three simulators, at machine
+loads from 27 to 156.
+
+| runtime, device | processes | renders | pixels differing from the first render |
+| --- | --- | --- | --- |
+| iOS 26.5, iPhone 17e | 8 | 48 | **0, every render** |
+| iOS 18.5, iPhone 16e | 4 | 24 | 0 – 594 |
+| iOS 18.5, iPhone 16 Pro | 6 | 36 | 0 – 601 |
+
+**The current runtime is bit-exact and iOS 18.5 is not.** Not "rounds
+differently" — 26.5 produced the identical byte for every pixel of every frame
+in 48 renders, and both iOS 18.5 devices produced a different picture nearly
+every time. It is the runtime and not one phone: two device models, same
+behaviour. It is not the load either; the bit-exact runs were taken at load 30
+to 45 and the noisy ones at 27 and again at 156.
+
+Every differing pixel differs by **one level in one channel** — `53,53,53` to
+`53,53,54`, `30,31,31` to `30,30,31` — and the frames that move are the three
+tall ones. `week medium` (676 × 316) and `month small` (316 × 316) were
+identical in all 132 renders; `week large` and `week large sunday` (676 × 708)
+and `grid rows` (706 × 636) were not.
+
+**What that noise does to the signature, and what it does not.** The 16 × 16
+cell grid averages roughly 1,800 pixels per cell, so several hundred
+single-level flips move a cell mean by about a thousandth of a level: no cell
+moved, in any render, on any runtime. Nor did the exact-black share, the width
+or the height.
+
+The tone census does move, and the reason it does is the reason it exists
+(#199): it is a **count of pixels at one exact level**, which is what makes it
+blind to how thin a mark is and what makes it the one number a single pixel can
+change. `week large` shows it at its sharpest — the count at 255 is 4106 in
+every one of the 132 renders, and what oscillates is `histogram[254]`, 8 or 9,
+which `toneExcess` subtracts. **The white never moved. One pixel on the 253/254
+boundary did.** `grid rows` is the same story at the other end: one pixel
+crossing 124/125, where the resting grey composites over a material that
+already dithers by a level.
+
+Rates, per render, over the 60 iOS 18.5 renders:
+
+| frame | tone | values | split |
+| --- | --- | --- | --- |
+| `week large` | 255 | 4097 / 4098 | 30 / 30 |
+| `week large sunday` | 255 | 7233 / 7234 | 6 / 54 |
+| `grid rows` | 124 | 230 / 231 | 6 / 54 |
+
+Two values, never three, never two apart.
+
+**The framing this overturns: the nightly does not fail on it.**
+`framesMatchBaseline` compares cells against a tolerance of 3 and tones against
+a retention ratio of one half — 230 against a committed 231 needs to clear 115.
+Nothing in `Tools/test.sh` or `Tools/validate-test-result.py` compares the
+rendered signatures to the committed file at all. The only thing that ever did
+was `Tools/approve-baseline.sh`, with `cmp`, and that is what failed in every
+observation on this issue. The gate is not at risk; the check standing in front
+of it was stricter than the gate by accident rather than by decision.
+
+**Decision.** `Tools/compare-signatures.py` replaces `cmp`. Width, height,
+exact-black share and all 256 cells are compared **exactly** — they were
+measured exact on both runtimes, so exactness there costs nothing and keeps the
+signal. A tone count that moves by more than **2** is a change; by 1 or 2 it is
+reported and **not written**, in either mode. A red `GlowRenderTests` verdict
+in `validation.json` outranks the file comparison in both directions.
+
+Not writing is the half that matters. Whichever of 4097 and 4098 is committed,
+half the later runs on that lane render the other one, so approving either is
+committing a coin flip and moving the disagreement rather than settling it.
+
+**What this stops catching, stated plainly.** A deliberate visual change whose
+entire effect, on every frame, is one or two pixels of one flat tone, with no
+cell mean and no ground share moving at all. Nothing in this project's history
+is that small: #194 moved a tone by about 3,400 and #332 collapsed one from
+4,401 to 2,170. The bound is a measured noise floor with one level of headroom
+over a spread of 1, not a slackening chosen to make a failure go away — and
+`RenderBaselineTests` is untouched, so the gate is exactly as exact as it was.
+
+**What was rejected.** *Widening the gate's own tolerance*: it was never the
+gate that failed. *Approving one of the two values*: that is the mistake this
+issue was filed to prevent. *Making the render deterministic*: the noise is in
+`.ultraThinMaterial`, which `GlowPalette.widgetSurface` draws and the widget
+ships — removing it from the harness would make the baseline a picture of
+something the app does not draw, which is the objection `widgetSurface`'s own
+comment already records.
+
+**Re-measuring it.** The constant is `TONE_NOISE` in
+`Tools/compare-signatures.py`, and what would have to be re-measured before
+moving it is the table above: render one unchanged commit repeatedly through
+`RenderBaselineTests.render` on the lane in question and read the spread. An
+Xcode or runtime bump is the event that could change it.
