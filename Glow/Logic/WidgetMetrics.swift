@@ -169,10 +169,13 @@ enum WidgetMetrics {
         let fromHeight = designRows > 0
             ? (available - CGFloat(designRows - 1) * rowGap) / CGFloat(designRows)
             : 0
-        // A frame too small to hold the design's rows at any positive slot is a
-        // layout artifact — a `GeometryReader` reporting zero on its first pass
-        // is the common one — and it takes the track's answer and whatever
-        // capacity that yields, which is what this did before #410.
+        // Three ways the height has nothing to say, all answered the way this
+        // did before #410 — the track's slot, and whatever capacity that
+        // yields. A frame proportionally *taller* than the design's is the
+        // ordinary one: the rows already fit, so capping would shrink them for
+        // nothing. The other two are degenerate — no rows asked for, or a
+        // frame too small to hold them at any positive slot, which is what a
+        // `GeometryReader` reporting zero on its first pass looks like.
         guard fromHeight > 0, fromHeight < fromTrack else {
             return RowLayout(
                 slot: fromTrack,
