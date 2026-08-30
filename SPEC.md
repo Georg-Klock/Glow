@@ -1029,6 +1029,21 @@ reports a kind and a family, never a configuration. A preview per placed widget
 would be four previews of one widget, and a wrong one is worse than a generic
 one.
 
+**The system's own widget gallery draws a sample, and it is the one fixture in
+the app** (#365). That gallery is not this page. Its picture is taken by
+WidgetKit calling the provider once, with `context.isPreview` true, at the
+moment the extension is installed — and then cached: re-opening the sheet
+redraws the same bitmap without asking again. So the preview cannot be a store
+read. The commonest moment for that one call is before the app has ever been
+launched, when there is no container to open, and the read that came back
+`unavailable` froze "Data unavailable — Open Glow" into all three pages for the
+life of the install; a real week read later would freeze just as hard, and be
+wrong on every day but the one it was taken on. `WidgetPreviewSample` is what
+is drawn instead: `DefaultHabits.all`, the set the empty state offers, over
+`SeededHistory`, the invented past the demo toggle uses — with today left open,
+because that is the one thing the widget is for. A placed widget is unaffected
+and still says what the store says.
+
 **Nothing on that page places a widget, because no API can.** No public call
 opens the widget gallery or adds anything to a Home Screen; `WidgetCenter`
 invalidates, reloads and reports, and `promptsForUserConfiguration()` — the one
