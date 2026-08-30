@@ -18,6 +18,37 @@ struct SlotMarkView: View {
     /// The rest day's column, in this mark's own coordinates, taken out of the
     /// shape. Nil on every mark that does not cross one. See `RestWindow`.
     var restWindow: ClosedRange<CGFloat>?
+    /// Draw the socket into one flattened layer rather than as live filters.
+    ///
+    /// **The socket is the scroll cost, and this is what takes it off the
+    /// compositor** (#402). Its bevel is a pair of `InnerShadow`s, and each of
+    /// those is a mask holding an offset blurred copy of the shape inside a
+    /// compositing group — four offscreen passes per shadow, eight per socket,
+    /// and a full screen of the week grid holds around 119 sockets. Every one
+    /// of them is re-evaluated by the render server on every frame a row moves,
+    /// which is why the grid scrolled at 7fps where the Settings `Form` beside
+    /// it does 60.
+    ///
+    /// `.drawingGroup()` renders that stack once into a single layer, and a
+    /// layer that only changes position is composited rather than re-rendered.
+    /// Measured on an iPhone 17 Pro / iOS 26.5 over 30 rows and the same eight
+    /// flicks: 137.8ms between frames without it, 31.0ms with — 7.3fps to
+    /// 32.2fps, against 16.6ms for the plain `Form` control taken the same
+    /// minute.
+    ///
+    /// **It is off for the widget, deliberately.** A widget is a snapshot and
+    /// never scrolls, so there is nothing here for it to win, and it renders
+    /// through WidgetKit's archiver rather than through this process — a
+    /// rasterising modifier there is untested risk for no gain.
+    ///
+    /// **It is not pixel-identical, and that is measured.** Against the same
+    /// screen from the same build without it: 15.4% of the screen's pixels
+    /// differ, 94% of them by one level out of 255 and none by more than 11,
+    /// all of it inside the bevel's own gradient. `.extendedLinear` is further
+    /// off, not closer — 33 — so the difference is the rasteriser's blur, not
+    /// its colour space.
+    var flattensSocket = false
+
     /// How far this mark's anchor column sits from the centre of its own
     /// frame. Only the ✕ reads it — every other mark either fills its span or
     /// is one column wide. See `SlotLayout.anchorOffset(trackWidth:dayCount:)`.
@@ -48,6 +79,7 @@ struct SlotMarkView: View {
         // `GlowShape.pillHeight`.
         case .upcoming, .openToday, .doneToday, .donePast:
             sized(socket(size.height * GlowShape.pillHeight, circle: !spansDays))
+                .flattened(flattensSocket)
                 .restWindowRemoved(restWindow)
         }
     }
@@ -329,6 +361,19 @@ struct SlotMarkView: View {
         guard max(leftRoom, rightRoom) > 0 else { return 0 }
         let centre = leftRoom >= rightRoom ? leftRoom / 2 : high + rightRoom / 2
         return centre - size.width / 2
+    }
+}
+
+
+extension View {
+    /// One flattened layer when asked for, and the view itself when not.
+    ///
+    /// A `@ViewBuilder` branch rather than `.drawingGroup(enabled:)`, which does
+    /// not exist: the modifier takes no switch, so the choice has to be made
+    /// over the view.
+    @ViewBuilder
+    fileprivate func flattened(_ flattens: Bool) -> some View {
+        if flattens { drawingGroup() } else { self }
     }
 }
 

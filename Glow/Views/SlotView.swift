@@ -86,7 +86,7 @@ struct SlotView: View {
                 ringLineWidth: GlowShape.ringWeight
             )
         } else {
-            SlotMarkView(mark: slot.mark, size: size)
+            SlotMarkView(mark: slot.mark, size: size, flattensSocket: true)
         }
     }
 
