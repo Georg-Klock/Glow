@@ -7090,3 +7090,34 @@ artwork, the second is the website's HDR word images, whose baked halo is the
 subject of its own section in [glow.md](glow.md). Removing the light from those
 would be a change to two shipped artefacts that nobody asked for. If they should
 go too, that is a separate decision.
+
+## 2026-08-30 — The pop draws fresh, and #420's reason for the seed did not apply
+
+#420 chose the phrase by hashing the habit's id with the calendar day, and its
+entry here states that as deliberate, with a reason: a Live Activity's content
+can be re-read, and a phrase that changed under the reader would look like a
+glitch. It went further and said a real RNG would be a regression.
+
+**The reason did not apply.** Both surfaces choose the phrase once and store
+it — `GoalPopAttributes.ContentState` holds the chosen `line` and the Activity
+renders from that, and the in-app pop holds its own — so nothing recomputes a
+phrase while it is on screen. Stability under re-read was already guaranteed by
+the architecture; the seed was buying something that was not for sale.
+
+**And what the seed did buy was visible.** One habit on one day had exactly one
+phrase, for the whole day, however many times it was toggled — 173 phrases in
+the pool and a person sees one of them per habit per day. Reported from real
+use (#450): "if I toggle this on and off, I always get the same one."
+
+So `GoalPop.line()` now draws at random and takes no habit and no day, because
+it depends on neither. `lineIsStable` asserted the opposite of the intent and
+was deleted rather than adapted. The variety checks around it were testing that
+the *hash* spread properly; they are replaced by one honest statement — over
+200 draws, more than one phrase appears. `everyLineIsReachable` stays and its
+own e^-115 argument is more true of a random draw than of the hash.
+
+Unchanged: the switch (Never / Goals / Everything) gates whether a pop fires,
+not which phrase it draws; `PopWindow`'s newest-wins numbering and
+`GoalPop.duration` handle two taps inside one pop's two seconds, which is a
+different problem; and nothing is stored either way.
+

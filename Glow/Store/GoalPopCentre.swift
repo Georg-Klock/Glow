@@ -68,7 +68,7 @@ enum GoalPopCentre {
         let content = ActivityContent(
             state: GoalPopAttributes.ContentState(
                 habitName: name,
-                line: GoalPop.line(habitID: habitID, on: day, calendar: calendar)
+                line: GoalPop.line()
             ),
             staleDate: nil
         )

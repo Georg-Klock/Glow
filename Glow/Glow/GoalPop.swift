@@ -235,28 +235,25 @@ enum GoalPop {
         "proud of you",
     ]
 
-    /// One line, chosen deterministically.
+    /// One line, drawn fresh.
     ///
-    /// The same completion must say the same thing every time it is rendered:
-    /// a Live Activity's content can be re-read, and a phrase that changed
-    /// under the reader would read as a glitch. Hashed from the habit and the
-    /// day rather than random, so it is stable without storing anything.
+    /// Random per pop, not hashed from the habit and the day. The seed made
+    /// one habit say exactly one thing all day however many times it was
+    /// toggled, and with 173 phrases in the pool that is what a person
+    /// actually notices (#450).
     ///
-    /// **A real RNG would be a regression, not the fix** (#420). Widening the
-    /// pool from six to 173 is what "make it random" was reaching for — the
-    /// complaint was ever seeing the same phrase, not the arithmetic behind
-    /// it. Widen the pool; keep the seed.
-    static func line(
-        habitID: UUID,
-        on day: Date,
-        calendar: Calendar = WeekCalendar.calendar
-    ) -> String {
-        let parts = calendar.dateComponents([.year, .month, .day], from: day)
-        var seed = UInt64(truncatingIfNeeded: habitID.hashValue)
-        seed = seed &* 31 &+ UInt64(truncatingIfNeeded: parts.year ?? 0)
-        seed = seed &* 31 &+ UInt64(truncatingIfNeeded: parts.month ?? 0)
-        seed = seed &* 31 &+ UInt64(truncatingIfNeeded: parts.day ?? 0)
-        return lines[Int(seed % UInt64(lines.count))]
+    /// #420 argued the opposite and gave a reason: a Live Activity's content
+    /// can be re-read, so a phrase that changed under the reader would look
+    /// like a glitch. **That risk is handled by the architecture, not by the
+    /// seed.** Both surfaces choose once and store the result —
+    /// `GoalPopAttributes.ContentState` holds the chosen `line` and the
+    /// Activity renders from it, and the in-app pop holds its own — so nothing
+    /// recomputes a phrase while it is on screen. Stability under re-read was
+    /// never what the arithmetic was buying.
+    ///
+    /// Takes no habit and no day, because it no longer depends on either.
+    static func line() -> String {
+        lines.randomElement() ?? ""
     }
 
     /// The longest a line may be, in characters.
