@@ -19,9 +19,9 @@ import ImageIO
 /// **false**, while both PQ encodings came back **true**. See docs/glow.md.
 ///
 /// The output is a flat, uniform tile. It carries no shape and no gradient: the
-/// slot's shape comes from clipping it, and the halo around the slot is drawn
-/// by the view as an ordinary shadow. That means one tile serves every slot at
-/// every size, so the whole app renders one image and reuses it.
+/// slot's shape comes from clipping it, and nothing is drawn around it — the
+/// SDR halo the view used to cast went with #394. That means one tile serves
+/// every slot at every size, so the whole app renders one image and reuses it.
 struct GlowRenderer: Sendable {
     /// How many times brighter than SDR white the glow peaks at.
     ///

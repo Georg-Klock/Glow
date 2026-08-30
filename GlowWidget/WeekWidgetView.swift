@@ -229,7 +229,7 @@ private struct WidgetHeader: View {
                         // day is still today and still reads as today, it has
                         // simply stopped asking.
                         switch TypeTier.weekday(isToday: isToday, anyHabitOpen: anyOpen) {
-                        case .emitting: letter.glowing(halo: GlowPalette.headerHalo)
+                        case .emitting: letter.glowing()
                         case .lit: letter.foregroundStyle(GlowPalette.lit)
                         case .resting: letter.foregroundStyle(GlowPalette.grey)
                         }
@@ -425,7 +425,7 @@ private struct WidgetRow: View {
             // in every state, so `text` is styled as one thing rather than a
             // glyph and a string styled apart.
             switch TypeTier.label(isOpenToday: isDue, isHandledToday: isHandled) {
-            case .emitting: text.glowing(halo: GlowPalette.labelHalo)
+            case .emitting: text.glowing()
             case .lit: text.foregroundStyle(GlowPalette.lit)
             case .resting: text.foregroundStyle(GlowPalette.grey)
             }

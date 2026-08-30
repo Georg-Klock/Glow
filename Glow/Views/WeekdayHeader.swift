@@ -65,7 +65,7 @@ struct WeekdayHeader: View {
                         // handled it steps down to the lit tier — still plainly
                         // today, no longer asking.
                         switch TypeTier.weekday(isToday: isToday, anyHabitOpen: anyOpen) {
-                        case .emitting: column.glowing(halo: GlowPalette.headerHalo)
+                        case .emitting: column.glowing()
                         case .lit: column.foregroundStyle(GlowPalette.lit)
                         case .resting: column.foregroundStyle(GlowPalette.grey)
                         }

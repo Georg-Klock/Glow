@@ -7020,3 +7020,72 @@ month half can only be a provider bug.
 A placed widget is untouched. On the same fresh install the gallery advertises
 the sample while the widget on the Home Screen still says "Data unavailable"
 until the app is opened — which is #282's rule holding exactly where it should.
+## The halo comes out entirely (#394)
+
+**Supersedes** "The halo gets a switch, off by default (#313)" above, two days
+after it (2026-08-29). Georg: "Delete the halo toggle... I don't want to have
+the halo in the code anywhere."
+
+**What went.** The Settings toggle and its `glowHaloDisabled` key;
+`GlowModifier`'s caster — every drop shadow it drew, plain and ring alike — and
+the `Style` enum that chose between them; `GlowPalette`'s whole "Glow reach"
+section (`haloRadius`, `ringHaloRadius`, `ringHaloOffset`,
+`ringHaloOffsetRatio`, `ringHaloOpacity`, `labelHalo`, `headerHalo`, and the
+already-unused `ringInnerRadius` documented as their exception);
+`GlowSettings.haloScale`, `haloReference` and `maxHaloScale`; and Settings'
+preview reservation, which existed only to give a shadow room to fall off in.
+`glowing(halo:style:)` is now `glowing()`.
+
+**What did not.** The HDR tile — the emitting layer — is untouched, and that is
+the reason this does not reach SPEC §1. The halo was SDR light thrown onto the
+ground *around* a mark; the mark's own headroom comes from the image, which is
+still masked to the same silhouette and still encoded from the same slider. A
+lit mark is still lit. It is lit exactly as far as its own shape reaches and no
+further.
+
+**#313's reasoning, and why the reversal is not a contradiction of it.** That
+entry chose a toggle over a removal because "the visuals are being iterated on
+and both looks need to be comparable live on a device". The toggle did its job:
+both looks were compared on a device, and the answer came back. A switch that
+exists to settle a question is spent once the question is settled.
+
+**What this costs, stated rather than discovered later.** A screen with no EDR
+headroom drew the halo *in place of* real emission — so on that hardware, and
+in accented (Tinted/Clear) widget rendering where the tile's headroom is
+discarded (#53), the marks are now flat white shapes with nothing around them.
+That was already the halo-off build's behaviour, and it is the trade being
+accepted here.
+
+**Two numbers kept their value and lost their reason**, deliberately not
+adjusted in the same change. `WidgetMetrics.rowGap` was set by how far a halo
+spilled out of a row; it is left at 8, which is also the column gap and gives
+the grid a pitch of 32 in both directions (#331). Settings' preview padding was
+derived — slot height times `haloRadius` times `maxHaloScale` times a measured
+Gaussian reach of 3 — and is now a plain 24pt chosen by eye. Both are spacing
+decisions to make deliberately if they are made at all, not consequences to
+take silently inside a removal.
+
+**One test rebuilt rather than deleted, and the first rebuild was wrong.**
+`WidgetRenderDiffTests`' `haloIsWhatLiftsIt` asserted that turning the glow up
+lifts pixels off the ground, because the halo was the only thing that could.
+Inverting it to `lifted == 0` failed at 941 pixels — and none of them were a
+halo. The tile's encoded headroom changes what a mark renders as *even in SDR*,
+because a PQ encode of 2x reference white does not tone-map to the level a 1x
+encode does, so every antialiased edge pixel moves with the setting and a thin
+band of them crosses the `clear` threshold. A count of zero would have been
+asserting that antialiasing does not exist.
+
+So the claim is spatial instead: a halo lifts pixels *at a distance* from a
+mark, an antialiased edge lifts only pixels touching one.
+`nothingSpreadsFromAMark` measures, for every lifted pixel, the Chebyshev
+distance to the nearest pixel the render already drew something at, and bounds
+the furthest at 2. It fails if any caster comes back, and it does not fail on
+the edge noise that a naive inversion tripped over.
+
+**Not touched, and named here so the scope is on the record.**
+`Tools/make-app-icon.swift` and `Tools/make-glow-word.swift` both draw a halo
+and both keep it. Neither renders the app's marks — the first is the app icon's
+artwork, the second is the website's HDR word images, whose baked halo is the
+subject of its own section in [glow.md](glow.md). Removing the light from those
+would be a change to two shipped artefacts that nobody asked for. If they should
+go too, that is a separate decision.

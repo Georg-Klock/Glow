@@ -90,7 +90,7 @@ struct MonthWidgetView: View {
                     // waiting on today is the loudest thing in its frame, and
                     // one already handled steps back.
                     if isDue {
-                        name.glowing(halo: GlowPalette.labelHalo)
+                        name.glowing()
                     } else {
                         name.foregroundStyle(GlowPalette.grey)
                     }

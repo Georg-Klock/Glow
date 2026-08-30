@@ -130,7 +130,7 @@ struct SymbolPickerView: View {
                 // is gone — and a glow is what this app says "chosen" with
                 // everywhere else.
                 if selection == symbol {
-                    glyph.glowing(halo: GlowPalette.labelHalo)
+                    glyph.glowing()
                 } else {
                     glyph.foregroundStyle(GlowPalette.color)
                 }
@@ -200,7 +200,7 @@ struct SymbolPickerView: View {
                 if selection == item.glyph {
                     Circle()
                         .strokeBorder(GlowPalette.color, lineWidth: 1.5)
-                        .glowing(halo: GlowPalette.labelHalo)
+                        .glowing()
                 }
             }
         }

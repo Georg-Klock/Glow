@@ -250,10 +250,15 @@ enum WidgetMetrics {
     /// grid's pitch is 32 in both directions and a row is as tall as a column
     /// is wide.
     ///
-    /// **`rowGap` is still not a spacing number.** It is set by how far a halo
-    /// spills out of a row, and closing it would put each row's light into its
-    /// neighbour. It moved from 10 to 8 because the whole grid rescaled, not
-    /// because it was slack to be taken.
+    /// **`rowGap` was never a spacing number, and the reason has just gone.**
+    /// It was set by how far a halo spilled out of a row — closing it would
+    /// have put each row's light into its neighbour — and it moved from 10 to 8
+    /// because the whole grid rescaled, not because it was slack to be taken.
+    /// The halo is gone (#394) and nothing spills any more, so the constraint
+    /// that fixed this number no longer exists. It is left where it is on
+    /// purpose: 8 also matches the column gap and gives the grid a pitch of 32
+    /// in both directions (#331), and changing it is a spacing decision to make
+    /// deliberately rather than a consequence to take here.
     static let headerGap: CGFloat = 4
     static let rowGap: CGFloat = 8
 

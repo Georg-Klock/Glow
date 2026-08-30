@@ -474,9 +474,11 @@ cleanup does not unify them back.
 
 The emitting pair is a tight white bloom either side of a 1pt stroke, and it is
 for **marks only** — emitting text takes none of it (§8.5). Figma's stand-in for
-the real thing. **The HDR halo is a code-side effect scaled by
+the real thing. **The HDR glow is a code-side effect scaled by
 `GlowSettings`** and cannot be drawn in Figma at all, so the 1pt blur is a
-placeholder for its shape, not a specification of its size.
+placeholder for its shape, not a specification of its size. The app also drew an
+SDR halo around a lit mark until #394; nothing spreads outside a mark's own
+silhouette now.
 
 Socket and lit fill invert each other's light direction: a socket is pressed in,
 a lit mark stands proud. **The socket bevel was drawn against a 7–10% white

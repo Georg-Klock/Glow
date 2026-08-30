@@ -198,10 +198,7 @@ private struct GlowTile: View {
                 // Whether it is honoured there is still unmeasured, and the
                 // simulator cannot settle it: with no EDR headroom the tile is
                 // tone-mapped anyway, and against glass a flattened white and a
-                // lit white are the same pixels. What the simulator does show is
-                // that the *halo* does not survive — see GlowModifier — so a
-                // mark on a Tinted or Clear home screen reads as a flat shape
-                // whatever this line does for the core. #53.
+                // lit white are the same pixels. #53.
                 .widgetAccentedRenderingMode(.fullColor)
         } else {
             GlowPalette.color
@@ -209,90 +206,30 @@ private struct GlowTile: View {
     }
 }
 
-/// Renders anything as a real glow: the HDR tile masked to its shape, with the
-/// halo cast underneath.
+/// Renders anything as a real glow: the HDR tile masked to its shape.
 ///
 /// Applies to *any* view, not just the slot shapes, because the rule it serves
-/// is a rule about the design file rather than about geometry: full white plus a
-/// drop shadow means headroom. That covers the marks, and it also covers the
-/// label of a habit still due and today's letter in the header, both of which
-/// are drawn exactly that way and were rendering as merely bright text.
+/// is a rule about the design file rather than about geometry: full white means
+/// headroom. That covers the marks, and it also covers the label of a habit
+/// still due and today's letter in the header, both of which are drawn exactly
+/// that way and were rendering as merely bright text.
 ///
-/// The halo is an ordinary SwiftUI shadow rather than part of the image. Two
-/// reasons. The image is opaque, because the PQ encoder drops alpha, so a halo
-/// baked into it would arrive as a black square covering its neighbours. And a
-/// shadow composites against whatever is behind it, which an opaque tile cannot.
-/// The core is what has to be HDR; a halo is dimmer than its source by
-/// definition, so nothing is lost by drawing it in SDR.
+/// **Nothing spreads.** A lit mark used to cast an SDR drop shadow underneath
+/// the tile — the halo — sized from `GlowPalette`'s reach constants and scaled
+/// by the intensity setting. It is gone (#394): a mark is lit exactly as far as
+/// its own silhouette reaches and no further. The HDR tile is untouched by that
+/// removal, which is the whole point — the emitting layer is the image, the
+/// halo was only the light it threw on the ground, and SPEC §1's rule is about
+/// the mark being lit.
 ///
-/// It is lost on a Tinted or Clear home screen, though: the same widget renders
-/// today's ring with a halo under Default and as a bare white circle under both
-/// of the others. Measured in the simulator, 2026-08-21. Nothing here can put
-/// it back — see #53 — so a widget on those appearances shows the marks without
-/// the light around them.
-///
-/// The caster is the same view as the mask, which matters for a hollow shape: a
-/// solid caster under a ring shows through the hole as a grey lozenge, and the
-/// slot stops reading as an outline.
+/// One consequence worth keeping: on a Tinted or Clear home screen the widget
+/// renders in accented mode, which cannot show the tile's headroom (#53). That
+/// used to leave the halo as the only light there. Now those appearances draw
+/// the marks as flat white shapes, which is what the halo-off build already
+/// looked like.
 struct GlowModifier: ViewModifier {
-    /// Halo reach in points before the intensity setting scales it.
-    let halo: CGFloat
-    /// The design draws the ring's halo softer, offset above and below, and at
-    /// half strength; every other glow is one plain shadow at full strength.
-    var style: Style = .plain
-
-    enum Style: Equatable {
-        case plain
-        case ring
-    }
-
     @AppStorage(GlowSettings.key, store: GlowSettings.store)
     private var peak: Double = GlowSettings.defaultValue
-
-    // The toggle removes the caster's drop shadows and nothing else (#313):
-    // the tile overlay below draws regardless, so a mark keeps its HDR fill
-    // with no light spread onto the ground. The ring's inner shadow pair is
-    // deliberately not behind this — it is baked into the stroke in
-    // `GlowImageView` as the ring's own thickness, light in the tube rather
-    // than light on the ground, and a build with the pair removed rendered a
-    // ring near-identical at slot size, so gating it would change the mark's
-    // silhouette for nothing.
-    @AppStorage(GlowSettings.haloDisabledKey, store: GlowSettings.store)
-    private var haloDisabled: Bool = false
-
-    private var haloRadius: CGFloat {
-        halo * CGFloat(GlowSettings.haloScale(for: peak))
-    }
-
-    @ViewBuilder
-    private func caster(_ content: some View) -> some View {
-        let base = content.foregroundStyle(GlowPalette.color)
-        if haloDisabled {
-            base
-        } else {
-            switch style {
-            case .plain:
-                base.shadow(color: GlowPalette.color, radius: haloRadius)
-            case .ring:
-                // Two passes offset up and down rather than one centred: it is
-                // what the file specifies, and it reads as a tube of light
-                // rather than a disc behind a hole. The offset is its own
-                // number, not a fraction of the radius: the file pairs a
-                // radius of 5 with an offset of 1.25, so the offset is a
-                // quarter of the reach.
-                let offset = haloRadius * GlowPalette.ringHaloOffsetRatio
-                base
-                    .shadow(
-                        color: GlowPalette.color.opacity(GlowPalette.ringHaloOpacity),
-                        radius: haloRadius, y: offset
-                    )
-                    .shadow(
-                        color: GlowPalette.color.opacity(GlowPalette.ringHaloOpacity),
-                        radius: haloRadius, y: -offset
-                    )
-            }
-        }
-    }
 
     func body(content: Content) -> some View {
         // An overlay rather than a ZStack, and that is load-bearing: the tile is
@@ -301,9 +238,6 @@ struct GlowModifier: ViewModifier {
         // hugging its leading edge and drifts to the middle of whatever it is
         // in. An overlay takes the base view's size and cannot do that.
         //
-        // The caster is one shadow, not the three this used to stack: the design
-        // specifies a single blur per mark, and three passes were an invention
-        // approximating a long tail the file never asked for.
         // Nothing here animates on its own. A lit mark is lit and holds still:
         // the glow's one signal is brightness, and the breath that used to
         // pulse this layer said the same thing a second time, in a register
@@ -311,28 +245,27 @@ struct GlowModifier: ViewModifier {
         // the history, including the measurement that the compositor does not
         // flatten an animated HDR layer.
         //
-        // `geometryGroup()` is a guard now, not a fix. The content is measured
-        // twice — once for the caster, once for the mask — and while a
-        // repeating animation lived here, the second measurement became
-        // something to interpolate: the breath walked Today's rings ~15pt
-        // sideways (#45). With the breath gone nothing animates this geometry,
-        // but the pin stays for the next caller who animates anything here —
-        // and it belongs exactly at this line. Written above `.opacity`, where
-        // it reads just as sensibly, it was built and measured *still
-        // drifting*: by that point both measurements have already happened.
+        // `geometryGroup()` is a guard now, not a fix. The content was measured
+        // twice while the caster existed — once for the caster, once for the
+        // mask — and while a repeating animation lived here, the second
+        // measurement became something to interpolate: the breath walked
+        // Today's rings ~15pt sideways (#45). With the breath gone and the
+        // caster gone nothing animates this geometry, but the pin stays for the
+        // next caller who animates anything here — and it belongs exactly at
+        // this line. Written above `.opacity`, where it reads just as sensibly,
+        // it was built and measured *still drifting*: by that point both
+        // measurements have already happened.
         let settled = content.geometryGroup()
-        return caster(settled)
+        return settled
+            .foregroundStyle(GlowPalette.color)
             .overlay { GlowTile(peak: peak).mask { settled } }
     }
 }
 
 extension View {
     /// Draw this view as a real glow rather than as bright colour.
-    func glowing(
-        halo: CGFloat,
-        style: GlowModifier.Style = .plain
-    ) -> some View {
-        modifier(GlowModifier(halo: halo, style: style))
+    func glowing() -> some View {
+        modifier(GlowModifier())
     }
 }
 
@@ -410,20 +343,16 @@ struct GlowImageView: View {
     var restWindow: ClosedRange<CGFloat>?
 
     var body: some View {
-        // Subtracted from the *silhouette*, before `glowing` sees it — which is
-        // the whole trap. The halo is generated from whatever shape is handed
-        // in, so masking the rendered result instead would slice the glow flat
-        // at the window's edges rather than letting it wrap the new open ends.
-        // The halo reaches `slotHeight * GlowPalette.haloRadius`, far wider
-        // than the gap being punched, so the difference is not subtle.
+        // Subtracted from the *silhouette*, before `glowing` sees it, so the
+        // tile's mask is the shortened shape rather than the full one. It
+        // mattered more while the halo existed — a halo generated from the full
+        // silhouette and then masked would have been sliced flat at the
+        // window's edges instead of wrapping the new open ends — but the order
+        // is still the correct one, and reversing it would mask a rendered
+        // result rather than the shape that produced it.
         sized(silhouette)
             .restWindowRemoved(restWindow)
-            .glowing(
-                halo: size.height * (shape == .ring
-                    ? GlowPalette.ringHaloRadius
-                    : GlowPalette.haloRadius),
-                style: shape == .ring ? .ring : .plain
-            )
+            .glowing()
             .accessibilityHidden(true)
     }
 

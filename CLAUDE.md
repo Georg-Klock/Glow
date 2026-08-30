@@ -430,7 +430,7 @@ actual bug. Every line here is something that already happened.
   glowing text in the wrong place. There is a comment saying so; believe it.
 - **One hex at three steps, and white above them** (#335, 2026-08-28; before it
   #111, #194, #240 and the 2026-08-24 retirement — all in `docs/decisions.md`).
-  `#FFFFFF` with a halo emits, `#D9D9D9` at 100% is lit but not emitting, and
+  `#FFFFFF` with the HDR tile emits, `#D9D9D9` at 100% is lit but not emitting, and
   `#D9D9D9` at 50% is at rest.
   **Not a grey ramp** — the palette used to stack opacities into four steps for
   one distinction and the grid read as a grey scale. These are three different

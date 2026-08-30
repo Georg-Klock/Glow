@@ -39,7 +39,7 @@ struct InAppPop: View {
 
             Text(content.line)
                 .font(.system(size: WidgetMetrics.textSize, weight: .medium))
-                .glowing(halo: GlowPalette.labelHalo)
+                .glowing()
 
             Spacer(minLength: 0)
 

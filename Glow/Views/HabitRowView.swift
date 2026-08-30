@@ -649,7 +649,7 @@ struct HabitRowView: View {
         // while you try to read them is the cost. So while editing, both layers
         // step aside for a flat `GlowPalette.color`.
         //
-        // Flat, not `.glowing`: the halo is this app's vocabulary for lit, the
+        // Flat, not `.glowing`: the glow is this app's vocabulary for lit, the
         // same claim an open ring makes, and wearing it on every row would say
         // every habit is due at once. This is a title's white — the same white
         // as the week's dates above the grid — and it says legible, not lit.
@@ -675,7 +675,7 @@ struct HabitRowView: View {
                 } else {
                     text.foregroundStyle(GlowPalette.grey)
                 }
-                text.glowing(halo: GlowPalette.labelHalo).opacity(lit)
+                text.glowing().opacity(lit)
             }
         }
         .frame(width: isEditing ? nil : geometry.labelWidth, alignment: .leading)

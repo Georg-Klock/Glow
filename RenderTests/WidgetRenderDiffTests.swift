@@ -670,10 +670,13 @@ struct WidgetRenderDiffTests {
         let entry = WeekEntry(date: week.days[4], week: week, habits: .loaded(rows))
 
         try withRestColumn(6, of: week) {
-            // The halo is off for this one. It is not part of the claim, and
-            // with it on a lit dot's light reaches the row above and below —
-            // which is exactly where the blank row's assertion looks.
-            try withoutHalo {
+            // Rendered at the bottom of the glow range. It used to be
+            // necessary — with the halo on, a lit dot's light reached the row
+            // above and below, which is exactly where the blank row's
+            // assertion looks. The halo is gone (#394) and nothing spreads, so
+            // this is now only what makes the render independent of whatever
+            // another suite left the glow set to.
+            try withGlowDown {
                 let pixels = try rgba(of: try render(entry))
 
                 #expect(brightest(atColumn: columnCentre(2), row: 0, rows: 3, in: pixels) > Self.litFloor,
@@ -753,19 +756,22 @@ struct WidgetRenderDiffTests {
         )
     }
 
-    /// Renders with the glow at the bottom of its range, where
-    /// `GlowSettings.haloScale` is 0 and no mark casts a shadow.
+    /// Renders with the glow at the bottom of its range, and with the tile
+    /// cache emptied so the render is actually made at that setting.
     ///
-    /// The background cannot be measured with the halo on. A lit mark spreads
-    /// white onto the ground on purpose — that is the product, not a leak — and
-    /// on a small family it reaches the corners: the measurement that
-    /// established this was the Today ring's halo at
+    /// This existed because the background could not be measured with the halo
+    /// on: a lit mark spread white onto the ground on purpose — the product,
+    /// not a leak — and on a small family it reached the corners. The
+    /// measurement that established it was the Today ring's halo at
     /// `96 * ringHaloRadius * maxHaloScale` = 46.6pt across a 158pt frame,
     /// whose corners read 1,1,1 with the glow up and **0,0,0 with it down**.
-    /// That family is gone (#209) and the claim is not — `haloIsWhatLiftsIt`
-    /// makes it against a family that still ships, and fails rather than
-    /// passing vacuously if no halo reaches that far.
-    private func withoutHalo<T>(_ body: () throws -> T) rethrows -> T {
+    ///
+    /// The halo is gone (#394), so nothing spreads and the ground no longer
+    /// needs protecting from it. What is left is the other half: pinning the
+    /// setting makes these renders independent of whatever another suite left
+    /// stored. `nothingLiftsTheGround` is the pair that now *asserts* the
+    /// spreading is gone, rather than working around it.
+    private func withGlowDown<T>(_ body: () throws -> T) rethrows -> T {
         let previous = GlowSettings.store.object(forKey: GlowSettings.key)
         defer { GlowSettings.store.set(previous, forKey: GlowSettings.key) }
         GlowSettings.store.set(GlowSettings.range.lowerBound, forKey: GlowSettings.key)
@@ -775,7 +781,7 @@ struct WidgetRenderDiffTests {
 
     @Test("The ground is one flat dark tone in every family")
     func groundIsFlatGlass() throws {
-        try withoutHalo {
+        try withGlowDown {
         // **#87's claim was that the ground is 0,0,0, and #333 replaces it.**
         // The widget's surface is a dark glass material now, so pure black is
         // no longer the truth and asserting it would only assert that #333 had
@@ -853,32 +859,48 @@ struct WidgetRenderDiffTests {
         }
     }
 
-    @Test("With the glow up, the only thing lifting the ground is the halo")
-    func haloIsWhatLiftsIt() throws {
-        // The other half of the same claim, and the reason the test above turns
-        // the glow down rather than loosening its tolerance.
+    @Test("Turning the glow up lifts nothing at a distance from a mark")
+    func nothingSpreadsFromAMark() throws {
+        // **This assertion is rebuilt from what it was, and the rebuild is the
+        // point** (#394). It used to be `haloIsWhatLiftsIt`, and it read
+        // `lifted > 0`: the halo was the one thing that raised the ground away
+        // from a mark, and `groundIsFlatGlass` turns the glow down rather than
+        // loosening its tolerance precisely because of it.
         //
-        // It used to read one corner of the small Today family, whose ring halo
-        // reached `96 * ringHaloRadius * maxHaloScale` = 46.6pt and so covered a
-        // 158pt frame corner to corner: there was nowhere in that frame where
-        // "no mark is near". **That family is gone** (#209), and measured on the
-        // four that remain, no corner is lifted at all — the corner was a
-        // property of the ring, not of the halo.
+        // With the halo removed a mark is lit exactly as far as its own
+        // silhouette reaches, so the claim inverts: turning the glow up must
+        // lift nothing. **Measured, it lifts 941 pixels, and none of them are a
+        // halo.** The tile's encoded headroom changes what a mark renders as
+        // even in SDR — a PQ encode of 2x reference white does not tone-map to
+        // the same level a 1x encode does — so every antialiased edge pixel
+        // shifts with the setting, and a thin band of them crosses `clear`.
+        // A flat `lifted == 0` would be asserting that antialiasing does not
+        // exist.
         //
-        // So the sample is the difference itself rather than a place. Every
-        // pixel that is exactly 0,0,0 with the glow down and is not with it up
-        // is a pixel the halo lifted, wherever it falls, and the claim is about
-        // all of them: there are some, and every one is neutral.
+        // So the claim is spatial rather than a count. A halo lifts pixels *at
+        // a distance*: its whole nature is reaching past the shape. An
+        // antialiased edge lifts only pixels touching one. Every lifted pixel
+        // must therefore sit within a pixel or two of something the render
+        // already drew, and how far the furthest one sits is the number that
+        // fails if a caster comes back.
+        //
+        // If `lifted` ever reaches zero this passes, and that is the right
+        // outcome rather than a vacuous one: zero is the strongest form of the
+        // same claim. The count is printed either way.
+        let reach = 2
         var lifted = 0
-        var worstSpread = 0
+        var worstDistance = 0
         for (name, view, size) in families() {
-            // Explicitly, both times. `withoutHalo` empties the cache on the way
-            // in and not on the way out, so a lit render following a dark one
-            // would otherwise draw the previous family's unlit tiles.
+            // Explicitly, both times. `withGlowDown` empties the cache on the
+            // way in and not on the way out, so a lit render following a dark
+            // one would otherwise draw the previous family's unlit tiles.
             GlowImageCache.shared.removeAll()
-            let lit = try rgba(of: try renderFamily(view, size: size))
-            let dark = try withoutHalo { try rgba(of: try renderFamily(view, size: size)) }
+            let image = try renderFamily(view, size: size)
+            let lit = try rgba(of: image)
+            let dark = try withGlowDown { try rgba(of: try renderFamily(view, size: size)) }
             #expect(lit.count == dark.count, "\(name) rendered two different sizes")
+            guard lit.count == dark.count else { continue }
+            let w = image.width, h = image.height
 
             // **At the ground, not at zero** (#333). This used to select
             // pixels the unlit render left at 0,0,0 and ask whether the lit one
@@ -887,33 +909,49 @@ struct WidgetRenderDiffTests {
             // the test passed its hue clause vacuously and failed its "the glow
             // lifts something" clause, which is exactly the pair #226 warns
             // about.
-            for i in stride(from: 0, to: min(lit.count, dark.count), by: 4)
-            where Int(max(dark[i], dark[i + 1], dark[i + 2])) <= Self.clear {
-                let high = Int(max(lit[i], lit[i + 1], lit[i + 2]))
-                guard high > Self.clear else { continue }
-                lifted += 1
-                worstSpread = max(
-                    worstSpread, high - Int(min(lit[i], lit[i + 1], lit[i + 2]))
-                )
+            func drawn(_ x: Int, _ y: Int) -> Bool {
+                let i = (y * w + x) * 4
+                return Int(max(dark[i], dark[i + 1], dark[i + 2])) > Self.clear
+            }
+
+            for y in 0..<h {
+                for x in 0..<w {
+                    let i = (y * w + x) * 4
+                    guard Int(max(dark[i], dark[i + 1], dark[i + 2])) <= Self.clear,
+                          Int(max(lit[i], lit[i + 1], lit[i + 2])) > Self.clear
+                    else { continue }
+                    lifted += 1
+
+                    // Chebyshev distance to the nearest pixel the dark render
+                    // already drew something at, capped one past the bound so
+                    // a genuine halo reports `reach + 1` rather than scanning
+                    // the whole frame for every pixel in it.
+                    var distance = reach + 1
+                    ring: for r in 1...(reach + 1) {
+                        for dy in -r...r where y + dy >= 0 && y + dy < h {
+                            for dx in -r...r where x + dx >= 0 && x + dx < w {
+                                guard max(abs(dx), abs(dy)) == r else { continue }
+                                if drawn(x + dx, y + dy) {
+                                    distance = r
+                                    break ring
+                                }
+                            }
+                        }
+                    }
+                    worstDistance = max(worstDistance, distance)
+                }
             }
         }
         GlowImageCache.shared.removeAll()
 
-        #expect(lifted > 0, "the glow lifts no pixel off the ground at all")
-        // Neutral where it lands, which is the claim that survives the halo.
-        // Three levels of slack, and each is accounted for: one is the
-        // encoder's own rounding between channels, #333's material dithers the
-        // ground by another, and the track's 25% black inner shadow rounds
-        // again where it composites over that dither. Measured at 3; an actual
-        // tint lands in the tens.
-        #expect(worstSpread <= 3, "the halo carries a hue: channels spread by \(worstSpread)")
+        print("spread-audit: \(lifted) pixels lifted, furthest \(worstDistance)px from a drawn pixel")
+        #expect(worstDistance <= reach,
+                "the glow lifts a pixel \(worstDistance)px from anything drawn — that is a caster, not an edge")
     }
 
     @Test("No pixel the widget renders carries a hue")
     func noHueAnywhere() throws {
-        // Two colours and no third. This also covers the halo, which is a white
-        // shadow: near a lit mark the ground is genuinely not zero, and that is
-        // the product rather than a leak — but it is still neutral.
+        // Two colours and no third, over every pixel of every family.
         for (name, view, size) in families() {
             let pixels = try rgba(of: try renderFamily(view, size: size))
             var worst = 0
