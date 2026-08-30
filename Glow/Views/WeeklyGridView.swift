@@ -988,8 +988,8 @@ struct WeeklyGridView: View {
                 // **#103 said no pop here and PR #275 reverses it.** The Island
                 // still will not render a Live Activity while its own app is in
                 // front, which is why this draws its own rather than asking for
-                // one. Same words, same order, same preferences — see
-                // `GoalPop.registers` and `InAppPop`.
+                // one. Same words, same preferences — see `PopPreferences` and
+                // `InAppPop`.
                 showPop(for: habit, on: day)
             case .uncompleted:
                 Haptics.uncompleted()
@@ -1018,11 +1018,14 @@ struct WeeklyGridView: View {
 
     /// Puts the completion's words on screen, and takes them off again.
     ///
-    /// The same sequence `GoalPopCentre` runs for the Island: the routine line,
-    /// then the goal's after `GoalPop.handover` when the tap met the goal, then
-    /// gone after `GoalPop.duration`. `GoalPop.registers` decides which of
-    /// those there are and `PopPreferences` decides which are wanted, so the
-    /// two surfaces cannot disagree.
+    /// The same thing `GoalPopCentre` does for the Island: one line, gone after
+    /// `GoalPop.duration`. `PopPreferences.allows` decides whether it is wanted
+    /// at all, so the two surfaces cannot disagree.
+    ///
+    /// **One line per tap** (#420). This used to run the routine line and then
+    /// replace it with the goal's after `GoalPop.handover` when the tap met the
+    /// goal — two things said inside one two-second window, and the only
+    /// double-fire in the app. One pool, one line, no sequence to play.
     ///
     /// One task, cancelled and replaced. Checking off several habits quickly is
     /// the flurry this has to survive (#272): without the cancel, the first
@@ -1032,30 +1035,23 @@ struct WeeklyGridView: View {
         let week = WeekCalendar.week(containing: day)
         let snapshot = habit.snapshot(within: week.dayIDs())
         let met = GoalMet.justMet(habit: snapshot, in: week)
-        let due = GoalPop.registers(justMetGoal: met).filter { PopPreferences.allows($0) }
-        guard let first = due.first else { return }
+        guard PopPreferences.allows(justMetGoal: met) else { return }
 
         popTask?.cancel()
-        let name = habit.name
-        show(register: first, name: name, habitID: habit.id, on: day)
+        show(name: habit.name, habitID: habit.id, on: day)
 
         popTask = Task { @MainActor in
-            if due.count > 1 {
-                try? await Task.sleep(for: GoalPop.handover)
-                guard !Task.isCancelled else { return }
-                show(register: .goal, name: name, habitID: habit.id, on: day)
-            }
             try? await Task.sleep(for: GoalPop.duration)
             guard !Task.isCancelled else { return }
             withAnimation(gridReduceMotion ? nil : .easeOut(duration: 0.2)) { pop = nil }
         }
     }
 
-    private func show(register: GoalPop.Register, name: String, habitID: UUID, on day: Date) {
+    private func show(name: String, habitID: UUID, on day: Date) {
         let content = InAppPop.PopContent(
             id: UUID(),
             habitName: name,
-            line: GoalPop.line(habitID: habitID, on: day, register: register)
+            line: GoalPop.line(habitID: habitID, on: day)
         )
         withAnimation(gridReduceMotion ? nil : .easeOut(duration: 0.2)) { pop = content }
     }

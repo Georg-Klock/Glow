@@ -6533,3 +6533,71 @@ recording.** Everything the `List` draws at its trailing edge moved by the same
 panel ending at 381.7, measured on the same device. Before the change it was
 that 10pt further out — past the panel, on the black — which is the shape #398
 went after from the other side when it put one surface behind the whole list.
+
+## 2026-08-29 — One pool of 173, and a tap says one thing (#420)
+
+**Reverses the two-vocabulary decision `GoalPop` argued for.** That type said:
+
+> Two vocabularies, so the rare thing still reads as rarer. A repetition gets a
+> plain acknowledgement; a goal met gets the celebratory one. Sharing a list
+> would have made the goal indistinguishable from the twelfth glass of water,
+> which is the failure the old restriction was really guarding against.
+
+It is quoted rather than deleted because it is the argument anyone will
+re-derive, and because what it got wrong is not obvious from its own terms.
+
+**What it got wrong: the register was doing two unrelated jobs.** It picked a
+vocabulary *and* it gated how often the Island speaks. Only the second job was
+carrying the "rarer" claim, and the second job is the three-way switch, which
+survives untouched: **Goals** is the setting where the goal-completing tap is
+the only tap that says anything. The two lists were paying for the same
+distinction a second time, and charging six phrases for it — a person logging
+twice a day sees all six inside a week, at which point the vocabulary that was
+supposed to read as routine reads as a loop.
+
+**Decision: one pool of 173 phrases, drawn from for every tap.** All lowercase,
+all at most fourteen characters, no duplicates — the list is in `GoalPop.lines`
+and `GoalPopTests` holds all three properties, because the next batch of
+phrases is what would put the problem back. The budget is #310's measurement of
+the compact Island region: it cannot carry fifteen characters at any pushed
+size, and the previous list's "that's the week" survived there only on
+`minimumScaleFactor(0.6)`. Nothing in the new set leans on that floor, so the
+scale factor goes back to being the guard for a narrower island it was always
+meant to be.
+
+**And a tap says one thing.** The goal-completing tap used to pop the routine
+line and replace it with the celebratory one after a 700ms handover, sharing
+the pop's two seconds — the only place in the app where a single tap produced
+two pops. Both call sites ran that sequence: `GoalPopCentre.announce` for the
+Island and `WeeklyGridView.showPop` for the app's own pill. With one pool there
+is nothing to hand over to, and `GoalPop.handover` is gone with the sequence.
+
+**Where "never fires twice" lives: in the return type, not in a guard.**
+`PopPreferences.allows` used to take a register and be called through a
+`filter` over `GoalPop.registers(justMetGoal:)`, which returned `[.logged,
+.goal]` for the goal-completing tap. It now takes `justMetGoal: Bool` and
+returns one `Bool`. A single verdict cannot express a sequence, so the
+double-fire is removed by construction rather than by a suppression rule
+somebody has to remember. The boolean is the one both call sites already
+compute on their first line, from `GoalMet.justMet(habit:in:)`, so nothing new
+is plumbed to reach it.
+
+**No suppression logic was needed for the other direction either.** The Island's
+pop and the app's own cannot both fire for one tap: `GoalPopCentre` is reached
+only from `MarkHabitIntent`, which is the widget's button, and `WeeklyGridView`
+is the app's own row — and iOS will not render a Live Activity while its own app
+is in the foreground regardless. Removing the handover is the whole of it.
+
+**What is kept, and why removing it with the handover would be a bug.**
+`GoalPop.duration` (2s) bounds one pop, and `PopWindow`'s newest-wins numbering
+settles *two different taps* landing inside one pop's window. Neither has
+anything to do with one tap saying two things, and both still happen — the week
+widget puts a column of tappable slots on the home screen precisely so they can
+be worked through in a flurry. Removing them would reintroduce #102.
+
+**Selection stays deterministic, and that is not a bug left unfixed.**
+`GoalPop.line` is a stable hash of habit and day rather than an RNG, because a
+Live Activity's content can be re-read and a phrase that changed under the
+reader would read as a glitch. The complaint that reaches for "make it random"
+is ever seeing the same phrase, and 173 is what answers it. Widen the pool;
+keep the seed.

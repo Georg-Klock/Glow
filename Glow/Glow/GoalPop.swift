@@ -24,54 +24,216 @@ import Foundation
 /// person wants to be spoken to, which is a preference, not an invariant. It is
 /// a three-way switch now, and the person decides.
 ///
-/// **Two vocabularies, so the rare thing still reads as rarer.** A repetition
-/// gets a plain acknowledgement; a goal met gets the celebratory one. Sharing a
-/// list would have made the goal indistinguishable from the twelfth glass of
-/// water, which is the failure the old restriction was really guarding against.
+/// **One pool, and one line per tap** (#420, 2026-08-29). This type used to
+/// hold two vocabularies and argue for them:
+///
+/// > Two vocabularies, so the rare thing still reads as rarer. A repetition
+/// > gets a plain acknowledgement; a goal met gets the celebratory one.
+/// > Sharing a list would have made the goal indistinguishable from the
+/// > twelfth glass of water.
+///
+/// That is reversed, and the paragraph is quoted rather than left standing
+/// because it is the argument anyone will re-derive. What it got wrong is that
+/// the register was doing two unrelated jobs at once: picking a vocabulary,
+/// *and* gating how often the Island speaks. Only the second one was carrying
+/// the "rarer" claim, and the switch below still does it — **Goals** is the
+/// setting that makes the goal the only thing spoken. The vocabularies were
+/// paying for it a second time, at the price of a six-word list that a person
+/// logging twice a day exhausts inside a week.
+///
+/// It also made one tap say two things. The goal-completing tap fired the
+/// routine line and then replaced it with the goal's part-way through a
+/// two-second window — a handover nobody asked for, and the only place in the
+/// app where a single tap produced two pops. One tap, one line, and the pool
+/// is wide enough that repetition is what makes a phrase rare rather than
+/// which list it came from. See docs/decisions.md.
 enum GoalPop {
-    /// Which vocabulary a line is drawn from.
-    enum Register {
-        /// One repetition, or one day, logged. The routine case.
-        case logged
-        /// The day's or the week's goal met. The rare one.
-        case goal
-    }
-
-    /// The routine acknowledgement. Flat on purpose: this is the line a person
-    /// may see several times a day, and a phrase that congratulates them for a
-    /// third of a habit wears out by lunchtime.
+    /// Everything the pop can say. 173 phrases, one pool.
+    ///
+    /// **Fourteen characters is a measurement, not a style rule** (#310). The
+    /// compact Island region cannot carry fifteen characters at any pushed
+    /// size: the previous list's "that's the week" survived there only on
+    /// `minimumScaleFactor(0.6)`, and nothing in this set leans on that floor.
+    /// `GoalPopTests` holds the budget, because the next batch of phrases is
+    /// what would put the problem back.
+    ///
+    /// Lowercase throughout, and a clean set: this appears over whatever else
+    /// is on screen, and it keeps the app at 4+.
     static let lines = [
-        "logged",
-        "nice one",
-        "there it is",
-        "done",
-        "got it",
-        "counted",
-    ]
-
-    /// The goal's own vocabulary, and the reason the routine one is flat.
-    ///
-    /// Short is a hard constraint rather than a style preference: a compact
-    /// Island state has very little room, and anything that does not fit is
-    /// truncated by the system rather than wrapped.
-    ///
-    /// Clean set only, both lists. This appears over whatever else is on screen,
-    /// and it keeps the app at 4+.
-    static let goalLines = [
+        "yes slay",
+        "ate that",
+        "no notes",
+        "certified icon",
+        "devoured it",
+        "iconic",
+        "legend",
+        "pr energy",
+        "beast mode",
+        "new pr",
+        "locked in",
+        "lockout",
+        "gains secured",
+        "iron sharpened",
+        "set complete",
+        "gg",
+        "clutch",
+        "unlocked",
+        "level up",
+        "s-tier",
+        "high score",
+        "boss cleared",
+        "xp secured",
+        "clean landing",
+        "nailed it",
+        "stuck it",
+        "rolling clean",
+        "full send",
+        "smooth line",
+        "undefeated",
+        "champion",
+        "full distance",
+        "takedown",
+        "still standing",
+        "little win",
+        "bread's rising",
+        "nurtured that",
+        "cozy win",
+        "big w",
+        "the way",
+        "understood",
+        "chef's kiss",
+        "certified w",
+        "sent it",
+        "big win",
+        "home run",
+        "all net",
+        "match point",
+        "first down",
+        "photo finish",
+        "banger",
+        "on beat",
+        "encore worthy",
+        "clean drop",
+        "shipped it",
+        "zero bugs",
+        "compiled clean",
+        "deployed",
+        "all green",
+        "look at you",
+        "that's enough",
+        "crushing it",
+        "you showed up",
+        "well earned",
+        "well plated",
+        "well seasoned",
+        "done right",
+        "recipe nailed",
+        "ignition",
+        "orbit achieved",
+        "liftoff",
+        "touchdown",
+        "summit reached",
+        "in stride",
+        "trail cleared",
+        "fresh fit",
+        "cop that win",
+        "heat confirmed",
+        "grail unlocked",
+        "new high score",
+        "game won",
+        "insert win",
+        "quest complete",
+        "loot earned",
+        "legend status",
+        "level cleared",
+        "treasure found",
+        "smooth sailing",
+        "x marks it",
+        "rode it out",
+        "saddled up",
+        "reined it in",
+        "full house",
+        "ace played",
+        "called it",
+        "encore please",
+        "ovation",
+        "clear skies",
+        "storm cleared",
+        "earned calm",
+        "new growth",
+        "bloomed",
+        "roots deeper",
+        "perfect brew",
+        "well steeped",
+        "wonderful",
+        "checkmate",
+        "good move",
+        "endgame",
+        "new pace",
+        "miles logged",
+        "crossed it",
+        "chain's tight",
+        "on cadence",
+        "you got this",
+        "clean stroke",
+        "personal best",
+        "touched first",
+        "topped out",
+        "held the line",
+        "bullseye",
+        "on target",
+        "arrow's true",
+        "course held",
+        "docked clean",
+        "smooth harbor",
+        "clean & simple",
+        "you're winning",
+        "love it",
+        "harvest is in",
+        "field tended",
+        "crop is strong",
+        "godspeed",
+        "mission done",
+        "code cracked",
+        "pulled it off",
+        "ta-da",
+        "saved the day",
+        "power move",
+        "nicely done",
+        "case closed",
+        "here we go",
+        "solved it",
+        "no net needed",
+        "balanced",
+        "stars aligned",
         "you did it",
+        "yeah",
+        "fire's lit",
+        "done & dusted",
+        "strike",
+        "pins cleared",
+        "perfect frame",
         "awesome",
+        "right on mark",
+        "reeled it in",
+        "good catch",
+        "line held",
+        "on tempo",
+        "in step",
+        "hit that mark",
         "go get it",
+        "there it is",
         "that's the one",
-        "well played",
-        "that's the week",
+        "well done",
+        "keep going",
+        "nice work",
+        "way to go",
+        "solid work",
+        "good on you",
+        "right on",
+        "onward",
+        "proud of you",
     ]
-
-    static func lines(for register: Register) -> [String] {
-        switch register {
-        case .logged: lines
-        case .goal: goalLines
-        }
-    }
 
     /// One line, chosen deterministically.
     ///
@@ -80,13 +242,13 @@ enum GoalPop {
     /// under the reader would read as a glitch. Hashed from the habit and the
     /// day rather than random, so it is stable without storing anything.
     ///
-    /// The register is not part of the seed, so the goal-completing tap draws
-    /// the *same index* from a different list — which is what makes the pair
-    /// read as one moment rather than two unrelated phrases.
+    /// **A real RNG would be a regression, not the fix** (#420). Widening the
+    /// pool from six to 173 is what "make it random" was reaching for — the
+    /// complaint was ever seeing the same phrase, not the arithmetic behind
+    /// it. Widen the pool; keep the seed.
     static func line(
         habitID: UUID,
         on day: Date,
-        register: Register,
         calendar: Calendar = WeekCalendar.calendar
     ) -> String {
         let parts = calendar.dateComponents([.year, .month, .day], from: day)
@@ -94,9 +256,15 @@ enum GoalPop {
         seed = seed &* 31 &+ UInt64(truncatingIfNeeded: parts.year ?? 0)
         seed = seed &* 31 &+ UInt64(truncatingIfNeeded: parts.month ?? 0)
         seed = seed &* 31 &+ UInt64(truncatingIfNeeded: parts.day ?? 0)
-        let vocabulary = lines(for: register)
-        return vocabulary[Int(seed % UInt64(vocabulary.count))]
+        return lines[Int(seed % UInt64(lines.count))]
     }
+
+    /// The longest a line may be, in characters.
+    ///
+    /// #310's measurement of the compact Island region, kept beside the list
+    /// it constrains rather than in a test file, so the next person adding
+    /// phrases finds the number where the phrases are.
+    static let maximumLineLength = 14
 
     /// How long it stays. Long enough to read, short enough not to be a
     /// notification — this is a pop, and a Live Activity is a session that ends
@@ -106,32 +274,12 @@ enum GoalPop {
     /// process that requested the pop is what ends it, and a widget tap's
     /// process loses its background assertion well before 30s. See
     /// docs/decisions.md and #102.
-    /// The registers one completion has to say, in the order it says them,
-    /// before preferences are asked.
     ///
-    /// **Shared by both surfaces** (PR #275). The Island's pop and the app's own
-    /// say the same words for the same tap, and used to decide that separately
-    /// — `GoalPopCentre` had the only copy while the app deliberately said
-    /// nothing. Now that the app pops too, one rule keeps them from drifting
-    /// into disagreeing about what a tap means.
-    ///
-    /// The tap that meets the goal has two things to say (#119), and they share
-    /// the two seconds rather than getting one each: a compact Island state has
-    /// room for one short phrase, so "logged" hands over to "you did it"
-    /// partway through.
-    static func registers(justMetGoal: Bool) -> [Register] {
-        justMetGoal ? [.logged, .goal] : [.logged]
-    }
-
+    /// **Kept when the handover went** (#420). This bounds *one* pop, and
+    /// `PopWindow` below settles two different taps landing inside it. Neither
+    /// had anything to do with one tap saying two things; removing them with
+    /// the handover would reintroduce #102.
     static let duration: Duration = .seconds(2)
-
-    /// How long the routine line holds before a goal-completing tap replaces it.
-    ///
-    /// The tap that meets the goal has two things to say, and they share the
-    /// two seconds rather than getting one each: "logged", then "you did it".
-    /// Sequential rather than combined, because a compact Island state has room
-    /// for one short phrase and not for two.
-    static let handover: Duration = .milliseconds(700)
 }
 
 /// How much the Island says.
@@ -156,11 +304,12 @@ enum PopPreferences {
 
     enum Level: Int, CaseIterable, Identifiable {
         /// Never written. Reads as `everything` for a fresh install (#185) —
-        /// people need encouragement, and a repetition now has its own quieter
-        /// register (`logged`, `counted`, `got it`) precisely so frequent
-        /// acknowledgement does not wear out the way it would have before #119
-        /// gave it one. An install that already stored `1` under the old
-        /// boolean scheme is a different question: see `goals`.
+        /// people need encouragement, and the pool is 173 phrases wide (#420)
+        /// precisely so frequent acknowledgement does not wear out. #185 gave
+        /// that job to a separate quiet register; the width does it now, and
+        /// does it for the goal-completing tap too. An install that already
+        /// stored `1` under the old boolean scheme is a different question:
+        /// see `goals`.
         case unset = 0
         /// Only when the day's or the week's goal is met. Never the default
         /// for a new install any more, but still what a *stored* `1` means —
@@ -186,20 +335,34 @@ enum PopPreferences {
         set { GlowSettings.store.set(newValue.effective.rawValue, forKey: key) }
     }
 
-    /// Whether a pop of this register should fire at all.
+    /// Whether this tap's pop should fire at all.
     ///
-    /// Pure, and the only place the rule lives — `GoalPopCentre` asks rather
+    /// Pure, and the only place the rule lives — both call sites ask rather
     /// than deciding, so "what does the switch mean" is one testable answer.
-    static func allows(_ register: GoalPop.Register, at level: Level) -> Bool {
+    ///
+    /// **Written against the goal, not against a register** (#420). This used
+    /// to take a `GoalPop.Register`, which made the three-way switch look like
+    /// it depended on the two vocabularies. It never did: the register was
+    /// gating frequency and picking words in one type, and only the frequency
+    /// half is what **Never / Goals / Everything** means. The boolean is the
+    /// one both call sites already compute on their first line, from
+    /// `GoalMet.justMet(habit:in:)`, so nothing new is plumbed to get it here.
+    ///
+    /// **One answer, not a list**, which is where "never fires twice" actually
+    /// lives. A tap that meets the goal used to get a two-element sequence out
+    /// of here and play it with a handover in between. A `Bool` cannot express
+    /// that, so the double-fire is gone by construction rather than by a guard
+    /// somebody has to remember to keep.
+    static func allows(justMetGoal: Bool, at level: Level) -> Bool {
         switch level.effective {
         case .off: false
-        case .goals: register == .goal
+        case .goals: justMetGoal
         case .everything, .unset: true
         }
     }
 
-    static func allows(_ register: GoalPop.Register) -> Bool {
-        allows(register, at: level)
+    static func allows(justMetGoal: Bool) -> Bool {
+        allows(justMetGoal: justMetGoal, at: level)
     }
 
     /// Kept so nothing outside has to know about three states to ask the one

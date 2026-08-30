@@ -147,11 +147,26 @@ landed on; that was weighed and taken. See docs/decisions.md.
   kept in `GoalMet`'s own comment, marked superseded. What it got wrong is the
   screen: a pop is not on that one.
 
-  **Two vocabularies, so the rare thing still reads as rarer.** A repetition
-  gets a flat acknowledgement — "logged", "counted" — and a goal met gets the
-  celebratory one. The tap that meets the goal says both, sequentially inside
-  the same two seconds, because a compact Island state has room for one short
-  phrase and not two.
+  **One pool of 173 phrases, and one line per tap** (#420). Every pop draws
+  from the same list, whether the tap was the first repetition of the week or
+  the one that finished it. Each line is lowercase and at most fourteen
+  characters, which is what the compact Island region carries without being
+  scaled to fit (#310).
+
+  This replaced two vocabularies — a flat acknowledgement for a repetition, a
+  celebratory one for a goal met — and the argument for them: that sharing a
+  list would make the goal indistinguishable from the twelfth glass of water.
+  The register was gating *frequency* and picking *words* at once, and only
+  the frequency half was doing that job. **Goals** still makes the goal the
+  only thing spoken, and the six-word routine list was paying for the same
+  claim a second time, at a width a person logging twice a day exhausted
+  inside a week.
+
+  **A tap never says two things.** The tap that met the goal used to say the
+  routine line and then replace it with the celebratory one part-way through
+  the two seconds — the only place in the app where one tap produced two pops.
+  It says one line now. `PopPreferences.allows(justMetGoal:at:)` returns one
+  verdict rather than a sequence, so there is nothing to play in order.
 
   **A correction says nothing.** Un-logging a day fires no pop. An acknowledgement for taking something
   back is the app congratulating somebody for an undo.
@@ -195,13 +210,17 @@ mark that is not tappable is not a `Toggle`, exactly as it was never a
 `Button`. VoiceOver's label, value and hint follow the same `isOn` the pixels
 do, so the announcement cannot lag the mark.
 
-  **It fires from the home screen only** (#103). The Island does not render a
-  Live Activity while its own app is in the foreground, so a goal met inside
-  the app would spend its two seconds on nobody. `GoalPopCentre` is called from
-  `MarkHabitIntent` and from nowhere else — it was two intents until #209
-  took the ring's away; the app's
-  acknowledgement is the one it already had, which is the ring closing and the
-  row going quiet.
+  **The Island fires from the home screen only, and the app draws its own**
+  (#103, reversed in part by PR #275). The Island does not render a Live
+  Activity while its own app is in the foreground, so a completion logged in
+  the app would spend its two seconds on nobody. `GoalPopCentre` is therefore
+  called from `MarkHabitIntent` and from nowhere else — it was two intents
+  until #209 took the ring's away. #103's answer was that the app then says
+  nothing, and that read as the app saying *less* the moment a person is
+  looking at it: the app draws `InAppPop` instead, the Live Activity's own
+  Lock Screen presentation, from the same pool under the same setting. The two
+  surfaces cannot both fire for one tap — they are reached from different entry
+  points, and the widget's button is not a foreground tap.
 
   The alternative was to rewrite §1 so that light may also mean *well done*.
   That was declined: it would put a second meaning on the one signal the app
