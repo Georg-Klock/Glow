@@ -137,6 +137,22 @@ struct RowGeometryTests {
         }
     }
 
+    /// #458: the step faces breathe evenly inside the frequency platter.
+    /// These are production values rather than a scan of the view's source,
+    /// and the subtraction is the relationship the eye sees.
+    @Test("The step faces leave ten points at every outer edge")
+    func editorStepMargins() {
+        #expect(HabitEditorGeometry.rowHeight == 56)
+        #expect(HabitEditorGeometry.stepInset == 10)
+        #expect(HabitEditorGeometry.stepSize == CGSize(width: 44, height: 36))
+        #expect(
+            (HabitEditorGeometry.rowHeight - HabitEditorGeometry.stepSize.height) / 2
+                == HabitEditorGeometry.stepInset
+        )
+        #expect(HabitEditorGeometry.stepRadius == 16)
+        #expect(HabitEditorGeometry.stepRadius < HabitEditorGeometry.stepSize.height / 2)
+    }
+
     /// #405 assumed the screen and the widget could disagree about where a name
     /// is cut, which would mean no single creation-time preview could be honest
     /// about both. They cannot disagree: this type applies one factor to the
