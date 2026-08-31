@@ -299,34 +299,30 @@ enum WidgetMetrics {
 
     /// Inside the label: the icon's column, and where the name starts.
     ///
-    /// The file places the name at x=28.5 with the symbol at x=0, so the icon
-    /// column and the space after it have to add up to exactly that or every
-    /// habit name in the widget sits a point off.
+    /// The gap is half the former 4.5pt (#455), giving the name 4.5pt more
+    /// room because the same `HStack` spacing sits on both sides of it. The
+    /// Figma fixture placed the name at x=28.5; the phone read made the tighter
+    /// x=26.25 start the controlling evidence instead.
     static let iconWidth: CGFloat = 24
-    static let iconGap: CGFloat = 4.5
+    static let iconGap: CGFloat = 2.25
 
     /// SF Pro Regular, one size for the habit name and every weekday letter.
     static let textSize: CGFloat = 12
-    /// The habit icon is two points smaller than the name it sits beside, and
-    /// derived from it rather than written down (#404).
+    /// The habit icon is the same size as the name it sits beside (#455), and
+    /// derived from it rather than written down so the two cannot drift.
     ///
-    /// It used to be `textSize + 2`, which drew the glyph 17% *larger* than the
-    /// name beside it — the opposite of what the label reads as. The brief was
-    /// "2 steps smaller as the font", and this file has no step scale to count
-    /// on: `textSize` is a literal point size, not a Dynamic Type style. So the
-    /// most literal reading is the one taken — two points below the text — and
-    /// it is written as an expression so that moving `textSize` moves this with
-    /// it instead of silently reopening the gap.
+    /// #404 took it from two points larger than the name to two points smaller.
+    /// The phone read that result as too small; equality is the requested
+    /// relationship rather than a third independent size.
     ///
-    /// The icon *column* is unchanged at `iconWidth` 24: the glyph shrank, the
-    /// space it sits in did not, so nothing after it moves and `nameMaxWidth`
-    /// is untouched.
-    static let iconSize: CGFloat = textSize - 2
+    /// The icon *column* is unchanged at `iconWidth` 24: the glyph changed, the
+    /// space it sits in did not, so nothing after it moves.
+    static let iconSize: CGFloat = textSize
 
     /// How far a habit name may run before it is truncated: the label column,
     /// less the icon and the gap on each side of the name.
     ///
-    ///     label 98 − icon 24 − iconGap 4.5 − iconGap 4.5 = 65
+    ///     label 98 − icon 24 − iconGap 2.25 − iconGap 2.25 = 69.5
     ///
     /// This constant used to read `(labelWidth + labelGap) - iconWidth -
     /// iconGap` = 73.5, and described a name as "allowed to overflow the label
@@ -339,17 +335,18 @@ enum WidgetMetrics {
     /// `.frame(maxWidth: nameMaxWidth)` on the name never bound: at 73.5 it
     /// was 8.5pt larger than anything the row could hand it.
     ///
-    /// Measured rather than derived: on a 390pt device (panel 350, scale
-    /// 1.03551) the row grants the name 67.31pt, and 65 × 1.03551 = 67.31.
-    /// "Watch Sunset Every Evening" reads `Watch Su…` on This Week and in the
-    /// week widget alike; at 73.5 it would read `Watch Sun…`.
+    /// #455 halves both gaps, because the same spacing constant appears on
+    /// both sides of the name. That grants 69.5pt rather than 65pt while the
+    /// icon column and track stay fixed. `HabitEditorView` renders this same
+    /// arrangement for its truncation measurement rather than copying the
+    /// number.
     ///
     /// So this is the arrangement's own number, not the design's target. The
     /// design's 73.5 — a name reaching into `labelGap`, which is how the file
     /// fits "Watch Sunset" — is a thing the app does not do, and #412 records
     /// the choice to say what the row grants rather than what the design
-    /// wanted. Changing this constant alone will not widen a name: the frame
-    /// is what binds, so reaching 73.5 means changing the arrangement.
+    /// wanted. Changing this constant alone would not widen a name: #455
+    /// changes the arrangement's two gaps, and the derivation follows it.
     static let nameMaxWidth: CGFloat = labelWidth - iconWidth - iconGap - iconGap
 
     /// The weekday header's own row: shorter than a slot row, and its cells are

@@ -7121,3 +7121,21 @@ not which phrase it draws; `PopWindow`'s newest-wins numbering and
 `GoalPop.duration` handle two taps inside one pop's two seconds, which is a
 different problem; and nothing is stored either way.
 
+## 2026-08-31 — The icon and its name share a size, and the gap halves (#455)
+
+#404 made the habit icon two points smaller than its 12pt name. Read on the
+phone, that hierarchy made the icon look undersized rather than quieter. The
+relationship is now equality: `WidgetMetrics.iconSize` is `textSize`, so a
+future type-size change cannot separate them again.
+
+The icon-to-name gap halves from 4.5pt to 2.25pt. `HabitRowView` and
+`WeekWidgetView` both build the label as an `HStack` containing icon, name and
+a trailing spacer, so that spacing occurs twice. Halving the one shared
+constant therefore also halves the name's trailing breathing room. That is
+deliberate: it is the smallest reading of the requested change, keeps one
+number for one repeated spacing, and grants the name 69.5pt rather than 65pt
+without moving the 24pt icon column or the track.
+
+The creation preview keeps measuring the real row instead of copying 69.5.
+The app and widget remain the same geometry at two scales, and a name that
+truncates on one truncates at the same character on the other.

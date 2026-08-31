@@ -491,17 +491,14 @@ One face throughout: **SF Pro Regular, 12pt**, `wdth 100`, line-height normal,
 single line, truncating with an ellipsis.
 
 - **Habit label** — 98 × 18, vertically centred on its row. Icon column 24 wide
-  at x 0; glyph 14.98 × 17.08 centred (SF Symbol at 14pt). Name at x 28.5,
-  max width **73.5** — `(98 + 4) − 24 − 4.5`, which is exactly where the track
-  begins, so a name can never reach the grid.
+  at x 0; the shipped glyph is 12pt, matching the name (#455). Name at x 26.25,
+  max width **69.5** — `98 − 24 − 2.25 − 2.25`. The second gap is the
+  `HStack` spacing before the trailing spacer; keeping both in the derivation
+  prevents the name from reaching the grid.
 
-  **The glyph is 10pt in the code, not the file's 14** (#404). The file draws
-  the icon a step *larger* than the name it labels, which is the opposite of
-  what the label reads as; `WidgetMetrics.iconSize` is `textSize - 2` and the
-  widget was rendered at 14, 13, 12, 11 and 10 before that was settled. The
-  column is unchanged at 24, so nothing else in this section moves — this is a
-  seventh entry for §8.6's list, found after the file was transcribed rather
-  than on the way in.
+  The Figma glyph is 14pt. #404 first corrected it to 10pt, two points smaller
+  than the name; the phone read that as too small, so #455 makes equality the
+  rule. The column remains 24pt, so changing the glyph does not move the name.
 - **Weekday letter** — cell 24 × 14 at the column's own x, text centred.
 
 Colour is one hex and three steps of it, and it says what is still asked of you:
@@ -530,7 +527,7 @@ Six deviations from an otherwise regular system, taken as slips:
 | --- | --- |
 | Two long done pills drawn socket 12 / inner 10 (rows 2x and 1x) | socket 14 / inner 12, like every other done pill — **socket 24 / inner 22 since #426**, which took every pill to the circles' height |
 | Weekday letter cells 17.455 wide — the *old* slot — on a 32pt pitch, landing 0.27 left of centre | 24 wide, on the column |
-| Name max width 84.5, derived from the old 15pt label gap, overrunning the track by 11 | 73.5 |
+| Name max width 84.5, derived from the old 15pt label gap, overrunning the track by 11 | 73.5 in the transcribed design; **69.5 in the shipped arrangement since #455**, after both gaps halved |
 | Socket fill `#D9D9D9 @ 1%` | no fill; the socket is its bevel — **superseded by #427**, which gives it `#000000 @ 15%`. Not this slip returning: black at 15% presses the recess in where near-white at 1% would lift it out |
 | Icon pure white beside a `#D9D9D9` name | icon takes the name's value |
 | Four zero-size boolean nodes; one fully authored but hidden row | file detritus, dropped |

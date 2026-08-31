@@ -19,7 +19,7 @@ import SwiftUI
 /// below has said so ever since. The stale half of that sentence is where
 /// #405's claim that the screen and the widget can truncate a name differently
 /// came from — they cannot: the one factor scales `textSize` too, so
-/// `nameMaxWidth` is 6.125 text-sizes on both. The third was the header, said
+/// `nameMaxWidth` is 5.792 text-sizes on both. The third was the header, said
 /// here to carry a date under each letter where the widget had room only for
 /// the letter: the date line went when the screen was required to be a large
 /// widget scaled up, and `WeekdayHeader` has drawn the letter alone since. The
