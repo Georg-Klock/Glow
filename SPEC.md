@@ -993,19 +993,23 @@ instructions, the only thing on the page no preview can demonstrate. The
 "Added" checkmarks all went with #312 — and with the checkmarks went the
 page's `WidgetCenter` query, since nothing displayed its answer any more.
 
-**The month is previewed against several habits, up to three.** It is the
-widget that asks *which habit* as it is placed, so one example answers a
-question the page is trying to show being asked; three of the person's own
-habits, in their own order, show the choice instead. Three because the third
-card is what makes it read as "one of yours" rather than as an arbitrary pair,
-and because each preview is a full-size month render — a fresh install's eight
-seeded habits would make that one section longer than the rest of the page. The
-week is one preview per size at every size: it already shows every habit at
-once, so "which one is this" is not a question it asks. Zero weekly habits is
-still one card, drawing the widget's own empty state — what adding it today
-would actually get you. The clause that kept Week-Small to a single card — it
-had no per-habit axis to vary a second one over until #188 gave it one — went
-with the family itself (PR #277).
+**The month is shown once for every tracked habit** (#465). Spacer rows are not
+habits and get no month; every habit `MonthStore.offered` returns gets one card,
+in the person's current order, with duplicate ids collapsed. This is a control
+surface rather than a demonstration sample, so there is no three-card cap. The
+week is still one preview per wide size because it already shows the whole
+list. Zero weekly habits is still one card, drawing the widget's own empty
+state — what adding it today would actually get you.
+
+**The production controls stay live inside the Widgets tab** (#465). Today's
+actionable mark in either week card and every month card is the same
+AppIntent-backed `SlotToggle` the Home Screen widget uses: it changes its face
+optimistically, asks the idempotent `MarkHabitIntent` for an absolute done or
+undone state, and then reconciles to the shared store. Past and future marks
+remain display-only. The controls keep their production VoiceOver labels and
+hints; the page does not hide a widget view as one picture. A finished intent
+signals the live Widgets and This Week tabs to re-read their bounded snapshots,
+while the usual widget invalidation updates installed widgets.
 
 **The Small previews sit two to a line, the way a Home Screen sits them**
 (#274). Two Small widgets occupy the footprint of one Medium, so a column of

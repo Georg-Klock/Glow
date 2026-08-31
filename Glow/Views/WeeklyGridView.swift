@@ -51,6 +51,10 @@ struct WeeklyGridView: View {
     @State private var editMode: EditMode = .inactive
     @State private var isShowingLowPowerNotice = false
     @State private var lowPower = LowPowerMonitor()
+    /// Advances when `MarkHabitIntent` settles a write from the Widgets tab or
+    /// a Home Screen widget while this app process is alive. The view's model
+    /// container is a peer of the intent's, so a redraw is the bridge (#465).
+    @State private var intentRevision = 0
     /// The pop currently on screen, or nil. See `InAppPop` and PR #275.
     @State private var pop: InAppPop.PopContent?
     /// Cancels a pop's own dismissal when a newer one replaces it, so the
@@ -335,6 +339,9 @@ struct WeeklyGridView: View {
             // calls — this handler used to call it directly.
             refreshToday()
         }
+        .onReceive(NotificationCenter.default.publisher(for: StoreChange.fromIntent)) { _ in
+            intentRevision &+= 1
+        }
         // **This screen writes nothing to the store unasked.** Seeding went in
         // #228 and the per-day sweep went to `GlowApp` in #239, so the empty
         // state below is a real answer about what the store holds rather than a
@@ -366,7 +373,8 @@ struct WeeklyGridView: View {
     /// costs what this one does. A pager over whole histories would have made
     /// every step back the most expensive thing the screen does.
     private var snapshots: [HabitSnapshot] {
-        Habit.snapshots(of: habits, within: week.dayIDs())
+        _ = intentRevision
+        return Habit.snapshots(of: habits, within: week.dayIDs())
     }
 
     private var grid: some View {

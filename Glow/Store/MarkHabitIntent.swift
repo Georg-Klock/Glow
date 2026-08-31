@@ -72,6 +72,13 @@ struct MarkHabitIntent: LiveActivityIntent {
         let result = try HabitStore(context: context)
             .setCompletion(for: habit, on: today, done: done)
 
+        // The in-app Widgets tab uses this exact intent too (#465). Its own
+        // `ModelContainer` cannot observe a peer container's completion rows,
+        // so tell the live app views to take fresh snapshots after the answer
+        // is final. Post for every verdict: an unchanged duplicate and a
+        // refusal must reconcile an optimistic mark just as a saved write does.
+        NotificationCenter.default.post(name: StoreChange.fromIntent, object: nil)
+
         // A tap already costs a timeline reload, so the completion can animate
         // inside the timeline that reload produces. This is the note the
         // provider reads. Only completing animates; un-completing is a

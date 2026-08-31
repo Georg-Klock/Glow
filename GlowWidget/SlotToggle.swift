@@ -1,6 +1,21 @@
 import AppIntents
 import SwiftUI
 
+/// WidgetKit promotes the toggle style's accessibility in an archived widget;
+/// a hosted app view does not. The Widgets tab sets this environment value so
+/// the same control can add an outer accessibility fallback without changing
+/// the installed widget's optimistic, `configuration.isOn`-driven voice.
+private struct InAppWidgetPreviewKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var isInAppWidgetPreview: Bool {
+        get { self[InAppWidgetPreviewKey.self] }
+        set { self[InAppWidgetPreviewKey.self] = newValue }
+    }
+}
+
 /// A widget mark that draws the state it just asked for (#292).
 ///
 /// This is the other half of `MarkHabitIntent` carrying `done`. The intent made
@@ -33,6 +48,8 @@ import SwiftUI
 /// and a spoken label and hint that follow `configuration.isOn` — so VoiceOver
 /// agrees with the optimistic pixels, not with the snapshot they outran.
 struct SlotToggle<OnMark: View, OffMark: View>: View {
+    @Environment(\.isInAppWidgetPreview) private var isInAppWidgetPreview
+
     private let habitID: UUID
     private let isDone: Bool
     private let onLabel: String
@@ -56,7 +73,22 @@ struct SlotToggle<OnMark: View, OffMark: View>: View {
         self.offMark = offMark()
     }
 
+    @ViewBuilder
     var body: some View {
+        if isInAppWidgetPreview {
+            control
+                // The hosted app accessibility tree does not promote the
+                // labels inside a custom AppIntent toggle style. Use the same
+                // strings at the control boundary there; the intent's local
+                // reconciliation redraw replaces this snapshot immediately.
+                .accessibilityLabel(isDone ? onLabel : offLabel)
+                .accessibilityHint(SlotVoice.hint(isDone: isDone))
+        } else {
+            control
+        }
+    }
+
+    private var control: some View {
         Toggle(isOn: isDone, intent: MarkHabitIntent(habitID: habitID, done: !isDone)) {
             // Never drawn: the style below draws the mark and ignores its
             // label, and what VoiceOver reads is the style's own

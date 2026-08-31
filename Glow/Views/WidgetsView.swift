@@ -73,6 +73,12 @@ struct WidgetsView: View {
     /// half of what a screen that reads the override owes.
     @State private var today = WeekCalendar.today()
 
+    /// An AppIntent writes through a peer SwiftData container, so `@Query`
+    /// cannot observe its completion rows. The intent posts a process-local
+    /// signal after it settles; changing this state makes the production views
+    /// take fresh bounded snapshots and reconcile their optimistic marks.
+    @State private var intentRevision = 0
+
     /// The week's first day, observed — the previews are widgets, and a widget
     /// draws seven columns from this. Read here for the same reason
     /// `WeeklyGridView` reads it: a value read only inside `WeekCalendar` is a
@@ -158,6 +164,12 @@ struct WidgetsView: View {
         ) { _ in
             refreshToday()
         }
+        // The preview's `SlotToggle` acknowledges immediately. This signal is
+        // the second half: re-read the shared store when the same intent has
+        // finished, whether it saved, was delivered twice, or was refused.
+        .onReceive(NotificationCenter.default.publisher(for: StoreChange.fromIntent)) { _ in
+            intentRevision &+= 1
+        }
         // **And once on the way in, which the notification cannot cover.**
         // `onReceive` subscribes when this view appears, and this tab may never
         // have appeared: the override is set in Settings, and a tab that has
@@ -228,7 +240,11 @@ struct WidgetsView: View {
             // as two widgets do.
             let perRow = WidgetMetrics.perRow(group.placement.family)
             let cardWidth = perRow > 1
-                ? (width - Self.gutter * CGFloat(perRow - 1)) / CGFloat(perRow)
+                // A `GeometryReader` can briefly propose zero while the
+                // hosted screen is entering the hierarchy. A negative frame
+                // is never a meaningful preview size, and SwiftUI diagnoses
+                // one before the settled width arrives.
+                ? max(0, (width - Self.gutter * CGFloat(perRow - 1)) / CGFloat(perRow))
                 : width
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(Array(group.rows.enumerated()), id: \.offset) { _, row in
@@ -252,13 +268,18 @@ struct WidgetsView: View {
     /// background. The rounded corner is drawn here because the system is not
     /// here to mask it.
     ///
-    /// Not interactive. The marks are intents in the real widget and still are
-    /// here, so hit testing is switched off rather than left to surprise
-    /// somebody: tapping a picture of a widget should not log a habit.
+    /// Interactive since #465. These are production `SlotToggle`s, so the app
+    /// gets the same AppIntent-backed optimistic frame, idempotent write and
+    /// today-only scope as the Home Screen widget. The transforms around them
+    /// change size, not behaviour or accessibility.
     private func preview(_ card: WidgetCard, width: CGFloat) -> some View {
         let size = WidgetMetrics.size(of: card.placement.family)
         let scale = size.width > 0 ? min(1, width / size.width) : 1
         return content(for: card)
+            // The control and intent remain the production ones. This only
+            // exposes their existing labels at the boundary SwiftUI's hosted
+            // accessibility tree reads; WidgetKit promotes the style itself.
+            .environment(\.isInAppWidgetPreview, true)
             .padding(.leading, WidgetMetrics.padLeading(for: card.placement.family))
             .padding(.trailing, WidgetMetrics.padTrailing(for: card.placement.family))
             .padding(.top, WidgetMetrics.padTop)
@@ -304,11 +325,6 @@ struct WidgetsView: View {
             // is actually drawn — `scaleEffect` alone changes nothing about the
             // space the view takes.
             .frame(width: size.width * scale, height: size.height * scale)
-            .allowsHitTesting(false)
-            // One stop, not forty. Every mark inside carries the label it
-            // carries on the Home Screen, and a preview is a picture: the
-            // heading above says which widget this is.
-            .accessibilityHidden(true)
     }
 
     /// The space between two widgets sitting side by side, from the sizes
@@ -340,6 +356,7 @@ struct WidgetsView: View {
     /// The week the week widget would draw, from the app's own live query
     /// rather than from a second read-only container.
     private var weekEntry: WeekEntry {
+        _ = intentRevision
         let week = WeekCalendar.week(containing: today)
         return WeekEntry(
             date: today,
@@ -369,6 +386,7 @@ struct WidgetsView: View {
     /// empty state, which is the honest preview of what adding the widget
     /// today would get you.
     private func monthEntry(for habitID: UUID?) -> MonthEntry {
+        _ = intentRevision
         let offered = previewHabits
         let chosen = habitID.map { id in offered.first { $0.id == id } } ?? offered.first
         guard let chosen, let days = MonthGrid.dayRange(containing: today),

@@ -227,16 +227,13 @@ struct WidgetPlacementTests {
         #expect(previewed == expected)
     }
 
-    /// The bound the page states. Unbounded, a fresh install's eight seeded
-    /// habits would be eight full-size month renders in one section.
-    @Test("More habits than the bound stop at the bound, keeping the first")
-    func habitsAreBounded() {
+    @Test("More than three habits are all shown, in the person's order")
+    func everyHabitGetsAMonthCard() {
         let habits = Self.habitIDs(9)
         let month = monthGroup(WidgetCatalog.groups(placed: [], habits: habits))
         let previewed: [UUID?] = month.cards.map(\.habitID)
-        let expected: [UUID?] = Array(habits.prefix(WidgetCatalog.habitPreviewLimit))
-        #expect(WidgetCatalog.habitPreviewLimit == 3)
-        #expect(month.cards.count == WidgetCatalog.habitPreviewLimit)
+        let expected: [UUID?] = habits
+        #expect(month.cards.count == habits.count)
         #expect(previewed == expected)
     }
 
@@ -439,6 +436,59 @@ struct WidgetPlacementTests {
         #expect(toggles >= 3, "the mark scan found \(toggles) SlotToggles, expected 3")
     }
 
+    /// The app does not wrap the production widget views in its own gesture.
+    /// Their `SlotToggle` controls stay intact all the way through the preview
+    /// transform, which is what makes the same optimistic AppIntent run on both
+    /// surfaces (#465). The modifiers are a source-level contract because hit
+    /// testing is not represented in a still render.
+    @Test("The Widgets tab leaves production AppIntent controls interactive")
+    func inAppPreviewsKeepTheProductionControls() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let widgets = try String(
+            contentsOf: root.appendingPathComponent("Glow/Views/WidgetsView.swift"),
+            encoding: .utf8
+        )
+        let slotToggle = try String(
+            contentsOf: root.appendingPathComponent("GlowWidget/SlotToggle.swift"),
+            encoding: .utf8
+        )
+        let previewStart = try #require(widgets.range(of: "private func preview("))
+        let previewTail = widgets[previewStart.lowerBound...]
+        let previewEnd = try #require(previewTail.range(of: "private static var gutter"))
+        let preview = previewTail[..<previewEnd.lowerBound]
+
+        #expect(!preview.contains(".allowsHitTesting(false)"))
+        #expect(!preview.contains(".accessibilityHidden(true)"))
+        #expect(widgets.contains("WeekWidgetView(entry:"))
+        #expect(widgets.contains("MonthWidgetView(entry:"))
+        #expect(slotToggle.contains("Toggle(isOn: isDone, intent: MarkHabitIntent("))
+    }
+
+    /// AppIntent writes happen through a peer container. The system's
+    /// optimistic face is immediate; this local signal is what makes both live
+    /// app tabs fetch the final answer afterwards, including a refusal or a
+    /// duplicate delivery.
+    @Test("An intent result reconciles both live app surfaces")
+    func intentResultHasAReconciliationPath() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        func source(_ path: String) throws -> String {
+            try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+        }
+
+        #expect(try source("Glow/Store/MarkHabitIntent.swift").contains(
+            "NotificationCenter.default.post(name: StoreChange.fromIntent"
+        ))
+        for path in ["Glow/Views/WidgetsView.swift", "Glow/Views/WeeklyGridView.swift"] {
+            #expect(try source(path).contains(
+                "NotificationCenter.default.publisher(for: StoreChange.fromIntent)"
+            ))
+        }
+    }
+
     /// The sizes the previews are laid out at are the sizes the render harness
     /// renders at — one source, so a preview cannot be a layout no phone shows.
     @Test("Each family has the size the design is authored against")
@@ -478,8 +528,8 @@ struct WidgetPreviewLayoutTests {
 
     @Test("A trailing odd card is a line of its own, not a stretched one")
     func oddCardStandsAlone() {
-        // #237 gives the month widget up to three cards, which is the case
-        // this actually renders.
+        // Any odd count can now reach this layout (#465); three is the smallest
+        // one that proves the final card keeps one widget's width.
         #expect(group(.systemSmall, cards: 3).rows.map(\.count) == [2, 1])
         #expect(group(.systemSmall, cards: 1).rows.map(\.count) == [1])
         #expect(group(.systemSmall, cards: 0).rows.isEmpty)

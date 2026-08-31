@@ -180,20 +180,6 @@ enum WidgetCatalog {
         })
     }
 
-    /// How many habits one per-habit widget is previewed against (#237).
-    ///
-    /// **The bound is three, and the reason is that the card demonstrates a
-    /// choice rather than enumerating a list.** Three is the smallest count
-    /// that reads as a series — one is an example, two is a pair and invites
-    /// "why those two", three is plainly "one of yours, you pick". Above that
-    /// the cost is real and the argument stops improving: each preview is a
-    /// production `MonthWidgetView` laid out at the family's true 158pt and
-    /// then scaled, so the section grows about 170pt per habit. Three keeps
-    /// This Month near a screen; the eight habits a fresh install seeds would
-    /// make it about 1,400pt — the same widget, longer than the rest of the
-    /// page put together, which teaches nothing the third card did not.
-    static let habitPreviewLimit = 3
-
     /// The page, top to bottom: everything we ship, grouped by placement, each
     /// group carrying whether it is already on the Home Screen — placed widgets
     /// are shown with a checkmark rather than dropped, because seeing what is
@@ -214,7 +200,9 @@ enum WidgetCatalog {
             let isPlaced = placed.contains(placement)
             let cards: [WidgetCard]
             if placement.previewsOneHabit, !distinct.isEmpty {
-                cards = distinct.prefix(habitPreviewLimit).map {
+                // A live control surface, not a sample (#465): every real
+                // habit gets its month card, in the order it has in the app.
+                cards = distinct.map {
                     WidgetCard(placement: placement, isPlaced: isPlaced, habitID: $0)
                 }
             } else {
