@@ -15,6 +15,12 @@ enum HabitEditorGeometry {
     static let stepSize = CGSize(width: 44, height: 36)
     /// Rounder than the old segmented-control corner, but short of a capsule.
     static let stepRadius: CGFloat = 16
+    /// One footnote line, present whether or not it has anything to say. The
+    /// warning changes opacity inside this slot rather than entering the
+    /// layout, so typing the first too-wide glyph cannot move the field or the
+    /// frequency row (#456).
+    static let nameHintHeight: CGFloat = 18
+    static let nameHintSpacing: CGFloat = 6
 }
 
 /// Add or edit a habit. One sheet for both, since the fields are identical.
@@ -101,38 +107,7 @@ struct HabitEditorView: View {
             // override, and all three now measure 20/12/7/4 at 2/4/6/8pt down.
             ScrollView {
                 VStack(spacing: 16) {
-                    HStack(spacing: 10) {
-                        Button { isPickingIcon = true } label: {
-                            // No chevron badge. It was there to say the icon
-                            // could be changed, back when the glyph sat loose
-                            // inside the name field and read as decoration. On
-                            // its own platter it is plainly a control, and the
-                            // badge was a label on something already labelled.
-                            HabitIconView(icon: icon, size: Self.iconSize)
-                                .frame(
-                                    width: HabitEditorGeometry.rowHeight,
-                                    height: HabitEditorGeometry.rowHeight
-                                )
-                                .background(platter)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Icon")
-                        .accessibilityHint("Choose a different icon")
-                        .accessibilityAddTraits(.isButton)
-
-                        TextField("Name", text: $name)
-                            .textInputAutocapitalization(.sentences)
-                            .focused($isNameFocused)
-                            .submitLabel(.done)
-                            .padding(.horizontal, Self.namePadding)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: HabitEditorGeometry.rowHeight)
-                            .background(platter)
-                    }
-
-                    // The name as the app will draw it, from the first letter
-                    // on. See `namePreview`.
-                    if !trimmedName.isEmpty { namePreview }
+                    nameEditor
 
                     // One platter, and now one row on it. It held two while a
                     // habit could be counted within a day as well as across a
@@ -272,9 +247,9 @@ struct HabitEditorView: View {
             .hidden()
     }
 
-    /// `HabitRowView`'s label, laid out the way that view lays it out when it is
-    /// not editing: the icon column, the name, a spacer, and the whole thing
-    /// held to the label column's width.
+    /// `HabitRowView`'s label measured off-screen, laid out the way that view
+    /// lays it out when it is not editing: the icon column, the name, a spacer,
+    /// and the whole thing held to the label column's width.
     ///
     /// **The arrangement is copied, not the numbers.** Which width the name ends
     /// up with is decided by this whole stack rather than by any one constant
@@ -285,7 +260,7 @@ struct HabitEditorView: View {
     /// width while the list is in edit mode, which gives the name more room —
     /// but that is a transient state of the list, not how the habit is read, and
     /// a preview should show the narrower of the two.
-    private var rowLabel: some View {
+    private var rowLabelProbe: some View {
         HStack(spacing: rowPreview.iconGap) {
             HabitIconView(icon: icon, size: rowPreview.iconSize)
                 .frame(width: rowPreview.iconWidth)
@@ -304,51 +279,110 @@ struct HabitEditorView: View {
         .frame(width: rowPreview.labelWidth, alignment: .leading)
     }
 
-    /// The habit's row, drawn here exactly as This Week and the widget will draw
-    /// it, so the ellipsis in the sheet is the ellipsis that ships.
+    /// Icon picker and name field, with the warning occupying a permanent line
+    /// immediately above them.
     ///
-    /// **A preview, not a counter.** A counter would have to name a number of
-    /// letters, and there is no such number: the limit is a width, so
-    /// "Illinois" and "Watch Waves" reach it at different lengths. And **not a
-    /// cap on the field**: what is stored is what was typed, unchanged. This
-    /// shows; it does not edit.
+    /// The old editor drew a second habit label below the field. That made the
+    /// field a place to enter one thing and the row beneath it the place to see
+    /// another, and the block's arrival moved the frequency control. The field
+    /// is the preview now: its type and width come from `rowPreview`, the same
+    /// geometry the hidden probes measure and the app and widget draw (#456).
     ///
-    /// **Shown from the first letter, not only once the name overruns.** The
-    /// line under it is what changes — the row is the same row either way, and
-    /// a block that appears at one keystroke and vanishes at the next is a
-    /// worse way to say the same thing. It costs one 12pt row and one footnote,
-    /// and it means the ellipsis, drawn by SwiftUI rather than predicted here,
-    /// is what carries the warning.
+    /// The input remains the full string. Once it is wider than the row, the
+    /// native field's scrolling text becomes transparent and a tail-truncated
+    /// copy is drawn over the same bounds. The field still owns focus, input,
+    /// selection and accessibility; only its pixels are replaced. This is the
+    /// deliberate cost of always showing the shipped truncation while focused:
+    /// the end being typed is no longer visible after the cut, exactly the
+    /// choice made for this issue.
     ///
-    /// Grey rather than amber. `GlowPalette.warning` is documented as the app's
-    /// one non-white colour, reserved for saying the glow is unavailable — this
-    /// is not that, and widening it is a palette decision rather than a
-    /// side effect of this screen.
-    private var namePreview: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ZStack(alignment: .topLeading) {
-                idealNameProbe
-                rowLabel
+    /// The amber warning changes opacity inside a fixed-height slot. Empty,
+    /// fitting and cut names therefore put every control below them at exactly
+    /// the same y-position.
+    private var nameEditor: some View {
+        VStack(spacing: HabitEditorGeometry.nameHintSpacing) {
+            HStack(spacing: 10) {
+                Color.clear
+                    .frame(width: HabitEditorGeometry.rowHeight, height: 1)
+
+                Text("Cut off on This Week and in the widget.")
+                    .font(.footnote)
+                    .foregroundStyle(GlowPalette.warning)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .opacity(isNameCut ? 1 : 0)
+                    .accessibilityHidden(!isNameCut)
+            }
+            .frame(height: HabitEditorGeometry.nameHintHeight)
+
+            HStack(spacing: 10) {
+                Button { isPickingIcon = true } label: {
+                    // No chevron badge. It was there to say the icon could be
+                    // changed, back when the glyph sat loose inside the name
+                    // field and read as decoration. On its own platter it is
+                    // plainly a control, and the badge was a label on
+                    // something already labelled.
+                    HabitIconView(icon: icon, size: Self.iconSize)
+                        .frame(
+                            width: HabitEditorGeometry.rowHeight,
+                            height: HabitEditorGeometry.rowHeight
+                        )
+                        .background(platter)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Icon")
+                .accessibilityHint("Choose a different icon")
+                .accessibilityAddTraits(.isButton)
+
+                ZStack(alignment: .leading) {
+                    HStack {
+                        TextField("Name", text: $name)
+                            .font(.system(size: rowPreview.textSize))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .foregroundStyle(isNameCut ? Color.clear : Color.primary)
+                            .textInputAutocapitalization(.sentences)
+                            .focused($isNameFocused)
+                            .submitLabel(.done)
+                            .frame(width: rowPreview.nameMaxWidth, alignment: .leading)
+
+                        Spacer(minLength: 0)
+                    }
+
+                    if isNameCut {
+                        Text(trimmedName)
+                            .font(.system(size: rowPreview.textSize))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(
+                                width: rowPreview.nameMaxWidth,
+                                alignment: .leading
+                            )
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .padding(.horizontal, Self.namePadding)
+                .frame(maxWidth: .infinity)
+                .frame(height: HabitEditorGeometry.rowHeight)
+                .background(platter)
+                .accessibilityHint(
+                    isNameCut
+                        ? "Cut off on This Week and in the widget"
+                        : ""
+                )
             }
 
-            Text(
-                isNameCut
-                    ? "Cut off here on This Week and in the widget."
-                    : "How it reads on This Week and in the widget."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+            // Kept in the ordinary layout rather than a background: both
+            // probes must be remeasured on every keystroke (#405). Their own
+            // explicit geometry is resolved before this zero-sized container
+            // removes them from the visible arrangement.
+            ZStack(alignment: .topLeading) {
+                idealNameProbe
+                rowLabelProbe
+            }
+            .frame(width: 0, height: 0)
+            .hidden()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, Self.namePadding)
-        // One announcement rather than a glyph, a fragment of a name and a
-        // sentence read as three stops.
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            isNameCut
-                ? "This name is too long. On This Week and in the widget it is cut off."
-                : "On This Week and in the widget this name is shown in full."
-        )
     }
 
     /// Minus, the reading, plus — in that order across the row.
