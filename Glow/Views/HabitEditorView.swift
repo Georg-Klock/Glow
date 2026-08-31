@@ -2,6 +2,21 @@ import SwiftData
 import SwiftUI
 import WidgetKit
 
+/// The editor's fixed control geometry, kept outside the view so tests can
+/// hold the relationship between the row and its step buttons rather than
+/// inspecting source text.
+enum HabitEditorGeometry {
+    /// The icon, name and frequency platters are one height. The step faces
+    /// leave this same inset at the row's outer left/right and top/bottom.
+    static let rowHeight: CGFloat = 56
+    static let stepInset: CGFloat = 10
+    /// Width keeps the existing hit target; height makes the vertical margins
+    /// equal to `stepInset` (#458).
+    static let stepSize = CGSize(width: 44, height: 36)
+    /// Rounder than the old segmented-control corner, but short of a capsule.
+    static let stepRadius: CGFloat = 16
+}
+
 /// Add or edit a habit. One sheet for both, since the fields are identical.
 struct HabitEditorView: View {
     let habit: Habit?
@@ -33,14 +48,13 @@ struct HabitEditorView: View {
     /// first pass is a real row rather than a zero-wide one.
     @State private var sheetWidth: CGFloat = WidgetMetrics.largeWidth
 
-    /// One height and one corner for every platter on this screen.
+    /// One corner for every outer platter on this screen.
     ///
     /// The icon, the name and the stepper were three different heights: two
     /// hand-set and one whatever a Form row happened to size itself to. Now all
-    /// three draw their own background at the same numbers, which is the only
-    /// way three rows agree — matching a system row's height by eye works until
-    /// the OS changes its padding.
-    private static let rowHeight: CGFloat = 56
+    /// three draw their own background at `HabitEditorGeometry.rowHeight`,
+    /// which is the only way three rows agree — matching a system row's height
+    /// by eye works until the OS changes its padding.
     /// 26, which is what the Form's own section corner measured at before the
     /// platters were drawn by hand: inset 36px at 12px down from the top edge,
     /// which solves to a 78px radius. On a 56pt row that is nearly a capsule,
@@ -55,16 +69,6 @@ struct HabitEditorView: View {
     /// How far the name sits from the platter's edge.
     private static let namePadding: CGFloat = 20
 
-    /// The step buttons' own face. 44 × 32 was already the hit target; it is
-    /// now also what you can see.
-    private static let stepSize = CGSize(width: 44, height: 32)
-    /// A quarter of the control's height, which is where a segmented control's
-    /// selected segment sits at this size.
-    ///
-    /// The row's 26 is not a candidate: it is a ratio of a 56pt row, and on a
-    /// 32pt button the same ratio is 15 — a capsule, which would read as a
-    /// different family of control rather than the same one, smaller.
-    private static let stepRadius: CGFloat = 8
     /// Spent, not merely quiet. Low enough to stop inviting a tap, high enough
     /// that the button is still plainly there and the row keeps its shape.
     private static let stepDisabledOpacity: Double = 0.45
@@ -105,7 +109,10 @@ struct HabitEditorView: View {
                             // its own platter it is plainly a control, and the
                             // badge was a label on something already labelled.
                             HabitIconView(icon: icon, size: Self.iconSize)
-                                .frame(width: Self.rowHeight, height: Self.rowHeight)
+                                .frame(
+                                    width: HabitEditorGeometry.rowHeight,
+                                    height: HabitEditorGeometry.rowHeight
+                                )
                                 .background(platter)
                         }
                         .buttonStyle(.plain)
@@ -119,7 +126,7 @@ struct HabitEditorView: View {
                             .submitLabel(.done)
                             .padding(.horizontal, Self.namePadding)
                             .frame(maxWidth: .infinity)
-                            .frame(height: Self.rowHeight)
+                            .frame(height: HabitEditorGeometry.rowHeight)
                             .background(platter)
                     }
 
@@ -134,7 +141,7 @@ struct HabitEditorView: View {
                     // that chose between them is gone and the count is the
                     // whole decision.
                     frequencyRow
-                        .frame(height: Self.rowHeight)
+                        .frame(height: HabitEditorGeometry.rowHeight)
                         .background(platter)
 
                     if isEditing {
@@ -378,7 +385,7 @@ struct HabitEditorView: View {
         }
         // Inset from the platter's edges. Hard against them the controls read
         // as part of the container rather than as things inside it.
-        .padding(.horizontal, 10)
+        .padding(.horizontal, HabitEditorGeometry.stepInset)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Times per week")
         .accessibilityValue("\(count.wrappedValue)")
@@ -410,6 +417,8 @@ struct HabitEditorView: View {
     ///
     /// The platter *is* the hit target rather than a smaller decoration inside
     /// it, so what looks pressable and what is pressable are the same rectangle.
+    /// At 44 × 36 inside a 56pt row, the visible face leaves the same 10pt at
+    /// the row's outer horizontal edges and above and below it (#458).
     private func stepButton(
         _ symbol: String,
         enabled: Bool,
@@ -418,9 +427,15 @@ struct HabitEditorView: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.body.weight(.medium))
-                .frame(width: Self.stepSize.width, height: Self.stepSize.height)
+                .frame(
+                    width: HabitEditorGeometry.stepSize.width,
+                    height: HabitEditorGeometry.stepSize.height
+                )
                 .background(
-                    RoundedRectangle(cornerRadius: Self.stepRadius, style: .continuous)
+                    RoundedRectangle(
+                        cornerRadius: HabitEditorGeometry.stepRadius,
+                        style: .continuous
+                    )
                         .fill(Color(.tertiarySystemFill))
                 )
                 .contentShape(Rectangle())

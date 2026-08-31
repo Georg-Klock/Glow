@@ -7139,3 +7139,15 @@ without moving the 24pt icon column or the track.
 The creation preview keeps measuring the real row instead of copying 69.5.
 The app and widget remain the same geometry at two scales, and a name that
 truncates on one truncates at the same character on the other.
+## 2026-08-31 — The step faces have the same ten-point air on every edge (#458)
+
+The frequency row stays 56pt tall and its minus and plus targets stay 44pt
+wide. Their visible faces grow from 32pt to 36pt tall, so the row leaves
+`(56 − 36) / 2 = 10pt` above and below them — the same 10pt its horizontal
+padding already leaves between each face and the row platter's edge.
+
+The face radius is 16pt. That is deliberately two points short of the 18pt
+capsule radius for a 36pt face: rounder than the old 8pt segmented-control
+corner, but still a continuous rounded rectangle. `HabitEditorGeometry` owns
+the row, inset, face and radius together so a test can hold the four equal
+margins without reading a private SwiftUI implementation.
