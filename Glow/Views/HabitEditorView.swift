@@ -216,8 +216,8 @@ struct HabitEditorView: View {
     /// **The screen's row and the widget's row are one row at two sizes.**
     /// `RowGeometry` is the large widget times one factor — the panel's width
     /// over 338 — and that factor is applied to `textSize` as well as to the
-    /// label column. So `nameMaxWidth / textSize` is `73.5 / 12` on This Week
-    /// whatever phone it is, and `73.5 / 12` in the widget. #405 assumed
+    /// label column. So `nameMaxWidth / textSize` is `69.5 / 12` on This Week
+    /// whatever phone it is, and `69.5 / 12` in the widget. #405 assumed
     /// otherwise, on the strength of this type's own stale header comment;
     /// Dynamic Type came out of `RowGeometry` on 2026-08-24 (docs/decisions.md)
     /// and nothing has scaled independently since. `RowGeometryTests` holds
@@ -236,17 +236,12 @@ struct HabitEditorView: View {
     /// Whether the name gets less room than it wants, and so ends in an
     /// ellipsis.
     ///
-    /// **Not `idealNameWidth > nameMaxWidth`**, which was the first version of
-    /// this and was a character optimistic on the screenshot that caught it.
-    /// `nameMaxWidth` is a ceiling the row never reaches: `HabitRowView` holds
-    /// the whole label to `.frame(width: labelWidth)` when it is not editing,
-    /// and `WeekWidgetView` does the same, so after the icon column, the two
-    /// `HStack` gaps and the trailing spacer, what is left for the name is
-    /// 65pt at a 12pt text size where `nameMaxWidth` says 73.5 — measured off
-    /// the row below at 67.3pt on a 390pt phone, whose scale is 1.0355.
-    ///
-    /// Which is why nothing here recomputes that: the row below *is* the row,
-    /// and it reports what the name was actually given.
+    /// **Still measured rather than compared with a copied constant.** The
+    /// first version predicted the cut from `nameMaxWidth` and was a character
+    /// optimistic on the screenshot that caught it. The row below is the real
+    /// arrangement — icon column, both gaps, name and trailing spacer — and it
+    /// reports what SwiftUI actually granted at this sheet's width. That keeps
+    /// the hint honest if any part of the arrangement moves again.
     private var isNameCut: Bool { idealNameWidth > grantedNameWidth }
 
     /// The typed name with nothing holding it back, which is the width the row

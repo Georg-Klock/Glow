@@ -155,6 +155,21 @@ struct RowGeometryTests {
         }
     }
 
+    /// #455: the two visible requests and the room they create are one rule.
+    /// Pin the production values directly; the ratio check above would stay
+    /// green if both app and widget agreed on the wrong geometry.
+    @Test("The icon matches the name and the two half-gaps grant 69.5 points")
+    func iconAndNameGeometry() {
+        #expect(WidgetMetrics.iconSize == WidgetMetrics.textSize)
+        #expect(WidgetMetrics.iconGap == 2.25)
+        #expect(WidgetMetrics.nameMaxWidth == 69.5)
+        #expect(
+            WidgetMetrics.nameMaxWidth
+                == WidgetMetrics.labelWidth - WidgetMetrics.iconWidth
+                    - WidgetMetrics.iconGap - WidgetMetrics.iconGap
+        )
+    }
+
     /// And at the widget's own width it is not merely the same ratio but the
     /// same numbers, which is the scale the editor's preview renders at.
     @Test("At 338 the screen's row is the widget's row")
