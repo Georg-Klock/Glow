@@ -247,9 +247,11 @@ enum GlowPalette {
         }
     }
 
-    /// Amber, and the only colour in the app that is not white or grey. Used for
-    /// exactly one thing: saying that the glow is unavailable. A warning in the
-    /// app's own white would be indistinguishable from the thing it warns about.
+    /// Amber, and the only colour in the app that is not white or grey. It says
+    /// that something visible cannot carry the full promise it appears to: the
+    /// glow is unavailable, or a typed name will be cut on the compact row. A
+    /// warning in the app's own white would be indistinguishable from the thing
+    /// it warns about.
     static let warning = Color(.sRGB, red: 1.0, green: 0.72, blue: 0.22, opacity: 1)
 }
 

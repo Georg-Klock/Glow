@@ -7254,3 +7254,29 @@ Keep the sink stamp so future OS releases and device traces retain the
 boundary. The tapped ring already acknowledges immediately through
 `SlotToggle` (#292); the rest of the row can remain stale until WidgetKit's
 reload arrives, which is the platform limit this measurement establishes.
+
+## 2026-08-31 — The name field is its own truncation preview (#456)
+
+**Supersedes #405's separate row preview and its grey sentence.** The stored
+name remains uncapped, and the cut is still measured from the real compact-row
+arrangement rather than predicted from a character count. What changes is where
+that truth is drawn: the editable field itself takes the row's font and measured
+name width and tail-truncates while it has focus. The full string remains the
+field's value and is what `save()` writes; only its compact presentation is
+replaced after the cut.
+
+The acknowledged cost is that the end currently being typed is no longer
+visible once the name overruns. Keeping the full text visible during focus was
+considered and declined: the field is meant to show the result continuously,
+not switch meanings when the keyboard appears.
+
+The hint is one amber footnote immediately above the field: *Cut off on This
+Week and in the widget.* Its 18pt line is always part of the layout and changes
+opacity rather than being inserted or removed. Empty, fitting and overlong names
+therefore leave the field and the weekly-frequency control at identical
+positions. There is no explanatory line or duplicate label below the field.
+
+This deliberately broadens `GlowPalette.warning`. Amber now says that a visible
+promise is unavailable in its full form: either the display cannot emit the
+glow, or the compact row cannot display the whole typed name. In both cases
+white would be indistinguishable from the content the warning qualifies.

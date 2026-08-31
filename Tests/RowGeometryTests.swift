@@ -151,6 +151,8 @@ struct RowGeometryTests {
         )
         #expect(HabitEditorGeometry.stepRadius == 16)
         #expect(HabitEditorGeometry.stepRadius < HabitEditorGeometry.stepSize.height / 2)
+        #expect(HabitEditorGeometry.nameHintHeight == 18)
+        #expect(HabitEditorGeometry.nameHintSpacing == 6)
     }
 
     /// #405 assumed the screen and the widget could disagree about where a name
