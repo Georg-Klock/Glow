@@ -146,6 +146,29 @@ inside the week it was given, so a week's worth is all a week's row needs;
 `WeekSpans`, `WeekDots`, `GoalMet` and `MonthGrid` rather than against a
 reading of them.
 
+**The widget's Island acknowledgement reads that bound before it writes**
+(#464). `OptimisticPop.shouldPresent` takes the requested absolute state, the
+pre-write week snapshot and the stored preference. It rejects undo, spacers and
+a day already completed; for **Goals** it adds one hypothetical row to the value
+snapshot and asks `GoalMet`, while **Everything** accepts any otherwise-new
+completion. `MarkHabitIntent` calls `GoalPopCentre` with that answer before
+`HabitStore.setCompletion`, so ActivityKit starts alongside the optimistic
+widget control rather than behind the save.
+
+`SlotToggle` also carries the presentation boundary into that shared intent.
+Its default, used by installed widgets, enables the Island; the in-app Widgets
+preview's existing environment value disables it. Both still execute the same
+absolute-state intent and reconciliation path, but the foreground app does not
+request a Live Activity the system will not display.
+
+`LatestPopDelivery` owns replacement ordering for a running Live Activity. It
+does not serialise updates: every new operation begins immediately. When an
+operation returns, it compares its generation with the latest; a stale one
+delivers the newest operation again and repeats that check before exiting.
+Thus an older ActivityKit call that finishes last cannot leave its old habit
+name and line on screen. `PopWindow` remains a separate generation guard for
+the two-second end task, whose clock restarts at every eligible tap.
+
 ### Slots carry their own action
 
 `Slot.actionDay` is the day a tap would toggle, or `nil` if the slot is not

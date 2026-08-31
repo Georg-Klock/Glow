@@ -180,6 +180,29 @@ landed on; that was weighed and taken. See docs/decisions.md.
   running activity rather than requesting another; the ending belongs to the
   most recent one, so nothing is cut short.
 
+  **The Island acknowledges the request, not the eventual save** (#464). An
+  eligible completion pop is decided from the bounded pre-write week snapshot
+  and launched before `HabitStore.setCompletion`, alongside the widget mark's
+  optimistic transition. **Never** stays silent; **Everything** allows a new
+  requested completion; **Goals** allows one whose hypothetical row would
+  reach the target. Undo and a requested completion the snapshot already holds
+  stay silent. A later refusal or save failure may take the mark back after the
+  words appeared; that rare mismatch is the accepted cost of not delaying the
+  acknowledgement behind persistence.
+
+  Existing-activity replacements are latest-wins even when ActivityKit returns
+  updates out of order. A new replacement starts immediately rather than
+  waiting in a queue. Every older delivery checks the latest generation after
+  its asynchronous update returns and reapplies the newest content before it
+  exits if it became stale. The two-second ending still belongs to the latest
+  tap, so both the words and their full visible duration restart there.
+
+  The production control hosted inside Glow's Widgets tab passes the same
+  intent with Island presentation disabled: the app is foreground, where the
+  Live Activity is not visible. Installed widgets pass it enabled. This keeps
+  the Island a Home Screen acknowledgement and leaves the existing in-app pop
+  as the foreground presentation.
+
 **A mark from a widget sets a state; it does not flip one** (#272, #292).
 `MarkHabitIntent` carries the state the tapped mark was *asking for* — a ring
 means "make this done", a dot means "make it not done" — and

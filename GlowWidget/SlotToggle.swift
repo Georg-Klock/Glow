@@ -89,7 +89,11 @@ struct SlotToggle<OnMark: View, OffMark: View>: View {
     }
 
     private var control: some View {
-        Toggle(isOn: isDone, intent: MarkHabitIntent(habitID: habitID, done: !isDone)) {
+        Toggle(isOn: isDone, intent: MarkHabitIntent(
+            habitID: habitID,
+            done: !isDone,
+            presentsIsland: !isInAppWidgetPreview
+        )) {
             // Never drawn: the style below draws the mark and ignores its
             // label, and what VoiceOver reads is the style's own
             // `accessibilityLabel`, which is the one that can follow `isOn`.
