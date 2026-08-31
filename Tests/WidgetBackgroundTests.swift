@@ -28,12 +28,13 @@ struct WidgetBackgroundTests {
         #expect(a == 1)
     }
 
-    @Test("Every colour the widget draws is neutral")
+    @Test("Every palette colour the widget draws is neutral")
     @MainActor
-    func nothingCarriesAHue() {
-        // One hex at three steps and white above them (#335): a hue anywhere
-        // would also break the widget's accented rendering, where the system
-        // keeps alpha and discards colour.
+    func thePaletteCarriesNoHue() {
+        // One hex at three steps and white above them (#335): a hue in the
+        // palette would also break the widget's accented rendering, where the
+        // system keeps alpha and discards colour. User-authored emoji are
+        // content and deliberately retain their own hues (#457).
         let neutral: [Color] = [
             GlowPalette.color, GlowPalette.lit, GlowPalette.greyResting,
             GlowPalette.greyIncreasedContrast, GlowPalette.greyAccented,

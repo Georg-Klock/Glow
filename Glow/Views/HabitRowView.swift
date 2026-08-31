@@ -585,53 +585,26 @@ struct HabitRowView: View {
     @State private var lit: Double = 1
 
     private var label: some View {
-        let text = HStack(spacing: geometry.iconGap) {
-            HabitIconView(icon: snapshot.icon, size: geometry.iconSize)
-                .frame(width: geometry.iconWidth)
-            // **Truncated at the track, never shrunk.** Still never shrunk —
-            // text at 12pt that quietly becomes 9pt is worse than text that
-            // ends in an ellipsis — but it no longer *overflows* either.
-            //
-            // `fixedSize(horizontal:)` used to sit here, which makes the text
-            // take its full ideal width and ignore the frame below. That was
-            // right when it was written: the gap before the track was 15 and a
-            // mark was a 3pt dot centred in a 17.455pt slot, so a long name ran
-            // into ~22pt of air and, as the old comment put it, "stops short of
-            // the grid". #331 took the gap to 4 and #332 made a mark fill its
-            // slot, so the air is gone and "Watch Sunset" ran *under the first
-            // circle* — measured on a device build.
-            //
-            // The design file has said truncate all along: its Habit Label
-            // component reads "the name ... truncates at 84.5, which is exactly
-            // where the track begins", and the frame's width is derived to land
-            // exactly there. Dropping `fixedSize` is what lets it.
-            //
-            // **The cap is the row's, and while editing the row is wider**
-            // (#440). `nameMaxWidth` is the label column less the icon and both
-            // gaps, and edit mode does not draw a label column — so it truncated
-            // where a track that is not there would have begun, with half the
-            // row empty either side. `editingNameMaxWidth` is the same rule
-            // measured against what edit mode actually grants. It is the third
-            // of the three things that hold this name in a label-shaped column;
-            // the other two are already conditional, two lines below and at the
-            // end of this view.
-            Text(snapshot.name)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(
-                    maxWidth: isEditing
-                        ? geometry.editingNameMaxWidth : geometry.nameMaxWidth,
-                    alignment: .leading
-                )
-            // This spacer and the column width below are the other two things
-            // that hold the name at the leading edge, so editing drops both: a
-            // label still filling a label-shaped column would centre that
-            // column rather than the name in it, which is not the thing being
-            // centred. The frame above was the one that was not dropped with
-            // them, which is #440.
-            if !isEditing { Spacer(minLength: 0) }
-        }
-        .font(.system(size: geometry.textSize))
+        // **Truncated at the track, never shrunk.** Still never shrunk — text
+        // at 12pt that quietly becomes 9pt is worse than text that ends in an
+        // ellipsis — but it no longer *overflows* either. `nameMaxWidth` is the
+        // label column less the icon and both gaps. Editing has no track, so it
+        // gets the wider `editingNameMaxWidth` and drops both the trailing
+        // spacer and the fixed label-column frame (#440).
+        let text = HabitLabelView(
+            icon: snapshot.icon,
+            name: snapshot.name,
+            iconSize: geometry.iconSize,
+            iconWidth: geometry.iconWidth,
+            iconGap: geometry.iconGap,
+            textSize: geometry.textSize,
+            nameMaxWidth: isEditing
+                ? geometry.editingNameMaxWidth : geometry.nameMaxWidth,
+            baseTier: isHandled ? .lit : .resting,
+            emittingOpacity: isEditing ? 0 : lit,
+            keepsTrailingSpacer: !isEditing,
+            isPlain: isEditing
+        )
 
         // The lit label sits over the resting one and its opacity is what
         // moves, rather than the two swapping — a swap is instant, and this has
@@ -657,27 +630,11 @@ struct HabitRowView: View {
         // `lit` keeps running underneath: it is untouched here, so leaving edit
         // mode returns each name to whatever the crossfade had already settled
         // on rather than re-deriving it.
-        return ZStack {
-            if isEditing {
-                text.foregroundStyle(GlowPalette.color)
-            } else {
-                // The resting or lit step underneath, with the emitting one
-                // crossfaded over it (#335, §8.5). `lit` is the spring that
-                // already ran this label; the step below it is what the
-                // crossfade lands *on*, and it is the middle tier once the
-                // habit has been handled today rather than the resting one.
-                //
-                // The whole label takes the tier, name and icon together: §8.5
-                // is explicit that the two carry the same value in every state,
-                // and a glowing name beside a resting icon reads as two facts.
-                if isHandled {
-                    text.foregroundStyle(GlowPalette.lit)
-                } else {
-                    text.foregroundStyle(GlowPalette.grey)
-                }
-                text.glowing().opacity(lit)
-            }
-        }
+        // `HabitLabelView` owns the shared app/widget styling rule. Symbols
+        // still take the tier with their names. Emoji keep their full colour
+        // outside the glow mask while the name crossfades exactly as before
+        // (#457).
+        return text
         .frame(width: isEditing ? nil : geometry.labelWidth, alignment: .leading)
         // No clipping: the overflow is the point. The frame reserves the
         // column so the track still starts where the geometry says it does.

@@ -391,45 +391,23 @@ private struct WidgetRow: View {
 
     @ViewBuilder
     private var label: some View {
-        let text = HStack(spacing: WidgetMetrics.iconGap) {
-            HabitIconView(icon: habit.icon, size: WidgetMetrics.iconSize)
-                .frame(width: WidgetMetrics.iconWidth)
-            // **Truncated at the track, never shrunk.** Still never shrunk —
-            // text at 12pt that quietly becomes 9pt is worse than text that
-            // ends in an ellipsis — but it no longer *overflows* either.
-            //
-            // `fixedSize(horizontal:)` used to sit here, which makes the text
-            // take its full ideal width and ignore the frame below. That was
-            // right when it was written: the gap before the track was 15 and a
-            // mark was a 3pt dot centred in a 17.455pt slot, so a long name ran
-            // into ~22pt of air and, as the old comment put it, "stops short of
-            // the grid". #331 took the gap to 4 and #332 made a mark fill its
-            // slot, so the air is gone and "Watch Sunset" ran *under the first
-            // circle* — measured on a device build.
-            //
-            // The design file has said truncate all along: its Habit Label
-            // component reads "the name ... truncates at 84.5, which is exactly
-            // where the track begins", and the frame's width is derived to land
-            // exactly there. Dropping `fixedSize` is what lets it.
-            Text(habit.name)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: WidgetMetrics.nameMaxWidth, alignment: .leading)
-            Spacer(minLength: 0)
-        }
-        .font(.system(size: WidgetMetrics.textSize))
-
-        Group {
-            // Three steps (#335, §8.5), and the whole label takes the tier —
-            // §8.5 is explicit that the icon carries the same value as its name
-            // in every state, so `text` is styled as one thing rather than a
-            // glyph and a string styled apart.
-            switch TypeTier.label(isOpenToday: isDue, isHandledToday: isHandled) {
-            case .emitting: text.glowing()
-            case .lit: text.foregroundStyle(GlowPalette.lit)
-            case .resting: text.foregroundStyle(GlowPalette.grey)
-            }
-        }
+        // The field and the row share this width: truncate at the track, never
+        // shrink type to make a long name appear to fit (#405, #456).
+        let tier = TypeTier.label(isOpenToday: isDue, isHandledToday: isHandled)
+        HabitLabelView(
+            icon: habit.icon,
+            name: habit.name,
+            iconSize: WidgetMetrics.iconSize,
+            iconWidth: WidgetMetrics.iconWidth,
+            iconGap: WidgetMetrics.iconGap,
+            textSize: WidgetMetrics.textSize,
+            nameMaxWidth: WidgetMetrics.nameMaxWidth,
+            // An emitting widget label has no crossfade underneath it. The
+            // shared view still supplies an icon-only base for an emoji, which
+            // is how its colour survives the name's glow mask (#457).
+            baseTier: tier == .emitting ? nil : tier,
+            emittingOpacity: tier == .emitting ? 1 : 0
+        )
         .frame(width: labelWidth, alignment: .leading)
         // No clipping: the overflow is the point. The frame reserves the
         // column so the track still starts where the design says it does.

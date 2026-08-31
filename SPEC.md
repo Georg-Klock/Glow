@@ -23,11 +23,13 @@ sentence.
 
 **Light has two tiers** (#334). The HDR emission — the physical glow of the
 opening paragraph — is reserved for what is still actionable: today's weekday
-letter while any habit is still open, the icon and name of a habit open today,
-and the open mark. A completion is lit but does not emit; it reads as an object
-catching light rather than as a source of it. The sentence above is unchanged by
-this — every completion is still lit, and absence is still dark — what the
-second tier adds is a *ceiling* a completion does not reach.
+letter while any habit is still open, the name of a habit open today, its SF
+Symbol when it has one, and the open mark. Emoji remain their own full-colour
+content while the name beside them emits (#457). A completion is lit but does
+not emit; it reads as an object catching light rather than as a source of it.
+The sentence above is unchanged by this — every completion is still lit, and
+absence is still dark — what the second tier adds is a *ceiling* a completion
+does not reach.
 
 That is not #75 reversing. #75 refused to paint a completion grey and still
 does; a completion is bright on every surface. #75's reasoning was written when

@@ -949,9 +949,11 @@ struct WidgetRenderDiffTests {
                 "the glow lifts a pixel \(worstDistance)px from anything drawn — that is a caster, not an edge")
     }
 
-    @Test("No pixel the widget renders carries a hue")
-    func noHueAnywhere() throws {
-        // Two colours and no third, over every pixel of every family.
+    @Test("A symbol-only widget remains neutral")
+    func symbolOnlyWidgetsHaveNoHue() throws {
+        // The app's own palette remains neutral. Full-colour emoji are the one
+        // content-owned exception (#457), and this fixture intentionally uses
+        // only SF Symbols so a palette tint still cannot hide among them.
         for (name, view, size) in families() {
             let pixels = try rgba(of: try renderFamily(view, size: size))
             var worst = 0
@@ -969,6 +971,69 @@ struct WidgetRenderDiffTests {
             // ground's own flatness. #226.
             #expect(worst <= 3, "\(name) carries a hue: channels spread by \(worst)")
         }
+    }
+
+    @Test("A due emoji keeps its colour while its name still emits")
+    func dueEmojiKeepsItsColour() throws {
+        func renderLabel(_ icon: String) throws -> (CGImage, [UInt8]) {
+            let size = CGSize(width: WidgetMetrics.labelWidth, height: 24)
+            let view = HabitLabelView(
+                icon: icon,
+                name: "Hydration",
+                iconSize: WidgetMetrics.iconSize,
+                iconWidth: WidgetMetrics.iconWidth,
+                iconGap: WidgetMetrics.iconGap,
+                textSize: WidgetMetrics.textSize,
+                nameMaxWidth: WidgetMetrics.nameMaxWidth,
+                baseTier: nil,
+                emittingOpacity: 1
+            )
+            .frame(width: size.width, height: size.height, alignment: .leading)
+            .background(Color.black)
+            .environment(\.colorScheme, .dark)
+
+            let renderer = ImageRenderer(content: view)
+            renderer.scale = Self.scale
+            renderer.proposedSize = ProposedViewSize(size)
+            let image = try #require(renderer.cgImage, "ImageRenderer produced no label")
+            return (image, try rgba(of: image))
+        }
+
+        func audit(
+            _ image: CGImage, _ pixels: [UInt8], xRange: Range<Int>
+        ) -> (hue: Int, brightest: Int) {
+            var hue = 0
+            var brightest = 0
+            for y in 0..<image.height {
+                for x in xRange.clamped(to: 0..<image.width) {
+                    let i = (y * image.width + x) * 4
+                    let channels = [Int(pixels[i]), Int(pixels[i + 1]), Int(pixels[i + 2])]
+                    hue = max(hue, (channels.max() ?? 0) - (channels.min() ?? 0))
+                    brightest = max(brightest, channels.max() ?? 0)
+                }
+            }
+            return (hue, brightest)
+        }
+
+        let (emojiImage, emojiPixels) = try renderLabel("💧")
+        let (symbolImage, symbolPixels) = try renderLabel("drop")
+        let iconEnd = Int((WidgetMetrics.iconWidth * Self.scale).rounded(.up))
+        // Leave the icon/name gap out of both samples, so antialiasing at one
+        // edge cannot be mistaken for colour in the other object.
+        let nameStart = Int(
+            ((WidgetMetrics.iconWidth + WidgetMetrics.iconGap + 2) * Self.scale)
+                .rounded(.up)
+        )
+
+        let emojiIcon = audit(emojiImage, emojiPixels, xRange: 0..<iconEnd)
+        let emojiName = audit(emojiImage, emojiPixels, xRange: nameStart..<emojiImage.width)
+        let symbolIcon = audit(symbolImage, symbolPixels, xRange: 0..<iconEnd)
+
+        #expect(emojiIcon.hue > 20, "the emoji was flattened to neutral pixels")
+        #expect(emojiName.hue <= 3, "the name inherited the emoji's colour")
+        #expect(emojiName.brightest > 200, "the due name stopped emitting")
+        #expect(symbolIcon.hue <= 3, "the SF Symbol stopped using the neutral glow")
+        #expect(symbolIcon.brightest > 200, "the due SF Symbol stopped emitting")
     }
 
     // MARK: - The fixture

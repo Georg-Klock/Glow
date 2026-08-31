@@ -11,9 +11,11 @@ absence: a missed day, a day still to come, a rep that ran out of days.
 
 **Light has two tiers, and the top one is reserved for what is still
 actionable** (#334, 2026-08-27). The HDR emission — the physical glow — goes to
-today's weekday letter while any habit is still open, to the icon and name of a
-habit open today, and to the open mark itself. A completion is *lit but does not
-emit*: an object catching light rather than a source of it.
+today's weekday letter while any habit is still open, to the name of a habit
+open today and its SF Symbol when it has one, and to the open mark itself. Emoji
+remain their own full-colour content while the name beside them emits (#457). A
+completion is *lit but does not emit*: an object catching light rather than a
+source of it.
 
 That reverses the corollary this paragraph used to draw. It read that **light
 cannot also be what separates open from done** — so shape carried that instead,
