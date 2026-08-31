@@ -374,8 +374,8 @@ declares whether a placed widget of that kind draws one habit somebody chose —
 true for the month, whose `SelectWeeklyHabitIntent` asks as it is placed; false
 for the week at every family, which is a `StaticConfiguration` over whatever the
 week holds. `WidgetCatalog.groups(placed:habits:)` turns that into the page:
-one group per placement, and under a per-habit placement one card per habit, up
-to `habitPreviewLimit` (3). The group is what carries the card's one heading,
+one group per placement, and under a per-habit placement one card per offered
+habit, without a demonstration cap (#465). The group is what carries the card's one heading,
 because a placement is one widget however many previews of it the page draws
 (#312 named the headings and dropped the per-size captions). The habit ids
 arrive as a parameter, read from the view's own `@Query` through
@@ -384,6 +384,30 @@ own picker cannot offer different habits. An empty list yields one card with no
 habit, which is `MonthWidgetView`'s own empty state rather than a heading with
 nothing under it. The clause that kept Week-Small to a single card went with
 the family itself (PR #277).
+
+**Those production views are live controls in the app too** (#465). The page
+does not disable hit testing or hide their accessibility trees. Today's
+actionable week slots, frequency spans and month cell therefore remain the
+same `SlotToggle` backed by the same idempotent `MarkHabitIntent` as a placed
+widget; past and future marks remain display-only because the production views
+already derive them with `SlotEditing.todayOnly`. The toggle's style draws its
+requested state optimistically before the intent finishes.
+
+A hosted app tree does not promote the accessibility label and hint attached
+inside the custom AppIntent toggle style the way WidgetKit's archived tree
+does. `WidgetsView` therefore marks the shared control as in-app through an
+environment value, and `SlotToggle` repeats the same current label and hint at
+the control boundary on that surface only. The installed widget keeps its
+`configuration.isOn`-driven accessibility; the app gets discoverable controls
+and reconciles that snapshot as soon as the intent finishes.
+
+The intent writes through a peer `ModelContainer`, which SwiftData does not
+merge into the app's already-fetched view state. After every intent verdict —
+including an unchanged duplicate or a refusal — `StoreChange.fromIntent` is
+posted inside the process. `WidgetsView` and `WeeklyGridView` advance a local
+revision and take fresh bounded snapshots, reconciling the optimistic face to
+the store while `WidgetRefresh` independently asks installed widgets for a new
+timeline.
 
 **`WidgetPlacementQuerying` is the seam.** `WidgetCenter` answers for the
 Home Screen of the device it is running on, which a test cannot arrange, so the

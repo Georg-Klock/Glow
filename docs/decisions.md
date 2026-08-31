@@ -7319,3 +7319,37 @@ There is no headroom-change notification to observe. A one-second visible-only
 poll is the deliberate trade: current enough for a human-readable diagnostic,
 without tying the screen to frame cadence or inventing a notification UIKit
 does not provide.
+## 2026-08-31 — The Widgets tab is a live control surface (#465)
+
+The tab already compiled and rendered the production `WeekWidgetView` and
+`MonthWidgetView`, but then disabled hit testing and hid each whole view from
+accessibility. It looked like the installed widget and deliberately withheld
+the installed widget's one-tap job. Those two modifiers are gone. Today's
+actionable week slot, frequency span and month cell remain their production
+`SlotToggle`s, with the same AppIntent-backed optimistic face, the same
+absolute-state `MarkHabitIntent`, and the same VoiceOver labels and hints.
+Because the production grids derive their actions with
+`SlotEditing.todayOnly`, this does not widen editing to another day.
+
+The first hosted accessibility run found the marks but no action label or hint:
+SwiftUI did not promote the values attached inside the custom AppIntent toggle
+style into an app-hosted tree. The shared toggle now reads an environment value
+set only by `WidgetsView` and repeats those same strings at the outer control
+boundary there. WidgetKit keeps the existing `configuration.isOn`-driven style
+labels; the app gets an accessible control and re-renders its snapshot when the
+intent settles.
+
+An intent opens a peer SwiftData container against the shared file. That keeps
+the file coherent and does not invalidate an app view's existing context. The
+intent therefore posts `StoreChange.fromIntent` after every final verdict — a
+saved completion, saved undo, unchanged duplicate, or refusal. The Widgets and
+This Week views advance a local revision and fetch fresh bounded snapshots;
+the optimistic face is acknowledged immediately and then reconciled to the
+store. Installed widgets still converge through the existing
+`WidgetRefresh.invalidate()` path.
+
+The month section also stops demonstrating only three choices. Every
+non-spacer habit offered by `MonthStore`, in the person's order and deduplicated
+by id, gets a card. The zero-habit case remains one unconfigured empty card.
+The accepted cost is a longer page for a long habit list: two Small cards still
+share each row, and completeness now wins over the old demonstration cap.

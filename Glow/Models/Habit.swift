@@ -252,15 +252,14 @@ final class Habit {
     /// store**. `MarkHabitIntent` opens its own `ModelContainer` against the
     /// same App Group file — in the app's process, since `LiveActivityIntent`
     /// (#58), which changes nothing here: peer containers do not notify each
-    /// other — and nothing tells the app's live context to re-fetch when the
-    /// intent's deletes a completion. The app tells the widget about every
-    /// write it makes; the reverse path does not exist.
+    /// other or merge their cached relationships. Since #465 the intent does
+    /// post a process-local signal that makes subscribed views fetch fresh
+    /// bounded snapshots, but the context and this cached array remain peers;
+    /// the signal does not make either one safe to trust.
     ///
     /// So this reads through the context instead. A fetch cannot hand back a
     /// row that is already gone, which sidesteps cross-context invalidation
-    /// rather than requiring it — that is the more complete fix and it is a
-    /// separate question, because whether SwiftData exposes persistent-history
-    /// notifications the way Core Data does is not established here.
+    /// rather than pretending the app-level redraw signal merged this model.
     ///
     /// Falls back to the cached array only when there is no context to ask,
     /// which is a model object that was built but never inserted — a fixture,
@@ -417,11 +416,11 @@ final class Habit {
     /// The tempting version of this is a cache on the habit, taken once and
     /// invalidated when the app writes. It cannot be made honest here: the
     /// widget's tap intent opens its own container against the same App Group
-    /// file, the app's live contexts are never told when it writes, and a
-    /// cache the writing context cannot invalidate is a wrong number that
-    /// survives until something unrelated redraws. So the pass is shared within one render and
-    /// dropped at the end of it, which is a cost the *number of habits* no
-    /// longer multiplies.
+    /// file. Its process-local signal redraws the subscribed app surfaces; it
+    /// does not give a model-owned cache a complete invalidation contract, nor
+    /// does it cross into the widget process. So the pass is shared within one
+    /// render and dropped at the end of it, which is a cost the *number of
+    /// habits* no longer multiplies.
     ///
     /// Maps `snapshot()` in two cases: when there is no range, where the shared
     /// pass measured no better than a fetch per habit and so is not worth the

@@ -1,6 +1,13 @@
 import Foundation
 import SwiftData
 
+/// Process-local reconciliation for a write performed through the AppIntent's
+/// peer SwiftData container. SwiftData keeps the file coherent but does not
+/// invalidate another container's already-fetched view state (#145, #465).
+enum StoreChange {
+    static let fromIntent = Notification.Name("com.georgklock.glow.store-change-from-intent")
+}
+
 /// The one container, shared by the app and the widget.
 ///
 /// Both processes open the same file in the App Group container — the app
@@ -11,21 +18,19 @@ import SwiftData
 /// does not do is keep another context's already-fetched objects up to date,
 /// and that sentence used to say only the first half.
 ///
-/// **Neither direction is automatic**, and only one of them was wired up:
+/// **Neither direction is automatic**, so both are wired explicitly:
 ///
 ///  - The app tells the widget, by following every write with a timeline
 ///    reload. See `WidgetRefresh`.
-///  - Nothing tells the app's live contexts when the *intent* writes. A
-///    `Habit` the app fetched earlier keeps a cached `completions` array, and
-///    the intent's context can delete a row out from under it — which crashed
-///    on the next render until `Habit.liveCompletions` stopped trusting the
-///    cache (#145). Sharing a process changes none of this: peer containers in
-///    one process do not notify each other either.
+///  - The intent posts `StoreChange.fromIntent` after every verdict. Live app
+///    surfaces that render its rows advance a local revision and fetch their
+///    bounded snapshots again (#465).
 ///
-/// The complete fix is a cross-context change notification, and whether
-/// SwiftData exposes persistent history the way Core Data does is not
-/// established here. Until it is, nothing should read a cached relationship
-/// array and assume its rows still exist.
+/// That signal is a redraw bridge, not a context merge. A `Habit` fetched by
+/// the app can still hold a cached `completions` relationship while the
+/// intent's context deletes one of its rows — the crash #145 fixed by making
+/// `Habit.liveCompletions` fetch through its context instead. Nothing should
+/// read a cached relationship array and assume a peer container kept it live.
 enum GlowStore {
     /// Built from the versioned declaration, not from a bare model list
     /// (#283): every reader of this property — both containers here, the

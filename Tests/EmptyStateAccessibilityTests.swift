@@ -116,6 +116,27 @@ struct EmptyStateAccessibilityTests {
         #expect(try screen.container.mainContext.fetchCount(FetchDescriptor<Habit>()) == 0)
     }
 
+    /// The Widgets tab used to hide each production widget view wholesale.
+    /// Hosting the real page proves the `SlotToggle` labels and action hints
+    /// now reach UIKit's accessibility tree in all three cards (#465).
+    @Test func widgetPreviewsExposeTheirProductionControls() throws {
+        let screen = try WidgetScreen()
+        defer { screen.tearDown() }
+
+        let elements = screen.contentElements()
+        let controls = elements.filter {
+            ($0.accessibilityLabel ?? "").hasPrefix("Preview Habit,")
+                && $0.accessibilityHint == "Mark as done"
+        }
+        #expect(
+            controls.count >= 3,
+            """
+            expected Large, Medium and Month controls; found \(controls.count). Tree: \
+            \(elements.map { "\($0.accessibilityLabel ?? "<nil>") | \($0.accessibilityHint ?? "<nil>")" })
+            """
+        )
+    }
+
     // MARK: - Reading the tree
 
     /// `WeeklyGridView` over an empty store, hosted in a window.
@@ -259,6 +280,93 @@ struct EmptyStateAccessibilityTests {
                 }
             }
 
+            if let view = node as? UIView {
+                for subview in view.subviews {
+                    walk(subview, into: &found, seen: &seen, depth: depth + 1)
+                }
+            }
+        }
+    }
+
+    /// The production Widgets tab over one real in-memory habit. Kept inside
+    /// this existing hosted suite so the repository still pays for one live
+    /// accessibility harness, not a second competing one (#245, #291).
+    @MainActor
+    struct WidgetScreen {
+        private static var kept: [ModelContainer] = []
+
+        let container: ModelContainer
+        let host: UIViewController
+        let window: UIWindow
+
+        init() throws {
+            container = try ModelContainer(
+                for: GlowStore.schema,
+                configurations: ModelConfiguration(
+                    schema: GlowStore.schema, isStoredInMemoryOnly: true
+                )
+            )
+            container.mainContext.insert(Habit(
+                name: "Preview Habit",
+                icon: "figure.walk",
+                frequency: .daily,
+                createdAt: WeekCalendar.today(),
+                sortOrder: 0
+            ))
+            try container.mainContext.save()
+
+            host = UIHostingController(rootView: WidgetsView().modelContainer(container))
+            window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
+            if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                window.windowScene = scene
+            }
+            window.rootViewController = host
+            window.isHidden = false
+            window.makeKeyAndVisible()
+            Self.kept.append(container)
+            settle()
+        }
+
+        func settle() {
+            host.view.layoutIfNeeded()
+            RunLoop.current.run(until: Date().addingTimeInterval(1.5))
+            host.view.layoutIfNeeded()
+        }
+
+        func tearDown() {
+            window.rootViewController = nil
+            window.isHidden = true
+            window.windowScene = nil
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+        }
+
+        func contentElements() -> [NSObject] {
+            var found: [NSObject] = []
+            var seen = Set<ObjectIdentifier>()
+            Self.walk(host.view, into: &found, seen: &seen, depth: 0)
+            return found
+        }
+
+        private static func walk(
+            _ node: NSObject, into found: inout [NSObject], seen: inout Set<ObjectIdentifier>,
+            depth: Int
+        ) {
+            guard depth < 60, seen.insert(ObjectIdentifier(node)).inserted else { return }
+            if node.isAccessibilityElement { found.append(node) }
+
+            if let children = node.accessibilityElements as? [NSObject], !children.isEmpty {
+                for child in children { walk(child, into: &found, seen: &seen, depth: depth + 1) }
+            } else {
+                let count = node.accessibilityElementCount()
+                if count > 0, count != NSNotFound {
+                    for index in 0..<count {
+                        guard let child = node.accessibilityElement(at: index) as? NSObject else {
+                            continue
+                        }
+                        walk(child, into: &found, seen: &seen, depth: depth + 1)
+                    }
+                }
+            }
             if let view = node as? UIView {
                 for subview in view.subviews {
                     walk(subview, into: &found, seen: &seen, depth: depth + 1)
