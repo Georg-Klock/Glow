@@ -7183,3 +7183,36 @@ has a different order, and a changed pool discards a persisted partial cycle.
 This does revise #450's last sentence: the phrase choice now stores its bag, but
 still no habit, completion, phrase history, or time. `docs/data-inventory.md`
 names the two App Group-defaults values explicitly.
+## 2026-08-31 — The week panel scrolls with its rows (#454)
+
+**This corrects #398's interpretation without reverting its swipe fix.** The
+request there concerned a horizontal row swipe: Edit and Delete should open on
+the grey card rather than on bare black. Attaching one panel to the `List`
+viewport did that, but it also pinned the panel during vertical scrolling. A
+long list could then move its rows above and below the surface that supposedly
+contained them. The Widgets tab already has the intended model: one card,
+content and ground moving together.
+
+The native `List` remains the one and only scroller. It still owns each cell,
+`swipeActions`, `onMove`, `onDelete`, edit accessories, separators and
+accessibility. Its iOS 18 `onScrollGeometryChange` reports the vertical content
+offset, normalized to zero at rest, and the single panel behind the List takes
+that same transform. Vertically, card and rows therefore travel as a unit;
+horizontally, a swiped cell still reveals the List's panel underneath it.
+
+The panel is no longer clamped to the viewport: it keeps the full
+`RowGeometry.panelHeight(rows:)` that the production header and row insets sum
+to. It deliberately is not clipped to the List's resting bounds: the List rows
+travel beneath the navigation and tab bars, and the card must accompany them;
+the shared `TopFade` now dissolves both at the top, just as it already does for
+the Widgets cards. That keeps the navigation and status region black while the
+moving material passes beneath it. The last row and the card's bottom corners
+are one position, even while they pass beneath the floating tab bar.
+The #400 modifier ordering survives: the panel is applied before the List's
+10pt horizontal padding, and row padding hands those 10pt back, so native edit
+controls retain their breathing room without moving the resting grid.
+
+`RowGeometryTests` already sum the production header and row insets independently
+of `panelHeight`. Direct simulator evidence is still required at rest,
+mid-scroll and mid-swipe because the widget render gate does not render this app
+screen.

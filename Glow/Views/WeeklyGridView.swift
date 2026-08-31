@@ -30,6 +30,10 @@ struct WeeklyGridView: View {
     @State private var isDemoSeeded = false
     @State private var editingHabit: Habit?
     @State private var isAddingHabit = false
+    /// The native `List`'s vertical displacement from its resting position.
+    /// The rows already move by this amount; #454 gives the single panel behind
+    /// them the same transform without replacing any of the List interactions.
+    @State private var gridScrollOffset: CGFloat = 0
     /// Edit mode, owned rather than left to the `NavigationStack` (#207).
     ///
     /// The list's editing controls are offered on the current week and nowhere
@@ -151,6 +155,13 @@ struct WeeklyGridView: View {
             // draws it — the principal item takes the centre — but it is what
             // a `NavigationLink` pushed from here would name its back button,
             // and what the system reads when the toolbar is not on screen.
+            //
+            // The panel now travels beneath the navigation bar with its rows
+            // (#454). Use the same measured fade as the Widgets tab so that
+            // moving material dissolves to black instead of lighting the status
+            // region. Applied before the pop overlay: a pop belongs above the
+            // screen treatment, not underneath it.
+            .overlay(alignment: .top) { TopFade() }
             // **An overlay, not a row in the stack** (PR #275). Put in the
             // `VStack` it pushed the whole grid down for its two seconds, so
             // the row that was just tapped moved out from under the finger —
@@ -526,13 +537,27 @@ struct WeeklyGridView: View {
             // The list's own ground goes, so the panel below is what shows
             // through the rows' now-clear backgrounds.
             .scrollContentBackground(.hidden)
-            // **The panel, once** (#398). `.background` attaches to the `List`
-            // itself rather than to anything inside its scroll, so it does not
-            // move: rows slide over it, a swipe opens its buttons on it rather
-            // than on bare black, and the weekday header still scrolls out of
-            // view because nothing about the header changed.
+            // **The panel, once, following the List's own scroll** (#454).
+            // It stays behind the List, so a horizontal row swipe still reveals
+            // material (#398). Vertically it receives the same content offset
+            // as the rows, so its top and bottom corners travel with them.
             .background(alignment: .top) {
-                panel(geometry: geometry, inset: GridMetrics.rowPadding)
+                GeometryReader { _ in
+                    panel(geometry: geometry, inset: GridMetrics.rowPadding)
+                        .offset(y: -gridScrollOffset)
+                }
+                // Like the List rows, the travelling card is allowed under the
+                // navigation and tab bars. `TopFade` dissolves it at the top;
+                // clipping this reader would strand those rows on black again.
+            }
+            // At rest `contentOffset.y` is the negative top inset. Adding that
+            // inset gives zero; after a drag it is the exact distance by which
+            // the List moved its content. This iOS 18 API observes the native
+            // scroller without putting another scroller around it.
+            .onScrollGeometryChange(for: CGFloat.self) { scroll in
+                scroll.contentOffset.y + scroll.contentInsets.top
+            } action: { _, offset in
+                gridScrollOffset = offset
             }
             // **The edit controls' breathing room, taken from the `List`**
             // (#400). The delete circle and the reorder handle are the
@@ -575,7 +600,7 @@ struct WeeklyGridView: View {
 
     /// The grid's one grey surface (#398).
     ///
-    /// **As tall as the habits on it, and no taller than the screen.** The
+    /// **As tall as the habits on it.** The
     /// panel used to be N+1 row backgrounds that abutted, which gave it that
     /// height for free. One shape has to be told how tall it is, which is
     /// `RowGeometry.panelHeight(rows:)`, reading the same numbers the rows lay
@@ -588,12 +613,10 @@ struct WeeklyGridView: View {
     /// numbers and the method are in `docs/decisions.md`; #402 keeps the
     /// attribution and stays open.
     ///
-    /// **It does not scroll, and that is the change Georg asked for.** A row's
-    /// content is what slides to reveal its swipe buttons; the surface those
-    /// buttons sit on stays where it is. The consequence, said plainly rather
-    /// than left to be found: on a list longer than the screen the panel fills
-    /// the screen and its bottom corner stops travelling with the last row.
-    /// A panel that ends under the last row *is* a panel that moves.
+    /// **It moves vertically with the rows and stays behind a horizontal row
+    /// swipe** (#454). The native List reports its vertical content offset and
+    /// this shape receives that same transform. It remains the List's
+    /// background, so a cell sliding horizontally still reveals material.
     ///
     /// All four corners, where the header carried the top two and the last row
     /// the bottom two. One shape, one radius.
@@ -603,26 +626,12 @@ struct WeeklyGridView: View {
     /// padded by `editControlInset`, and the two sum back to 20pt. The panel
     /// sits exactly where it did before that split.
     private func panel(geometry: RowGeometry, inset: CGFloat) -> some View {
-        // The reader is the `List`'s own height, not the screen's. The two are
-        // not the same: the list scrolls under the tab bar, and measuring the
-        // outer `GeometryReader` instead left the panel ending 90pt short with
-        // the last rows sitting on bare black — which is the bug this issue is
-        // about, reintroduced by the fix for it. Measured, not reasoned about.
-        GeometryReader { panelProxy in
-            GlowPalette.widgetSurface
-                .frame(height: min(
-                    panelProxy.size.height, geometry.panelHeight(rows: habits.count)
-                ))
-                .clipShape(RoundedRectangle(
-                    cornerRadius: GridMetrics.panelCorner, style: .continuous
-                ))
-                .padding(.horizontal, inset)
-        }
-        // The rows are drawn past the list's own frame, under the floating tab
-        // bar — before #398 they carried their backgrounds down there with
-        // them, and a panel that stopped at the safe area left the last rows on
-        // bare black. The panel follows them.
-        .ignoresSafeArea(.container, edges: .bottom)
+        GlowPalette.widgetSurface
+            .frame(height: geometry.panelHeight(rows: habits.count))
+            .clipShape(RoundedRectangle(
+                cornerRadius: GridMetrics.panelCorner, style: .continuous
+            ))
+            .padding(.horizontal, inset)
         // Nothing here is readable and the marks above it are what a screen
         // reader walks. A decorative rectangle in the tree is one more stop on
         // the way to them.
