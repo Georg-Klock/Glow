@@ -114,6 +114,14 @@ recorded in [decisions.md](decisions.md). The ceiling came down from 12 with
 it: `potentialEDRHeadroom` on the reference device is 8.0, so the old top third
 of the slider was positions the panel could never grant.
 
+Settings names both display readings beside that slider: for example,
+`3.2× right now · 8.0× maximum`. The first value is
+`currentEDRHeadroom`, the live grant that can move with operating conditions;
+the second is `potentialEDRHeadroom`, the maximum available under the current
+display configuration. The current value is sampled immediately and once per
+second while Settings is visible. It is not inferred from the potential value,
+and polling stops with the screen.
+
 This paragraph said 6x until 2026-08-25 and the table below said `6.0`. Both
 were left behind when the default moved to 12, and the drift is worth naming
 because of what it cost: a device found running at **1.5** was read against a
