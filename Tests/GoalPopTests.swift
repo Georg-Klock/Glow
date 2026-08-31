@@ -5,6 +5,15 @@ import Testing
 /// #58: the goal, not each repetition — and the switch that is on by default.
 @Suite("Goal pop", .serialized)
 struct GoalPopTests {
+    private struct SeededGenerator: RandomNumberGenerator {
+        var state: UInt64
+
+        mutating func next() -> UInt64 {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return state
+        }
+    }
+
     private let calendar = TestCalendar.monday
     private var week: Week {
         WeekCalendar.week(containing: TestCalendar.date(2026, 8, 17), calendar: calendar)
@@ -75,38 +84,58 @@ struct GoalPopTests {
 
     // MARK: - The line
 
-    @Test("One habit on one day does not keep saying the same thing")
-    func theLineIsDrawnFresh() {
-        // The defect #450 was filed for: the line was hashed from the habit
-        // and the day, so one habit said exactly one thing all day however
-        // many times it was toggled. Over 200 draws from what used to be a
-        // fixed seed, more than one phrase has to appear. With 173 phrases the
-        // chance of a false failure is (1/173)^199.
-        var seen = Set<String>()
-        for _ in 0..<200 {
-            seen.insert(GoalPop.line())
+    @Test("A cycle says every line exactly once")
+    func aCycleIsTheExactPool() throws {
+        let suite = "\(StoreLocation.appGroupID).tests.goal-pop.\(UUID())"
+        let store = try #require(UserDefaults(suiteName: suite))
+        defer { store.removePersistentDomain(forName: suite) }
+        var generator = SeededGenerator(state: 452)
+
+        // Rebuild the value around every draw, as `GoalPop.line()` does. The
+        // only thing carrying the cycle is the persisted remainder.
+        let cycle = (0..<GoalPop.lines.count).map { _ in
+            GoalPop.ShuffleBag(lines: GoalPop.lines, store: store)
+                .draw(using: &generator)
         }
-        #expect(seen.count > 1, "the pop repeats: every draw said the same thing")
+
+        #expect(cycle.count == GoalPop.lines.count)
+        #expect(Set(cycle) == Set(GoalPop.lines))
+        #expect(Set(cycle).count == cycle.count)
     }
 
-    @Test("Every line drawn is one of the pool's")
-    func theLineComesFromThePool() {
-        for _ in 0..<200 {
-            #expect(GoalPop.lines.contains(GoalPop.line()))
-        }
+    @Test("The next cycle is independently shuffled")
+    func cyclesDiffer() throws {
+        let suite = "\(StoreLocation.appGroupID).tests.goal-pop.\(UUID())"
+        let store = try #require(UserDefaults(suiteName: suite))
+        defer { store.removePersistentDomain(forName: suite) }
+        let bag = GoalPop.ShuffleBag(lines: GoalPop.lines, store: store)
+        var generator = SeededGenerator(state: 452)
+
+        let first = (0..<GoalPop.lines.count).map { _ in bag.draw(using: &generator) }
+        let second = (0..<GoalPop.lines.count).map { _ in bag.draw(using: &generator) }
+
+        #expect(first != second)
+        #expect(Set(first) == Set(GoalPop.lines))
+        #expect(Set(second) == Set(GoalPop.lines))
     }
 
-    @Test("Every line in the pool is reachable")
-    func everyLineIsReachable() {
-        // A draw that could not reach part of the list would make the count a
-        // lie. 20,000 draws over 173 phrases leaves the chance of missing any
-        // one of them at e^-115 — an argument that is more true of a real
-        // random draw than it was of the hash it replaced.
-        var seen = Set<String>()
-        for _ in 0..<20_000 {
-            seen.insert(GoalPop.line())
-        }
-        #expect(seen.count == GoalPop.lines.count)
+    @Test("Changing the phrase pool rebuilds the persisted bag")
+    func aChangedPoolRebuilds() throws {
+        let suite = "\(StoreLocation.appGroupID).tests.goal-pop.\(UUID())"
+        let store = try #require(UserDefaults(suiteName: suite))
+        defer { store.removePersistentDomain(forName: suite) }
+        var generator = SeededGenerator(state: 452)
+
+        let old = GoalPop.ShuffleBag(lines: ["old one", "old two"], store: store)
+        _ = old.draw(using: &generator)
+
+        let newLines = ["new one", "new two", "new three"]
+        let changed = GoalPop.ShuffleBag(lines: newLines, store: store)
+        let cycle = (0..<newLines.count).map { _ in changed.draw(using: &generator) }
+
+        #expect(Set(cycle) == Set(newLines))
+        #expect(Set(cycle).count == cycle.count)
+        #expect(store.stringArray(forKey: GoalPop.ShuffleBag.poolMarkerKey) == newLines)
     }
 
     // MARK: - The switch

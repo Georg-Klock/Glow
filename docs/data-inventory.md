@@ -99,9 +99,11 @@ itself travels in the same backup.
 
 `<App Group container>/Library/Preferences/group.com.georgklock.glow.plist`.
 Settings (`glowPeakHeadroom`, `weekFirstWeekday`, `weekRestDay`, `islandPop`),
-the debug today override, widget burst notes, and the widget trace — which
-records habit UUIDs, counts and timings and never a name; that claim is
-enforced by `WidgetTraceRedactionTests`, not by intent. **Backed up.**
+the Goal Pop shuffle bag (unseen phrase indices plus an exact marker for the
+static phrase pool), the debug today override, widget burst notes, and the
+widget trace — which records habit UUIDs, counts and timings and never a name;
+that claim is enforced by `WidgetTraceRedactionTests`, not by intent. **Backed
+up.**
 
 ### Standard-defaults fallback
 

@@ -7151,3 +7151,35 @@ capsule radius for a 36pt face: rounder than the old 8pt segmented-control
 corner, but still a continuous rounded rectangle. `HabitEditorGeometry` owns
 the row, inset, face and radius together so a test can hold the four equal
 margins without reading a private SwiftUI implementation.
+## 2026-08-31 — The pop shuffles without repeats (#452)
+
+**Supersedes only #450's independent draw, not its removal of the habit/day
+seed.** A fresh random choice fixed one habit saying the same phrase all day,
+but it made two weaker promises than the pool advertised: the same phrase could
+appear twice in a row, and another phrase could remain unseen indefinitely.
+With 173 phrases, variety should be an invariant rather than a probability.
+
+`GoalPop.line()` now spends a persisted shuffle bag. The App Group defaults
+hold the unseen indices and the exact ordered phrase pool as their validity
+marker. Every index is spent exactly once; an empty bag shuffles all 173 again;
+and any edit or reorder of the pool makes the marker mismatch and rebuilds the
+bag before an old index can name a new phrase. App and widget therefore share a
+cycle just as they share the preference that decides whether to speak.
+
+The write order is part of the recovery rule: remaining indices first, marker
+second. A process killed between those writes after a pool change leaves the
+old marker behind, so the next draw rebuilds. Reversing them could bless a
+remainder made for the old pool. A lock covers concurrent draws inside one
+process. `UserDefaults` cannot make the read-modify-write atomic across the app
+and widget, so simultaneous cross-process taps can rarely spend the same index;
+that bounded race is accepted instead of adding a second coordination store for
+a two-second flourish.
+
+The old reachability and fresh-variety tests used probability to argue that
+randomness was probably broad enough. They are gone. Seeded tests now prove one
+cycle is exactly the 173-line pool with no duplicate, the next complete cycle
+has a different order, and a changed pool discards a persisted partial cycle.
+
+This does revise #450's last sentence: the phrase choice now stores its bag, but
+still no habit, completion, phrase history, or time. `docs/data-inventory.md`
+names the two App Group-defaults values explicitly.
