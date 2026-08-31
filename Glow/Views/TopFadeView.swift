@@ -11,9 +11,10 @@ import UIKit
 /// `.toolbarBackground(.visible, for:)` was read as granting, and a hard cut is
 /// what was holding the light back. See #195.
 ///
-/// Its own type because two screens need it (#210): Settings scrolls a lit
-/// preview under the bar and the Widgets tab scrolls four of them, and a second
-/// copy of a gradient whose every number was measured is a copy that drifts.
+/// Its own type because three screens need it (#210, #454): Settings scrolls a
+/// lit preview under the bar, the Widgets tab scrolls four of them, and This
+/// Week now moves its panel with its rows. A copied gradient whose every number
+/// was measured is a copy that drifts.
 ///
 /// Opaque through the safe area, so nothing is ever lit beside the Dynamic
 /// Island, and the falloff resolves below the bar rather than at it: reserve
