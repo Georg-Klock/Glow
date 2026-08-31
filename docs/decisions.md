@@ -7216,3 +7216,41 @@ controls retain their breathing room without moving the resting grid.
 of `panelHeight`. Direct simulator evidence is still required at rest,
 mid-scroll and mid-swipe because the widget render gate does not render this app
 screen.
+## 2026-08-31 — The reload request is prompt; WidgetKit schedules the undo late (#121)
+
+The last open boundary was between `WidgetRefresh.invalidate()` and the week
+provider. The trace stamped the intent and the provider, but not the actual
+`WidgetCenter` call between them, so a 3.2-second undo could still have been
+Glow abandoning the scheduled `Task { @MainActor in flush() }` until the
+process received another turn.
+
+`WidgetRefresh.sink` now records immediately before it calls WidgetKit. The
+line carries only the process identity and whether all kinds or a count of
+selected kinds was requested; neither is content a person entered. Tests still
+replace the whole sink, so their spies remain isolated from both WidgetKit and
+the diagnostic.
+
+**Measured on the iPhone 17e simulator, iOS 26.5, signed Debug build, two
+placed week widgets and ten local fixture rows.** Four isolated taps on the
+same medium-widget ring, each allowed to settle before the next:
+
+| verdict | tap to reload sink | tap to first provider call | provider load |
+| --- | ---: | ---: | ---: |
+| done | 3ms | 699ms | 10ms |
+| undone | 2ms | 3,170ms | 5ms |
+| done | 4ms | 132ms | 8ms |
+| undone | 5ms | 3,183ms | 6ms |
+
+The provider-call time subtracts its recorded load from the provider's final
+stamp. Both undo cases reproduce the issue's deterministic 3.17-second class,
+and in both Glow had already entered the reload sink within 5ms. The queued
+main-actor turn is not the delay; `reloadAllTimelines()` has returned the
+request to WidgetKit, and WidgetKit waits before it asks the provider.
+
+**Decision:** do not make invalidation synchronous and do not lengthen the
+burst to disguise a multi-second redraw. Neither changes when WidgetKit calls
+the provider, while both spend real product behaviour on a falsified cause.
+Keep the sink stamp so future OS releases and device traces retain the
+boundary. The tapped ring already acknowledges immediately through
+`SlotToggle` (#292); the rest of the row can remain stale until WidgetKit's
+reload arrives, which is the platform limit this measurement establishes.

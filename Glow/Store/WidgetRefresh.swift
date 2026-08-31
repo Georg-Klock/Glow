@@ -30,6 +30,13 @@ enum WidgetRefresh {
 
     /// What actually happens when a reload is due. Replaced in tests.
     static var sink: (Set<String>) -> Void = { kinds in
+        // #121 distinguishes time spent waiting for this main-actor turn from
+        // time WidgetKit spends before asking a provider. Keep the stamp here,
+        // immediately before the system call, rather than at `invalidate()`.
+        // Process identity and kind count are diagnostic metadata; neither is
+        // content a person entered.
+        let scope = kinds == allKinds ? "all" : "\(kinds.count) selected"
+        WidgetTrace.record("reload sink [\(WidgetTrace.origin)]: \(scope) kind(s)")
         if kinds == allKinds {
             WidgetCenter.shared.reloadAllTimelines()
         } else {

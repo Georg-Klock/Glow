@@ -585,6 +585,20 @@ that was one process performing twice or `LiveActivityIntent`'s handover from
 the extension into the app running both halves. Those two have different
 fixes.
 
+A reload line now sits between the intent and the provider:
+
+```
+08:31:28.520  reload sink [app:9042]: all kind(s)
+```
+
+It is stamped inside `WidgetRefresh.sink`, immediately before the
+`WidgetCenter` call — not when invalidation is requested. The tap-to-sink gap
+is therefore Glow waiting to deliver its coalesced request; the sink-to-provider
+gap belongs to WidgetKit. That distinction settled #121's standing hypothesis:
+on two isolated undo taps the sink ran in 2ms and 5ms, then the provider was
+not called for another 3.168s and 3.178s. Making invalidation synchronous
+would move neither delay.
+
 ## The widget gallery's preview is a cached picture
 
 **The iOS widget gallery — long-press the Home Screen, tap +, pick Glow Up — does not ask the extension for anything.** Its preview is a rendering the system took at some earlier moment and kept, and there is no public call that invalidates it. `WidgetCenter.reloadAllTimelines()` refreshes *placed* widgets and does not touch it.
