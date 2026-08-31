@@ -67,9 +67,10 @@ Mark states:
 
 **Light comes in two tiers, and that is new** (2026-08-27). The HDR glow is
 reserved for what is still actionable — today's weekday letter while any habit
-is open, the icon and name of a habit open today, and the open mark itself. A
-completion is *lit* but does not emit: an object catching light rather than a
-source of it.
+is open, the name of a habit open today, its SF Symbol when it has one, and the
+open mark itself. An emoji remains full colour while the name beside it emits
+(#457). A completion is *lit* but does not emit: an object catching light rather
+than a source of it.
 
 That reverses the corollary `CLAUDE.md` opens with — "light cannot also be what
 separates open from done — so shape carries that instead" — because under two
@@ -509,9 +510,11 @@ Colour is one hex and three steps of it, and it says what is still asked of you:
 | `#D9D9D9` @ 100% | today, everything closed | handled today |
 | `#D9D9D9` @ 50% | any other day | at rest |
 
-The icon carries the **same value as its name** in every state; the two dim
-together. A done mark is `#D9D9D9` under the lit bevel of §8.4 — lit, but not
-emitting, per §2.
+An SF Symbol carries the **same value as its name** in every state; the two dim
+and emit together. An emoji is already a full-colour picture, not type: it
+keeps those colours in every tier while only the name beside it dims or emits.
+The emitting mask therefore excludes emoji (#457). A done mark is `#D9D9D9`
+under the lit bevel of §8.4 — lit, but not emitting, per §2.
 
 **Emitting text carries no drawn effect at all** — no drop shadow, no inner
 shadow. It is `#FFFFFF` and nothing else, and what makes it emit is the HDR
@@ -529,7 +532,8 @@ Six deviations from an otherwise regular system, taken as slips:
 | Weekday letter cells 17.455 wide — the *old* slot — on a 32pt pitch, landing 0.27 left of centre | 24 wide, on the column |
 | Name max width 84.5, derived from the old 15pt label gap, overrunning the track by 11 | 73.5 in the transcribed design; **69.5 in the shipped arrangement since #455**, after both gaps halved |
 | Socket fill `#D9D9D9 @ 1%` | no fill; the socket is its bevel — **superseded by #427**, which gives it `#000000 @ 15%`. Not this slip returning: black at 15% presses the recess in where near-white at 1% would lift it out |
-| Icon pure white beside a `#D9D9D9` name | icon takes the name's value |
+| SF Symbol pure white beside a `#D9D9D9` name | symbol takes the name's value |
+| Emoji sent through the emitting mask | emoji stays full colour; only its name emits |
 | Four zero-size boolean nodes; one fully authored but hidden row | file detritus, dropped |
 
 ### 8.7 The open mark
@@ -672,8 +676,9 @@ Consequences to carry with it:
   it, and with `capacity_after` is **unsolved and deliberately out of
   scope here.** Nothing in this document should be read as having settled it.
 - **Animation.** What moves when the division re-flows at midnight.
-- **The glow work behind this**: a completed habit's icon and name going dark,
-  today's weekday letter lighting, the open marks glowing.
+- **The glow work behind this**: a completed habit's SF Symbol and name going
+  dark, today's weekday letter lighting, the open marks glowing. Emoji remain
+  full-colour content while their names take the tier (#457).
 
 ## Tests
 

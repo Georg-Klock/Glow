@@ -7280,3 +7280,22 @@ This deliberately broadens `GlowPalette.warning`. Amber now says that a visible
 promise is unavailable in its full form: either the display cannot emit the
 glow, or the compact row cannot display the whole typed name. In both cases
 white would be indistinguishable from the content the warning qualifies.
+
+
+## 2026-08-31 — Emoji keep their colour outside the label glow (#457)
+
+An SF Symbol is type: it takes the resting, lit or emitting tier of the habit
+name beside it. An emoji is already a picture. Passing that picture through the
+HDR glow mask keeps only its alpha and replaces its coloured pixels with the
+neutral glow tile, which turns a full-colour emoji into a white silhouette.
+
+The app row and week widget now share one `HabitLabelView`. For an emoji it
+keeps the icon in the ordinary layer and sends only the name through the
+emitting layer; for an SF Symbol it sends the symbol and name together exactly
+as before. Resting and completed emoji also keep their native colours while the
+name still takes its tier. The month widget draws the habit name without an
+icon, so it is unaffected.
+
+The accepted cost is that an emoji no longer dims or brightens with the habit
+state. That state remains explicit in the name and the week's marks, while the
+icon retains the information its own colours carry.

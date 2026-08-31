@@ -39,10 +39,11 @@ import UIKit
 /// one level short of being invisible here.
 ///
 /// So the signature carries a second statistic that thinness cannot dilute.
-/// The app paints exactly two colours and no ramp between them (#111), which
-/// means every mark deposits its interior pixels at *one exact level* while its
-/// antialiased edge deposits a smooth gradient. That shows in a histogram as a
-/// spike standing on a ramp, and the height of the spike above the ramp —
+/// The app palette paints exactly two colours and no ramp between them (#111),
+/// apart from content-owned emoji (#457). Every mark therefore deposits its
+/// interior pixels at *one exact level* while its antialiased edge deposits a
+/// smooth gradient. That shows in a histogram as a spike standing on a ramp,
+/// and the height of the spike above the ramp —
 /// `RenderSignature.toneExcess` — is a count of pixels, not an average, so it
 /// does not care how thin the mark is.
 ///
@@ -755,7 +756,10 @@ struct RenderBaselineTests {
                     habit(2, "Stretch", "figure.flexibility", .daily, done: [tuesday]),
                     habit(3, "Study", "book", .daily, done: [tuesday]),
                     habit(4, "Early night", "bed.double", .timesPerWeek(2), done: []),
-                    habit(5, "Hydration", "drop", .daily, done: []),
+                    // Due on the pinned Tuesday and deliberately an emoji:
+                    // the app-row and widget-row baselines both exercise the
+                    // full-colour exception to the label glow (#457).
+                    habit(5, "Hydration", "💧", .daily, done: []),
                     habit(6, "Touch Grass", "leaf", .daily, done: [monday, tuesday]),
                     habit(7, "Sunset", "sunrise", .timesPerWeek(1), done: [monday]),
                     // **The two rows that put a ✕ and a second filled mark

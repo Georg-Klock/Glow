@@ -36,9 +36,11 @@ enum TypeTier: Equatable, Sendable {
         return anyHabitOpen ? .emitting : .lit
     }
 
-    /// A habit's own label: **the name and the icon together**, which §8.5 is
-    /// explicit about — they carry the same value in every state and dim as a
-    /// pair. A glowing name beside a resting icon would read as two facts.
+    /// A habit's own label. The tier always belongs to the name, and an SF
+    /// Symbol takes it too because the glyph is part of the typography. Emoji
+    /// keep their own full-colour pixels outside the tier's glow mask (#457).
+    /// The state answer is still shared by both surfaces; only the view decides
+    /// how that answer is painted for each kind of icon.
     static func label(isOpenToday: Bool, isHandledToday: Bool) -> TypeTier {
         if isOpenToday { return .emitting }
         return isHandledToday ? .lit : .resting
