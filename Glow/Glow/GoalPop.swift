@@ -235,12 +235,14 @@ enum GoalPop {
         "proud of you",
     ]
 
-    /// One line, drawn fresh.
+    /// One line from a persisted shuffle bag.
     ///
-    /// Random per pop, not hashed from the habit and the day. The seed made
+    /// Random per cycle, not hashed from the habit and the day. The seed made
     /// one habit say exactly one thing all day however many times it was
-    /// toggled, and with 173 phrases in the pool that is what a person
-    /// actually notices (#450).
+    /// toggled (#450); independent random draws fixed that while still making
+    /// an immediate repeat possible and leaving some phrases unseen for an
+    /// arbitrarily long time. The bag makes the promise exact: all 173 lines
+    /// appear once before any appears again (#452).
     ///
     /// #420 argued the opposite and gave a reason: a Live Activity's content
     /// can be re-read, so a phrase that changed under the reader would look
@@ -251,9 +253,68 @@ enum GoalPop {
     /// recomputes a phrase while it is on screen. Stability under re-read was
     /// never what the arithmetic was buying.
     ///
-    /// Takes no habit and no day, because it no longer depends on either.
+    /// The unseen indices and an exact marker for this pool live in the App
+    /// Group defaults, so app and widget spend the same cycle. A pool edit
+    /// invalidates the bag instead of interpreting old indices against new
+    /// words. Takes no habit and no day, because it depends on neither.
     static func line() -> String {
-        lines.randomElement() ?? ""
+        lineLock.lock()
+        defer { lineLock.unlock() }
+
+        var generator = SystemRandomNumberGenerator()
+        return ShuffleBag(lines: lines, store: GlowSettings.store).draw(using: &generator)
+    }
+
+    /// Serialises the read-modify-write inside one process. App Group defaults
+    /// cannot make that operation atomic across the app and widget processes;
+    /// two taps landing in that tiny window can still spend the same index,
+    /// which is an accepted rare race rather than a second buffering system.
+    private static let lineLock = NSLock()
+
+    /// The persisted part of phrase selection, separated only far enough for
+    /// deterministic tests to supply a generator and a private defaults suite.
+    struct ShuffleBag {
+        static let remainingKey = "goalPopShuffleRemainingIndices"
+        static let poolMarkerKey = "goalPopShufflePoolMarker"
+
+        let lines: [String]
+        let store: UserDefaults
+
+        func draw<Generator: RandomNumberGenerator>(using generator: inout Generator) -> String {
+            guard !lines.isEmpty else { return "" }
+
+            let markerMatches = store.stringArray(forKey: Self.poolMarkerKey) == lines
+            let stored = store.array(forKey: Self.remainingKey) as? [Int]
+            var remaining: [Int]
+
+            if markerMatches, let stored, Self.isValid(stored, for: lines) {
+                remaining = stored
+            } else {
+                remaining = Array(lines.indices).shuffled(using: &generator)
+            }
+
+            if remaining.isEmpty {
+                remaining = Array(lines.indices).shuffled(using: &generator)
+            }
+
+            let index = remaining.removeLast()
+
+            // Remaining first, marker second. If the process dies between the
+            // two writes after a pool edit, the stale marker forces a rebuild;
+            // the reverse order could bless old indices for the new pool.
+            store.set(remaining, forKey: Self.remainingKey)
+            if !markerMatches {
+                store.set(lines, forKey: Self.poolMarkerKey)
+            }
+
+            return lines[index]
+        }
+
+        private static func isValid(_ indices: [Int], for lines: [String]) -> Bool {
+            indices.count <= lines.count
+                && Set(indices).count == indices.count
+                && indices.allSatisfy(lines.indices.contains)
+        }
     }
 
     /// The longest a line may be, in characters.
