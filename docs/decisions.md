@@ -7299,3 +7299,23 @@ icon, so it is unaffected.
 The accepted cost is that an emoji no longer dims or brightens with the habit
 state. That state remains explicit in the name and the week's marks, while the
 icon retains the information its own colours carry.
+
+## 2026-08-31 — Settings names the EDR grant and ceiling separately (#422)
+
+`UIScreen.currentEDRHeadroom` answers what iOS is granting at this moment.
+`UIScreen.potentialEDRHeadroom` answers the maximum available under the current
+display configuration. Settings used the second value and called it what the
+screen allowed "right now", turning a ceiling into a live reading.
+
+The readout now keeps the slider's ask and follows it with both explicitly
+named values: `Aiming for 2× — 3.2× right now · 8.0× maximum`. At the slider's
+off position, only the two headroom values remain. The current and maximum
+values are sampled together immediately, then once per second while the
+Settings task is visible and the scene is active. SwiftUI cancels the task when
+the screen disappears, and changing scene phase cancels or restarts it, so the
+app does not maintain a display poll in the background or on another tab.
+
+There is no headroom-change notification to observe. A one-second visible-only
+poll is the deliberate trade: current enough for a human-readable diagnostic,
+without tying the screen to frame cadence or inventing a notification UIKit
+does not provide.

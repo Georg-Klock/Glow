@@ -57,6 +57,11 @@ struct SettingsView: View {
     /// add a lifetime to reason about.
     @State private var lowPower = LowPowerMonitor()
 
+    /// The two EDR values Settings names: what iOS is granting now, and what
+    /// the current display configuration could grant at most. A view-bound
+    /// task refreshes the snapshot while this tab is visible (#422).
+    @State private var headroom = EDRHeadroomSnapshot.mainScreen
+
     /// Whether the explanation sheet is up. The grid announces the condition
     /// once, unprompted; this screen never does — here the notice is something
     /// the person tapped the preview to ask for.
@@ -133,6 +138,13 @@ struct SettingsView: View {
             // read. `WeeklyGridView` pairs the two the same way.
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { lowPower.refresh() }
+            }
+            // `currentEDRHeadroom` has no change notification. A task is tied
+            // to this screen's visibility, so polling stops when Settings
+            // disappears; changing scene phase cancels and restarts it too.
+            .task(id: scenePhase) {
+                guard scenePhase == .active else { return }
+                await refreshHeadroomWhileVisible()
             }
             // Both of these change what a widget draws: the week's first day
             // moves every column, and the glow level is the brightness the
@@ -653,23 +665,38 @@ struct SettingsView: View {
         return symbols[weekday - 1]
     }
 
-    /// Both numbers in one sentence.
+    /// The requested brightness and both meanings of display headroom in one
+    /// sentence.
     ///
-    /// They were two labelled rows — "Asking for 12×" and "Screen currently
-    /// allows 1.0×" — which is the same information filed as a specification
-    /// sheet. Neither number means anything alone: what matters is the gap
-    /// between what the app asks for and what the panel is willing to give at
-    /// this moment, and a sentence puts the two next to each other where that
-    /// gap is legible.
+    /// `currentEDRHeadroom` is the live grant; `potentialEDRHeadroom` is the
+    /// display configuration's ceiling. Calling the latter what the screen
+    /// allows "right now" was the bug in #422. The fixed labels keep the
+    /// distinction beside the slider instead of making either value explain
+    /// itself elsewhere.
     ///
     /// At the bottom of the range the aim is dropped rather than printed as
     /// "off": the amber notice directly below already says the glow is off, and
-    /// what is still worth reading is what the screen could have granted.
+    /// what is still worth reading is what the screen grants and could grant.
     private var readout: String {
         guard peak > GlowSettings.range.lowerBound else {
-            return "The screen allows \(ceiling) right now."
+            return headroom.summary
         }
-        return String(format: "Aiming for %.0f×", peak) + " — the screen allows \(ceiling) right now."
+        return String(format: "Aiming for %.0f×", peak) + " — " + headroom.summary
+    }
+
+    /// Samples immediately and then once a second until SwiftUI cancels the
+    /// task. One second keeps "right now" current without running a display
+    /// poll anywhere except the visible Settings screen.
+    @MainActor
+    private func refreshHeadroomWhileVisible() async {
+        while !Task.isCancelled {
+            headroom = .mainScreen
+            do {
+                try await Task.sleep(for: .seconds(1))
+            } catch {
+                return
+            }
+        }
     }
 
     /// Why the week's first day is more than a column order.
@@ -689,8 +716,8 @@ struct SettingsView: View {
     /// and settling it needs a device. The sentence goes rather than gets
     /// corrected, which is what #424 decided independently: the number it
     /// annotated is already on the row above, and the one thing this section
-    /// never said is what the slider costs. `ceiling` keeps the open question,
-    /// because #422 is about that readout and this row is no longer part of it.
+    /// never said is what the slider costs. #422 now settles the two values in
+    /// the readout itself.
     ///
     /// **"Open habits" is the exact set, not a loose phrase.** The slider
     /// drives the HDR tile, and the tile only ever reaches what is still
@@ -701,21 +728,25 @@ struct SettingsView: View {
         "A brighter glow makes the open habits stand out. Your eye adapts to "
             + "it, so everything else reads duller in exchange."
 
-    /// What the display will grant right now — and "now" is load-bearing.
-    ///
-    /// `potentialEDRHeadroom` moves with ambient light, display brightness and
-    /// thermal state, so the same phone reports different numbers indoors and
-    /// outdoors, and again once it is warm. Hence "currently": a reading, not a
-    /// specification.
-    ///
-    /// Asking for more than this is not an error and not wasted — it is simply
-    /// tone-mapped back down. Showing both numbers is the only honest way to
-    /// answer how bright it can get, which depends on the panel and the moment
-    /// rather than on the app.
-    private var ceiling: String {
-        String(format: "%.1f×", UIScreen.main.potentialEDRHeadroom)
+}
+
+/// A named pair because UIKit's two headroom properties answer different
+/// questions and putting either in an unlabelled `Double` caused #422.
+struct EDRHeadroomSnapshot: Equatable, Sendable {
+    let current: Double
+    let maximum: Double
+
+    @MainActor
+    static var mainScreen: Self {
+        Self(
+            current: Double(UIScreen.main.currentEDRHeadroom),
+            maximum: Double(UIScreen.main.potentialEDRHeadroom)
+        )
     }
 
+    var summary: String {
+        String(format: "%.1f× right now · %.1f× maximum", current, maximum)
+    }
 }
 
 /// The written file, identified so `sheet(item:)` can present it.

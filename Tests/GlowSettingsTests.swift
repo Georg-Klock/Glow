@@ -6,6 +6,20 @@ import Testing
 
 @Suite("Glow intensity setting")
 struct GlowSettingsTests {
+    @Test("Headroom readout separates the live grant from the maximum")
+    func headroomMeaningsStayNamed() {
+        let snapshot = EDRHeadroomSnapshot(current: 3.24, maximum: 8)
+
+        #expect(snapshot.summary == "3.2× right now · 8.0× maximum")
+    }
+
+    @Test("Headroom values round independently to one decimal place")
+    func headroomPrecision() {
+        let snapshot = EDRHeadroomSnapshot(current: 1.26, maximum: 6.04)
+
+        #expect(snapshot.summary == "1.3× right now · 6.0× maximum")
+    }
+
     @Test("Out-of-range values clamp instead of being encoded")
     func clamping() {
         // A headroom of 400 is not a brighter glow, it is an encode no display

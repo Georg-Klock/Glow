@@ -849,6 +849,10 @@ mark used to spread an SDR halo onto the ground around itself, with a **No
 halo** switch beside the slider (#313); both the halo and the switch are gone
 (#394), and a mark is now lit exactly as far as its own silhouette reaches. The
 slider is stored in the App Group, so the widgets obey it too.
+Settings places the live EDR grant and the display configuration's potential
+ceiling beside that ask — `3.2× right now · 8.0× maximum`, for example — and
+refreshes the live value while the screen is visible. The potential ceiling is
+never labelled as the current grant.
 What no test and no measurement can answer is whether it *reads* as lit in a
 given room, which stays a matter of looking at it.
 
