@@ -1,19 +1,17 @@
 # Week marks
 
-Dated 2026-08-27, status updated 2026-08-28. It specifies two things: **what a
+Dated 2026-08-27, status updated 2026-09-01. It specifies two things: **what a
 weekly habit's row draws** — the pills, the circles and the ✕ (§1–§7) — and, in
 §8, **the large widget's visual geometry**, read off Figma node `228:10690` and
 reconciled against the code.
 
-**§1–§5 and §7 have shipped.** #339–#342, #344 and #345 landed as #350–#354; the
-behaviour those sections describe is `main`, not a target, and `SPEC.md` should
-be read alongside them rather than in place of them. §6 (creation credit, #343)
-landed as #355, and #415 corrected its formula for a week with a completion
-before the creation day. §8 is unbuilt in full — #331, #332, #333 and
-#335 are open issues, tracked under #338 — and remains **a target, not shipped
-behaviour**: while it is unbuilt, the code's existing dot-and-bar marks are what
-the widget draws. Landing any part of §8 still requires the `docs/decisions.md`
-entry named under "Decisions this reopens" in the same change.
+**§1–§7 have shipped.** #339–#345 established the anchored mark model, #415
+corrected creation credit, and #476 settled the claimable-window rule below.
+The behavior in these sections is normative. §8 is unbuilt in full — #331,
+#332, #333 and #335 are open issues, tracked under #338 — and remains **a
+target, not shipped behavior**. Landing any part of §8 still requires the
+`docs/decisions.md` entry named under "Decisions this reopens" in the same
+change.
 
 Emission is fully settled (§2, §8.5, §8.7) — both the open mark's construction
 and the appearance of emitting text were resolved against Figma nodes `228:11106`
@@ -23,21 +21,26 @@ and `228:11107` and are no longer open questions, only unbuilt ones.
 
 ## 1. The rule
 
-A habit due N times a week draws **N marks across seven columns**. A mark is one
-repetition. The columns are weekdays and never move.
+A current habit due N times a week draws **N rep marks against seven fixed day
+columns**. Each rep owns a claimable window:
 
-> **A mark spans from the end of the previous mark through its own anchor day.**
+- a completion owns the window ending on the day it happened;
+- the open rep owns every unused day after the previous mark through today,
+  and never a day after today;
+- future reps divide only the days after today, evenly as whole days allow,
+  with shorter windows nearer today;
+- a rep that has become impossible is a one-day ✕ on the earliest blank day it
+  could have used.
 
-That single sentence is the whole layout, and it is also the forgiveness
-mechanism. A day that goes by unused has no mark of its own, so it is swallowed
-by whatever mark comes next — it is never a hole, and never an accusation. The
-app shows a failure only when one has become arithmetically unavoidable, and
-then it shows exactly as many as are unavoidable.
+Unused days are therefore absorbed by the next completion or the open rep.
+They are room, not accusations. A ✕ appears only after the remaining reps no
+longer fit in the remaining days.
 
-The bias is toward acting early: the week divides with **the remainder to the
-right**, so the near days are single columns and the slack collects at the end
-of the week. Singles are pacing, not obligation — missing one costs nothing but
-room.
+Two terminal states deliberately differ. A met week keeps N completed marks,
+with the final completion owning the rest of the week. A finished unmet week is
+no longer a rep forecast at all: it becomes a seven-day diary, with a filled
+mark on every completed day and a one-day ✕ on every uncompleted day on which
+the habit existed (#476).
 
 Columns run from the user's configured week start. Every example below uses a
 Monday start for legibility only.
@@ -50,7 +53,7 @@ Monday start for legibility only.
 | --- | --- |
 | **Row** | One habit's week. |
 | **Column** | One weekday. Always seven. |
-| **Mark** | One repetition's shape. A row draws exactly `target` of them. |
+| **Mark** | One drawn shape: a rep window in a live or met row, or a day in a finished unmet diary. |
 | **Anchor** | The column a mark ends on. |
 | **`target`** | Reps per week. 1–7. |
 | **`credit`** | Reps granted to a habit created part-way into the week (§5). |
@@ -63,7 +66,7 @@ Mark states:
 | **done** | lit, but not emitting | filled |
 | **open** | emitting | at most one per row, today only |
 | **upcoming** | unlit | outline |
-| **dead** | unlit | outline, with a ✕ glyph on its anchor column |
+| **lost** | unlit | one-day outline with a ✕ glyph |
 
 **Light comes in two tiers, and that is new** (2026-08-27). The HDR glow is
 reserved for what is still actionable — today's weekday letter while any habit
@@ -83,17 +86,16 @@ carry the one-tier rule and are the contradiction to settle next.
 
 ## 3. Invariants
 
-1. A row draws exactly `target` marks. Always — however late in the week, however
-   the goal is going.
-2. The marks tile all seven columns: contiguous, no gaps, no overlaps.
+1. A current or met row draws exactly `target` marks. A finished unmet row
+   draws exactly seven day marks.
+2. Marks are ordered, contiguous and non-overlapping. They cover the track
+   except when the final mark is open; then future columns remain visibly blank.
 3. Every mark is at least one column wide.
-4. At most one mark is `open`, and only when today is in this week and unspent.
+4. At most one mark is `open`. It ends on today and never contains a future day.
 5. A day holds at most one completion. Days are binary.
-6. No mark ever carries two ✕ glyphs.
-
-Invariant 1 is what makes the row readable: a 5x row is five shapes whether you
-are ahead, behind or finished, so its silhouette says what the habit *is*
-without being read.
+6. Every ✕ is exactly one day wide.
+7. Completing today changes the open window to filled without moving the
+   remaining future windows. The next day roll may redistribute them.
 
 ---
 
@@ -104,58 +106,35 @@ mark boundaries:
 
 ```
 █ done (lit, filled)    ○ open today (emitting)
-· upcoming (unlit)      ✕ dead rep, drawn on its anchor column
+· upcoming (unlit)      ✕ lost rep or missed diary day
 ```
 
 A done mark that spans several columns is lit uniformly across all of them. A
-dead mark that spans several columns is unlit track with the ✕ on its anchor;
-the columns before it are the days it swallowed.
+lost mark never spans: its ✕ owns one day.
 
 ### 4.1 Procedure
 
-1. Compute `credit` (§5), `completions` (days logged this week), and
+1. Compute `credit` (§6), this week's completions, and
    `owed = max(0, target − credit − completions)`.
-2. **If `owed == 0` the goal is met.** Draw `target` marks: the credit marks pack
-   left, then one mark per completion anchored on the day it was logged, and the
-   last mark runs to the final column. Every mark is lit. Completions past the
-   target have no mark of their own — they fall inside the last one, which
-   already runs to the end. The record keeps them; the row simply has nothing
-   left to say.
-3. **Otherwise**, build the mark list in this order:
-   - `credit` credit marks — unlit, no anchor
-   - every **anchored** mark in day order: one **done** mark per completion on
-     its column, one **dead** mark per dead day (§6) on that column, and the
-     **open** mark on today — omitted when today is spent, is the rest day, or
-     is not in this week
-   - the remaining **upcoming** marks — unlit, no anchor
-
-   **The open mark sorts by its anchor like every other anchored mark** (#382).
-   It used to be listed after the done and dead marks instead, which is the same
-   order only while every completion is in the past. A completion logged *after*
-   today — reachable through `SlotEditing.week(allowingFuture:)` — is an anchor
-   to the right of the open mark's, so in a list read left to right the two
-   swapped: the ring was drawn on a day that is not today and the completion's
-   mark ended before the day it was logged on. A spent today has no anchor, so
-   it keeps its place after the completions: it is not an event on a day, it is
-   the arithmetic that divides what they leave.
-
-   What a week *should* look like once you have logged ahead is a separate
-   question and is not settled here — see #382. This is the anchor rule applied
-   to one more mark, not an answer to it.
-4. Assign columns left to right. An anchored mark ends on its anchor. A run of
-   unanchored marks divides the free columns between its neighbours as evenly as
-   whole days allow, **remainder to the right**. The last mark in the row always
-   ends on the final column.
+2. **If the week is finished and `owed > 0`, draw the diary.** Each completed
+   day is filled. Each blank day on which the habit existed is a one-day ✕. A
+   pre-creation day without a completion is inactive.
+3. **If `owed == 0`, draw the met row.** Credit marks pack left, completions
+   anchor in day order, and the final completed mark reaches the final column.
+   Completions past the target remain in the record but receive no extra mark.
+4. **Otherwise, draw the live row.** Compute how many owed reps no longer fit
+   from today through the end of the week. Give each loss the earliest eligible
+   blank past day, one day each. Sort those losses, completions and today's open
+   mark by day. The open mark reaches back from the previous boundary and ends
+   on today. Divide the future columns among the remaining reps with the
+   remainder to the right.
 
 ### 4.2 The open mark ends at today
 
-It starts wherever the previous mark ended — reaching back over any blank days —
-and ends **on today**, not at the end of its share. The exception is when it is
-the last mark in the row: then it runs to the end of the week, because there is
-nothing after it to divide.
-
-So the open mark is a single lit ring on most rows, and stretches only when it
-has swallowed dead days behind it, or when it is the last rep owed.
+It starts wherever the previous mark ended — reaching back over blank days —
+and ends **on today**. There is no final-mark exception. If it is the last rep
+owed, every day after today is left blank because none of those future days is
+part of the control the person can press (#476).
 
 ### 4.3 Worked states
 
@@ -170,7 +149,7 @@ ending at today:
 4x   [○][·  ·][·  ·][·  ·]
 3x   [○][·  ·  ·][·  ·  ·]
 2x   [○][·  ·  ·  ·  ·  ·]
-1x   [○  ·  ·  ·  ·  ·  ·]      last mark: runs to the end
+1x   [○]                         Tue–Sun remain blank
 ```
 
 **Monday logged, still Monday.** Today is spent, so no row has an open mark:
@@ -197,13 +176,12 @@ rep owns a day, has an unavoidable miss:
 2x   [█][█  █  █  █  █  █]      met -> last mark runs to the end
 ```
 
-**3x, Mon and Tue done, Saturday.** One rep owed and it is the last mark, so it
-takes everything from Tuesday onward — Wednesday through Friday went by unused
-and cost nothing:
+**3x, Mon and Tue done, Saturday.** One rep is owed. It reaches back through
+the unused days but stops on Saturday; Sunday remains blank:
 
 ```
       M  T  W  T  F  S  S
-3x   [█][█][○  ○  ○  ○  ○]
+3x   [█][█][○  ○  ○  ○]   _
 ```
 
 **3x, only Monday done, Saturday.** Two owed, two days: Saturday and Sunday are
@@ -215,75 +193,47 @@ column:
 3x   [█][○  ○  ○  ○  ○][·]
 ```
 
-**5x, nothing logged, Thursday.** One rep died when Wednesday ended; Monday and
-Tuesday are unaccused, inside the dead mark:
+**5x, nothing logged, Thursday.** One rep no longer fits. It is a one-day cross
+on Monday, and the open rep absorbs Tuesday through Thursday:
 
 ```
       M  T  W  T  F  S  S
-5x   [·  ·  ✕][○][·][·][·]
+5x   [✕][○  ○  ○][·][·][·]
 ```
 
-**3x, nothing logged, Saturday.** The week broke on Friday:
+**3x, nothing logged, Saturday.** One rep no longer fits. Monday is the first
+day it could have used, so Monday is the one-day cross:
 
 ```
       M  T  W  T  F  S  S
-3x   [·  ·  ·  ·  ✕][○][·]
+3x   [✕][○  ○  ○  ○  ○][·]
 ```
 
 ---
 
-## 5. The dead-rep rule
+## 5. The lost-rep rule
 
-> A **blank past day `d`** carries a dead rep when
-> `owed_through(d) > capacity_after(d)`,
-> where `owed_through(d) = target − credit − completions on or before d` and
-> `capacity_after(d)` is the days after `d` that can still carry one of those
-> reps: the blank actionable ones, **plus the ones already completed**.
+For a live week:
 
-Pure, day-pinned, and computed from the record rather than from an event log —
-so a backfill recomputes it away with no stored state to migrate.
+```
+actionableLeft = blank days from today through the end of the week
+lost           = max(0, owed − actionableLeft)
+```
 
-**A completed day is capacity, not a free day** (#381). It counted
-`actionable_days_after` — every day after `d` that is not the rest day, blank or
-not — and that is right only while every completion is in the past and off the
-rest day. Neither is guaranteed: the week view opens the days *after* today on a
-demo-seeded store, and moving the rest day in Settings turns a day that was
-logged into a day nothing may be logged on. In the first case a completion after
-`d` was counted as a free day *and* not subtracted from `owed_through`, so its
-rep was owed twice; in the second the day was dropped from both sides at once.
-Either way the walk stopped agreeing with `max(0, owed − days_left)`, and
-`WeekSpans` asked for a negative number of ✕ marks — `EXC_BREAKPOINT`, on every
-redraw of the week.
+The comparison is strict. A rep that still has one day available is live; it
+is never drawn as a warning. Each lost rep takes the earliest blank past day on
+which the habit existed. Its ✕ occupies that day alone, and the following mark
+absorbs any unused days after it. Backfilling a day recomputes the row from the
+record and can remove a ✕; no loss state is stored.
 
-**The count is always right.** Walk the week: `owed_through − capacity_after`
-increases by exactly one on each blank actionable day, stays flat on each
-completed day — which moves both sides by one — and stays flat on a blank rest
-day, which is in neither set. So it is monotone, and the days it is positive on
-are the last *k* blank days, where *k* is `max(0, owed − days_left)` today. The
-pinned ✕ and the arithmetic cannot disagree.
+If a mid-week habit's target was edited upward, frozen creation credit can
+leave more losses than post-creation blank days. Only in that legacy edge does
+the fallback use the earliest remaining pre-creation blank day. No two losses
+share a mark.
 
-**It never warns and never predicts.** A miss becomes a ✕ at the moment the day
-ends and the arithmetic tips, and not before. A 3x row stays clean until Friday
-ends; do Monday, Tuesday and Wednesday then stop and the only ✕ lands on
-Saturday, which is exactly the day the week broke.
-
-**A ✕ is not final.** Tapping it logs that day and the ✕ recomputes away —
-possibly from a different column than the one tapped, since the rule re-derives
-the whole week. Past days are editable **in the app only**; the widget draws the
-✕ and cannot answer it.
-
-### 5.1 Pinning is possible except after an upward edit
-
-Pinning needs one blank past column per dead rep. With `c` = the column a habit
-was created on, that requires `target − credit + c ≤ 7`, and since
-`credit = max(0, target − (7 − c))` the two sides are equal — pinning fits
-exactly, always.
-
-The one exception is an upward target edit on a habit created part-way into the
-week, where `credit` stays frozen (§6) while `target` grows and the inequality
-breaks. A dead rep with no blank column to pin to **loses its anchor and
-floats**: it keeps its place in the mark order and takes the leftmost free
-column. It never doubles up — invariant 6 stands.
+Once the week is over, rep forecasting ends. An unmet week shows every blank
+eligible day as a one-day ✕, regardless of the target. A met week shows its
+completed rep windows and no crosses.
 
 ---
 
@@ -365,7 +315,8 @@ The row is a function of the record and of today, so it changes on exactly two
 events:
 
 - **the instant a completion is logged or undone**, and
-- **midnight**, when the division re-flows and any newly dead rep appears.
+- **midnight**, when future windows re-divide and any newly lost rep appears;
+  when the week ends unmet, the row becomes its seven-day diary.
 
 The widget therefore needs a scheduled timeline entry at the next local midnight.
 Without it the Home Screen row is a day stale — showing yesterday's open ring on
@@ -591,34 +542,21 @@ strength there.
 
 # PRD
 
-## What changes in the shipped code
+## Shipped implementation record
 
-`WeekSpans` already produces most of this shape. Seven changes, roughly in
-dependency order:
+The model landed incrementally. Its implementation record, in dependency
+order, is:
 
-1. **`divide` gives the remainder to the right**, not the left. Today a 6x week
-   ships as a pill across Mon–Tue then five singles; the target is five singles
-   then a weekend pill. One line, and it is the whole early bias.
-2. **A filled span draws lit.** `SlotSpan.mark` currently maps `.filled` to
-   `.upcoming` — the same unlit line an upcoming span draws. This is the change
-   that reopens #47 (below).
-3. **The completed block anchors on real days.** It currently divides the
-   columns before today evenly among the completions. It must instead give each
-   completion a mark ending on the day it was logged, reaching back to the
-   previous mark.
-4. **Dead reps pin.** `placeLost` currently parks them immediately left of the
-   open span. Replace with the §5 rule, plus the float fallback of §5.1.
-5. **The met-goal state stops collapsing.** It currently returns one span across
-   the whole week; it must keep each completion on its day and let the last mark
-   run to the end.
-6. **Creation credit** — a new concept. `HabitSnapshot.existed(on:)` already
-   knows the creation date; the frozen value needs the target *at creation*,
-   which is a stored field and a migration.
-7. **A midnight timeline entry** in the widget provider.
-
-Unchanged: the open mark's extent (`openLast` already ends at today and already
-runs to the end when it is the last mark) and the seven-column covering
-invariant (#81).
+1. `divide` gives the remainder to the right.
+2. A filled span draws lit.
+3. Completed marks anchor on real days.
+4. Lost reps became derived, day-pinned marks.
+5. A met goal keeps its completed marks instead of collapsing.
+6. Mid-week creation credit is stored and frozen.
+7. The widget refreshes the division at local midnight.
+8. #476 turns the live row into claimable rep windows: every open mark stops on
+   today, future marks divide only future days, a loss is a one-day earliest-day
+   cross, and a finished unmet week becomes a seven-day diary.
 
 **`Frequency.daily` needs no change and must stay consistent.** A 7x row is
 day-pinned through `WeekGrid`, not `WeekSpans`. Check that the two agree: for
@@ -662,20 +600,19 @@ Consequences to carry with it:
   column. That is intended — a met goal is a lit row whatever the target — but it
   should be looked at on a device before it is called finished, because it is a
   perceptual claim and the simulator has no headroom to test it with.
-- **A wide open mark reads as slack it may not have.** 3x with only Monday done,
-  on Saturday, draws a five-column open ring at the moment both remaining days
-  became mandatory. The shape says room; the arithmetic says none.
+- **A wide open mark reaches backward, not forward.** 3x with only Monday done
+  on Saturday draws Tuesday–Saturday as the current rep's claimable history;
+  Sunday remains a separate future rep.
 - **Credit is invisible.** A 5x created on Friday asks for three reps and gives
   no on-screen account of the two it forgave.
-- **The float case (§5.1) is the only place the ✕ lies about its day.** It is
+- **The creation-credit fallback can cross a pre-creation blank day.** It is
   reachable only by editing a mid-week habit's target upward.
 
 ## Deferred, on purpose
 
-- **The rest day.** It still exists as a setting and still subtracts a column
-  (#72, #73, #100). How it interacts with pinning a ✕, with reaching back across
-  it, and with `capacity_after` is **unsolved and deliberately out of
-  scope here.** Nothing in this document should be read as having settled it.
+- **The rest day.** The shipping app retired the setting (#390). A stored legacy
+  rest day retains the pre-#476 division. Designing its return is separate
+  feature work; nothing here settles or expands it.
 - **Animation.** What moves when the division re-flows at midnight.
 - **The glow work behind this**: a completed habit's SF Symbol and name going
   dark, today's weekday letter lighting, the open marks glowing. Emoji remain
@@ -687,12 +624,16 @@ All of it is pure and belongs in `Glow/Logic/`, exercised through the real types
 Property tests for the invariants of §3 across every `target` × every weekday ×
 every completion pattern:
 
-- exactly `target` marks;
-- the marks tile all seven columns, contiguous and non-overlapping;
+- exactly `target` marks in live/met rows and seven in finished unmet rows;
+- ordered, contiguous, non-overlapping marks, with only a final open mark
+  allowed to leave future columns blank;
 - ✕ count equals `max(0, owed − days_left)` — the §5 monotonicity claim, checked
   rather than trusted;
-- no mark carries two ✕;
-- at most one open mark, and it contains today;
+- every ✕ is one day wide;
+- at most one open mark, and it ends on today;
+- completing today preserves the future partition until the next day roll;
+- every finished unmet day is a filled, missed or pre-creation inactive diary
+  mark, while a finished met week has no crosses;
 - backfilling any day never increases the ✕ count.
 
 Plus the worked states of §4.3 as fixtures, and `Tools/test.sh` before the PR

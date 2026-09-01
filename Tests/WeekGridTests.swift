@@ -514,8 +514,8 @@ struct BeforeCreationTests {
         #expect(!spans.contains { $0.state == .missed })
     }
 
-    /// And a span row the habit *did* live through is untouched.
-    @Test("A span row in a week the habit lived through still loses reps")
+    /// A finished unmet span row becomes a seven-day diary (#476).
+    @Test("A span row in a week the habit lived through crosses every blank day")
     func spanRowsAreOtherwiseUnchanged() {
         let later = TestCalendar.date(2026, 8, 31)
         let habit = HabitSnapshot(
@@ -526,7 +526,7 @@ struct BeforeCreationTests {
             for: habit, in: week, today: later, target: 3,
             editing: .week(allowingFuture: false), restDay: nil, calendar: calendar
         )
-        #expect(spans.count == 3)
-        #expect(spans.contains { $0.state == .missed })
+        #expect(spans.count == 7)
+        #expect(spans.allSatisfy { $0.state == .missed && $0.dayCount == 1 })
     }
 }

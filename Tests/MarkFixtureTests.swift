@@ -45,8 +45,8 @@ struct MarkFixtureTests {
         #expect(shape(target: 4, today: 0) == "open:0-0 inactive:1-2 inactive:3-4 inactive:5-6")
         #expect(shape(target: 3, today: 0) == "open:0-0 inactive:1-3 inactive:4-6")
         #expect(shape(target: 2, today: 0) == "open:0-0 inactive:1-6")
-        // The last mark runs to the end, so a lone rep is the whole week.
-        #expect(shape(target: 1, today: 0) == "open:0-6")
+        // Even the final open rep stops at today; the future is not a control.
+        #expect(shape(target: 1, today: 0) == "open:0-0")
     }
 
     /// §4.3, "Monday logged, still Monday". Today is spent, so no row has an
@@ -67,7 +67,7 @@ struct MarkFixtureTests {
     /// afford it. Only 7x, where every rep owns a day, has an unavoidable miss
     /// — and the ✕ lands on Tuesday, between the two completions, which is the
     /// case that forces the mark list to interleave by day rather than run all
-    /// the completions before all the dead reps.
+    /// the completions before all the lost reps.
     @Test("A skipped Tuesday is swallowed by Wednesday, except at seven a week")
     func skippedTuesday() {
         #expect(shape(target: 7, done: [0, 2], today: 2)
@@ -83,12 +83,11 @@ struct MarkFixtureTests {
         #expect(shape(target: 2, done: [0, 2], today: 2) == "filled:0-0 filled:1-6")
     }
 
-    /// §4.3, "3x, Mon and Tue done, Saturday". One rep owed and it is the last
-    /// mark, so it takes everything from Tuesday onward — Wednesday through
-    /// Friday went by unused and cost nothing.
-    @Test("The last rep owed takes the rest of the week")
+    /// #476: the last rep still reaches back over blank days, but its open
+    /// drawing stops at today like every other open rep.
+    @Test("The last rep owed stops at today")
     func oneRepOwedOnSaturday() {
-        #expect(shape(target: 3, done: [0, 1], today: 5) == "filled:0-0 filled:1-1 open:2-6")
+        #expect(shape(target: 3, done: [0, 1], today: 5) == "filled:0-0 filled:1-1 open:2-5")
     }
 
     /// §4.3, "3x, only Monday done, Saturday". Two owed, two days: Saturday and
@@ -99,18 +98,19 @@ struct MarkFixtureTests {
         #expect(shape(target: 3, done: [0], today: 5) == "filled:0-0 open:1-5 inactive:6-6")
     }
 
-    /// §4.3, "5x, nothing logged, Thursday". One rep died when Wednesday ended;
-    /// Monday and Tuesday are unaccused, inside the dead mark.
-    @Test("The ✕ lands on the day the week broke, not on the day it was noticed")
+    /// #476: a lost rep is one day, on the first day it could have happened;
+    /// the next open rep absorbs the unused days after it.
+    @Test("The ✕ is one day and the open rep absorbs what follows")
     func oneDeadRepOnThursday() {
         #expect(shape(target: 5, today: 3)
-            == "missed:0-2 open:3-3 inactive:4-4 inactive:5-5 inactive:6-6")
+            == "missed:0-0 open:1-3 inactive:4-4 inactive:5-5 inactive:6-6")
     }
 
-    /// §4.3, "3x, nothing logged, Saturday". The week broke on Friday.
-    @Test("A blank three-a-week week breaks on Friday")
+    /// Saturday's lost rep is Monday's one-day cross; the live rep owns the
+    /// claimable run from Tuesday through Saturday.
+    @Test("A blank three-a-week Saturday starts with one cross")
     func blankWeekBreaksOnFriday() {
-        #expect(shape(target: 3, today: 5) == "missed:0-4 open:5-5 inactive:6-6")
+        #expect(shape(target: 3, today: 5) == "missed:0-0 open:1-5 inactive:6-6")
     }
 }
 
@@ -122,18 +122,10 @@ struct MarkFixtureTests {
 /// any blank past day — which is exactly `WeekGrid`'s per-day miss. If they ever
 /// disagree, one of them is wrong, and nothing else in the suite would say so.
 ///
-/// **With no rest day.** They were swept against each other with one too, and
-/// they disagree there — measured, not assumed. Seven reps against six days that
-/// can carry one is a goal with a rep that can never land: `deadDays` finds six
-/// blank days to pin to, the seventh dead rep floats under §5.1 and takes the
-/// leftmost free column, and every column after it shifts. `WeekGrid` draws
-/// `.rest` on that column and a miss on the others.
-///
-/// Neither side is wrong on its own; the combination is the thing without an
-/// answer, and it is exactly what `docs/week-marks.md` lists under "Deferred, on
-/// purpose" and what #346 holds open. Narrowing the sweep is that scope
-/// boundary written down, not a case swept under it — widen this to a rest day
-/// on the day #346 is decided, and it will fail until the decision is built.
+/// **With no rest day.** A stored legacy rest day deliberately uses the older
+/// divider, while #476 changes the shipping seven-day path only. Narrowing the
+/// sweep is that feature boundary written down; widen it when the separately
+/// scoped rest-day return is designed and built.
 @Suite("Seven a week is the daily row")
 struct DailyAgreementTests {
     private let calendar = TestCalendar.monday
