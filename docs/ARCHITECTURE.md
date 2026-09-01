@@ -155,11 +155,12 @@ completion. `MarkHabitIntent` calls `GoalPopCentre` with that answer before
 `HabitStore.setCompletion`, so ActivityKit starts alongside the optimistic
 widget control rather than behind the save.
 
-`SlotToggle` also carries the presentation boundary into that shared intent.
-Its default, used by installed widgets, enables the Island; the in-app Widgets
-preview's existing environment value disables it. Both still execute the same
-absolute-state intent and reconciliation path, but the foreground app does not
-request a Live Activity the system will not display.
+`SlotToggle` also carries the presentation boundary into the shared
+`MarkHabitOperation`. Installed widgets reach it through `MarkHabitIntent` with
+the Island enabled. The in-app Widgets preview reaches it through a binding
+adapter over the app's live `ModelContext`, with the Island disabled. Both use
+the same absolute-state write and reconciliation path, but the foreground app
+does not request a Live Activity the system will not display.
 
 `LatestPopDelivery` owns replacement ordering for a running Live Activity. It
 does not serialise updates: every new operation begins immediately. When an
@@ -411,26 +412,29 @@ the family itself (PR #277).
 **Those production views are live controls in the app too** (#465). The page
 does not disable hit testing or hide their accessibility trees. Today's
 actionable week slots, frequency spans and month cell therefore remain the
-same `SlotToggle` backed by the same idempotent `MarkHabitIntent` as a placed
-widget; past and future marks remain display-only because the production views
-already derive them with `SlotEditing.todayOnly`. The toggle's style draws its
-requested state optimistically before the intent finishes.
+same `SlotToggle` as a placed widget; past and future marks remain display-only
+because the production views already derive them with
+`SlotEditing.todayOnly`. WidgetKit backs that toggle with `MarkHabitIntent`.
+An ordinary app host backs it with a local binding that changes `isOn` before
+the write begins. Both adapters call the same idempotent `MarkHabitOperation`,
+and the toggle style draws the same requested state from either adapter (#477).
 
 A hosted app tree does not promote the accessibility label and hint attached
 inside the custom AppIntent toggle style the way WidgetKit's archived tree
 does. `WidgetsView` therefore marks the shared control as in-app through an
 environment value, and `SlotToggle` repeats the same current label and hint at
 the control boundary on that surface only. The installed widget keeps its
-`configuration.isOn`-driven accessibility; the app gets discoverable controls
-and reconciles that snapshot as soon as the intent finishes.
+`configuration.isOn`-driven accessibility; the app's label and hint follow its
+local optimistic binding and reconcile when the shared operation finishes.
 
-The intent writes through a peer `ModelContainer`, which SwiftData does not
-merge into the app's already-fetched view state. After every intent verdict —
-including an unchanged duplicate or a refusal — `StoreChange.fromIntent` is
-posted inside the process. `WidgetsView` and `WeeklyGridView` advance a local
-revision and take fresh bounded snapshots, reconciling the optimistic face to
-the store while `WidgetRefresh` independently asks installed widgets for a new
-timeline.
+The installed-widget intent writes through a peer `ModelContainer`, which
+SwiftData does not merge into the app's already-fetched view state. The app
+adapter instead hands the operation its already-live context. After every
+operation verdict — including an unchanged duplicate or a refusal — the
+historically named `StoreChange.fromIntent` is posted inside the process.
+`WidgetsView` and `WeeklyGridView` advance a local revision and take fresh
+bounded snapshots, reconciling the optimistic face to the store while
+`WidgetRefresh` independently asks installed widgets for a new timeline.
 
 **`WidgetPlacementQuerying` is the seam.** `WidgetCenter` answers for the
 Home Screen of the device it is running on, which a test cannot arrange, so the

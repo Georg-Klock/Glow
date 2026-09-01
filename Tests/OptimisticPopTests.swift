@@ -97,12 +97,17 @@ struct OptimisticPopTests {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let source = try String(
+        let slotToggle = try String(
             contentsOf: root.appendingPathComponent("GlowWidget/SlotToggle.swift"),
             encoding: .utf8
         )
+        let widgetsView = try String(
+            contentsOf: root.appendingPathComponent("Glow/Views/WidgetsView.swift"),
+            encoding: .utf8
+        )
 
-        #expect(source.contains("presentsIsland: !isInAppWidgetPreview"))
+        #expect(slotToggle.contains("presentsIsland: true"))
+        #expect(widgetsView.contains("presentsIsland: false"))
     }
 }
 

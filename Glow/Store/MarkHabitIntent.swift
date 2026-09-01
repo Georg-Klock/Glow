@@ -69,9 +69,44 @@ struct MarkHabitIntent: LiveActivityIntent {
 
         let container = try GlowStore.makeContainer()
         let context = ModelContext(container)
+        try MarkHabitOperation.perform(
+            habitID: id,
+            done: done,
+            presentsIsland: presentsIsland,
+            context: context
+        )
+        return .result()
+    }
+}
+
+/// The absolute-state mark operation shared by WidgetKit's AppIntent adapter
+/// and the binding-backed control hosted inside Glow (#477).
+///
+/// The two surfaces differ only in how SwiftUI delivers a requested state.
+/// Both arrive here with that absolute state, then use the same bounded lookup,
+/// store contract, reconciliation signal, burst note and widget invalidation.
+/// Keeping the already-live app `ModelContext` at the boundary also lets hosted
+/// tests exercise the production operation without redirecting the App Group.
+@MainActor
+enum MarkHabitOperation {
+    @discardableResult
+    static func perform(
+        habitID id: UUID,
+        done: Bool,
+        presentsIsland: Bool,
+        context: ModelContext
+    ) throws -> HabitStore.ToggleOutcome? {
         let descriptor = FetchDescriptor<Habit>(predicate: #Predicate { $0.id == id })
 
-        guard let habit = try context.fetch(descriptor).first else { return .result() }
+        // Reconcile even when a once-valid archived control outlives its habit,
+        // or when persistence throws. The optimistic face must never become a
+        // new source of truth merely because there was no verdict to draw.
+        defer {
+            NotificationCenter.default.post(name: StoreChange.fromIntent, object: nil)
+            WidgetRefresh.invalidate()
+        }
+
+        guard let habit = try context.fetch(descriptor).first else { return nil }
         // One reading of "today" for the whole tap (#204), for the reason
         // `TapHabitIntent` gives: the widget's write has to land on the day the
         // widget drew as open, and this asked the clock three times.
@@ -94,13 +129,6 @@ struct MarkHabitIntent: LiveActivityIntent {
 
         let result = try HabitStore(context: context)
             .setCompletion(for: habit, on: today, done: done)
-
-        // The in-app Widgets tab uses this exact intent too (#465). Its own
-        // `ModelContainer` cannot observe a peer container's completion rows,
-        // so tell the live app views to take fresh snapshots after the answer
-        // is final. Post for every verdict: an unchanged duplicate and a
-        // refusal must reconcile an optimistic mark just as a saved write does.
-        NotificationCenter.default.post(name: StoreChange.fromIntent, object: nil)
 
         // A tap already costs a timeline reload, so the completion can animate
         // inside the timeline that reload produces. This is the note the
@@ -143,11 +171,6 @@ struct MarkHabitIntent: LiveActivityIntent {
         GlowLog.widget.notice("\(outcome, privacy: .public)")
         WidgetTrace.record(outcome)
 
-        // Explicit, and not redundant with the store's own invalidation: a
-        // refusal saves nothing, so nothing would invalidate — and after a
-        // refusal the surface was stale *before* the tap, which is how the tap
-        // happened. Same mechanism, so the two coalesce. See `WidgetRefresh`.
-        WidgetRefresh.invalidate()
-        return .result()
+        return result
     }
 }
