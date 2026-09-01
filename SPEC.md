@@ -806,9 +806,9 @@ gap it stands for. Reduce Motion snaps the change rather than shortening it.
 
 **And the name is measured against the row it is now in** (#440). The width the
 week gives back is only given back if the name is allowed to use it: the cap on
-a name is the label column less the icon and both gaps, and edit mode draws no
-label column, so a name went on being cut where the track would have begun with
-half the row empty either side — "Touch Grass" as "Touch Gr…" beside eight
+a name is the label column less the icon and the gap before the name, and edit
+mode draws no label column, so a name went on being cut where the track would
+have begun with half the row empty either side — "Touch Grass" as "Touch Gr…" beside eight
 columns of nothing. While editing the cap is the row's own width instead, less
 the gaps either side of the label, less the icon column, and less the part of
 the row the system's two controls cover — they are laid out against the `List`'s

@@ -182,15 +182,21 @@ struct RowGeometryTests {
     /// #455: the two visible requests and the room they create are one rule.
     /// Pin the production values directly; the ratio check above would stay
     /// green if both app and widget agreed on the wrong geometry.
-    @Test("The icon matches the name and the two half-gaps grant 69.5 points")
+    @Test("The icon matches the name and the one real gap grants 71.75 points")
     func iconAndNameGeometry() {
         #expect(WidgetMetrics.iconSize == WidgetMetrics.textSize)
         #expect(WidgetMetrics.iconGap == 2.25)
-        #expect(WidgetMetrics.nameMaxWidth == 69.5)
+        #expect(WidgetMetrics.nameMaxWidth == 71.75)
         #expect(
             WidgetMetrics.nameMaxWidth
                 == WidgetMetrics.labelWidth - WidgetMetrics.iconWidth
-                    - WidgetMetrics.iconGap - WidgetMetrics.iconGap
+                    - WidgetMetrics.iconGap
+        )
+        #expect(
+            WidgetMetrics.iconWidth + WidgetMetrics.iconGap
+                + WidgetMetrics.nameMaxWidth + WidgetMetrics.labelGap
+                == WidgetMetrics.labelWidth + WidgetMetrics.labelGap,
+            "the name must end one labelGap before the track starts"
         )
     }
 
