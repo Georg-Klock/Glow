@@ -7386,3 +7386,34 @@ latest; if stale, it applies the newest operation and checks again before
 exiting. A deterministic suspended-operation test completes Water before Read,
 then proves Read's stale task reapplies Water. `PopWindow` independently keeps
 the activity's ending and full two-second duration owned by the newest tap.
+
+## 2026-08-31 — Whole app screens use the compositor render gate (#386)
+
+The existing baseline covered every widget family plus the app's isolated
+`HabitRowView` and `WeekdayHeader`, but not the `List`, navigation chrome and
+surrounding layout of `WeeklyGridView` or the assembled `WidgetsView`. Those
+production screens are now baseline frames too; row and header frames remain
+because they give tighter evidence when an isolated component moves.
+
+The screens do not use `ImageRenderer`. Both contain a `NavigationStack`, and
+the measured result from that path is SwiftUI's yellow invalid-configuration
+placeholder rather than either screen. `HostedScreenFrames` instead mounts the
+real app-module views in a `UIWindow` and captures `drawHierarchy`. Its contract
+is a 393 × 852 logical surface, no inherited safe area, dark appearance, 2x
+display and output scale, and standard-range SDR. The scene uses March 10,
+2026 and converts the existing exact nine-row render fixture into production
+SwiftData models. Containers remain alive for the test process because a
+hosted `@Query` leaves an observer behind (#357).
+
+`WeeklyGridView` and `WidgetsView` take an optional `today` only for that
+boundary. The default remains nil and resolves through `WeekCalendar.today()`,
+so production date refresh and lifecycle behaviour are unchanged. Repeated
+current-runtime captures of both complete PNGs were byte-identical, and the
+current and iOS 18 baselines were reviewed and approved separately because
+their native navigation chrome legitimately differs.
+
+The hosted frame gates the initially visible screen viewport, not content
+below a scroll boundary. The Widgets frame includes its instructions, Large
+preview and the beginning of Medium. Monthly cards farther down the page remain
+covered as `MonthWidgetView` frames and by the pure grouping tests, but this
+single screen signature does not claim to capture every offscreen card.
