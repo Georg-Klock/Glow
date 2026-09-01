@@ -73,11 +73,14 @@ import UIKit
 /// * **The rest day.** Pinned to none, because `HabitRowView` reads it out of
 ///   the App Group rather than taking it as a parameter (#386). No widget
 ///   frame depends on it; the app's row does.
-/// * **Size, scale, colour space and appearance.** Direct `ImageRenderer`
-///   frames are 2x, sRGB and dark over `GlowPalette.widgetBackground`, exactly
-///   as the widget configurations are. The two whole screens use the compositor
-///   through `HostedScreenFrames`: a 393 × 852 window, no inherited safe area,
-///   a forced 2x display/output scale, dark appearance and SDR output.
+/// * **Size, safe area, scale, colour space and appearance.** Direct
+///   `ImageRenderer` frames are 2x, sRGB and dark over
+///   `GlowPalette.widgetBackground`, exactly as the widget configurations are.
+///   The two whole screens use the compositor through `HostedScreenFrames`: a
+///   393 × 852 window with that surface's 59pt top and 34pt bottom safe area, a
+///   forced 2x display/output scale, dark appearance and SDR output. The safe
+///   area correction is installed before the host enters its live scene;
+///   otherwise the simulator model still moves both screens (#481).
 ///
 /// Locale still reaches the weekday initials. It is the simulator's own, en_US
 /// on every machine this runs on; a machine with another one is a legitimate
@@ -188,11 +191,15 @@ struct RenderBaselineTests {
             }
 
             let blackDelta = abs(signature.exactBlackPercent - expected.exactBlackPercent)
-            if blackDelta > Self.blackTolerance {
+            let blackTolerance = HostedScreenFrames.names.contains(name)
+                ? Self.hostedBlackTolerance
+                : Self.blackTolerance
+            if blackDelta > blackTolerance {
                 Issue.record("""
                     \(name) is \(String(format: "%.1f", signature.exactBlackPercent))% pure black; \
                     the baseline says \(String(format: "%.1f", expected.exactBlackPercent))%. \
-                    A gradient, a tint or a material lifts this number off the floor.
+                    A gradient, a tint or a material lifts this number off the floor. The \
+                    tolerance for this frame is \(blackTolerance) percentage points.
                     """)
             }
 
@@ -264,20 +271,45 @@ struct RenderBaselineTests {
             """)
     }
 
+    @Test("Hosted screens correct each measured model to one safe area")
+    func hostedSafeAreaIsPinned() {
+        let cases: [(inherited: UIEdgeInsets, additional: UIEdgeInsets)] = [
+            (.init(top: 47, left: 0, bottom: 34, right: 0),
+             .init(top: 12, left: 0, bottom: 0, right: 0)),
+            (.init(top: 59, left: 0, bottom: 34, right: 0), .zero),
+            (.init(top: 62, left: 0, bottom: 0, right: 0),
+             .init(top: -3, left: 0, bottom: 34, right: 0)),
+        ]
+
+        for value in cases {
+            #expect(
+                HostedScreenFrames.additionalSafeAreaInsets(for: value.inherited)
+                    == value.additional
+            )
+        }
+    }
+
     // MARK: - Thresholds
 
     /// Mean-brightness levels a 16 × 16 cell may move before this is a
     /// regression rather than a rounding difference.
     ///
-    /// Measured rather than guessed: the same commit rendered on two simulator
-    /// models moved no cell at all, so the honest floor is 0 and this is
-    /// headroom for a renderer that rounds differently after an Xcode bump. A
-    /// mark that moves one column moves its cells by tens.
+    /// Measured rather than guessed: the direct frames on two simulator models
+    /// moved no cell at all. After #481 pinned the hosted window's previously
+    /// inherited safe area, those two screens move by at most one level across
+    /// three models. A mark that moves one column moves its cells by tens.
     static let cellTolerance = 3
 
     /// Percentage points of "exactly 0,0,0" the frame may move by. The claim
     /// #87 makes is that the ground is pure black; this notices it drifting.
     static let blackTolerance = 0.5
+
+    /// `drawHierarchy` leaves a sub-level compositor difference after the two
+    /// hosted screens' geometry is pinned. Across iPhone 17e, iPhone 14 Pro
+    /// and iPhone 17 Pro Max on the same runtime, the cell grid then differs by
+    /// at most one level while exact-black coverage spans 0.6 percentage
+    /// points. The direct renderer remains at the tighter threshold above.
+    static let hostedBlackTolerance = 0.75
 
     /// The levels the app paints flat. Declared on `RenderSignature`, which is
     /// what measures them.
@@ -567,10 +599,11 @@ struct RenderBaselineTests {
     ///
     /// `HostedScreenFrames` is the second rendering path: it hosts the actual
     /// production views in a `UIWindow` and snapshots them with
-    /// `drawHierarchy`. It removes the host safe area, forces a 393 × 852
-    /// logical surface and 2x scale, and passes the same pinned Tuesday through
-    /// a production-defaulted `today` seam. The result is a runtime baseline,
-    /// not a picture of whichever simulator model and weekday ran the test.
+    /// `drawHierarchy`. It forces a 393 × 852 logical surface, that surface's
+    /// 59pt/34pt safe area and 2x scale, then passes the same pinned Tuesday
+    /// through a production-defaulted `today` seam. The result is a runtime
+    /// baseline, not a picture of whichever simulator model and weekday ran
+    /// the test.
     ///
     /// The stack below is therefore **the test's surround, not the screen's**:
     /// one row gap between rows and the widget's inset around the block, which

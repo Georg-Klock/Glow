@@ -7440,3 +7440,32 @@ and disables Island presentation; the intent opens the shared App Group store
 and enables it. A hosted interaction test activates the production control,
 reads today's history through a fresh context, observes all three preview sizes
 reconcile, activates again and verifies the completion is removed.
+
+## 2026-09-01 — A hosted screen pins the reference surface's safe area (#481)
+
+The whole-screen render harness fixed its window at 393 × 852 but still took
+safe-area insets from the live simulator scene. The claim that
+`UIHostingController.safeAreaRegions = []` removed that input was false: the
+host view reported the inherited insets, and `NavigationStack` laid itself out
+from them.
+
+On one unchanged current-runtime commit, iPhone 17e supplied 47pt top / 34pt
+bottom, the native 393 × 852 iPhone 14 Pro supplied 59pt / 34pt, and iPhone 17
+Pro Max supplied 62pt / 0pt to the smaller hosted window. Against the 17e
+baseline the Pro Max moved the whole layout by 15pt: the weekly screen's worst
+cell moved 33 levels, the Widgets screen's moved 42, and exact-black coverage
+moved 0.9 percentage points. That is a different scene, not renderer noise.
+
+The reference surface now includes the iPhone 14 Pro's 59pt top and 34pt bottom
+safe area. `HostedScreenFrames` computes the additive correction from the live
+window and installs it before assigning the hosting controller as the root.
+Doing the same after first layout is too late: UIKit reports the corrected
+inset, but SwiftUI's navigation layout has already consumed the model's value.
+The harness asserts the effective host inset before drawing.
+
+After that correction, three current-runtime models move a hosted grid cell by
+at most one level. `drawHierarchy` still varies exact-black coverage by 0.6
+percentage points across the visually identical captures, so the two hosted
+frames alone use a measured 0.75-point tolerance. Direct-rendered frames keep
+their 0.5-point tolerance. A mark or layout move remains far outside both: the
+same unpinned scene moved cells by tens.

@@ -616,17 +616,24 @@ also reaches the production app module for two full-screen frames.
 invalid-configuration placeholder rather than the screen, so
 `HostedScreenFrames` mounts the real `WeeklyGridView` and `WidgetsView` in a
 `UIWindow` and captures the compositor with `drawHierarchy`. That path pins a
-393 × 852 logical window, no inherited safe area, 2x display/output scale, dark
-appearance and a fixed today. It also carries the **render baseline**: a
+393 × 852 logical window, its 59pt top and 34pt bottom safe area, 2x
+display/output scale, dark appearance and a fixed today. The safe-area
+correction is applied before the hosting controller enters the live scene so a
+simulator model cannot move the navigation layout (#481). It also carries the
+**render baseline**: a
 committed 16 × 16 grid of mean brightness per frame — the widget frames, three
 isolated app frames and two whole app screens — in
 `RenderTests/Baselines/render-signatures.json`, rendered for a pinned date at a
 pinned glow setting. Each cell averages roughly 450 pixels, so antialiasing
 moves a cell by well under one level while a mark that moves a column moves
-several cells by tens — measured as bit-identical across two simulator models,
-with the tolerance at 3 for headroom. A change that is deliberate is approved by
-copying the manifest the run attached over the committed file; `Tools/test.sh`
-prints that command with the run's own path in it.
+several cells by tens. Direct frames were bit-identical across two simulator
+models; after the safe-area pin, hosted-screen cells differed by at most one
+level across three current-runtime models. The cell tolerance remains 3. The
+hosted compositor's exact-black share spans 0.6 percentage points across those
+models, so only those two frames use a measured 0.75-point black tolerance;
+direct frames retain 0.5. A change that is deliberate is approved by copying
+the manifest the run attached over the committed file; `Tools/test.sh` prints
+that command with the run's own path in it.
 
 The grid is a gate on **geometry**, and it took #199 to say so: a mean dilutes,
 and the marks that carry the unlit colour are thin, so #194 moved the whole
