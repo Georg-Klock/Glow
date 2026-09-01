@@ -7319,6 +7319,7 @@ There is no headroom-change notification to observe. A one-second visible-only
 poll is the deliberate trade: current enough for a human-readable diagnostic,
 without tying the screen to frame cadence or inventing a notification UIKit
 does not provide.
+
 ## 2026-08-31 — The Widgets tab is a live control surface (#465)
 
 The tab already compiled and rendered the production `WeekWidgetView` and
@@ -7353,3 +7354,35 @@ non-spacer habit offered by `MonthStore`, in the person's order and deduplicated
 by id, gets a card. The zero-habit case remains one unconfigured empty card.
 The accepted cost is a longer page for a long habit list: two Small cards still
 share each row, and completeness now wins over the old demonstration cap.
+
+## 2026-08-31 — The Island acknowledges the requested completion (#464)
+
+The widget mark already changes optimistically through its AppIntent-backed
+toggle. The Dynamic Island used to wait behind `HabitStore.setCompletion`, so
+one tap produced an immediate ring and noticeably later words. The words now
+belong to the request too: after the intent has opened the habit and read one
+bounded pre-write week snapshot, it asks `GoalPopCentre` to present before it
+asks the store to write.
+
+`OptimisticPop.shouldPresent` is the pre-write rule. Undo, a spacer and a day
+the snapshot already holds are silent. **Never** rejects everything;
+**Everything** accepts any otherwise-new requested completion; **Goals** adds
+one hypothetical completion to the value snapshot and asks whether that would
+meet the target exactly. The store remains authoritative. A rare refusal or
+save failure can therefore take the optimistic ring back after the words have
+appeared, and that mismatch is accepted rather than making every successful
+tap wait to avoid it. Foreground logging is unchanged and keeps its in-app pop
+after the app's own store verdict. The shared control hosted in the foreground
+Widgets tab passes Island presentation disabled; an installed widget passes it
+enabled.
+
+A second race existed inside a running activity. Each replacement was launched
+in an unstructured task, so an older `Activity.update` could return after a
+newer one and leave the old habit on screen. Serialising updates would avoid
+that race by making the newest tap wait behind the work it replaces, which is
+the opposite of the product rule. `LatestPopDelivery` starts each replacement
+immediately. After any delivery returns it compares its generation with the
+latest; if stale, it applies the newest operation and checks again before
+exiting. A deterministic suspended-operation test completes Water before Read,
+then proves Read's stale task reapplies Water. `PopWindow` independently keeps
+the activity's ending and full two-second duration owned by the newest tap.

@@ -29,37 +29,48 @@ import Foundation
 /// path that surfaced would be a worse bug than the missing two seconds.
 @MainActor
 enum GoalPopCentre {
-    /// Fire, if the goal was just met and the switch is on.
+    /// Fire for a requested completion if its pre-write snapshot and the
+    /// person's setting allow it (#464).
     ///
-    /// Takes the verdict rather than computing it: `GoalMet` is pure and
-    /// testable, and the callers already know what they just wrote.
+    /// Called before persistence. A rare refusal or save failure may therefore
+    /// roll the mark back after the pop has appeared; that is the explicit cost
+    /// of making both acknowledgements belong to the tap rather than the save.
     ///
-    /// Both callers are intents. See the note on the type before adding a
-    /// third from a view.
-    static func popIfMet(
+    /// The caller is the widget intent. See the note on the type before adding
+    /// one from a view.
+    static func popIfRequestedCompletion(
+        requestedDone: Bool,
         habit: HabitSnapshot,
         in week: Week,
         today: Date,
         calendar: Calendar = WeekCalendar.calendar
     ) {
-        let met = GoalMet.justMet(habit: habit, in: week)
-        // One rule, shared with the app's own pop — see `PopPreferences.allows`.
-        guard PopPreferences.allows(justMetGoal: met) else { return }
+        guard OptimisticPop.shouldPresent(
+            requestedDone: requestedDone,
+            habit: habit,
+            in: week,
+            today: today,
+            level: PopPreferences.level,
+            calendar: calendar
+        ) else { return }
 
         // **One pop, and this is the whole of "never fires twice"** (#420).
         // A goal-completing tap used to pop the routine line here and then
         // replace it with the goal's after `GoalPop.handover`, sharing the two
         // seconds. There is one pool now, so there is one line, and the second
         // request that made this the only double-fire in the app is gone.
-        pop(habitID: habit.id, name: habit.name, on: today, calendar: calendar)
+        pop(name: habit.name)
     }
 
     /// The number of the most recent pop. See `PopWindow`.
     private static var latest = 0
 
-    private static func pop(
-        habitID: UUID, name: String, on day: Date, calendar: Calendar
-    ) {
+    /// Existing-activity updates start immediately and converge if ActivityKit
+    /// completes them out of order. Kept independent from `latest`: this owns
+    /// content delivery, while the integer owns the two-second end window.
+    private static let updates = LatestPopDelivery()
+
+    private static func pop(name: String) {
         // Live Activities can be switched off system-wide, per app, and are
         // unavailable on some devices. All three arrive here as the same
         // answer, and the answer is to do nothing.
@@ -87,7 +98,7 @@ enum GoalPopCentre {
         // rather than a side effect of how the Island stacks.
         if let running = Activity<GoalPopAttributes>.activities.first {
             let id = running.id
-            Task { @MainActor in
+            updates.submit {
                 for live in Activity<GoalPopAttributes>.activities where live.id == id {
                     await live.update(content)
                 }

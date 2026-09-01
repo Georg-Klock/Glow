@@ -49,11 +49,18 @@ struct MarkHabitIntent: LiveActivityIntent {
     @Parameter(title: "Done")
     var done: Bool
 
+    /// Whether this archived control lives where the Island can be seen.
+    /// Installed widgets pass true; the same control hosted inside Glow's
+    /// Widgets tab passes false (#465). The app keeps its own foreground pop.
+    @Parameter(title: "Present Island Encouragement")
+    var presentsIsland: Bool
+
     init() {}
 
-    init(habitID: UUID, done: Bool) {
+    init(habitID: UUID, done: Bool, presentsIsland: Bool = true) {
         self.habitID = habitID.uuidString
         self.done = done
+        self.presentsIsland = presentsIsland
     }
 
     @MainActor
@@ -69,6 +76,22 @@ struct MarkHabitIntent: LiveActivityIntent {
         // `TapHabitIntent` gives: the widget's write has to land on the day the
         // widget drew as open, and this asked the clock three times.
         let today = WeekCalendar.today()
+
+        // The ring has already flipped optimistically. Give the Island the
+        // same timing: decide from the bounded pre-write snapshot and launch
+        // the eligible pop before persistence (#464). An undo or a day this
+        // snapshot already holds is silent; a refusal after this point is the
+        // accepted rollback cost of optimistic acknowledgement.
+        let week = WeekCalendar.week(containing: today)
+        if presentsIsland {
+            GoalPopCentre.popIfRequestedCompletion(
+                requestedDone: done,
+                habit: habit.snapshot(within: week.dayIDs()),
+                in: week,
+                today: today
+            )
+        }
+
         let result = try HabitStore(context: context)
             .setCompletion(for: habit, on: today, done: done)
 
@@ -93,27 +116,6 @@ struct MarkHabitIntent: LiveActivityIntent {
             // `WidgetBurst.record`.
             WidgetBurst.record(
                 habitID: id, reduceMotion: UIAccessibility.isReduceMotionEnabled
-            )
-            // The completion, and the week's goal on top of it if this was
-            // the tap that met it — which of those actually speaks is
-            // `PopPreferences`' business, not this call site's (#119).
-            //
-            // Only on `.completed`, which is what makes un-logging silent: an
-            // undo is a correction, and a correction that says "logged" is the
-            // app congratulating somebody for taking something back.
-            //
-            // This is the path the pop is actually seen on: the Island does not
-            // render an activity while its own app is in front, so a completion
-            // logged in the app fires one nobody looks at, and one logged from
-            // the home screen fires one they are already looking at.
-            // The week, not the history: `GoalMet` counts inside the week it
-            // is given and asks nothing about any day outside it, so a tap no
-            // longer reads a year to decide whether it was the seventh (#135).
-            let week = WeekCalendar.week(containing: today)
-            GoalPopCentre.popIfMet(
-                habit: habit.snapshot(within: week.dayIDs()),
-                in: week,
-                today: today
             )
         } else {
             // Anything that is not a completion drops this habit's note, if it
