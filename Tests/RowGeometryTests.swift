@@ -179,6 +179,50 @@ struct RowGeometryTests {
         }
     }
 
+    /// #482 restores the field's old body-sized type without restoring the old
+    /// lie where a roomy input cut somewhere other than the compact row. The
+    /// width and type grow together, including at Dynamic Type sizes.
+    @Test("The larger name field keeps the compact row's truncation ratio")
+    func editorNameFieldKeepsTheRowsRatio() {
+        #expect(HabitEditorGeometry.nameFieldBaseTextSize == 17)
+        #expect(
+            HabitEditorCopy.nameWarning
+                == "Short titles work better. Long titles will be cut."
+        )
+
+        for width in [320, 338, 390, 430] as [CGFloat] {
+            let row = RowGeometry(totalWidth: width)
+            for fieldTextSize in [17, 20, 28, 40] as [CGFloat] {
+                let fieldWidth = HabitEditorGeometry.nameFieldWidth(
+                    rowNameWidth: row.nameMaxWidth,
+                    rowTextSize: row.textSize,
+                    fieldTextSize: fieldTextSize
+                )
+                let fieldRatio = fieldWidth / fieldTextSize
+                let rowRatio = row.nameMaxWidth / row.textSize
+                #expect(abs(fieldRatio - rowRatio) < 1e-9)
+            }
+        }
+    }
+
+    @Test("Degenerate name-field ratios collapse safely")
+    func degenerateEditorNameFieldRatios() {
+        #expect(
+            HabitEditorGeometry.nameFieldWidth(
+                rowNameWidth: 71.75,
+                rowTextSize: 0,
+                fieldTextSize: 17
+            ) == 0
+        )
+        #expect(
+            HabitEditorGeometry.nameFieldWidth(
+                rowNameWidth: .infinity,
+                rowTextSize: 12,
+                fieldTextSize: 17
+            ) == 0
+        )
+    }
+
     /// #455: the two visible requests and the room they create are one rule.
     /// Pin the production values directly; the ratio check above would stay
     /// green if both app and widget agreed on the wrong geometry.

@@ -671,14 +671,16 @@ in.
 #456). The field has no character limit and imposes none — what is stored is
 exactly what was typed. Truncation is a width, not a count, so how many letters
 fit depends on which letters they are and no counter can state a number. The
-field therefore uses the compact row's real font and measured name width and
-tail-truncates while it is being edited. Once the name overruns, a fixed-height
-amber line immediately above it reads *Cut off on This Week and in the widget*.
-The line reserves its height while empty, so the field and frequency control do
-not move when it appears. **One field is honest about both surfaces**, because
-they are one row at two sizes: `RowGeometry` is the large widget's geometry
-times a single factor, applied to the text size as well as to the label column,
-so a name breaks at the same character on This Week as it does in the widget.
+field therefore uses the system's body-sized type and a width enlarged from the
+compact row by the same factor, then tail-truncates while it is being edited.
+The larger input remains an honest preview because its width-to-type ratio is
+unchanged. Once the name overruns, a fixed-height amber line immediately above
+it reads *Short titles work better. Long titles will be cut.* The line reserves
+its height while empty, so the field and frequency control do not move when it
+appears. **One field is honest about both surfaces**, because they are one row
+at two sizes: `RowGeometry` is the large widget's geometry times a single
+factor, applied to the text size as well as to the label column, so a name
+breaks at the same character on This Week as it does in the widget.
 
 **A blank row is grouping somebody put there** (#143, narrowed by #257).
 Blank rows exist so habits can be clustered, and they are made deliberately —

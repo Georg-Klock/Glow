@@ -34,6 +34,36 @@ enum HabitEditorGeometry {
     /// frequency row (#456).
     static let nameHintHeight: CGFloat = 18
     static let nameHintSpacing: CGFloat = 6
+
+    /// The system default a `TextField` used before #456 made the field itself
+    /// the compact-row preview. `@ScaledMetric` resolves this base at the
+    /// current Dynamic Type size in `HabitEditorView`.
+    static let nameFieldBaseTextSize: CGFloat = 17
+
+    /// Enlarging both sides of the compact row's width-to-type ratio keeps the
+    /// field's ellipsis on the same character even though the field is easier
+    /// to read than the row it previews (#482).
+    static func nameFieldWidth(
+        rowNameWidth: CGFloat,
+        rowTextSize: CGFloat,
+        fieldTextSize: CGFloat
+    ) -> CGFloat {
+        guard rowNameWidth.isFinite,
+              rowTextSize.isFinite,
+              fieldTextSize.isFinite,
+              rowNameWidth >= 0,
+              rowTextSize > 0,
+              fieldTextSize >= 0 else {
+            return 0
+        }
+        return rowNameWidth * fieldTextSize / rowTextSize
+    }
+}
+
+enum HabitEditorCopy {
+    /// One source for the visible warning and the field's spoken hint.
+    static let nameWarning =
+        "Short titles work better. Long titles will be cut."
 }
 
 /// Add or edit a habit. One sheet for both, since the fields are identical.
@@ -42,6 +72,12 @@ struct HabitEditorView: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+
+    /// Restores the field's pre-#456 `.body` size while retaining Dynamic Type.
+    /// Its width is scaled by the same resolved value below, so accessibility
+    /// sizes do not turn the field into a different truncation preview.
+    @ScaledMetric(relativeTo: .body)
+    private var nameFieldTextSize = HabitEditorGeometry.nameFieldBaseTextSize
 
     @State private var name = ""
     @State private var icon = HabitSymbol.default
@@ -228,6 +264,16 @@ struct HabitEditorView: View {
         RowGeometry(totalWidth: max(0, sheetWidth - GridMetrics.horizontalPadding * 2))
     }
 
+    /// The compact row's available width enlarged by exactly the same factor
+    /// as its type. That preserves the character at which the tail is cut.
+    private var nameFieldWidth: CGFloat {
+        HabitEditorGeometry.nameFieldWidth(
+            rowNameWidth: rowPreview.nameMaxWidth,
+            rowTextSize: rowPreview.textSize,
+            fieldTextSize: nameFieldTextSize
+        )
+    }
+
     /// Whether the name gets less room than it wants, and so ends in an
     /// ellipsis.
     ///
@@ -299,8 +345,9 @@ struct HabitEditorView: View {
     /// The old editor drew a second habit label below the field. That made the
     /// field a place to enter one thing and the row beneath it the place to see
     /// another, and the block's arrival moved the frequency control. The field
-    /// is the preview now: its type and width come from `rowPreview`, the same
-    /// geometry the hidden probes measure and the app and widget draw (#456).
+    /// is the preview now. Its larger `.body` type and width are the row's type
+    /// and width multiplied by one factor, so the hidden probes and the field
+    /// still cut at the same character (#456, #482).
     ///
     /// The input remains the full string. Once it is wider than the row, the
     /// native field's scrolling text becomes transparent and a tail-truncated
@@ -319,7 +366,7 @@ struct HabitEditorView: View {
                 Color.clear
                     .frame(width: HabitEditorGeometry.rowHeight, height: 1)
 
-                Text("Cut off on This Week and in the widget.")
+                Text(HabitEditorCopy.nameWarning)
                     .font(.footnote)
                     .foregroundStyle(GlowPalette.warning)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -350,25 +397,25 @@ struct HabitEditorView: View {
                 ZStack(alignment: .leading) {
                     HStack {
                         TextField("Name", text: $name)
-                            .font(.system(size: rowPreview.textSize))
+                            .font(.system(size: nameFieldTextSize))
                             .lineLimit(1)
                             .truncationMode(.tail)
                             .foregroundStyle(isNameCut ? Color.clear : Color.primary)
                             .textInputAutocapitalization(.sentences)
                             .focused($isNameFocused)
                             .submitLabel(.done)
-                            .frame(width: rowPreview.nameMaxWidth, alignment: .leading)
+                            .frame(width: nameFieldWidth, alignment: .leading)
 
                         Spacer(minLength: 0)
                     }
 
                     if isNameCut {
                         Text(trimmedName)
-                            .font(.system(size: rowPreview.textSize))
+                            .font(.system(size: nameFieldTextSize))
                             .lineLimit(1)
                             .truncationMode(.tail)
                             .frame(
-                                width: rowPreview.nameMaxWidth,
+                                width: nameFieldWidth,
                                 alignment: .leading
                             )
                             .allowsHitTesting(false)
@@ -380,9 +427,7 @@ struct HabitEditorView: View {
                 .frame(height: HabitEditorGeometry.rowHeight)
                 .background(platter)
                 .accessibilityHint(
-                    isNameCut
-                        ? "Cut off on This Week and in the widget"
-                        : ""
+                    isNameCut ? HabitEditorCopy.nameWarning : ""
                 )
             }
 
