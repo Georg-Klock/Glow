@@ -229,13 +229,14 @@ targets:
       - path: Glow/Glow
       - path: Glow/Views/HabitIconView.swift
       - path: Glow/Views/SlotMarkView.swift
-      # The app's own grid row and weekday header, so the render gate holds
-      # surfaces that are not widgets (#386). `HabitRowView` needs the two mark
-      # views it draws with. `WeeklyGridView` is deliberately not here, and
-      # cannot be: `ImageRenderer` will not draw a `NavigationStack` — it
-      # substitutes SwiftUI's own "invalid configuration" placeholder, measured
-      # and written up in `RenderBaselineTests`. `WeekdayHeader` was extracted
-      # from that file so this target can compile the header without it.
+      # The app's own grid row and weekday header, so the direct ImageRenderer
+      # frames hold isolated non-widget surfaces (#386). `HabitRowView` needs
+      # the two mark views it draws with. Whole `WeeklyGridView` and
+      # `WidgetsView` frames instead come from the production Glow dependency:
+      # HostedScreenFrames mounts them in a UIWindow because ImageRenderer
+      # substitutes its invalid-configuration placeholder for NavigationStack.
+      # `WeekdayHeader` remains separate so the isolated header can be compiled
+      # and gated without copying either whole screen into this target.
       - path: Glow/Views/HabitRowView.swift
       - path: Glow/Views/WeekdayHeader.swift
       - path: Glow/Views/SlotView.swift

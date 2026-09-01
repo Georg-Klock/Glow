@@ -13,7 +13,12 @@ struct WeeklyGridView: View {
     @Query(filter: Habit.weekly, sort: [SortDescriptor(\Habit.sortOrder)])
     private var habits: [Habit]
 
-    @State private var today = WeekCalendar.today()
+    /// A pinned day only when a hosted render supplies one (#386). Production
+    /// passes nothing and continues to re-read `WeekCalendar.today()` on every
+    /// lifecycle trigger below; the render gate needs the same screen to draw
+    /// the same week after the real calendar has moved on.
+    private let pinnedToday: Date?
+    @State private var today: Date
     /// The first day of the week on screen, which is not always this one
     /// (#117).
     ///
@@ -21,7 +26,7 @@ struct WeeklyGridView: View {
     /// the screen is up moves *this* week and leaves the one being looked at
     /// where it is. An offset would silently slide the whole view back a week
     /// at 00:00.
-    @State private var weekStart = WeekCalendar.startOfWeek(containing: WeekCalendar.today())
+    @State private var weekStart: Date
     /// The earliest day anything is on record for, from `HabitStore`. Held
     /// rather than recomputed per redraw — see `earliestRecordedDay`.
     @State private var recordStart: Date?
@@ -72,6 +77,15 @@ struct WeeklyGridView: View {
     /// same trick `HabitRowView` uses for the rest day.
     @AppStorage(WeekPreferences.firstWeekdayKey, store: GlowSettings.store)
     private var firstWeekday: Int = WeekPreferences.defaultFirstWeekday
+
+    init(today: Date? = nil) {
+        let initialToday = WeekCalendar.day(today ?? WeekCalendar.today())
+        pinnedToday = today == nil ? nil : initialToday
+        _today = State(initialValue: initialToday)
+        _weekStart = State(
+            initialValue: WeekCalendar.startOfWeek(containing: initialToday)
+        )
+    }
 
     private var week: Week {
         // `firstWeekday` is read, not used: reading it here is the whole point.
@@ -875,7 +889,7 @@ struct WeeklyGridView: View {
     }
 
     private func refreshToday() {
-        let current = WeekCalendar.today()
+        let current = pinnedToday ?? WeekCalendar.today()
         if current != today { today = current }
         refreshReach()
     }

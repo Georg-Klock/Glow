@@ -606,13 +606,16 @@ widget's view is not in it — so it compiles the widget's sources directly, the
 same sharing the widget target itself uses, hosted by the app so `Bundle.main`
 carries the symbol catalogue. **It compiles a handful of the app's own views the
 same way** (#386): `HabitRowView` and `WeekdayHeader`, with the two mark views
-they draw with, so the gate holds surfaces that are not widgets. Neither whole
-screen is among them and neither can be — `ImageRenderer` answers a
-`NavigationStack` with SwiftUI's invalid-configuration placeholder rather than
-with the screen, which is why `WeekdayHeader` was extracted from
-`WeeklyGridView.swift` into a file this target can compile. It also carries the
-**render baseline**: a committed 16 × 16 grid of mean brightness per frame — six
-widget frames and three of the app's — in
+they draw with, so the gate holds isolated surfaces that are not widgets. It
+also reaches the production app module for two full-screen frames.
+`ImageRenderer` answers either screen's `NavigationStack` with SwiftUI's
+invalid-configuration placeholder rather than the screen, so
+`HostedScreenFrames` mounts the real `WeeklyGridView` and `WidgetsView` in a
+`UIWindow` and captures the compositor with `drawHierarchy`. That path pins a
+393 × 852 logical window, no inherited safe area, 2x display/output scale, dark
+appearance and a fixed today. It also carries the **render baseline**: a
+committed 16 × 16 grid of mean brightness per frame — the widget frames, three
+isolated app frames and two whole app screens — in
 `RenderTests/Baselines/render-signatures.json`, rendered for a pinned date at a
 pinned glow setting. Each cell averages roughly 450 pixels, so antialiasing
 moves a cell by well under one level while a mark that moves a column moves

@@ -4,10 +4,10 @@ import SwiftUI
 import Testing
 import UIKit
 
-/// A committed, reviewed picture of what every widget family looks like — and,
-/// since #386, of the rows and the weekday header the app draws for itself —
-/// and a gate that goes red when one of them changes without anyone approving
-/// it.
+/// A committed, reviewed picture of what every widget family looks like and,
+/// since #386, of the app's weekly and widget screens as well as their isolated
+/// rows and weekday header — and a gate that goes red when one of them changes
+/// without anyone approving it.
 ///
 /// #138. The render tests next door already sample pixels, and they already
 /// print numbers: `bg-audit: week small exact-black 97.3%`. Printing is not a
@@ -73,8 +73,11 @@ import UIKit
 /// * **The rest day.** Pinned to none, because `HabitRowView` reads it out of
 ///   the App Group rather than taking it as a parameter (#386). No widget
 ///   frame depends on it; the app's row does.
-/// * **Size, scale, colour space and appearance.** 2x, sRGB, dark, over
-///   `GlowPalette.widgetBackground`, exactly as the widget configurations do.
+/// * **Size, scale, colour space and appearance.** Direct `ImageRenderer`
+///   frames are 2x, sRGB and dark over `GlowPalette.widgetBackground`, exactly
+///   as the widget configurations are. The two whole screens use the compositor
+///   through `HostedScreenFrames`: a 393 × 852 window, no inherited safe area,
+///   a forced 2x display/output scale, dark appearance and SDR output.
 ///
 /// Locale still reaches the weekday initials. It is the simulator's own, en_US
 /// on every machine this runs on; a machine with another one is a legitimate
@@ -252,7 +255,7 @@ struct RenderBaselineTests {
         // A baseline file that has quietly lost a family passes the test above
         // for every family it still has. This is the half that notices.
         let baseline = try Self.committedBaseline()
-        let rendered = Set(Self.frames.map(\.name))
+        let rendered = Set(Self.frames.map(\.name) + HostedScreenFrames.names)
         let committed = Set(baseline.frames.keys)
 
         #expect(committed == rendered, """
@@ -541,14 +544,16 @@ struct RenderBaselineTests {
     /// their arithmetic at the *screen's* scale are gated, where before they
     /// were gated only at the widget's.
     ///
-    /// It is **not** `WeeklyGridView`. The `List` around these rows — its row
-    /// insets, the panel and its rounded ends, the pager, the widget-boundary
-    /// hairline, and the delete and reorder controls edit mode brings — is
-    /// rendered by nothing. Nor is `WidgetsView`.
+    /// This frame by itself is **not** `WeeklyGridView`. The `List` around
+    /// these rows — its row insets, the panel and its rounded ends, the pager,
+    /// the widget-boundary hairline, and the delete and reorder controls edit
+    /// mode brings — is outside this isolated frame. The baseline now gates
+    /// those production screen boundaries separately through
+    /// `HostedScreenFrames`.
     ///
-    /// **Neither screen can go through this harness at all, and that is
-    /// measured rather than assumed** (#386). Both build a `NavigationStack`,
-    /// which SwiftUI implements as a UIKit container:
+    /// **Neither screen can go through the direct `ImageRenderer` path, and
+    /// that is measured rather than assumed** (#386). Both build a
+    /// `NavigationStack`, which SwiftUI implements as a UIKit container:
     /// `ImageRenderer` cannot flatten it, and rather than failing it
     /// substitutes SwiftUI's own invalid-configuration placeholder — a plain
     /// yellow field with a red no-entry sign. `WeeklyGridView` and
@@ -560,24 +565,20 @@ struct RenderBaselineTests {
     /// beside them. A signature taken from that render is a committed picture
     /// of an error icon, and it would pass forever.
     ///
-    /// So the screens are covered here by the app views they are built from —
-    /// this one, and `WeekdayHeaderFrame` below — and the rest waits on a
-    /// second rendering path. That path is hosting in a `UIWindow` and
-    /// snapshotting the layer, which `EmptyStateAccessibilityTests` already
-    /// does half of, and it is a bigger decision than it looks: a hosted render
-    /// inherits the scene's safe area and the device's own scale, so a baseline
-    /// taken that way is a picture of one simulator model rather than of one
-    /// runtime. `WeeklyGridView` also has no seam for "today" — it reads
-    /// `WeekCalendar.today()` into `@State` — so a hosted frame over this
-    /// fixture would draw whichever weekday the run happened on.
+    /// `HostedScreenFrames` is the second rendering path: it hosts the actual
+    /// production views in a `UIWindow` and snapshots them with
+    /// `drawHierarchy`. It removes the host safe area, forces a 393 × 852
+    /// logical surface and 2x scale, and passes the same pinned Tuesday through
+    /// a production-defaulted `today` seam. The result is a runtime baseline,
+    /// not a picture of whichever simulator model and weekday ran the test.
     ///
     /// The stack below is therefore **the test's surround, not the screen's**:
     /// one row gap between rows and the widget's inset around the block, which
     /// is a frame to hold the rows still rather than a claim about how the list
     /// arranges them. Every number in it comes from `RowGeometry` — the app's
     /// own object — so it moves when the app moves, but a change to
-    /// `WeeklyGridView`'s `listRowInsets` will not show up here, and should not
-    /// be read as covered because this frame exists.
+    /// `WeeklyGridView`'s `listRowInsets` will not show up in this isolated
+    /// frame; they are covered by the separate hosted weekly-screen frame.
     ///
     /// **The label's three renderings are held, and that was checked rather
     /// than assumed.** `HabitRowView` picks `GlowPalette.lit` or
@@ -920,6 +921,14 @@ struct RenderBaselineTests {
         for frame in frames {
             out[frame.name] = RenderSignature(of: try render(frame))
         }
+        for name in HostedScreenFrames.names {
+            let rendered = try HostedScreenFrames.render(named: name)
+            let image = try #require(
+                rendered,
+                "the hosted compositor produced nothing for \(name)"
+            )
+            out[name] = RenderSignature(of: image)
+        }
         return out
     }
 
@@ -974,9 +983,13 @@ struct RenderBaselineTests {
     /// destroys the evidence.
     private func attachActual(name: String) {
         let slug = name.replacingOccurrences(of: " ", with: "-")
-        if let frame = RenderBaselineTests.frames.first(where: { $0.name == name }),
-           let png = try? RenderBaselineTests.render(frame),
-           let data = UIImage(cgImage: png).pngData() {
+        let image: CGImage?
+        if let frame = RenderBaselineTests.frames.first(where: { $0.name == name }) {
+            image = try? RenderBaselineTests.render(frame)
+        } else {
+            image = try? HostedScreenFrames.render(named: name)
+        }
+        if let image, let data = UIImage(cgImage: image).pngData() {
             Attachment.record(data, named: "\(slug)-actual.png")
         }
     }

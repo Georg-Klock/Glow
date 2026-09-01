@@ -71,7 +71,11 @@ struct WidgetsView: View {
     /// it, the preview of it did not, and the two disagreed about which column
     /// is today. See `DebugToday`, and the banner below, which is the other
     /// half of what a screen that reads the override owes.
-    @State private var today = WeekCalendar.today()
+    /// Nil in production. A hosted render supplies a day so this entire
+    /// scrolling screen, not a substitute view, can join the pixel gate with a
+    /// stable calendar input (#386).
+    private let pinnedToday: Date?
+    @State private var today: Date
 
     /// An AppIntent writes through a peer SwiftData container, so `@Query`
     /// cannot observe its completion rows. The intent posts a process-local
@@ -85,6 +89,12 @@ struct WidgetsView: View {
     /// dependency SwiftUI cannot see (#134).
     @AppStorage(WeekPreferences.firstWeekdayKey, store: GlowSettings.store)
     private var firstWeekday: Int = WeekPreferences.defaultFirstWeekday
+
+    init(today: Date? = nil) {
+        let initialToday = WeekCalendar.day(today ?? WeekCalendar.today())
+        pinnedToday = today == nil ? nil : initialToday
+        _today = State(initialValue: initialToday)
+    }
 
     /// The habits a per-habit preview can be drawn against, in the person's
     /// own order. `MonthStore`'s rule rather than a second one, so the previews
@@ -185,7 +195,7 @@ struct WidgetsView: View {
     /// decides it. Assigning unconditionally would redraw four lit previews on
     /// every defaults change in the App Group, most of which are not this.
     private func refreshToday() {
-        let current = WeekCalendar.today()
+        let current = pinnedToday ?? WeekCalendar.today()
         if current != today { today = current }
     }
 

@@ -474,10 +474,11 @@ actual bug. Every line here is something that already happened.
   the render harness passes: `WeeklyGridView` and `WidgetsView` rendered at
   393 × 852 over a seeded container came back **byte-identical to each other**,
   because both were the placeholder. A baseline approved from that is a
-  committed picture of an error icon, and it agrees with itself forever. Gate
-  the views a screen is built from, not the screen; a whole screen needs
-  hosting in a `UIWindow`, which is a different rendering path with the
-  device's own safe area and scale in it.
+  committed picture of an error icon, and it agrees with itself forever. Whole
+  screens therefore use `HostedScreenFrames`: host the production view in a
+  `UIWindow`, remove the inherited safe area, force the logical size and 2x
+  display/output scale, pin today, then capture `drawHierarchy`. Do not move a
+  `NavigationStack` screen back to the direct `ImageRenderer` path.
 - **`@Environment(\.editMode)` read by a view that *contains* the
   `NavigationStack` is always inactive.** `EditButton` toggles the value in the
   stack's own environment, below where the outer view reads, so the button
