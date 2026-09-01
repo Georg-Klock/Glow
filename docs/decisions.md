@@ -7281,6 +7281,20 @@ promise is unavailable in its full form: either the display cannot emit the
 glow, or the compact row cannot display the whole typed name. In both cases
 white would be indistinguishable from the content the warning qualifies.
 
+## 2026-09-01 — A larger name field keeps the compact row's ratio (#482)
+
+The field is again body-sized, as it was before #456, rather than being drawn at
+the compact row's roughly 12pt type. Its width grows by the same factor as its
+resolved type size: `row name width × (field type size / row type size)`. The
+field is therefore easier to read without moving the ellipsis to a different
+character than This Week or the widget, and the ratio continues to hold when
+Dynamic Type resolves `.body` above its 17pt base.
+
+The warning remains conditional, amber, and inside the fixed-height slot above
+the field. Only its wording changes, to *Short titles work better. Long titles
+will be cut.* The same sentence is the field's accessibility hint, so visible
+and spoken guidance cannot drift apart.
+
 
 ## 2026-08-31 — Emoji keep their colour outside the label glow (#457)
 
