@@ -7497,6 +7497,7 @@ maximum width becomes 71.75pt (`98 − 24 − 2.25`) and ends at the label colum
 edge; the existing 4pt `labelGap` still separates it from the first mark. The
 screen and creation preview derive from the same arrangement and ratio, so all
 three surfaces gain the same room without allowing a name under the track.
+
 ## 2026-09-01 — Weekly pills are claimable rep windows, not future controls (#476)
 
 The old final-mark rule stretched an open pill to Sunday whenever no future rep
@@ -7534,3 +7535,17 @@ fixed.
 Rest days are not reopened. The shipping app retired their input in #390, and
 a stored legacy rest day deliberately keeps the prior divider. Designing the
 feature's return belongs to separate post-release work.
+
+## 2026-09-01 — Settings explainers live outside their platters again (#474)
+
+The Glow, Say well done, and Week explanations return to their sections'
+footers. A platter contains the control and any live value it reports; the
+sentence that explains the choice belongs immediately outside that container.
+This reverses #395's placement decision without reversing its edit: the three
+shortened explanations remain shortened.
+
+The separate Glow-off notice remains in its own section above the Glow card,
+with its icon, and the live EDR readout remains inside beside the slider. Data
+still has no footer. Changing the Say well done picker can only reflow the
+footer if its short variants take different line counts; SwiftUI's Form reflow
+is known to snap rather than animate, so the binding remains a plain write.
