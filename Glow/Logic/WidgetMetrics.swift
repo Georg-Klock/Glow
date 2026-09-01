@@ -320,34 +320,35 @@ enum WidgetMetrics {
     static let iconSize: CGFloat = textSize
 
     /// How far a habit name may run before it is truncated: the label column,
-    /// less the icon and the gap on each side of the name.
+    /// less the icon and the one gap between icon and name.
     ///
-    ///     label 98 − icon 24 − iconGap 2.25 − iconGap 2.25 = 69.5
+    ///     label 98 − icon 24 − iconGap 2.25 = 71.75
     ///
     /// This constant used to read `(labelWidth + labelGap) - iconWidth -
     /// iconGap` = 73.5, and described a name as "allowed to overflow the label
     /// column and use the gap before the track". **The app never did that**
     /// (#412). Both surfaces that draw a name hold the whole label to the
     /// label column — `HabitRowView`'s `.frame(width: labelWidth)` and
-    /// `WeekWidgetView`'s — and inside that column sit the icon, the name and
-    /// a trailing `Spacer`, with `iconGap` between each pair. So the name is
-    /// granted the column less the icon and less *both* gaps, and the
-    /// `.frame(maxWidth: nameMaxWidth)` on the name never bound: at 73.5 it
-    /// was 8.5pt larger than anything the row could hand it.
+    /// `WeekWidgetView`'s. Before #475 that column was an
+    /// `HStack(spacing: iconGap)` containing the icon, name and trailing
+    /// `Spacer`, so SwiftUI inserted a second 2.25pt gap before an empty
+    /// spacer. The arrangement now applies the gap to the icon's trailing edge
+    /// instead. The name reaches the label column's own edge while `labelGap`
+    /// still keeps it clear of the track.
     ///
-    /// #455 halves both gaps, because the same spacing constant appears on
-    /// both sides of the name. That grants 69.5pt rather than 65pt while the
-    /// icon column and track stay fixed. `HabitEditorView` renders this same
-    /// arrangement for its truncation measurement rather than copying the
-    /// number.
+    /// #455 halved the shared spacing constant, granting 69.5pt rather than
+    /// 65pt while the icon column and track stayed fixed. #475 then removed
+    /// the repeated spacing after the name, granting the otherwise-unused
+    /// 2.25pt as well. `HabitEditorView` renders this same arrangement for its
+    /// truncation measurement rather than copying the number.
     ///
     /// So this is the arrangement's own number, not the design's target. The
     /// design's 73.5 — a name reaching into `labelGap`, which is how the file
     /// fits "Watch Sunset" — is a thing the app does not do, and #412 records
     /// the choice to say what the row grants rather than what the design
-    /// wanted. Changing this constant alone would not widen a name: #455
-    /// changes the arrangement's two gaps, and the derivation follows it.
-    static let nameMaxWidth: CGFloat = labelWidth - iconWidth - iconGap - iconGap
+    /// wanted. Changing this constant alone would not widen a name: #475
+    /// changes the arrangement's one real gap, and the derivation follows it.
+    static let nameMaxWidth: CGFloat = labelWidth - iconWidth - iconGap
 
     /// The weekday header's own row: shorter than a slot row, and its cells are
     /// wider than a slot with almost no gap, because a letter needs the width

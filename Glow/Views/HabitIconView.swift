@@ -100,9 +100,13 @@ struct HabitLabelView: View {
     }
 
     private func content(iconOpacity: Double, nameOpacity: Double) -> some View {
-        HStack(spacing: iconGap) {
+        // The gap belongs between the icon and the name. Giving it to the
+        // HStack also inserts the same gap before the trailing Spacer, which
+        // spends width on nothing and cuts the name early (#475).
+        HStack(spacing: 0) {
             HabitIconView(icon: icon, size: iconSize)
                 .frame(width: iconWidth)
+                .padding(.trailing, iconGap)
                 .opacity(iconOpacity)
 
             Text(name)

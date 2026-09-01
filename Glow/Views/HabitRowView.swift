@@ -19,7 +19,7 @@ import SwiftUI
 /// below has said so ever since. The stale half of that sentence is where
 /// #405's claim that the screen and the widget can truncate a name differently
 /// came from — they cannot: the one factor scales `textSize` too, so
-/// `nameMaxWidth` is 5.792 text-sizes on both. The third was the header, said
+/// `nameMaxWidth` is 5.979 text-sizes on both. The third was the header, said
 /// here to carry a date under each letter where the widget had room only for
 /// the letter: the date line went when the screen was required to be a large
 /// widget scaled up, and `WeekdayHeader` has drawn the letter alone since. The
@@ -91,7 +91,7 @@ struct RowGeometry: Equatable {
     /// it is −13.5pt, which SwiftUI reports as
     /// `Invalid frame dimension (negative or non-finite)` — a line the suite
     /// has been logging at test-host startup.
-    var nameMaxWidth: CGFloat { max(0, labelWidth - iconWidth - iconGap - iconGap) }
+    var nameMaxWidth: CGFloat { max(0, labelWidth - iconWidth - iconGap) }
 
     /// Everything between the row's own edges: the label column, the gap after
     /// it and the track. What the `List` proposes to a row, and — once the
@@ -118,9 +118,9 @@ struct RowGeometry: Equatable {
     /// How far a name may run **while the list is being edited** (#440).
     ///
     /// Not `nameMaxWidth`, and that is the whole of the bug it fixes. That
-    /// number is the label column less the icon and both gaps, and the label
-    /// column is a thing edit mode does not draw: the marks go, the track's
-    /// width comes back to the name, and `HabitRowView` already drops the
+    /// number is the label column less the icon and its one leading gap, and
+    /// the label column is a thing edit mode does not draw: the marks go, the
+    /// track's width comes back to the name, and `HabitRowView` already drops the
     /// trailing `Spacer` and the `labelWidth` frame for exactly that reason.
     /// The `.frame(maxWidth:)` on the name was the third and it was not
     /// dropped, so a name went on truncating where the track used to begin
@@ -588,9 +588,9 @@ struct HabitRowView: View {
         // **Truncated at the track, never shrunk.** Still never shrunk — text
         // at 12pt that quietly becomes 9pt is worse than text that ends in an
         // ellipsis — but it no longer *overflows* either. `nameMaxWidth` is the
-        // label column less the icon and both gaps. Editing has no track, so it
-        // gets the wider `editingNameMaxWidth` and drops both the trailing
-        // spacer and the fixed label-column frame (#440).
+        // label column less the icon and the one gap before the name. Editing
+        // has no track, so it gets the wider `editingNameMaxWidth` and drops
+        // both the trailing spacer and the fixed label-column frame (#440).
         let text = HabitLabelView(
             icon: snapshot.icon,
             name: snapshot.name,

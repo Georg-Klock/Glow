@@ -211,8 +211,8 @@ struct HabitEditorView: View {
     /// **The screen's row and the widget's row are one row at two sizes.**
     /// `RowGeometry` is the large widget times one factor — the panel's width
     /// over 338 — and that factor is applied to `textSize` as well as to the
-    /// label column. So `nameMaxWidth / textSize` is `69.5 / 12` on This Week
-    /// whatever phone it is, and `69.5 / 12` in the widget. #405 assumed
+    /// label column. So `nameMaxWidth / textSize` is `71.75 / 12` on This Week
+    /// whatever phone it is, and `71.75 / 12` in the widget. #405 assumed
     /// otherwise, on the strength of this type's own stale header comment;
     /// Dynamic Type came out of `RowGeometry` on 2026-08-24 (docs/decisions.md)
     /// and nothing has scaled independently since. `RowGeometryTests` holds
@@ -234,7 +234,7 @@ struct HabitEditorView: View {
     /// **Still measured rather than compared with a copied constant.** The
     /// first version predicted the cut from `nameMaxWidth` and was a character
     /// optimistic on the screenshot that caught it. The row below is the real
-    /// arrangement — icon column, both gaps, name and trailing spacer — and it
+    /// arrangement — icon column, its gap, name and trailing spacer — and it
     /// reports what SwiftUI actually granted at this sheet's width. That keeps
     /// the hint honest if any part of the arrangement moves again.
     private var isNameCut: Bool { idealNameWidth > grantedNameWidth }
@@ -274,9 +274,10 @@ struct HabitEditorView: View {
     /// but that is a transient state of the list, not how the habit is read, and
     /// a preview should show the narrower of the two.
     private var rowLabelProbe: some View {
-        HStack(spacing: rowPreview.iconGap) {
+        HStack(spacing: 0) {
             HabitIconView(icon: icon, size: rowPreview.iconSize)
                 .frame(width: rowPreview.iconWidth)
+                .padding(.trailing, rowPreview.iconGap)
             Text(trimmedName)
                 .lineLimit(1)
                 .truncationMode(.tail)

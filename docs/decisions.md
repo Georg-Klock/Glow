@@ -7469,3 +7469,17 @@ percentage points across the visually identical captures, so the two hosted
 frames alone use a measured 0.75-point tolerance. Direct-rendered frames keep
 their 0.5-point tolerance. A mark or layout move remains far outside both: the
 same unpinned scene moved cells by tens.
+
+## 2026-09-01 — The name uses the gap before it, not a gap before empty space (#475)
+
+The label column used `HStack(spacing: iconGap)` for three children: icon, name
+and a trailing spacer. That correctly put 2.25pt between icon and name, but it
+also put 2.25pt between the name and an empty spacer. The second gap separated
+the name from nothing and made it truncate early.
+
+The stack now has zero blanket spacing and applies the same 2.25pt only to the
+icon's trailing edge. The icon, label column and track do not move. The name's
+maximum width becomes 71.75pt (`98 − 24 − 2.25`) and ends at the label column's
+edge; the existing 4pt `labelGap` still separates it from the first mark. The
+screen and creation preview derive from the same arrangement and ratio, so all
+three surfaces gain the same room without allowing a name under the track.
