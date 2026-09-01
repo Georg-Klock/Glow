@@ -233,20 +233,15 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
-                    // Inside the platter, and directly under the number it is
-                    // about (#395). It was a `Section(footer:)`, which SwiftUI
-                    // always draws below the card on the screen's own black —
-                    // so the one line explaining why the second number moves
-                    // was separated from that number by the platter's own
-                    // edge. As a row it is adjacent to it, which is also what
-                    // let it lose half its words: "what the screen grants"
-                    // does not need saying again when the sentence above just
-                    // said it.
+                } header: {
+                    Text("Glow")
+                } footer: {
+                    // Outside the platter again (#474). The compact wording
+                    // from #395 stays: moving the explainer does not restore
+                    // the repetition that was removed with it.
                     Text(Self.glowNote)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                } header: {
-                    Text("Glow")
                 }
 
                 Section {
@@ -265,13 +260,14 @@ struct SettingsView: View {
                     // in a `Form` drops it — leaving three unlabelled words
                     // where a row used to say what it was for.
                     .labelsHidden()
-
-                    // Inside the platter (#395), under the picker it answers.
+                } header: {
+                    Text("Say well done")
+                } footer: {
+                    // The explainer belongs outside the control's platter
+                    // again; all three shortened variants remain (#474).
                     Text(popNote)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                } header: {
-                    Text("Say well done")
                 }
 
                 // One row now. This section held the rest day too — a toggle
@@ -286,13 +282,14 @@ struct SettingsView: View {
                             Text(weekdayName(weekday)).tag(weekday)
                         }
                     }
-
-                    // Inside the platter (#395), under the picker it answers.
+                } header: {
+                    Text("Week")
+                } footer: {
+                    // The shortened sentence stays, outside the platter
+                    // whose picker it explains (#474).
                     Text(Self.weekNote)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                } header: {
-                    Text("Week")
                 }
 
                 // Data last: the export, beside the one control that writes
@@ -423,10 +420,10 @@ struct SettingsView: View {
     /// reflects it.
     ///
     /// **A plain synchronous write, and #203 asked for `withAnimation`.** The
-    /// line under this picker is one sentence or a longer two-clause one — a
-    /// footer under the section until #395 moved it inside — so it resizes and
-    /// every section below it moves, and that move snaps. Wrapping the write
-    /// does not change it: built with a three-second
+    /// line under this picker is a section footer again (#474), so a change in
+    /// its line count would resize the section and move everything below it.
+    /// That move snaps. Wrapping the write does not change it: built with a
+    /// three-second
     /// linear `withAnimation` around the write, and again with a linear
     /// `animation` modifier keyed to `popLevel` on the `Form` as well, a burst
     /// of screenshots 0.2s apart caught the Week section moving 373pt → 405pt
