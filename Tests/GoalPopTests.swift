@@ -216,12 +216,17 @@ struct GoalPopTests {
 
     // MARK: - The pool
 
-    @Test("The pool is 173 phrases with no duplicates")
+    @Test("The pool is 370 phrases with no duplicates")
     func thePoolIsWhatItSaysItIs() {
         // The count is the point of #420: six phrases were exhausted inside a
         // week by anybody logging twice a day. A duplicate would quietly make
         // one phrase twice as likely and the pool one shorter than it reads.
-        #expect(GoalPop.lines.count == 173)
+        //
+        // 370 since #471, which widened the pool across nine varieties of
+        // English. The number is asserted rather than derived so that adding
+        // phrases stays a deliberate act with a diff, the way lowering a floor
+        // in Tools/test-inventory.json is.
+        #expect(GoalPop.lines.count == 370)
         #expect(Set(GoalPop.lines).count == GoalPop.lines.count)
     }
 
