@@ -221,5 +221,8 @@ struct DemoHistory {
             context.rollback()
             throw error
         }
+        // This type bypasses `HabitStore`, so it crosses the retained Widgets
+        // projection's successful-save boundary itself (#478).
+        NotificationCenter.default.post(name: StoreChange.committed, object: nil)
     }
 }

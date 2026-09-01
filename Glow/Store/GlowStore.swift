@@ -6,6 +6,10 @@ import SwiftData
 /// invalidate another container's already-fetched view state (#145, #465).
 enum StoreChange {
     static let fromIntent = Notification.Name("com.georgklock.glow.store-change-from-intent")
+    /// Every successful live-store save, including a completion made in the
+    /// app's own context. Views that retain a bounded projection use this to
+    /// invalidate it without refetching on unrelated redraws (#478).
+    static let committed = Notification.Name("com.georgklock.glow.store-change-committed")
 }
 
 /// The one container, shared by the app and the widget.

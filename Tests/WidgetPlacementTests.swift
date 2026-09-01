@@ -461,7 +461,8 @@ struct WidgetPlacementTests {
 
         #expect(!preview.contains(".allowsHitTesting(false)"))
         #expect(!preview.contains(".accessibilityHidden(true)"))
-        #expect(widgets.contains("WeekWidgetView(entry:"))
+        #expect(widgets.contains("WeekWidgetView("))
+        #expect(widgets.contains("entry: projection.weekEntry"))
         #expect(widgets.contains("MonthWidgetView(entry:"))
         #expect(slotToggle.contains("Toggle(isOn: isDone, intent: MarkHabitIntent("))
         #expect(slotToggle.contains("Toggle(isOn: Binding("))

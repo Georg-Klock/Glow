@@ -7549,3 +7549,48 @@ with its icon, and the live EDR readout remains inside beside the slider. Data
 still has no footer. Changing the Say well done picker can only reflow the
 footer if its short variants take different line counts; SwiftUI's Form reflow
 is known to snap rather than animate, so the binding remains a plain write.
+
+## 2026-09-01 — The Widgets catalog is lazy over one projection (#478)
+
+The Widgets tab used an ordinary `VStack` for the whole catalog. More
+importantly, its computed entry properties hid work behind innocent-looking
+view construction: Large and Medium each projected the current week, then
+every habit's Small card projected the month again. Thirty habits therefore
+made 32 bounded SwiftData projection calls whenever SwiftUI evaluated the
+catalog, including cards below the viewport.
+
+The page now keeps stable card identity in `LazyVStack`s and owns a
+`WidgetPreviewProjectionCache`. One completion read spans the month grid's
+whole-week range. Since that range already contains the current week, the same
+value snapshots are filtered to seven days for one shared `WeekEntry` and
+indexed by habit for all `MonthEntry`s. Card bodies receive those values and
+never fetch. The key includes the day, first-weekday setting, ordered habit
+fingerprints and a successful-store revision; ordinary redraws reuse it, while
+successful `HabitStore` and `DemoHistory` saves advance it. A refused,
+unchanged or failed operation has no changed history to fetch.
+
+The regression evidence is runtime evidence. Injecting a counting reader into
+the production cache records exactly one completion projection on first load
+at 1, 8 and 30 habits, then no read for the same key and exactly one for each
+real revision. A phone-height `UIHostingController` observes that the initial
+viewport realises fewer cards than the catalog contains and that additional
+month cards appear only after scrolling. On an iOS 26.5 simulator, alternating
+the former query shape and the new one for 30 habits with 730 completed days
+each produced five-round medians of **510.8915 ms for 32 projections** and
+**24.829625 ms for one shared projection**, a 20.6× reduction in that work.
+
+Minimum-iOS reruns exposed why the runtime guard must also reproduce the
+cache's real lifetime. SwiftData 18 measured the former 32-query redraw at
+about 990 ms in a cold process and 12.6 ms after its query-plan cache warmed,
+while a shared miss stayed near 42–43 ms. Constructing a new production cache
+for every benchmark round therefore tested a lifecycle the view never has and
+could compare a cold shared miss with a warmed former redraw. The guard now
+warms the legacy arm once, then compares five ordinary redraws with the
+retained cache's one miss plus four hits. The injected-reader tests separately
+keep the exact one-read and invalidation contract.
+
+That simulator measurement is not the issue's physical-device frame-time
+gate. The app also emits a Points of Interest `Widgets projection` signpost so
+repeated This Week/Widgets switches can be measured in Instruments on the
+30-habit, two-year fixture. The issue closes only after that phone trace shows
+no empty intermediate frame and no main-thread hitch over 33 ms.

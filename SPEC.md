@@ -1028,6 +1028,18 @@ week is still one preview per wide size because it already shows the whole
 list. Zero weekly habits is still one card, drawing the widget's own empty
 state — what adding it today would actually get you.
 
+**The catalog is lazy and its history is one projection** (#478). Only cards
+in or near the scroll viewport are realised; stable placement-and-habit ids
+preserve their identity as they enter and leave it. Large and Medium receive
+the same precomputed week entry, while every month card indexes one shared
+month projection. The month grid spans whole weeks and therefore already
+contains the current week, so one bounded SwiftData completion read feeds the
+entire tab for a given day, week preference, habit list and successful store
+revision. A completion reconciles the visible controls by advancing that
+revision; it does not make each card fetch, construct every offscreen preview,
+or pass through an empty intermediate state. Empty state, habit order,
+accessibility and the production widget views themselves are unchanged.
+
 **The production controls stay live inside the Widgets tab** (#465). Today's
 actionable mark in either week card and every month card is the same
 `SlotToggle` the Home Screen widget uses. WidgetKit supplies its AppIntent

@@ -426,6 +426,26 @@ habit, which is `MonthWidgetView`'s own empty state rather than a heading with
 nothing under it. The clause that kept Week-Small to a single card went with
 the family itself (PR #277).
 
+**The catalog is lazy over one retained projection** (#478).
+`WidgetsView` uses stable `WidgetCard.ID`s in nested `LazyVStack`s, so SwiftUI
+realises only cards in or near the viewport. Before that change an ordinary
+stack constructed the whole catalog, and each of Large and Medium evaluated a
+separate week projection while every month preview opened another bounded
+history read. `WidgetPreviewProjectionCache` now performs one read over
+`MonthGrid.dayRange`; that range is made of whole weeks and already contains
+the current week, so filtering its value snapshots supplies the one shared
+`WeekEntry` as well as every `MonthEntry`. No preview body opens SwiftData.
+
+The cache key is the normalized day, first-weekday preference, ordered habit
+fingerprints and a successful-store revision. Ordinary geometry and optimistic
+redraws therefore return values synchronously without another read or an empty
+loading frame. Every successful `HabitStore` commit advances the revision via
+`StoreChange.committed`; `DemoHistory` posts the same signal because it owns a
+separate save boundary. Failed, unchanged and refused operations do not
+invalidate history. `StoreChange.fromIntent` remains the redraw/reconciliation
+signal for all final intent verdicts, while a successful intent also crosses
+the commit signal from the shared `HabitStore` operation.
+
 **Those production views are live controls in the app too** (#465). The page
 does not disable hit testing or hide their accessibility trees. Today's
 actionable week slots, frequency spans and month cell therefore remain the
@@ -449,9 +469,11 @@ SwiftData does not merge into the app's already-fetched view state. The app
 adapter instead hands the operation its already-live context. After every
 operation verdict — including an unchanged duplicate or a refusal — the
 historically named `StoreChange.fromIntent` is posted inside the process.
-`WidgetsView` and `WeeklyGridView` advance a local revision and take fresh
-bounded snapshots, reconciling the optimistic face to the store while
-`WidgetRefresh` independently asks installed widgets for a new timeline.
+`WeeklyGridView` advances a local revision and takes fresh bounded snapshots.
+`WidgetsView` redraws for every verdict but advances its retained projection
+only for a successful commit, reconciling the optimistic face without making
+an unchanged or refused operation refetch history. `WidgetRefresh`
+independently asks installed widgets for a new timeline.
 
 **`WidgetPlacementQuerying` is the seam.** `WidgetCenter` answers for the
 Home Screen of the device it is running on, which a test cannot arrange, so the
