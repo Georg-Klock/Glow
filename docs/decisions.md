@@ -7594,3 +7594,41 @@ gate. The app also emits a Points of Interest `Widgets projection` signpost so
 repeated This Week/Widgets switches can be measured in Instruments on the
 30-habit, two-year fixture. The issue closes only after that phone trace shows
 no empty intermediate frame and no main-thread hitch over 33 ms.
+
+## 2026-09-01 — Widget sockets rasterize only in the scrolling app host (#479)
+
+`WeekWidgetView` and `MonthWidgetView` were designed for WidgetKit snapshots,
+so their `SlotMarkView`s kept the socket bevel as two live inner-shadow filter
+trees. That was correct on the Home Screen and wrong when the same production
+views became interactive children of the Widgets tab's `ScrollView`: moving a
+card moved dozens of off-screen blur/mask passes, and every monthly habit added
+another 28–31 cells to the eager cost.
+
+The established app-grid answer remains the narrow one. A host-scoped
+`flattensWidgetSockets` environment value defaults off and is enabled only by
+`WidgetsView`. `SlotMarkView` combines that value with its existing explicit
+`flattensSocket` input and applies `drawingGroup()` to the socket background —
+not to `SlotToggle`, the content mark or the card. Both optimistic faces inherit
+the value naturally. The installed widget therefore keeps the archive-safe
+path already covered by its current and minimum-iOS render baselines, while the
+scrolling app copy uses the same rasterized socket path already reviewed for
+the week grid.
+
+The two runtime baselines localize the visual delta to that boundary. The
+installed week and month family row profiles are unchanged. Only the hosted
+Widgets screen's sampled rows move on the current runtime, while its flat-tone
+censuses stay unchanged. On iOS 18 the same hosted screen moves in the sampled
+rows and in three tone censuses: level 124 changes from 0 to −10, level 217
+from 156 to 153, and level 255 from 11,562 to 11,567. The changed cells sit in
+the preview tracks where the socket bevels are drawn. The baseline approvals
+record that reviewed blur-rasterizer delta rather than accepting a
+whole-screen movement.
+
+This choice is based on #402's isolated measurement, not the modifier's name:
+the same eight-flick probe improved from 137.8 ms between frames (7.3 fps) to
+31.0 ms (32.2 fps) when sockets were flattened. That result identifies the
+cost but does not satisfy #479's new physical gate. The repeatable Core
+Animation/SwiftUI procedure and result table live in
+`docs/widget-preview-scroll-trace.md`; merge and issue closure wait for its
+8- and 30-habit phone rows to meet the stated frame-time limits, including Low
+Power Mode and Reduce Motion.

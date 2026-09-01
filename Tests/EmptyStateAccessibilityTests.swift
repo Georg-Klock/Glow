@@ -151,6 +151,9 @@ struct EmptyStateAccessibilityTests {
     /// production preview control, then reads history through a fresh context
     /// and confirms every copy reconciles to the stored answer.
     @Test func activatingAWidgetPreviewControlPersistsAndReconciles() async throws {
+        // #479's socket rasterization is active on this host. The real
+        // production control remains live around it; Low Power and Reduce
+        // Motion are repeated in the physical trace where they can be toggled.
         let screen = try WidgetScreen()
         defer { screen.tearDown() }
 

@@ -469,6 +469,32 @@ struct WidgetPlacementTests {
         #expect(widgets.contains("MarkHabitOperation.perform("))
     }
 
+    /// Rasterization is selected by the host, not baked into the production
+    /// widget view. The default therefore protects WidgetKit's independently
+    /// baselined archive path, while the scrolling app host flattens only the
+    /// socket background beneath the unchanged `SlotToggle` (#479).
+    @Test("Only the scrolling app host flattens widget sockets")
+    func widgetSocketFlatteningIsHostScoped() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        func source(_ path: String) throws -> String {
+            try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+        }
+
+        let widgets = try source("Glow/Views/WidgetsView.swift")
+        let mark = try source("Glow/Views/SlotMarkView.swift")
+        let toggle = try source("GlowWidget/SlotToggle.swift")
+
+        #expect(EnvironmentValues().flattensWidgetSockets == false)
+        #expect(widgets.contains(".environment(\\.flattensWidgetSockets, true)"))
+        #expect(mark.contains(
+            ".flattened(flattensSocket || flattensWidgetSockets)"
+        ))
+        #expect(mark.contains("if flattens { drawingGroup() } else { self }"))
+        #expect(!toggle.contains("drawingGroup"), "the interactive control must stay live")
+    }
+
     /// AppIntent writes happen through a peer container. The system's
     /// optimistic face is immediate; this local signal is what makes both live
     /// app tabs fetch the final answer afterwards, including a refusal or a

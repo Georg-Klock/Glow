@@ -1,5 +1,21 @@
 import SwiftUI
 
+/// WidgetKit keeps the archive-safe live-vector socket by default. An ordinary
+/// scrolling app host opts in at its preview boundary, allowing every nested
+/// week and month mark — including both optimistic toggle faces — to select
+/// the already-measured app rasterization path without changing the control
+/// wrapped around it (#479).
+private struct FlattensWidgetSocketsKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var flattensWidgetSockets: Bool {
+        get { self[FlattensWidgetSocketsKey.self] }
+        set { self[FlattensWidgetSocketsKey.self] = newValue }
+    }
+}
+
 /// Draws one slot's mark, in the app and in the widget both.
 ///
 /// Kept out of `SlotView` because the widget cannot use that type — it owns a
@@ -7,6 +23,8 @@ import SwiftUI
 /// state to drive. What the two must agree on is what a mark *looks like*, so
 /// that is what lives here and nothing else.
 struct SlotMarkView: View {
+    @Environment(\.flattensWidgetSockets) private var flattensWidgetSockets
+
     let mark: SlotMark
     let size: CGSize
     /// Widget slots are distributed by their `HStack` and must not be pinned to
@@ -36,10 +54,14 @@ struct SlotMarkView: View {
     /// 32.2fps, against 16.6ms for the plain `Form` control taken the same
     /// minute.
     ///
-    /// **It is off for the widget, deliberately.** A widget is a snapshot and
-    /// never scrolls, so there is nothing here for it to win, and it renders
-    /// through WidgetKit's archiver rather than through this process — a
-    /// rasterising modifier there is untested risk for no gain.
+    /// **It is off for an installed widget, deliberately.** A widget is a
+    /// snapshot and never scrolls, so there is nothing there for it to win,
+    /// and it renders through WidgetKit's archiver rather than through this
+    /// process — a rasterising modifier there is untested risk for no gain.
+    /// The in-app Widgets catalog now opts in through
+    /// `flattensWidgetSockets`: those same production views do scroll there,
+    /// while the environment's default keeps their WidgetKit path untouched
+    /// (#479).
     ///
     /// **It is not pixel-identical, and that is measured.** Captured off the
     /// simulator through the real compositor, the same store planted in both
@@ -90,7 +112,7 @@ struct SlotMarkView: View {
         // `GlowShape.pillHeight`.
         case .upcoming, .openToday, .doneToday, .donePast:
             sized(socket(size.height * GlowShape.pillHeight, circle: !spansDays))
-                .flattened(flattensSocket)
+                .flattened(flattensSocket || flattensWidgetSockets)
                 .restWindowRemoved(restWindow)
         }
     }

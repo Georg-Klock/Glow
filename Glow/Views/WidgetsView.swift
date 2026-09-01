@@ -333,6 +333,11 @@ struct WidgetsView: View {
             // operation; this one uses the app's live context, yields the
             // optimistic frame first, and suppresses the foreground Island.
             .environment(\.isInAppWidgetPreview, true)
+            // These production widget views are archived stills on the Home
+            // Screen but live inside this scrolling app surface. Flatten only
+            // each socket's expensive inner-shadow stack; `SlotToggle` stays
+            // outside the rasterized layer and remains a real control (#479).
+            .environment(\.flattensWidgetSockets, true)
             .environment(\.inAppWidgetMarkAction, InAppWidgetMarkAction {
                 habitID, done in
                 try MarkHabitOperation.perform(

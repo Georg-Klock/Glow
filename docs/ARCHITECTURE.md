@@ -446,6 +446,18 @@ invalidate history. `StoreChange.fromIntent` remains the redraw/reconciliation
 signal for all final intent verdicts, while a successful intent also crosses
 the commit signal from the shared `HabitStore` operation.
 
+**Socket rendering follows the host, not the widget view** (#479).
+`EnvironmentValues.flattensWidgetSockets` defaults to `false`, preserving the
+live-vector path used and baselined by WidgetKit. `WidgetsView` sets it to
+`true` around the real production view because that copy lives in a scrolling
+app hierarchy. Each descendant `SlotMarkView` then sends only its socket
+background through the existing `drawingGroup()` branch. The `SlotToggle`
+stays above that layer, so rasterization cannot replace its hit testing,
+optimistic state, label, hint or app/intent delivery adapter. Both toggle faces
+inherit the host value, preventing an optimistic ring or dot from briefly
+returning to live filters during a tap. `docs/widget-preview-scroll-trace.md`
+is the repeatable physical gate for this boundary.
+
 **Those production views are live controls in the app too** (#465). The page
 does not disable hit testing or hide their accessibility trees. Today's
 actionable week slots, frequency spans and month cell therefore remain the
