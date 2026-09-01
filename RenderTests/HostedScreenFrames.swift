@@ -18,6 +18,28 @@ enum HostedScreenFrames {
 
     private static let size = CGSize(width: 393, height: 852)
     private static let scale: CGFloat = 2
+    /// The native safe area of the 393 × 852 surface this harness claims to
+    /// render. A window attached to the live test scene otherwise inherits the
+    /// simulator model's insets even though its own frame is pinned (#481).
+    static let safeArea = UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0)
+
+    static func additionalSafeAreaInsets(for inherited: UIEdgeInsets) -> UIEdgeInsets {
+        UIEdgeInsets(
+            top: safeArea.top - inherited.top,
+            left: safeArea.left - inherited.left,
+            bottom: safeArea.bottom - inherited.bottom,
+            right: safeArea.right - inherited.right
+        )
+    }
+
+    private struct SafeAreaMismatch: Error, CustomStringConvertible {
+        let actual: UIEdgeInsets
+        let expected: UIEdgeInsets
+
+        var description: String {
+            "hosted screen safe area is \(actual); expected \(expected)"
+        }
+    }
 
     /// See #357: SwiftData leaves an observer behind for a hosted `@Query`.
     /// Keeping every container alive for the test process removes the one
@@ -59,6 +81,11 @@ enum HostedScreenFrames {
             window.windowScene = scene
         }
         window.overrideUserInterfaceStyle = .dark
+        // This has to be installed before `rootViewController`: SwiftUI reads
+        // the safe area as the NavigationStack enters the hierarchy. Changing
+        // the same value after its first layout updates UIKit's reported inset
+        // but leaves the model-specific navigation layout in place.
+        host.additionalSafeAreaInsets = additionalSafeAreaInsets(for: window.safeAreaInsets)
         window.rootViewController = host
         window.isHidden = false
         window.makeKeyAndVisible()
@@ -70,6 +97,9 @@ enum HostedScreenFrames {
         // this same boundary at 1.5 seconds.
         RunLoop.current.run(until: Date().addingTimeInterval(1.5))
         host.view.layoutIfNeeded()
+        guard host.view.safeAreaInsets == safeArea else {
+            throw SafeAreaMismatch(actual: host.view.safeAreaInsets, expected: safeArea)
+        }
 
         let format = UIGraphicsImageRendererFormat()
         format.scale = scale

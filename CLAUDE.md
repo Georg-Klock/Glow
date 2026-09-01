@@ -476,8 +476,11 @@ actual bug. Every line here is something that already happened.
   because both were the placeholder. A baseline approved from that is a
   committed picture of an error icon, and it agrees with itself forever. Whole
   screens therefore use `HostedScreenFrames`: host the production view in a
-  `UIWindow`, remove the inherited safe area, force the logical size and 2x
-  display/output scale, pin today, then capture `drawHierarchy`. Do not move a
+  `UIWindow`, force the 393 × 852 reference surface's 59pt/34pt safe area before
+  the host enters the live scene, force 2x display/output scale, pin today,
+  then capture `drawHierarchy`. The timing is part of the contract: a
+  post-layout correction reports the requested inset but leaves the inherited
+  model-specific navigation layout in place (#481). Do not move a
   `NavigationStack` screen back to the direct `ImageRenderer` path.
 - **`@Environment(\.editMode)` read by a view that *contains* the
   `NavigationStack` is always inactive.** `EditButton` toggles the value in the
