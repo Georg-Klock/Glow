@@ -56,6 +56,7 @@ struct WidgetsView: View {
     @Query(filter: Habit.weekly, sort: [SortDescriptor(\Habit.sortOrder)])
     private var habits: [Habit]
 
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
 
     /// The day the previews are drawn for. Same reason `WeeklyGridView` holds
@@ -286,10 +287,21 @@ struct WidgetsView: View {
         let size = WidgetMetrics.size(of: card.placement.family)
         let scale = size.width > 0 ? min(1, width / size.width) : 1
         return content(for: card)
-            // The control and intent remain the production ones. This only
-            // exposes their existing labels at the boundary SwiftUI's hosted
-            // accessibility tree reads; WidgetKit promotes the style itself.
+            // The production mark remains one `SlotToggle`, but an ordinary
+            // app view needs a binding-backed delivery adapter where WidgetKit
+            // supplies an AppIntent adapter. Both call the same absolute-state
+            // operation; this one uses the app's live context, yields the
+            // optimistic frame first, and suppresses the foreground Island.
             .environment(\.isInAppWidgetPreview, true)
+            .environment(\.inAppWidgetMarkAction, InAppWidgetMarkAction {
+                habitID, done in
+                try MarkHabitOperation.perform(
+                    habitID: habitID,
+                    done: done,
+                    presentsIsland: false,
+                    context: modelContext
+                )
+            })
             .padding(.leading, WidgetMetrics.padLeading(for: card.placement.family))
             .padding(.trailing, WidgetMetrics.padTrailing(for: card.placement.family))
             .padding(.top, WidgetMetrics.padTop)

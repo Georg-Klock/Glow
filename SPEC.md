@@ -197,11 +197,12 @@ landed on; that was weighed and taken. See docs/decisions.md.
   exits if it became stale. The two-second ending still belongs to the latest
   tap, so both the words and their full visible duration restart there.
 
-  The production control hosted inside Glow's Widgets tab passes the same
-  intent with Island presentation disabled: the app is foreground, where the
-  Live Activity is not visible. Installed widgets pass it enabled. This keeps
-  the Island a Home Screen acknowledgement and leaves the existing in-app pop
-  as the foreground presentation.
+  The production control hosted inside Glow's Widgets tab calls the same mark
+  operation through an app binding adapter, with Island presentation disabled:
+  the app is foreground, where the Live Activity is not visible. Installed
+  widgets reach it through `MarkHabitIntent` with Island presentation enabled.
+  This keeps the Island a Home Screen acknowledgement and leaves the existing
+  in-app pop as the foreground presentation.
 
 **A mark from a widget sets a state; it does not flip one** (#272, #292).
 `MarkHabitIntent` carries the state the tapped mark was *asking for* — a ring
@@ -1026,13 +1027,15 @@ state — what adding it today would actually get you.
 
 **The production controls stay live inside the Widgets tab** (#465). Today's
 actionable mark in either week card and every month card is the same
-AppIntent-backed `SlotToggle` the Home Screen widget uses: it changes its face
-optimistically, asks the idempotent `MarkHabitIntent` for an absolute done or
-undone state, and then reconciles to the shared store. Past and future marks
-remain display-only. The controls keep their production VoiceOver labels and
-hints; the page does not hide a widget view as one picture. A finished intent
-signals the live Widgets and This Week tabs to re-read their bounded snapshots,
-while the usual widget invalidation updates installed widgets.
+`SlotToggle` the Home Screen widget uses. WidgetKit supplies its AppIntent
+adapter; the ordinary app host supplies a binding adapter whose local `isOn`
+changes before persistence begins (#477). Both adapters ask one idempotent
+`MarkHabitOperation` for an absolute done or undone state, then reconcile to
+the shared store. Past and future marks remain display-only. The controls keep
+their production VoiceOver labels and hints; the page does not hide a widget
+view as one picture. A finished operation signals the live Widgets and This
+Week tabs to re-read their bounded snapshots, while the usual widget
+invalidation updates installed widgets.
 
 **The Small previews sit two to a line, the way a Home Screen sits them**
 (#274). Two Small widgets occupy the footprint of one Medium, so a column of

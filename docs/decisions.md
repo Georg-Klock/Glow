@@ -7417,3 +7417,26 @@ below a scroll boundary. The Widgets frame includes its instructions, Large
 preview and the beginning of Medium. Monthly cards farther down the page remain
 covered as `MonthWidgetView` frames and by the pure grouping tests, but this
 single screen signature does not claim to capture every offscreen card.
+
+## 2026-09-01 — An app-hosted widget control needs an app adapter (#477)
+
+An AppIntent-backed `Toggle` remains the right installed-widget control: only
+WidgetKit owns the archived toggle state and performs its intent while updating
+that state optimistically. Hosting that same archived control as an ordinary
+SwiftUI view did not transfer either behavior. Accessibility activation
+returned true, but no intent ran and no completion was written.
+
+`SlotToggle` now has two delivery adapters around one rendered `isOn` value.
+WidgetKit keeps `Toggle(isOn:intent:)`. The Widgets tab supplies an ordinary
+binding whose local value changes before any SwiftData work begins, so touch
+and VoiceOver both get the same immediate ring/dot response. Its small delivery
+loop coalesces an input that outruns the first write and serializes later input,
+leaving the latest requested absolute state as the last store request.
+
+Both adapters call `MarkHabitOperation`, which owns the bounded habit lookup,
+absolute-state `HabitStore.setCompletion`, burst bookkeeping, reconciliation
+notification and widget invalidation. The app passes its live model context
+and disables Island presentation; the intent opens the shared App Group store
+and enables it. A hosted interaction test activates the production control,
+reads today's history through a fresh context, observes all three preview sizes
+reconcile, activates again and verifies the completion is removed.

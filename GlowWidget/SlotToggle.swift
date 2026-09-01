@@ -16,6 +16,25 @@ extension EnvironmentValues {
     }
 }
 
+/// The app-side adapter for the same absolute-state operation an installed
+/// widget reaches through `MarkHabitIntent`. It is synchronous deliberately:
+/// `SlotToggle` yields one frame after changing its local binding, then runs
+/// the bounded write on the main actor in delivery order.
+struct InAppWidgetMarkAction {
+    let perform: @MainActor (UUID, Bool) throws -> Void
+}
+
+private struct InAppWidgetMarkActionKey: EnvironmentKey {
+    static let defaultValue: InAppWidgetMarkAction? = nil
+}
+
+extension EnvironmentValues {
+    var inAppWidgetMarkAction: InAppWidgetMarkAction? {
+        get { self[InAppWidgetMarkActionKey.self] }
+        set { self[InAppWidgetMarkActionKey.self] = newValue }
+    }
+}
+
 /// A widget mark that draws the state it just asked for (#292).
 ///
 /// This is the other half of `MarkHabitIntent` carrying `done`. The intent made
@@ -49,6 +68,15 @@ extension EnvironmentValues {
 /// agrees with the optimistic pixels, not with the snapshot they outran.
 struct SlotToggle<OnMark: View, OffMark: View>: View {
     @Environment(\.isInAppWidgetPreview) private var isInAppWidgetPreview
+    @Environment(\.inAppWidgetMarkAction) private var inAppWidgetMarkAction
+
+    /// WidgetKit owns an AppIntent toggle's requested state. An ordinary app
+    /// host does not, so its binding stores the same bit locally before any
+    /// persistence work begins. It is cleared after the shared operation has
+    /// posted reconciliation, returning authority to the entry snapshot.
+    @State private var optimisticIsDone: Bool?
+    @State private var pendingRequest: Bool?
+    @State private var isDelivering = false
 
     private let habitID: UUID
     private let isDone: Bool
@@ -75,24 +103,26 @@ struct SlotToggle<OnMark: View, OffMark: View>: View {
 
     @ViewBuilder
     var body: some View {
-        if isInAppWidgetPreview {
-            control
+        if isInAppWidgetPreview, let inAppWidgetMarkAction {
+            inAppControl(action: inAppWidgetMarkAction)
                 // The hosted app accessibility tree does not promote the
                 // labels inside a custom AppIntent toggle style. Use the same
-                // strings at the control boundary there; the intent's local
-                // reconciliation redraw replaces this snapshot immediately.
-                .accessibilityLabel(isDone ? onLabel : offLabel)
-                .accessibilityHint(SlotVoice.hint(isDone: isDone))
+                // strings at the control boundary there, driven by the same
+                // optimistic bit as the pixels.
+                .accessibilityLabel(displayedIsDone ? onLabel : offLabel)
+                .accessibilityHint(SlotVoice.hint(isDone: displayedIsDone))
         } else {
-            control
+            installedWidgetControl
         }
     }
 
-    private var control: some View {
+    /// WidgetKit's archived adapter. Its `configuration.isOn` is the system's
+    /// optimistic state and remains independent of the app-hosted path.
+    private var installedWidgetControl: some View {
         Toggle(isOn: isDone, intent: MarkHabitIntent(
             habitID: habitID,
             done: !isDone,
-            presentsIsland: !isInAppWidgetPreview
+            presentsIsland: true
         )) {
             // Never drawn: the style below draws the mark and ignores its
             // label, and what VoiceOver reads is the style's own
@@ -102,6 +132,49 @@ struct SlotToggle<OnMark: View, OffMark: View>: View {
         .toggleStyle(SlotMarkToggleStyle(
             onMark: onMark, offMark: offMark, onLabel: onLabel, offLabel: offLabel
         ))
+    }
+
+    /// An ordinary binding is the app adapter WidgetKit does not provide.
+    /// Both adapters still hand `SlotMarkToggleStyle` one `isOn` bit, so the
+    /// optimistic pixels and VoiceOver state have one definition.
+    private func inAppControl(action: InAppWidgetMarkAction) -> some View {
+        Toggle(isOn: Binding(
+            get: { displayedIsDone },
+            set: { requested in request(requested, through: action) }
+        )) {
+            EmptyView()
+        }
+        .toggleStyle(SlotMarkToggleStyle(
+            onMark: onMark, offMark: offMark, onLabel: onLabel, offLabel: offLabel
+        ))
+    }
+
+    private var displayedIsDone: Bool { optimisticIsDone ?? isDone }
+
+    /// Coalesces input that arrives before the previous frame's bounded write
+    /// begins, then serialises any request that arrives while reconciliation
+    /// is being drawn. Absolute-state writes make duplicates harmless; this
+    /// delivery loop additionally guarantees the last requested state is the
+    /// last one handed to the store.
+    private func request(_ requested: Bool, through action: InAppWidgetMarkAction) {
+        optimisticIsDone = requested
+        pendingRequest = requested
+        guard !isDelivering else { return }
+        isDelivering = true
+
+        Task { @MainActor in
+            // Give SwiftUI the optimistic frame before opening SwiftData.
+            await Task.yield()
+            while let next = pendingRequest {
+                pendingRequest = nil
+                try? action.perform(habitID, next)
+                // Let the notification-driven entry redraw land, and accept a
+                // newer tap before deciding that this control is settled.
+                await Task.yield()
+            }
+            optimisticIsDone = nil
+            isDelivering = false
+        }
     }
 }
 

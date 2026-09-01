@@ -437,11 +437,11 @@ struct WidgetPlacementTests {
     }
 
     /// The app does not wrap the production widget views in its own gesture.
-    /// Their `SlotToggle` controls stay intact all the way through the preview
-    /// transform, which is what makes the same optimistic AppIntent run on both
-    /// surfaces (#465). The modifiers are a source-level contract because hit
-    /// testing is not represented in a still render.
-    @Test("The Widgets tab leaves production AppIntent controls interactive")
+    /// `SlotToggle` keeps the AppIntent adapter for WidgetKit and supplies the
+    /// ordinary binding adapter an app-hosted view needs (#477). The modifiers
+    /// are a source-level contract because hit testing is not represented in a
+    /// still render; the hosted accessibility test performs the real control.
+    @Test("The Widgets tab leaves production controls interactive")
     func inAppPreviewsKeepTheProductionControls() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -464,6 +464,8 @@ struct WidgetPlacementTests {
         #expect(widgets.contains("WeekWidgetView(entry:"))
         #expect(widgets.contains("MonthWidgetView(entry:"))
         #expect(slotToggle.contains("Toggle(isOn: isDone, intent: MarkHabitIntent("))
+        #expect(slotToggle.contains("Toggle(isOn: Binding("))
+        #expect(widgets.contains("MarkHabitOperation.perform("))
     }
 
     /// AppIntent writes happen through a peer container. The system's

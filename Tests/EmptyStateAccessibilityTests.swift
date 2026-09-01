@@ -137,6 +137,34 @@ struct EmptyStateAccessibilityTests {
         )
     }
 
+    /// #465 proved that the controls were present; #477 closes the gap between
+    /// accepting an activation and performing it. This activates the real
+    /// production preview control, then reads history through a fresh context
+    /// and confirms every copy reconciles to the stored answer.
+    @Test func activatingAWidgetPreviewControlPersistsAndReconciles() async throws {
+        let screen = try WidgetScreen()
+        defer { screen.tearDown() }
+
+        let openControl = try #require(screen.contentElements().first {
+            ($0.accessibilityLabel ?? "").hasPrefix("Preview Habit,")
+                && $0.accessibilityHint == "Mark as done"
+        })
+        #expect(openControl.accessibilityActivate())
+        await screen.settleAfterAction()
+
+        #expect(try screen.persistedIsDone())
+        let doneControls = screen.contentElements().filter {
+            ($0.accessibilityLabel ?? "").hasPrefix("Preview Habit,")
+                && $0.accessibilityHint == "Mark as not done"
+        }
+        #expect(doneControls.count >= 3, "every preview must reconcile after the write")
+
+        let doneControl = try #require(doneControls.first)
+        #expect(doneControl.accessibilityActivate())
+        await screen.settleAfterAction()
+        #expect(try screen.persistedIsDone() == false)
+    }
+
     // MARK: - Reading the tree
 
     /// `WeeklyGridView` over an empty store, hosted in a window.
@@ -298,6 +326,8 @@ struct EmptyStateAccessibilityTests {
         let container: ModelContainer
         let host: UIViewController
         let window: UIWindow
+        let habitID: UUID
+        let today: Date
 
         init() throws {
             container = try ModelContainer(
@@ -306,13 +336,16 @@ struct EmptyStateAccessibilityTests {
                     schema: GlowStore.schema, isStoredInMemoryOnly: true
                 )
             )
-            container.mainContext.insert(Habit(
+            today = WeekCalendar.today()
+            let habit = Habit(
                 name: "Preview Habit",
                 icon: "figure.walk",
                 frequency: .daily,
-                createdAt: WeekCalendar.today(),
+                createdAt: today,
                 sortOrder: 0
-            ))
+            )
+            habitID = habit.id
+            container.mainContext.insert(habit)
             try container.mainContext.save()
 
             host = UIHostingController(rootView: WidgetsView().modelContainer(container))
@@ -331,6 +364,30 @@ struct EmptyStateAccessibilityTests {
             host.view.layoutIfNeeded()
             RunLoop.current.run(until: Date().addingTimeInterval(1.5))
             host.view.layoutIfNeeded()
+        }
+
+        /// A binding-backed preview deliberately yields before persistence so
+        /// SwiftUI can commit the optimistic frame. The synchronous run-loop
+        /// settle above cannot resume a main-actor Swift concurrency task while
+        /// this test itself still owns the actor, so interaction assertions use
+        /// a real suspension point.
+        func settleAfterAction() async {
+            host.view.layoutIfNeeded()
+            await Task.yield()
+            try? await Task.sleep(for: .seconds(1.5))
+            host.view.layoutIfNeeded()
+        }
+
+        func persistedIsDone() throws -> Bool {
+            let context = ModelContext(container)
+            let id = habitID
+            let descriptor = FetchDescriptor<Habit>(predicate: #Predicate { $0.id == id })
+            let habit = try #require(context.fetch(descriptor).first)
+            let day = DayID(today, calendar: WeekCalendar.calendar)
+            let snapshot = try #require(
+                Habit.snapshots(of: [habit], within: day...day).first
+            )
+            return snapshot.completedDays.contains(WeekCalendar.day(today))
         }
 
         func tearDown() {
