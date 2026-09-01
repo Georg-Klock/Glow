@@ -36,7 +36,7 @@ struct WeekSpansTests {
         #expect(row[1].firstDay == 5 && row[1].lastDay == 6)  // the weekend
     }
 
-    @Test("Two a week, one done earlier: the completion keeps its day, the open mark takes the rest")
+    @Test("Two a week, one done earlier: the completion keeps its day and open stops today")
     func openSpanStartsAtToday() {
         let habit = HabitSnapshot.fixture(
             frequency: .timesPerWeek(2),
@@ -46,17 +46,17 @@ struct WeekSpansTests {
 
         // The completion anchors on Tuesday and reaches back over Monday
         // (#339); it used to be handed the whole block before today, which put
-        // its edge on Thursday — a day nothing happened on. The open mark is
-        // the last in the row, so it runs to the end of the week.
+        // its edge on Thursday — a day nothing happened on. The final open mark
+        // reaches back from Wednesday but stops on Friday, never in the future.
         #expect(row.count == 2)
         #expect(row[0].state == .filled)
         #expect(row[0].firstDay == 0 && row[0].lastDay == 1)  // Monday and Tuesday
         #expect(row[1].state == .open)
-        #expect(row[1].firstDay == 2 && row[1].lastDay == 6)  // Wednesday through Sunday
+        #expect(row[1].firstDay == 2 && row[1].lastDay == 4)  // Wednesday through Friday
     }
 
-    @Test("The row #389 reported: the arithmetic was right, the cross was not")
-    func theRowThatReportedItDrawsItsCrossOnThursday() {
+    @Test("The row #389 reported now draws its one-day cross on Monday")
+    func theRowThatReportedItDrawsItsCrossOnMonday() {
         // #389 read a screen as `4x, completions Thursday and Friday, today
         // Saturday` and could not reproduce it — those facts divide the week
         // cleanly, with two reps owed against Saturday and Sunday and no ✕ at
@@ -64,9 +64,8 @@ struct WeekSpansTests {
         //
         // The row that draws what was actually photographed is this one: **one
         // completion, not two**. Three owed against two actionable days is one
-        // dead rep, and §5 pins it to Thursday — the day the count tips. So
-        // `WeekSpans` was never wrong; the drawing was, and it is the same
-        // fault either way.
+        // lost rep. #476 makes it one day on Monday, the earliest blank day it
+        // could have used.
         let clean = spans(
             .fixture(
                 frequency: .timesPerWeek(4),
@@ -87,24 +86,9 @@ struct WeekSpansTests {
         )
         #expect(reported.count == 4)
         let dead = reported.first { $0.state == .missed }
-        // Monday through Thursday: the cross is a claim about Thursday and the
-        // three days before it are what it swallowed.
-        #expect(dead?.firstDay == 0 && dead?.lastDay == 3)
-
-        // Where the cross is actually drawn. Centred in that frame it landed
-        // between Tuesday and Wednesday — "a ✕ with no day to its name", which
-        // is what was photographed. The offset puts it on Thursday.
-        let track: CGFloat = 220
-        let frameCentre = SlotLayout.columnStart(trackWidth: track, index: 0)
-            + SlotLayout.spanWidth(trackWidth: track, dayCount: 4) / 2
-        let thursday = SlotLayout.columnCentre(trackWidth: track, index: 3)
-        let wednesday = SlotLayout.columnCentre(trackWidth: track, index: 2)
-        let slot = SlotLayout.dailySlot(trackWidth: track)
-        #expect(abs(frameCentre - wednesday) > slot / 2)
-        #expect(
-            abs(frameCentre + SlotLayout.anchorOffset(trackWidth: track, dayCount: 4) - thursday)
-                < 0.0001
-        )
+        // #476 supersedes the stretched cross entirely: the rep gets one day,
+        // Monday, and the completion/open marks absorb the released columns.
+        #expect(dead?.firstDay == 0 && dead?.lastDay == 0)
     }
 
     @Test("Once the goal is met the week stops being divided at all")
@@ -149,7 +133,7 @@ struct WeekSpansTests {
         #expect(row.first(where: \.isTappable)?.state == .filled)
     }
 
-    @Test("Spans tile the week exactly, whatever the day and the target")
+    @Test("Spans remain ordered; only a final open rep leaves the future blank")
     func spansTileTheWeek() {
         // The row is drawn as an HStack of span widths; a gap or an overlap in
         // the day ranges would put every column out of line with the daily rows.
@@ -166,7 +150,9 @@ struct WeekSpansTests {
                     guard !row.isEmpty else { continue }
 
                     #expect(row.first?.firstDay == 0)
-                    #expect(row.last?.lastDay == 6)
+                    let finalIsTruncatedOpen = row.last?.state == .open
+                        && row.last?.lastDay == dayIndex
+                    #expect(row.last?.lastDay == 6 || finalIsTruncatedOpen)
                     for (a, b) in zip(row, row.dropFirst()) {
                         let detail = "target \(target), day \(dayIndex), done \(doneCount): "
                             + "\(a.firstDay)...\(a.lastDay) then \(b.firstDay)...\(b.lastDay)"
@@ -196,9 +182,149 @@ struct WeekSpansTests {
     }
 }
 
-/// #81: a weekly row draws exactly `target` spans, however late in the week it
-/// is. The suite above is the design file's examples; this one is the rule that
-/// covers the days the file did not draw.
+/// #476: one rep owns one claimable window. The open drawing never reaches
+/// into the future, future windows get longer away from today, and a loss is a
+/// one-day cross rather than a pill.
+@Suite("Claimable rep windows")
+struct ClaimableRepWindowTests {
+    private let calendar = TestCalendar.monday
+    private var week: Week {
+        WeekCalendar.week(containing: TestCalendar.date(2026, 8, 17), calendar: calendar)
+    }
+
+    private func row(
+        target: Int,
+        done: [Int] = [],
+        todayColumn: Int,
+        editing: SlotEditing = .todayOnly
+    ) -> [SlotSpan] {
+        WeekSpans.spans(
+            for: .fixture(
+                frequency: .timesPerWeek(target),
+                completedDays: Set(done.map { week.days[$0] })
+            ),
+            in: week,
+            today: week.days[todayColumn],
+            target: target,
+            editing: editing,
+            restDay: nil,
+            calendar: calendar
+        )
+    }
+
+    private func pastRow(target: Int, done: [Int] = []) -> [SlotSpan] {
+        WeekSpans.spans(
+            for: .fixture(
+                frequency: .timesPerWeek(target),
+                completedDays: Set(done.map { week.days[$0] })
+            ),
+            in: week,
+            today: TestCalendar.date(2026, 8, 24),
+            target: target,
+            editing: .todayOnly,
+            restDay: nil,
+            calendar: calendar
+        )
+    }
+
+    private func shape(_ spans: [SlotSpan]) -> String {
+        spans.map { "\($0.state.rawValue):\($0.firstDay)-\($0.lastDay)" }
+            .joined(separator: " ")
+    }
+
+    @Test("Three skipped reps grow backward while future windows shorten near today")
+    func blankThreePerWeek() {
+        let expected = [
+            "open:0-0 inactive:1-3 inactive:4-6",
+            "open:0-1 inactive:2-3 inactive:4-6",
+            "open:0-2 inactive:3-4 inactive:5-6",
+            "open:0-3 inactive:4-4 inactive:5-6",
+            "open:0-4 inactive:5-5 inactive:6-6",
+            "missed:0-0 open:1-5 inactive:6-6",
+            "missed:0-0 missed:1-1 open:2-6",
+        ]
+        for today in 0...6 {
+            #expect(shape(row(target: 3, todayColumn: today)) == expected[today])
+        }
+    }
+
+    @Test("A Monday completion pushes the open window to Tuesday")
+    func completedMonday() {
+        let expected = [
+            "filled:0-0 inactive:1-3 inactive:4-6",
+            "filled:0-0 open:1-1 inactive:2-6",
+            "filled:0-0 open:1-2 inactive:3-6",
+            "filled:0-0 open:1-3 inactive:4-6",
+            "filled:0-0 open:1-4 inactive:5-6",
+            "filled:0-0 open:1-5 inactive:6-6",
+            "filled:0-0 missed:1-1 open:2-6",
+        ]
+        for today in 0...6 {
+            #expect(shape(row(target: 3, done: [0], todayColumn: today)) == expected[today])
+        }
+    }
+
+    @Test("Completing today settles only the open window")
+    func completionDoesNotRedistributeUntilTomorrow() {
+        #expect(shape(row(target: 3, todayColumn: 1))
+            == "open:0-1 inactive:2-3 inactive:4-6")
+        #expect(shape(row(target: 3, done: [1], todayColumn: 1))
+            == "filled:0-1 inactive:2-3 inactive:4-6")
+    }
+
+    @Test("The final open rep stops at today, then fills its owned window")
+    func lastOpenRepNeverDrawsTheFuture() {
+        #expect(shape(row(target: 1, todayColumn: 0)) == "open:0-0")
+        #expect(shape(row(target: 2, done: [0], todayColumn: 1))
+            == "filled:0-0 open:1-1")
+        #expect(shape(row(target: 2, done: [0, 1], todayColumn: 1))
+            == "filled:0-0 filled:1-6")
+    }
+
+    @Test("An unfinished loss is one cross on the first claimable day")
+    func lostRepIsNotAPill() {
+        let saturday = row(target: 3, todayColumn: 5)
+        #expect(saturday.first?.state == .missed)
+        #expect(saturday.first?.firstDay == 0)
+        #expect(saturday.first?.lastDay == 0)
+        #expect(saturday[1].firstDay == 1 && saturday[1].lastDay == 5)
+    }
+
+    @Test("A finished missed week crosses every uncompleted day")
+    func finishedMissedWeekIsADiary() {
+        #expect(shape(pastRow(target: 3, done: [0]))
+            == "filled:0-0 missed:1-1 missed:2-2 missed:3-3 missed:4-4 missed:5-5 missed:6-6")
+    }
+
+    @Test("A finished met week has completed pills and no crosses")
+    func finishedMetWeekHasNoCrosses() {
+        let row = pastRow(target: 2, done: [0, 1])
+        #expect(shape(row) == "filled:0-0 filled:1-6")
+        #expect(!row.contains { $0.state == .missed })
+    }
+
+    @Test("No tappable live pill contains a future column")
+    func openActionsNeverReachTheFuture() {
+        for target in 1...7 {
+            for today in 0...6 {
+                let spans = row(
+                    target: target,
+                    todayColumn: today,
+                    editing: .week(allowingFuture: false)
+                )
+                for span in spans where span.state == .open {
+                    #expect(span.lastDay == today)
+                    #expect(span.actionDay == week.days[today])
+                }
+            }
+        }
+    }
+}
+
+/// A current weekly row draws exactly `target` spans, however late in the week
+/// it is. A finished unmet week is tested separately as #476's seven-day diary.
+/// The suite above is the design file's examples; this one covers the current
+/// days the file did not draw.
 @Suite("Week spans, late in the week", .serialized)
 struct LateWeekSpansTests {
     private let calendar = TestCalendar.monday
@@ -247,24 +373,18 @@ struct LateWeekSpansTests {
     @Test("Nothing logged, no rest day: the squeeze arrives on the last days")
     func blankWeekTable() {
         #expect(shape(row(target: 2, todayColumn: 5)) == "open:0-5 inactive:6-6")
-        // The ✕ lands on the day the week broke on, and the mark carrying it
-        // reaches back over the blank days before it (#341). It used to be
-        // parked immediately left of the open span, on a day it had nothing to
-        // do with.
-        #expect(shape(row(target: 2, todayColumn: 6)) == "missed:0-5 open:6-6")
-        #expect(shape(row(target: 3, todayColumn: 5)) == "missed:0-4 open:5-5 inactive:6-6")
-        #expect(shape(row(target: 3, todayColumn: 6)) == "missed:0-4 missed:5-5 open:6-6")
+        #expect(shape(row(target: 2, todayColumn: 6)) == "missed:0-0 open:1-6")
+        #expect(shape(row(target: 3, todayColumn: 5)) == "missed:0-0 open:1-5 inactive:6-6")
+        #expect(shape(row(target: 3, todayColumn: 6)) == "missed:0-0 missed:1-1 open:2-6")
     }
 
-    @Test("A completion keeps its day, and the rep that died keeps Saturday")
+    @Test("A completion keeps its day, and the lost rep keeps one day")
     func completedBlockYields() {
         // Three a week, one logged on Monday, and it is Sunday. Two reps are
-        // owed against one day, so one is gone — and it went on Saturday, the
-        // day after which the goal became unreachable. Monday's mark is one
-        // column because Monday is where it happened; the dead rep swallows
-        // Tuesday through Saturday (#339, #341).
+        // owed against one day, so one is gone. It is Tuesday's one-day cross;
+        // the open rep absorbs Wednesday through Sunday.
         #expect(shape(row(target: 3, done: [0], todayColumn: 6))
-            == "filled:0-0 missed:1-5 open:6-6")
+            == "filled:0-0 missed:1-1 open:2-6")
     }
 
     @Test("A rest day brings the squeeze forward a day")
@@ -275,7 +395,7 @@ struct LateWeekSpansTests {
         }
     }
 
-    @Test("A week already over spends its last columns on what was not done")
+    @Test("A week already over crosses every blank day")
     func finishedWeek() {
         // Looking back at a week from a later one. Two a week, one logged:
         // one bar and one span for the rep that never happened, rather than
@@ -286,10 +406,8 @@ struct LateWeekSpansTests {
             in: week, today: later, target: 2,
             editing: .todayOnly, restDay: nil, calendar: calendar
         )
-        // Monday's completion is one column, and the rep that never happened
-        // takes the rest of the week: a week that is over has no open mark to
-        // hold the slack, so the last mark holds it.
-        #expect(shape(spans) == "filled:0-0 missed:1-6")
+        #expect(shape(spans)
+            == "filled:0-0 missed:1-1 missed:2-2 missed:3-3 missed:4-4 missed:5-5 missed:6-6")
     }
 
     @Test("A week that has not started divides evenly")
@@ -307,7 +425,7 @@ struct LateWeekSpansTests {
 
     // MARK: - The invariants, swept
 
-    @Test("Every row draws exactly its target, contiguous, covering all seven")
+    @Test("Every live row keeps its target, order, and open-day boundary")
     func invariantsHold() {
         for rest in [nil, 0, 2, 5, 6] as [Int?] {
             withRest(rest) { restDay in
@@ -327,7 +445,11 @@ struct LateWeekSpansTests {
                             #expect(spans.count == target, "span count — \(what)")
                             #expect(spans.allSatisfy { $0.dayCount >= 1 }, "empty span — \(what)")
                             #expect(spans.first?.firstDay == 0, "starts at 0 — \(what)")
-                            #expect(spans.last?.lastDay == 6, "ends at 6 — \(what)")
+                            let finalIsTruncatedOpen = rest == nil
+                                && spans.last?.state == .open
+                                && spans.last?.lastDay == todayColumn
+                            #expect(spans.last?.lastDay == 6 || finalIsTruncatedOpen,
+                                    "unexpected end — \(what)")
                             for (a, b) in zip(spans, spans.dropFirst()) {
                                 #expect(b.firstDay == a.lastDay + 1, "gap — \(what)")
                             }
@@ -395,7 +517,7 @@ struct LateWeekSpansTests {
         #expect(spans.first { $0.isTappable }?.state == .open)
     }
 
-    @Test("A finished week crosses every rep it never got to")
+    @Test("A finished missed week crosses every blank day")
     func finishedWeekCrossesTheRest() {
         let later = TestCalendar.date(2026, 8, 26)
         for (target, done) in [(2, 0), (2, 1), (3, 1), (6, 4)] {
@@ -407,7 +529,7 @@ struct LateWeekSpansTests {
                 in: week, today: later, target: target,
                 editing: .todayOnly, restDay: nil, calendar: calendar
             )
-            #expect(spans.count { $0.state == .missed } == target - done,
+            #expect(spans.count { $0.state == .missed } == 7 - done,
                     "target \(target), done \(done): \(shape(spans))")
         }
     }
@@ -549,14 +671,14 @@ struct LateWeekSpansTests {
         // Sunday, three a week, nothing logged: two reps have run out of days
         // and the third is open. On the widget only the open span acts.
         let widget = row(target: 3, todayColumn: 6)
-        #expect(shape(widget) == "missed:0-4 missed:5-5 open:6-6")
+        #expect(shape(widget) == "missed:0-0 missed:1-1 open:2-6")
         #expect(widget.map(\.actionDay) == [nil, nil, day(6)])
 
         // In the app every span covers a day that can still be corrected, so
         // every span acts — the ✕ included. A rep logged late is a rep that
         // happened, and the arithmetic then stops calling it lost.
         let app = row(target: 3, todayColumn: 6, editing: .week(allowingFuture: false))
-        #expect(app.map(\.actionDay) == [day(4), day(5), day(6)])
+        #expect(app.map(\.actionDay) == [day(0), day(1), day(6)])
     }
 
     @Test("A span entirely ahead of today acts only with the demo in")
@@ -624,9 +746,9 @@ struct LateWeekSpansTests {
                         + "logged \(aheadColumn): \(shape(spans))"
                 )
                 #expect(open.firstDay <= todayColumn && todayColumn <= open.lastDay, what)
-                // The open mark ends on today unless it is the last in the row,
-                // where it runs to the end of the week (§4.2).
-                #expect(open.lastDay == todayColumn || open.id == spans.last?.id, what)
+                // Even with a future completion in the record, today's open
+                // control ends on today and never claims a future column.
+                #expect(open.lastDay == todayColumn, what)
             }
         }
     }
@@ -740,7 +862,7 @@ struct LateWeekSpansTests {
         )
     }
 
-    @Test("A finished week still draws exactly its target, and every span acts")
+    @Test("A finished week draws completed pills or a day-by-day missed diary")
     func pastWeekInvariantsHold() {
         for rest in [nil, 0, 3, 6] as [Int?] {
             withRest(rest) { restDay in
@@ -750,10 +872,13 @@ struct LateWeekSpansTests {
                         let spans = pastRow(target: target, done: done, restDay: restDay)
                         let what = "target \(target), done \(doneCount), rest \(String(describing: rest)): \(shape(spans))"
 
-                        // Exactly `target` marks, met or not (#342). A met
-                        // goal used to collapse to one span across the whole
-                        // week, which forgot every day it had just recorded.
-                        #expect(spans.count == target, "span count — \(what)")
+                        // #476: an unmet seven-day week is seven day-sized
+                        // facts. A met goal still has one completed pill per
+                        // target, and a legacy rest-day row keeps its old rule.
+                        let expectedCount = rest == nil && doneCount < target
+                            ? 7
+                            : target
+                        #expect(spans.count == expectedCount, "span count — \(what)")
                         #expect(spans.first?.firstDay == 0, "starts at 0 — \(what)")
                         #expect(spans.last?.lastDay == 6, "ends at 6 — \(what)")
                         for (a, b) in zip(spans, spans.dropFirst()) {
@@ -823,18 +948,19 @@ struct LateWeekSpansTests {
         }
     }
 
-    @Test("Logging a day the week had given up on takes a cross away")
+    @Test("Logging a day in a finished missed week replaces that day's cross")
     func aLateCompletionUnmakesACross() {
-        // Three a week, one logged: two reps ran out of days, so two crosses.
+        // Three a week, one logged: every other finished day is a cross.
         let before = pastRow(target: 3, done: [0])
-        #expect(shape(before) == "filled:0-0 missed:1-5 missed:6-6")
-        #expect(before.count { $0.state == .missed } == 2)
+        #expect(shape(before)
+            == "filled:0-0 missed:1-1 missed:2-2 missed:3-3 missed:4-4 missed:5-5 missed:6-6")
+        #expect(before.count { $0.state == .missed } == 6)
 
         // Correct the record — the tap the pager exists for — and the
         // arithmetic re-runs: the rep happened, late, so it is no longer lost.
         let after = pastRow(target: 3, done: [0, 2])
-        #expect(after.count { $0.state == .missed } == 1)
-        #expect(after.count == 3)
+        #expect(after.count { $0.state == .missed } == 5)
+        #expect(after.count == 7)
 
         // And filling it out entirely stops the week being divided at all.
         let met = pastRow(target: 3, done: [0, 2, 4])
@@ -1254,11 +1380,15 @@ struct MarkInvariantsTests {
         }
     }
 
-    @Test("The marks tile all seven columns, contiguous and non-overlapping")
+    @Test("The marks are ordered; only a final open mark truncates the future")
     func marksTileTheWeek() {
         everyRow { row in
             #expect(row.spans.first?.firstDay == 0, "starts at 0 — \(row.what)")
-            #expect(row.spans.last?.lastDay == 6, "ends at 6 — \(row.what)")
+            let finalIsTruncatedOpen = row.restColumn == nil
+                && row.spans.last?.state == .open
+                && row.spans.last?.lastDay == row.todayColumn
+            #expect(row.spans.last?.lastDay == 6 || finalIsTruncatedOpen,
+                    "unexpected end — \(row.what)")
             #expect(row.spans.allSatisfy { $0.dayCount >= 1 }, "empty mark — \(row.what)")
             for (a, b) in zip(row.spans, row.spans.dropFirst()) {
                 #expect(b.firstDay == a.lastDay + 1, "gap or overlap — \(row.what)")
@@ -1313,7 +1443,7 @@ struct MarkInvariantsTests {
     @Test("A ✕ never outnumbers the days one could have been pinned to")
     func everyCrossHasADayOfItsOwn() {
         everyRow { row in
-            // **No mark carries two ✕** (invariant 6). A dead rep pins to a
+            // **No mark carries two ✕** (invariant 6). A lost rep pins to a
             // blank past day of its own, so the row cannot draw more crosses
             // than it has such days — if it ever did, two would be sharing a
             // mark and one of them would be invisible.
@@ -1449,13 +1579,13 @@ struct LaterCompletionTests {
         #expect(row.contains { $0.state == .missed })
     }
 
-    @Test("Every completion pattern draws its target, wherever the completions fall")
+    @Test("Every completion pattern draws ordered marks without a future open pill")
     func everyPatternDrawsItsTarget() {
         // The sweep `MarkInvariantsTests` excludes: all 128 subsets against
         // every today and every rest day, with no filter on when a completion
         // landed. Only the invariants that hold for any of them — the call
         // returns at all, the row is exactly `target` marks, and those marks
-        // tile columns 0 through 6 with no gap and no overlap.
+        // remain ordered. A final open mark intentionally stops at today.
         for restColumn in [nil, 0, 3, 6] as [Int?] {
             for target in 1...7 {
                 for todayColumn in 0...6 {
@@ -1472,7 +1602,11 @@ struct LaterCompletionTests {
 
                         #expect(row.count == target, "mark count — \(what)")
                         #expect(row.first?.firstDay == 0, "starts at 0 — \(what)")
-                        #expect(row.last?.lastDay == 6, "ends at 6 — \(what)")
+                        let finalIsTruncatedOpen = restColumn == nil
+                            && row.last?.state == .open
+                            && row.last?.lastDay == todayColumn
+                        #expect(row.last?.lastDay == 6 || finalIsTruncatedOpen,
+                                "unexpected end — \(what)")
                         for (a, b) in zip(row, row.dropFirst()) {
                             #expect(b.firstDay == a.lastDay + 1, "gap — \(what)")
                         }

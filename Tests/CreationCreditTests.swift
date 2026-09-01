@@ -197,19 +197,21 @@ struct CreationCreditTests {
                             "\(target)x, today \(todayColumn), made \(created), done \(done): "
                                 + row.map { "\($0.state.rawValue):\($0.firstDay)-\($0.lastDay)" }
                                     .joined(separator: " "))
-                        // Invariants 1, 2 and 3, which a changed grant changes
-                        // the shape through.
+                        // Credit still decides how many rep marks exist. #476
+                        // deliberately leaves future columns blank when the
+                        // open rep is last, and a one-day loss can leave a
+                        // pre-creation day unclaimed, so full-week tiling is no
+                        // longer an invariant of a live row.
                         #expect(row.count == target, what)
-                        #expect(row.first?.firstDay == 0 && row.last?.lastDay == 6, what)
                         for (a, b) in zip(row, row.dropFirst()) {
-                            #expect(b.firstDay == a.lastDay + 1, what)
+                            #expect(b.firstDay > a.lastDay, what)
                         }
                         // Invariant 4, and §4.2.
                         let open = row.filter { $0.state == .open }
                         #expect(open.count <= 1, what)
                         guard let mark = open.first else { continue }
                         #expect(mark.firstDay <= todayColumn && todayColumn <= mark.lastDay, what)
-                        #expect(mark.lastDay == todayColumn || mark.id == row.last?.id, what)
+                        #expect(mark.lastDay == todayColumn, what)
                     }
                 }
             }

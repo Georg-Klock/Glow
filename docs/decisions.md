@@ -7497,3 +7497,40 @@ maximum width becomes 71.75pt (`98 − 24 − 2.25`) and ends at the label colum
 edge; the existing 4pt `labelGap` still separates it from the first mark. The
 screen and creation preview derive from the same arrangement and ratio, so all
 three surfaces gain the same room without allowing a name under the track.
+## 2026-09-01 — Weekly pills are claimable rep windows, not future controls (#476)
+
+The old final-mark rule stretched an open pill to Sunday whenever no future rep
+followed it. The action still logged only today, but the drawn control covered
+days that had not happened. That made a press read as checking a future range.
+
+A live frequency row now gives each rep one claimable window. Today's open rep
+reaches backward over unused days from the preceding mark and stops on today,
+even when it is the final rep. Future reps divide only the columns after today,
+as evenly as whole days allow with the shorter windows nearest today. Logging
+today fills exactly the open window already shown and does not move the future
+partition; the following day roll may redistribute those future windows. A
+completed final rep still reaches Sunday, so met rows retain the settled
+completed shape.
+
+A lost rep is one day, not a stretched pill. Once the remaining owed reps no
+longer fit in the remaining blank days, each loss takes the earliest blank past
+day on which the habit could have been completed. The next live mark absorbs
+the unused range after it. The count remains strict, so a day that can still
+carry the rep never receives a predictive cross.
+
+When an unmet week is entirely past, rep windows have no future claim left to
+describe. The row becomes a seven-day diary: every completed day is filled,
+every other eligible day is a one-day cross, and a blank pre-creation day is
+inactive. If the goal was met, the row remains its completed rep windows with
+no crosses.
+
+This supersedes #81's all-states `target`-mark and full-track invariants,
+#341's break-day cross, and the final-open exception in the anchored-mark rule.
+The replacement invariants are: live and met rows have `target` marks; finished
+unmet rows have seven; every cross is one day; and only a final open mark may
+leave the track's future columns blank. The underlying seven-day track stays
+fixed.
+
+Rest days are not reopened. The shipping app retired their input in #390, and
+a stored legacy rest day deliberately keeps the prior divider. Designing the
+feature's return belongs to separate post-release work.

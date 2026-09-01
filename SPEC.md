@@ -35,9 +35,10 @@ That is not #75 reversing. #75 refused to paint a completion grey and still
 does; a completion is bright on every surface. #75's reasoning was written when
 there was one tier, so it is re-read rather than cited.
 
-**A completed mark is lit, on every surface** (#344). A habit due N times a week
-is drawn as N shapes dividing the week, and a shape whose rep happened is lit
-like any other completion — §1 above has no exception in it. This reverses #47,
+**A completed mark is lit, on every surface** (#344). A live or met habit due N
+times a week is drawn as N claimable-window shapes, and a shape whose rep
+happened is lit like any other completion — §1 above has no exception in it.
+A finished unmet week becomes a seven-day diary (#476). This reverses #47,
 which had those shapes draw the same unlit line whether their share was achieved
 or not, with a lit dot on the real weekday carrying *when*. What made that
 premise false is #339: a mark now ends on its own day, so its left edge carries
@@ -305,10 +306,11 @@ A build that violates one of these is broken regardless of what else works.
 - **R4.** A completion names one civil day and keeps naming it. Changing time
   zone, crossing a DST transition or relaunching does not move it, and a
   completion the app can see is a completion the app can un-log.
-- **R5.** A daily row draws exactly 7 slots; an N-times row draws exactly N
-  spans — met, behind or finished, however late in the week it is — and a span
-  whose rep happened is lit (#344).
-- **R6.** Every row spans the same track width, whatever its slot count.
+- **R5.** A daily row draws exactly 7 slots. A live or met N-times row draws
+  exactly N spans; a finished unmet N-times row draws a seven-day diary. A
+  span whose rep happened is lit (#344, #476).
+- **R6.** Every row uses the same fixed-width seven-day track. A final open span
+  stops at today, so the future portion of that track can intentionally be blank.
 - **R7.** Weeks reset clean. A frequency habit's unmet goal does not carry over.
 - **R8.** The glow is encoded in a colour space with headroom above SDR white.
   Without EDR the app renders flat colour, never a broken or blank slot.
@@ -351,14 +353,14 @@ the right.
 
 - **Daily:** 7 equal slots, one per weekday in the calendar's own week order,
   day-pinned.
-- **N per week:** N equal slots, the same height as a daily one, filling the
-  same total track width.
+- **N per week:** spans align to the same seven-day lattice. A span's width is
+  the day columns it owns; the final open span can leave future columns blank.
 
 Given track width `W` and inter-item margin `G`:
 
 ```
 dailySlotWidth = (W - 6 * G) / 7
-slotWidth(N)   = (W - (N - 1) * G) / N
+spanWidth(days) = days * dailySlotWidth + (days - 1) * G
 ```
 
 **A span's own edge carries the when now, not a separate dot** (#344). A mark
@@ -407,22 +409,24 @@ the reps had run out of days may no longer be owed, and the lit dot appears on
 the weekday it was logged. `WeekSpans` decides all of that from the record, as
 it always did — the record is simply now something the app can correct.
 
-A habit due a number of times a week is not day-pinned, so it is not drawn as
-seven columns at all: `WeekSpans` divides the week into N shapes that stretch
-across it, with the open one always containing today.
+A live habit due a number of times a week is not day-pinned. `WeekSpans`
+divides the fixed seven-day track into N claimable rep windows. The open one
+always ends on today and never paints a future day. A finished unmet week is
+the deliberate exception: it becomes seven day-pinned diary marks (#476).
 
 > **A mark spans from the end of the previous mark through its own anchor day**
 > (#339).
 
 That sentence is the whole layout, and it is also the forgiveness mechanism: a
-day that goes by unused has no mark of its own, so it is swallowed by whatever
-mark comes next rather than left as a hole. A completion anchors on the day it
-was logged, a rep that ran out of days on the day it ran out (#341), and the
-open mark on today. Marks with no anchor — reps still to come — divide what the
-anchored ones leave, **as evenly as whole days allow with the remainder to the
-right** (#340), so the near days are single columns and the slack collects at
-the end of the week. The last mark always ends on the final column, because
-there is nothing after it to divide.
+day that goes by unused has no rep mark of its own, so it is swallowed by the
+next completion or by today's open window rather than left as a hole. A
+completion anchors on the day it was logged. A lost rep is a one-day ✕ on the
+earliest blank day it could have used. The open mark ends on today. Future reps
+divide only the days after today, **as evenly as whole days allow with the
+remainder to the right** (#340, #476), so the near windows are shortest and the
+slack collects at the end of the week. A completed final mark reaches the last
+column; a final open mark does not, because future days are not part of today's
+control.
 
 **A habit made part-way into the week is granted credit** (#343). It has not
 failed the Monday it did not exist for, so it is given **the minimum number of
@@ -496,37 +500,33 @@ through one at a time. It is counted off the marks the grid actually draws, so
 what is spoken and what is drawn cannot disagree. (The year grid was the other
 counted surface, one sentence per week column, until #316 removed it.)
 
-**A weekly row draws exactly N shapes, however late in the week it is.** Each is
-at least one column wide and together they cover all seven with no gaps. A rep
-with no day left to land on still gets a column — it stops being the open one
-and draws a ✕ instead: never a warning, never a prediction, and it does not take
-the row down with it. On the widget and in the month it is permanent, because
-nothing there can change the past. **In the week view it is not** (#116): the
-column under it is a day, and logging that day means the rep happened, late, so
-the arithmetic re-runs and the ✕ goes. The mark never changes on its own — only
-the record can move it. **A finished week is where this is sharpest** (#117):
-every rep it still owed has run out of days, so the row is a completed block and
-a ✕ for each of the rest, and every one of those columns is a day the pager can
-now reach and correct. **A ✕ lands on the day the week broke on** (#341): the blank past day after
-which the goal became unreachable, derived from the record rather than logged,
-so a backfill recomputes it away. It used to be parked immediately left of the
-open span, which surfaced a missed Monday on a Thursday. **A lost rep never
-occupies the rest day's column alone**, which matters because `RestWindow`
-subtracts that column from whatever shape crosses it and a span exactly its
-width would be drawn and invisible (#100). That now holds by construction: a
-rep never dies on the rest day — nothing is expected there — so a ✕ is never
-anchored on it, and a mark reaching back from a later anchor is wider than one
-column. The reps still reachable keep glowing beside it, because a partially
-lost week is not a finished one. This used to produce *fewer* than N shapes,
-and it did so exactly when the goal was running out of room. The rest day
-enters only through which days count as actionable, which brings the squeeze
-forward by one.
+**A live weekly row draws exactly N rep windows** (#476). They are ordered,
+non-overlapping and at least one column wide. Together they cover the track
+unless the final window is open; that open window stops at today and leaves
+future columns blank. Pressing it therefore means only “log today,” never the
+future days that the old stretched control visually contained.
 
-**A lost week shows in the month too.** `MonthGrid` asks `WeekSpans` how many
-reps a week lost and crosses that week's unlogged past days — the week row
-compresses a loss to one column, the month says which days it cost. Strictly
-past: today and the days after it can still be acted on, and a ✕ there would be
-a prediction.
+A rep with no day left to land on becomes a one-day ✕ on the earliest blank
+past day it could have used: never a warning and never a prediction. The next
+live mark absorbs the unused days after that cross. **In the week view a ✕ is
+correctable** (#116): logging its day recomputes the row from the record and can
+remove it. The widget remains today-only.
+
+**A finished unmet week is a seven-day diary**, not N rep windows (#476). Every
+completed day is filled, every other day on which the habit existed is a
+one-day ✕, and a pre-creation blank day is inactive. Correcting one day changes
+that exact diary day. A finished met week keeps its N completed spans and has no
+crosses.
+
+Rest-day behavior is not part of #476. The shipping app retired rest-day input
+(#390), and a stored legacy rest day retains the earlier span algorithm until
+the separately scoped rest-day feature is designed.
+
+**A lost week shows in the month too.** `MonthGrid` derives its missed days from
+the same record. A finished unmet week now agrees with the weekly diary: every
+eligible uncompleted day is crossed. In the live week only mathematically lost
+reps are crossed, strictly in the past; today and future days remain actionable,
+and a ✕ there would be a prediction.
 
 **What any of this looks like is deliberately not written down.** The visual
 design is being worked on directly and prose here would only go stale between
@@ -848,8 +848,8 @@ where the crossfade already was.
 
 - [x] A daily habit shows exactly 7 circles for the current week, in the
       calendar's own week order.
-- [x] An N-times habit shows exactly N pills, per the width formula, with the
-      same margins as a daily row.
+- [x] A live or met N-times habit shows exactly N claimable-window marks on the
+      day lattice; a finished unmet one shows seven day-sized diary marks.
 - [x] Tapping today's open slot marks it complete, persists a `Completion`, and
       runs the fill transition.
 - [x] Tapping today's filled slot un-marks it, reverting to open with the glow
@@ -857,7 +857,8 @@ where the crossfade already was.
 - [x] Tapping any other day of the week in the app marks or un-marks *that*
       day; the widget offers today and nothing else.
 - [x] Days still to come are tappable only with demo history in.
-- [x] At most one slot per habit is open at a time.
+- [x] At most one slot per habit is open at a time, and it ends on today rather
+      than painting future days.
 - [x] Without EDR the glow renders as flat colour, no crash, no artifact.
 - [x] Restarting preserves all habits and completions.
 - [x] A fresh install shows both starting points; the primary opens the habit

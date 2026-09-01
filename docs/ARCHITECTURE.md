@@ -177,8 +177,8 @@ tappable. The view taps what it is handed.
 
 This is deliberate. The alternative is for the view to work out which day a
 given column represents, which means the day-pinning rules for daily rows and
-the not-day-pinned rules for frequency rows both end up duplicated in the view
-layer, where they cannot be tested. Instead, "is this tappable" and "what does
+the claimable-window rules for frequency rows both end up duplicated in the
+view layer, where they cannot be tested. Instead, "is this tappable" and "what does
 it do" are decided in one place, and R1 and R2 hold by construction.
 
 **Which days a surface may write is a parameter, not a fork** (#116).
@@ -191,6 +191,23 @@ grid, by the span pass, and again by the view for the column under a finger.
 `WeekSpans` runs the surface's answer as a pass over the finished row, so the
 division of the week — which spans exist, how wide, which one is open — is
 identical on both surfaces and only the actions differ.
+
+**`WeekSpans` owns claimable rep windows** (#476). In the current week a
+completion owns the window ending on its logged day, today's open rep reaches
+back over unused days but ends on today, and future reps divide only future
+columns with shorter windows nearest today. A lost rep is a one-day cross on
+the earliest blank day it could have used. Completing today changes only the
+open window's state; tomorrow's date change is what redistributes the remaining
+future windows. A final completed span can reach Sunday, but a final open span
+cannot: future columns are not part of the control a person is pressing.
+
+Once an unmet week is entirely past, `WeekSpans` stops forecasting reps and
+returns seven day-sized diary spans: completed, missed, or inactive before the
+habit existed. A met past week keeps its completed rep windows and no crosses.
+Both forms still pass through the same surface-action layer above, so the app
+can correct past days and an installed widget remains today-only. Stored legacy
+rest-day rows intentionally stay on the pre-#476 divider; rest-day redesign is
+separate feature scope.
 
 **Widening from one week to several changed neither** (#117). `SlotEditing` is
 about the surface, not about which week is on screen, so a week entirely in the

@@ -2,9 +2,10 @@ import Foundation
 
 /// One run of days drawn as a single shape.
 ///
-/// A habit due a number of times a week is not day-pinned, so it is not drawn
-/// as seven columns — it is drawn as N shapes that stretch across the week. A
-/// span is one of those: which columns it covers, and what state it is in.
+/// A live habit due a number of times a week is drawn as rep windows rather
+/// than seven day slots. A finished unmet week deliberately becomes a
+/// seven-day diary instead (#476). A span is one drawn shape in either form:
+/// which columns it covers, and what state it is in.
 struct SlotSpan: Identifiable, Equatable, Sendable {
     /// Which span this is in reading order. Kept for the arithmetic below and
     /// for the record of order; it is **not** what identifies a span. See `id`.
@@ -109,18 +110,17 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
 /// completions, which put a mark's edge nowhere in particular; an anchored mark
 /// ends on the day its rep happened, so the mark's left edge carries when.
 ///
-///  - **Exactly `target` marks**, each at least one column wide, together
-///    covering all seven columns with no gaps and no overlaps — however late in
-///    the week it is, and whether the goal is met, behind or finished (#81).
-///    A 5x row is five shapes at every moment of the week, so its silhouette
-///    says what the habit *is* without being read.
-///  - **A completion anchors on the day it was logged**, a rep that ran out of
-///    days on the day it ran out, and the open mark on today. Marks with no
-///    anchor — reps still to come — divide what the anchored ones leave,
-///    **remainder to the right** (#340).
-///  - **The last mark always ends on the final column.** There is nothing after
-///    it to divide, which is what makes a met 1x row one lit bar and a lone
-///    open rep a wide ring.
+///  - **A live or met row has exactly `target` marks.** Each is at least one
+///    column wide and their ranges are ordered and contiguous. A final open
+///    mark stops on today, leaving future columns blank; a finished unmet row
+///    instead has seven day-sized diary marks (#476).
+///  - **A completion anchors on the day it was logged**, a lost rep is a
+///    one-day cross on the earliest blank day it could have used, and the open
+///    mark ends on today. Marks still to come divide only the days after today,
+///    **remainder to the right** (#340, #476).
+///  - **A completed final mark ends on the final column.** A met 1x row is one
+///    lit bar. An open final mark is the deliberate exception: it never claims
+///    a future day, even when no future rep follows it (#476).
 ///  - **A completion logged today closes the row.** There is nothing open once
 ///    today is spent, so what follows the completions is arithmetic that
 ///    divides rather than a mark that ends on today.
@@ -138,11 +138,11 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
 ///
 /// Those lost marks draw as a ✕ (#82). The strictness matters: `lost` uses
 /// `repsLeft > actionableLeft`, not `>=`, so on Saturday with two reps owed and
-/// Sunday still live the row stays clean and the ✕ arrives on Sunday. The mark
-/// says a miss has *become unavoidable*; it is never a warning and never a
-/// prediction. **They are still unanchored here** — they take the leftmost
-/// columns their neighbours leave, which is where `placeLost` put them. #341
-/// pins each to the day the week broke on.
+/// Sunday still live the row stays clean. The mark says a miss has *become
+/// unavoidable*; it is never a warning and never a prediction. In the shipping
+/// seven-day path each loss is one day wide on the earliest blank day that rep
+/// could have used. The retained legacy-rest-day path still uses #341's older
+/// break-day pinning until the separate rest-day design work returns.
 enum WeekSpans {
     /// The spans to draw, with each one's action decided by the surface.
     ///
@@ -352,6 +352,25 @@ enum WeekSpans {
             return assignColumns(marks, lastColumn: lastColumn)
         }
 
+        // Rest days are retired from the shipping app (#390), and their return
+        // has its own design work. #476 deliberately changes only the live
+        // seven-day rule; a stored legacy rest day keeps the division it had.
+        if restDay == nil {
+            return dividedWithoutRestDay(
+                for: habit,
+                in: week,
+                today: todayStart,
+                todayIndex: todayIndex,
+                target: target,
+                credit: credit,
+                doneColumns: doneColumns,
+                done: done,
+                repsLeft: repsLeft,
+                doneToday: doneToday,
+                lastColumn: lastColumn
+            )
+        }
+
         // The columns a rep could still land on: every day from today onward
         // that is not the rest day and does not already carry a completion —
         // **a weekly cadence holds one completion per day (R3), so a day that
@@ -476,6 +495,111 @@ enum WeekSpans {
 
         let spans = assignColumns(marks, lastColumn: lastColumn)
         return withUndo(spans, doneToday: doneToday, todayRests: todayRests, today: todayStart)
+    }
+
+    /// The shipping seven-day division settled in #476.
+    ///
+    /// An open rep owns every still-claimable day through today and no day
+    /// after it. Future reps divide only the days after today, with shorter
+    /// windows nearest today. When the current day is logged, the open window
+    /// becomes a completion at the same division and those future windows do
+    /// not move; tomorrow's pass redistributes them.
+    ///
+    /// A rep that has run out is no longer a stretched mark ending on the day
+    /// the week became unwinnable. It is one cross on the first blank day the
+    /// rep could have used, and the next mark absorbs the days it gives up. A
+    /// finished, unmet week is the diary form of the same rule: every blank day
+    /// is a one-day cross. A met week returned above and never reaches either
+    /// path, so it carries completions and no crosses.
+    private static func dividedWithoutRestDay(
+        for habit: HabitSnapshot,
+        in week: Week,
+        today: Date,
+        todayIndex: Int?,
+        target: Int,
+        credit: Int,
+        doneColumns: [Int],
+        done: Int,
+        repsLeft: Int,
+        doneToday: Bool,
+        lastColumn: Int
+    ) -> [SlotSpan] {
+        let completed = Set(doneColumns)
+
+        // The week is over and the goal was not met. Pills only describe a rep
+        // that happened; every other day is now a day that did not. Keeping the
+        // seven day-sized marks also makes every correction in the pager name
+        // the exact day it changes.
+        guard let todayIndex else {
+            return week.days.indices.map { column in
+                let state: SlotState
+                if completed.contains(column) {
+                    state = .filled
+                } else if habit.existed(on: week.days[column]) {
+                    state = .missed
+                } else {
+                    state = .inactive
+                }
+                return SlotSpan(
+                    index: column,
+                    firstDay: column,
+                    lastDay: column,
+                    state: state,
+                    actionDay: nil
+                )
+            }
+        }
+
+        // Today and every blank day after it can still carry one rep. The
+        // strict subtraction keeps the final live rep open rather than warning
+        // about a loss that has not happened.
+        let actionableLeft = (todayIndex...lastColumn).count {
+            !completed.contains($0)
+        }
+        let lost = max(0, repsLeft - actionableLeft)
+        let live = repsLeft - lost
+
+        // Lost reps take the earliest blank days on which they could have
+        // happened. A mid-week habit normally excludes its pre-creation days;
+        // the fallback is only the old upward-edit edge where frozen credit
+        // leaves more real losses than post-creation columns to pin them to.
+        let blankPast = (0..<todayIndex).filter { !completed.contains($0) }
+        var lostColumns = Array(
+            blankPast.lazy.filter { habit.existed(on: week.days[$0]) }.prefix(lost)
+        )
+        if lostColumns.count < lost {
+            let alreadyPinned = Set(lostColumns)
+            lostColumns += blankPast.filter { !alreadyPinned.contains($0) }
+                .prefix(lost - lostColumns.count)
+        }
+
+        var marks = Array(
+            repeating: Mark(state: .inactive, anchor: nil), count: credit
+        )
+        var anchored = doneColumns.prefix(done).map {
+            Mark(state: .filled, anchor: $0)
+        }
+        anchored += lostColumns.map { Mark(state: .missed, anchor: $0) }
+
+        let canOpen = live > 0 && !doneToday && habit.existed(on: today)
+        if canOpen {
+            anchored.append(Mark(state: .open, anchor: todayIndex, actionDay: today))
+        }
+        marks += anchored.sorted { ($0.anchor ?? 0) < ($1.anchor ?? 0) }
+
+        // If today was just completed, all `live` reps are still the future
+        // windows that were already on screen. Otherwise one of them is the
+        // open rep and only the rest divide the days after today.
+        let upcoming = live - (canOpen ? 1 : 0)
+        marks += Array(repeating: Mark(state: .inactive, anchor: nil), count: upcoming)
+
+        let spans = assignColumns(
+            marks,
+            lastColumn: lastColumn,
+            finalAnchorExtendsToEnd: false,
+            singleDayMisses: true
+        )
+        return withUndo(spans, doneToday: doneToday, todayRests: false, today: today)
     }
 
     /// Reps granted to a habit created part-way into this week (#343, §6).
@@ -655,7 +779,7 @@ enum WeekSpans {
     /// mechanism: a day nothing happened on has no mark of its own, so it is
     /// swallowed by whatever mark comes next rather than left as a hole.
     ///
-    /// Three rules, and nothing else:
+    /// Four rules, and nothing else:
     ///
     ///  - **An anchored mark ends on its anchor** — clamped so every mark
     ///    before it and after it still has a column of its own. The clamp is
@@ -667,24 +791,30 @@ enum WeekSpans {
     ///    evenly as whole days allow, **remainder to the right** (#340). That
     ///    is the early bias: the near days are single columns and the slack
     ///    collects at the end of the week.
-    ///  - **The last mark always ends on the final column**, whatever it was
-    ///    anchored to, because there is nothing after it to divide.
+    ///  - A final mark normally ends on the final column. A caller can keep a
+    ///    final anchored open mark on its anchor so it does not paint future
+    ///    days (#476).
+    ///  - A caller can make anchored misses one day wide; the next mark then
+    ///    absorbs the range the miss would otherwise have swallowed (#476).
     ///
-    /// The result tiles all seven columns, contiguous and non-overlapping, with
-    /// exactly one span per mark — invariants 1, 2 and 3 of the spec, and what
-    /// the property sweep in `WeekSpansTests` checks rather than trusts.
+    /// The result is ordered and non-overlapping, with exactly one span per
+    /// mark and at least one column per span. Except for an intentionally
+    /// truncated final open mark it covers all seven columns. The property
+    /// sweep in `WeekSpansTests` checks those claims rather than trusting them.
     private static func assignColumns(
         _ marks: some Collection<Mark>,
-        lastColumn: Int
+        lastColumn: Int,
+        finalAnchorExtendsToEnd: Bool = true,
+        singleDayMisses: Bool = false
     ) -> [SlotSpan] {
         let marks = Array(marks)
         guard !marks.isEmpty else { return [] }
         let count = marks.count
 
-        // Pass one: where every anchored mark ends. An anchored mark that is
-        // also the last one runs to the end of the week whatever it was
-        // anchored to — that is what makes a met 1x row one lit bar, and the
-        // open mark stretch when it is the only rep still owed.
+        // Pass one: where every anchored mark ends. A final anchor normally
+        // runs to the end of the week, which makes a met 1x row one lit bar.
+        // The live seven-day path opts out for an open anchor: future days are
+        // left blank instead of being painted as part of today's action.
         var ends = [Int?](repeating: nil, count: count)
         var previousEnd = -1
         var previousIndex = -1
@@ -696,7 +826,13 @@ enum WeekSpans {
             // target of 1...7 guarantee.
             let low = previousEnd + (index - previousIndex)
             let high = lastColumn - (count - 1 - index)
-            let end = index == count - 1 ? lastColumn : max(low, min(anchor, high))
+            // A completed final rep owns the remainder of the week. The only
+            // final anchor #476 truncates is an open one: drawing its owned
+            // future columns would make those days look tappable.
+            let end = index == count - 1
+                && (finalAnchorExtendsToEnd || marks[index].state == .filled)
+                ? lastColumn
+                : max(low, min(anchor, high))
             ends[index] = end
             previousEnd = end
             previousIndex = index
@@ -718,7 +854,10 @@ enum WeekSpans {
                 ))
                 cursor += width
             }
-            spans.append(span(marks[index], at: index, from: cursor, to: end))
+            let first = singleDayMisses && marks[index].state == .missed
+                ? end
+                : cursor
+            spans.append(span(marks[index], at: index, from: first, to: end))
             cursor = end + 1
             runStart = index + 1
         }
