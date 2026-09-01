@@ -12,7 +12,20 @@ enum HabitEditorGeometry {
     static let stepInset: CGFloat = 10
     /// Width keeps the existing hit target; height makes the vertical margins
     /// equal to `stepInset` (#458).
-    static let stepSize = CGSize(width: 44, height: 36)
+    /// **88 wide, not 44** (#458 again). At 44 the faces measured ten points
+    /// from every edge of the platter — verified off a device screenshot, band
+    /// constant to within 0.24pt around the corners — and still read as sitting
+    /// too low and too high in it. The gap was never the problem: the platter
+    /// is 361 x 56, so a 44pt face is hugged on three sides and opens onto
+    /// ~307pt of empty platter on the fourth, and the eye stops reading the
+    /// whole platter as the container and reads only its rounded left cap.
+    /// Against that cap an even ten points looks like too much air.
+    ///
+    /// Widening the face rather than heightening it fixes the proportion while
+    /// keeping the ten: the inset is unchanged on all four sides, so the
+    /// concentric radius below is unchanged too. Height stays 36 — this is a
+    /// correction to what the face is shaped like, not to where it sits.
+    static let stepSize = CGSize(width: 88, height: 36)
     /// Rounder than the old segmented-control corner, but short of a capsule.
     static let stepRadius: CGFloat = 16
     /// One footnote line, present whether or not it has anything to say. The

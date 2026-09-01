@@ -140,11 +140,17 @@ struct RowGeometryTests {
     /// #458: the step faces breathe evenly inside the frequency platter.
     /// These are production values rather than a scan of the view's source,
     /// and the subtraction is the relationship the eye sees.
+    ///
+    /// The width is 88 and is not derived from anything here. Ten points at
+    /// every edge was already true at 44 and still read wrong on a device; the
+    /// face was widened to fix its proportion against a 361 x 56 platter, which
+    /// is a judgement about how the shape reads and not an arithmetic one. The
+    /// margin assertions below are what that change had to leave untouched.
     @Test("The step faces leave ten points at every outer edge")
     func editorStepMargins() {
         #expect(HabitEditorGeometry.rowHeight == 56)
         #expect(HabitEditorGeometry.stepInset == 10)
-        #expect(HabitEditorGeometry.stepSize == CGSize(width: 44, height: 36))
+        #expect(HabitEditorGeometry.stepSize == CGSize(width: 88, height: 36))
         #expect(
             (HabitEditorGeometry.rowHeight - HabitEditorGeometry.stepSize.height) / 2
                 == HabitEditorGeometry.stepInset
