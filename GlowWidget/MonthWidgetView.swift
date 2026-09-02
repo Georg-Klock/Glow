@@ -79,7 +79,7 @@ struct MonthWidgetView: View {
             // tightens rather than overflowing the frame, and a four-row one
             // does not spread to fill it.
             let available = proxy.size.height
-                - WidgetMetrics.headerHeight - WidgetMetrics.headerGap
+                - WidgetMetrics.monthTitleHeight - WidgetMetrics.headerGap
             let rowGap = rows > 1
                 ? max(1, min(gap, (available - CGFloat(rows) * side) / CGFloat(rows - 1)))
                 : 0
@@ -95,7 +95,7 @@ struct MonthWidgetView: View {
                         name.foregroundStyle(GlowPalette.grey)
                     }
                 }
-                .frame(height: WidgetMetrics.headerHeight)
+                .frame(height: WidgetMetrics.monthTitleHeight)
                 .padding(.bottom, WidgetMetrics.headerGap)
 
                 VStack(alignment: .leading, spacing: rowGap) {

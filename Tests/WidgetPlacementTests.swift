@@ -464,6 +464,12 @@ struct WidgetPlacementTests {
         #expect(widgets.contains("WeekWidgetView("))
         #expect(widgets.contains("entry: projection.weekEntry"))
         #expect(widgets.contains("MonthWidgetView(entry:"))
+        let month = try String(
+            contentsOf: root.appendingPathComponent("GlowWidget/MonthWidgetView.swift"),
+            encoding: .utf8
+        )
+        #expect(month.contains("WidgetMetrics.monthTitleHeight"))
+        #expect(!month.contains("WidgetMetrics.headerHeight"))
         #expect(slotToggle.contains("Toggle(isOn: isDone, intent: MarkHabitIntent("))
         #expect(slotToggle.contains("Toggle(isOn: Binding("))
         #expect(slotToggle.contains("handlesPresses: false"))

@@ -21,6 +21,17 @@ struct WidgetMetricsTests {
         return SlotLayout.slotHeight(trackWidth: track)
     }
 
+    @Test("The month title puts the design grid at 32 without moving the weekday header")
+    func monthTitleOwnsItsLineBox() {
+        #expect(WidgetMetrics.headerHeight == 14)
+        #expect(WidgetMetrics.monthTitleHeight == 18)
+        #expect(
+            WidgetMetrics.padTop
+                + WidgetMetrics.monthTitleHeight
+                + WidgetMetrics.headerGap == 32
+        )
+    }
+
     @Test("The large widget holds ten habits")
     func largeHoldsTen() {
         // **Eleven until #331.** Ten is not a stored number anywhere either: it
