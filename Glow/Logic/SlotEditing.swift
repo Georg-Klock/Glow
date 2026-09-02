@@ -3,10 +3,11 @@ import Foundation
 /// Which days a surface lets a tap touch.
 ///
 /// The app and the widget share `WeekGrid` and `WeekSpans` deliberately, so
-/// that what a slot draws and what it does are decided in one place. Since #116
-/// the two surfaces want different answers — the week view edits any day of the
-/// week it shows, the widget edits today — so the difference is *declared* here
-/// rather than forked into two grids that would drift.
+/// that what a slot draws and what it does are decided in one place. Since #508
+/// the month and week surfaces want different answers — a month widget edits
+/// today, while week views in both processes edit any non-future day they show
+/// — so the difference is *declared* here rather than forked into grids that
+/// would drift.
 ///
 /// **No default value anywhere this is passed.** A new call site has to say
 /// which surface it is; a default would let one inherit the permissive answer by
@@ -21,9 +22,9 @@ import Foundation
 /// (#181): a surface says which days it edits *and* which day it rests, and
 /// neither is read out of a store from in here.
 enum SlotEditing: Equatable, Sendable {
-    /// The widget, its intents, and the month grid: today and nothing else.
+    /// The month grid: today and nothing else.
     case todayOnly
-    /// The week view. `allowingFuture` opens the days after today, which only
+    /// A week surface. `allowingFuture` opens the days after today, which only
     /// demo history does — outside it you can correct the past, not claim the
     /// future, because a completion logged ahead is a claim about something
     /// that has not happened.

@@ -19,6 +19,8 @@ struct WeekEntry: TimelineEntry {
     var rowsAreConfigured: Bool = false
     /// The habit whose completion is mid-animation, if any.
     var burstHabit: UUID?
+    /// The exact day whose mark owns that animation (#508).
+    var burstDay: DayID?
     /// How far through the completion cross-fade this frame is, 0 through 1:
     /// the dot's opacity, and the ring's complement.
     var progress: Double = 1

@@ -339,10 +339,12 @@ struct WidgetsView: View {
             // outside the rasterized layer and remains a real control (#479).
             .environment(\.flattensWidgetSockets, true)
             .environment(\.inAppWidgetMarkAction, InAppWidgetMarkAction {
-                habitID, done in
+                habitID, day, renderedDay, done in
                 try MarkHabitOperation.perform(
                     habitID: habitID,
                     done: done,
+                    day: day,
+                    renderedDay: renderedDay,
                     presentsIsland: false,
                     context: modelContext
                 )

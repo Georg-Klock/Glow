@@ -42,7 +42,14 @@ final class WidgetPreviewTouchTests: XCTestCase {
             ))
 
         guard marks.firstMatch.waitForExistence(timeout: 3) else { return nil }
-        return marks.allElementsBoundByIndex.first { $0.isHittable }
+        // The week now exposes past-day controls too (#508). Keep this
+        // physical acknowledgement gate on today's emitting control: its
+        // label is the stable semantic distinction, independent of locale's
+        // formatted date and of which weekday today happens to be.
+        return marks.allElementsBoundByIndex.first {
+            $0.isHittable
+                && ($0.label.hasSuffix(", due today") || $0.label.hasSuffix(", done"))
+        }
     }
 
     private func toggledLabel(_ label: String) -> String {
