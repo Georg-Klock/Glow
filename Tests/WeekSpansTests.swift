@@ -47,12 +47,12 @@ struct WeekSpansTests {
         // The completion anchors on Tuesday and reaches back over Monday
         // (#339); it used to be handed the whole block before today, which put
         // its edge on Thursday — a day nothing happened on. The final open mark
-        // reaches back from Wednesday but stops on Friday, never in the future.
+        // reaches back from Wednesday and owns the rest of the row (#495).
         #expect(row.count == 2)
         #expect(row[0].state == .filled)
         #expect(row[0].firstDay == 0 && row[0].lastDay == 1)  // Monday and Tuesday
         #expect(row[1].state == .open)
-        #expect(row[1].firstDay == 2 && row[1].lastDay == 4)  // Wednesday through Friday
+        #expect(row[1].firstDay == 2 && row[1].lastDay == 6)  // Wednesday through Sunday
     }
 
     @Test("The row #389 reported now draws its one-day cross on Monday")
@@ -133,7 +133,7 @@ struct WeekSpansTests {
         #expect(row.first(where: \.isTappable)?.state == .filled)
     }
 
-    @Test("Spans remain ordered; only a final open rep leaves the future blank")
+    @Test("Spans remain ordered and tile the whole week")
     func spansTileTheWeek() {
         // The row is drawn as an HStack of span widths; a gap or an overlap in
         // the day ranges would put every column out of line with the daily rows.
@@ -150,9 +150,7 @@ struct WeekSpansTests {
                     guard !row.isEmpty else { continue }
 
                     #expect(row.first?.firstDay == 0)
-                    let finalIsTruncatedOpen = row.last?.state == .open
-                        && row.last?.lastDay == dayIndex
-                    #expect(row.last?.lastDay == 6 || finalIsTruncatedOpen)
+                    #expect(row.last?.lastDay == 6)
                     for (a, b) in zip(row, row.dropFirst()) {
                         let detail = "target \(target), day \(dayIndex), done \(doneCount): "
                             + "\(a.firstDay)...\(a.lastDay) then \(b.firstDay)...\(b.lastDay)"
@@ -182,9 +180,10 @@ struct WeekSpansTests {
     }
 }
 
-/// #476: one rep owns one claimable window. The open drawing never reaches
-/// into the future, future windows get longer away from today, and a loss is a
-/// one-day cross rather than a pill.
+/// #476 and #495: one rep owns one claimable window. An open mark stops on
+/// today while another rep follows; when it is final, it owns the remainder of
+/// the week. Future windows get longer away from today, and a loss is a one-day
+/// cross rather than a pill.
 @Suite("Claimable rep windows")
 struct ClaimableRepWindowTests {
     private let calendar = TestCalendar.monday
@@ -272,11 +271,13 @@ struct ClaimableRepWindowTests {
             == "filled:0-1 inactive:2-3 inactive:4-6")
     }
 
-    @Test("The final open rep stops at today, then fills its owned window")
-    func lastOpenRepNeverDrawsTheFuture() {
-        #expect(shape(row(target: 1, todayColumn: 0)) == "open:0-0")
+    @Test("Only the final open rep owns the rest of the week")
+    func lastOpenRepOwnsTheRemainder() {
+        #expect(shape(row(target: 1, todayColumn: 0)) == "open:0-6")
         #expect(shape(row(target: 2, done: [0], todayColumn: 1))
-            == "filled:0-0 open:1-1")
+            == "filled:0-0 open:1-6")
+        #expect(shape(row(target: 3, done: [0], todayColumn: 1))
+            == "filled:0-0 open:1-1 inactive:2-6")
         #expect(shape(row(target: 2, done: [0, 1], todayColumn: 1))
             == "filled:0-0 filled:1-6")
     }
@@ -303,8 +304,8 @@ struct ClaimableRepWindowTests {
         #expect(!row.contains { $0.state == .missed })
     }
 
-    @Test("No tappable live pill contains a future column")
-    func openActionsNeverReachTheFuture() {
+    @Test("A normal week keeps every open action on today")
+    func openActionsStayOnToday() {
         for target in 1...7 {
             for today in 0...6 {
                 let spans = row(
@@ -313,11 +314,25 @@ struct ClaimableRepWindowTests {
                     editing: .week(allowingFuture: false)
                 )
                 for span in spans where span.state == .open {
-                    #expect(span.lastDay == today)
                     #expect(span.actionDay == week.days[today])
                 }
             }
         }
+    }
+
+    @Test("The demo's explicit future editing reaches a final open span's last column")
+    func demoMayWriteTheFutureOfAFinalOpenSpan() {
+        let spans = row(
+            target: 2,
+            done: [0],
+            todayColumn: 1,
+            editing: .week(allowingFuture: true)
+        )
+        let open = spans.last
+
+        #expect(open?.state == .open)
+        #expect(open?.firstDay == 1 && open?.lastDay == 6)
+        #expect(open?.actionDay == week.days[6])
     }
 }
 
@@ -746,9 +761,15 @@ struct LateWeekSpansTests {
                         + "logged \(aheadColumn): \(shape(spans))"
                 )
                 #expect(open.firstDay <= todayColumn && todayColumn <= open.lastDay, what)
-                // Even with a future completion in the record, today's open
-                // control ends on today and never claims a future column.
-                #expect(open.lastDay == todayColumn, what)
+                // Even with a future completion in the record, the ring still
+                // contains today. It may extend only when it is the final mark;
+                // the normal surface's action remains pinned to today (#495).
+                if open == spans.last {
+                    #expect(open.lastDay == 6, what)
+                } else {
+                    #expect(open.lastDay == todayColumn, what)
+                }
+                #expect(open.actionDay == day(todayColumn), what)
             }
         }
     }
@@ -1380,15 +1401,11 @@ struct MarkInvariantsTests {
         }
     }
 
-    @Test("The marks are ordered; only a final open mark truncates the future")
+    @Test("The marks are ordered and tile the week")
     func marksTileTheWeek() {
         everyRow { row in
             #expect(row.spans.first?.firstDay == 0, "starts at 0 — \(row.what)")
-            let finalIsTruncatedOpen = row.restColumn == nil
-                && row.spans.last?.state == .open
-                && row.spans.last?.lastDay == row.todayColumn
-            #expect(row.spans.last?.lastDay == 6 || finalIsTruncatedOpen,
-                    "unexpected end — \(row.what)")
+            #expect(row.spans.last?.lastDay == 6, "unexpected end — \(row.what)")
             #expect(row.spans.allSatisfy { $0.dayCount >= 1 }, "empty mark — \(row.what)")
             for (a, b) in zip(row.spans, row.spans.dropFirst()) {
                 #expect(b.firstDay == a.lastDay + 1, "gap or overlap — \(row.what)")
@@ -1579,13 +1596,13 @@ struct LaterCompletionTests {
         #expect(row.contains { $0.state == .missed })
     }
 
-    @Test("Every completion pattern draws ordered marks without a future open pill")
+    @Test("Every completion pattern draws ordered marks that tile the week")
     func everyPatternDrawsItsTarget() {
         // The sweep `MarkInvariantsTests` excludes: all 128 subsets against
         // every today and every rest day, with no filter on when a completion
         // landed. Only the invariants that hold for any of them — the call
         // returns at all, the row is exactly `target` marks, and those marks
-        // remain ordered. A final open mark intentionally stops at today.
+        // remain ordered. A final open mark owns the remainder of the week.
         for restColumn in [nil, 0, 3, 6] as [Int?] {
             for target in 1...7 {
                 for todayColumn in 0...6 {
@@ -1602,11 +1619,7 @@ struct LaterCompletionTests {
 
                         #expect(row.count == target, "mark count — \(what)")
                         #expect(row.first?.firstDay == 0, "starts at 0 — \(what)")
-                        let finalIsTruncatedOpen = restColumn == nil
-                            && row.last?.state == .open
-                            && row.last?.lastDay == todayColumn
-                        #expect(row.last?.lastDay == 6 || finalIsTruncatedOpen,
-                                "unexpected end — \(what)")
+                        #expect(row.last?.lastDay == 6, "unexpected end — \(what)")
                         for (a, b) in zip(row, row.dropFirst()) {
                             #expect(b.firstDay == a.lastDay + 1, "gap — \(what)")
                         }

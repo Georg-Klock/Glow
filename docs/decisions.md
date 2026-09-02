@@ -7536,6 +7536,25 @@ Rest days are not reopened. The shipping app retired their input in #390, and
 a stored legacy rest day deliberately keeps the prior divider. Designing the
 feature's return belongs to separate post-release work.
 
+## 2026-09-01 — A final open mark owns the remainder of the week (#495)
+
+#476 made every open mark stop on today so its drawn shape could not look like
+a future control. That is still the rule while another rep follows: those
+future columns belong to the later rep. When the open rep is final, however, a
+row ending halfway through the week reads as truncated rather than nearly done.
+The final open mark now reaches the last column, exactly as the final filled
+mark already does.
+
+The geometry does not grant write permission. In the ordinary week surface a
+widened open mark still resolves its fallback and every valid column to today;
+the widget remains today-only. Demo-seeded history deliberately passes
+`allowingFuture: true`, so its widened final mark can write the future column
+under the finger and its location-less fallback is Sunday. That is the existing
+demo sandbox contract, made explicit in a test rather than silently narrowed.
+A final miss is not extended by state: the implementation continues to name
+`.filled` and `.open` rather than enabling the caller's blanket final-anchor
+rule.
+
 ## 2026-09-01 — Settings explainers live outside their platters again (#474)
 
 The Glow, Say well done, and Week explanations return to their sections'

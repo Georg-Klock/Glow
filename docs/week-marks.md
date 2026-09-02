@@ -25,8 +25,8 @@ A current habit due N times a week draws **N rep marks against seven fixed day
 columns**. Each rep owns a claimable window:
 
 - a completion owns the window ending on the day it happened;
-- the open rep owns every unused day after the previous mark through today,
-  and never a day after today;
+- the open rep owns every unused day after the previous mark through today;
+  when it is the final rep it also owns the remainder of the week (#495);
 - future reps divide only the days after today, evenly as whole days allow,
   with shorter windows nearer today;
 - a rep that has become impossible is a one-day ✕ on the earliest blank day it
@@ -88,10 +88,10 @@ carry the one-tier rule and are the contradiction to settle next.
 
 1. A current or met row draws exactly `target` marks. A finished unmet row
    draws exactly seven day marks.
-2. Marks are ordered, contiguous and non-overlapping. They cover the track
-   except when the final mark is open; then future columns remain visibly blank.
+2. Marks are ordered, contiguous and non-overlapping. They cover the track.
 3. Every mark is at least one column wide.
-4. At most one mark is `open`. It ends on today and never contains a future day.
+4. At most one mark is `open`. It contains today. It ends there while a rep
+   follows and reaches the final column when it is itself final (#495).
 5. A day holds at most one completion. Days are binary.
 6. Every ✕ is exactly one day wide.
 7. Completing today changes the open window to filled without moving the
@@ -126,20 +126,23 @@ lost mark never spans: its ✕ owns one day.
    from today through the end of the week. Give each loss the earliest eligible
    blank past day, one day each. Sort those losses, completions and today's open
    mark by day. The open mark reaches back from the previous boundary and ends
-   on today. Divide the future columns among the remaining reps with the
-   remainder to the right.
+   on today while another rep follows. Divide the future columns among those
+   remaining reps with the remainder to the right; if none remain, run the open
+   mark to the final column (#495).
 
-### 4.2 The open mark ends at today
+### 4.2 A final open mark owns the remainder
 
-It starts wherever the previous mark ended — reaching back over blank days —
-and ends **on today**. There is no final-mark exception. If it is the last rep
-owed, every day after today is left blank because none of those future days is
-part of the control the person can press (#476).
+It starts wherever the previous mark ended — reaching back over blank days. If
+another rep follows, it ends **on today** and leaves that rep's future window
+alone. If it is the final rep owed, it reaches the final column instead. The
+ordinary week surface and the widget still write today; widening the shape does
+not widen their editing permission. Demo-seeded history explicitly permits
+future editing, so its future columns remain working demo controls (#495).
 
 ### 4.3 Worked states
 
-**Week start, nothing logged.** The remainder-right division, and the open mark
-ending at today:
+**Week start, nothing logged.** The remainder-right division. The open mark
+ends at today while another rep follows; a final open mark owns the row:
 
 ```
       M  T  W  T  F  S  S
@@ -149,7 +152,7 @@ ending at today:
 4x   [○][·  ·][·  ·][·  ·]
 3x   [○][·  ·  ·][·  ·  ·]
 2x   [○][·  ·  ·  ·  ·  ·]
-1x   [○]                         Tue–Sun remain blank
+1x   [○  ○  ○  ○  ○  ○  ○]
 ```
 
 **Monday logged, still Monday.** Today is spent, so no row has an open mark:
@@ -177,11 +180,11 @@ rep owns a day, has an unavoidable miss:
 ```
 
 **3x, Mon and Tue done, Saturday.** One rep is owed. It reaches back through
-the unused days but stops on Saturday; Sunday remains blank:
+the unused days and, because it is final, continues through Sunday:
 
 ```
       M  T  W  T  F  S  S
-3x   [█][█][○  ○  ○  ○]   _
+3x   [█][█][○  ○  ○  ○  ○]
 ```
 
 **3x, only Monday done, Saturday.** Two owed, two days: Saturday and Sunday are
@@ -554,9 +557,11 @@ order, is:
 5. A met goal keeps its completed marks instead of collapsing.
 6. Mid-week creation credit is stored and frozen.
 7. The widget refreshes the division at local midnight.
-8. #476 turns the live row into claimable rep windows: every open mark stops on
-   today, future marks divide only future days, a loss is a one-day earliest-day
-   cross, and a finished unmet week becomes a seven-day diary.
+8. #476 turns the live row into claimable rep windows: an open mark stops on
+   today while future marks divide the days after it, a loss is a one-day
+   earliest-day cross, and a finished unmet week becomes a seven-day diary.
+9. #495 lets a final open mark own the remainder of the week when no future rep
+   needs those columns; production actions remain pinned to today.
 
 **`Frequency.daily` needs no change and must stay consistent.** A 7x row is
 day-pinned through `WeekGrid`, not `WeekSpans`. Check that the two agree: for
@@ -625,12 +630,11 @@ Property tests for the invariants of §3 across every `target` × every weekday 
 every completion pattern:
 
 - exactly `target` marks in live/met rows and seven in finished unmet rows;
-- ordered, contiguous, non-overlapping marks, with only a final open mark
-  allowed to leave future columns blank;
+- ordered, contiguous, non-overlapping marks that cover the track;
 - ✕ count equals `max(0, owed − days_left)` — the §5 monotonicity claim, checked
   rather than trusted;
 - every ✕ is one day wide;
-- at most one open mark, and it ends on today;
+- at most one open mark; it contains today and reaches the end only when final;
 - completing today preserves the future partition until the next day roll;
 - every finished unmet day is a filled, missed or pre-creation inactive diary
   mark, while a finished met week has no crosses;
