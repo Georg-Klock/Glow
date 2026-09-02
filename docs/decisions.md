@@ -7735,6 +7735,20 @@ No motion policy changes with this guarantee. Completing still closes only in
 the forward direction, undo remains an instant correction, and Reduce Motion
 still snaps both paths. Since no view is replaced, those instant paths have no
 intermediate background frame to expose.
+
+## 2026-09-02 — Short months centre one fixed-pitch row block (#505)
+
+The small month widget keeps its 16pt cells on a 19pt pitch. Four- and five-row
+months no longer leave all unused height below the grid; the row block splits
+the space remaining beneath the 18pt title and 4pt gap equally above and below.
+A six-row month moves only half a point, preserving the authored case #493
+aligned.
+
+The calculation is the week widget's existing `WidgetMetrics.rowsOffset`,
+generalized to accept the month title footprint and the month gap that can
+tighten on a short real frame. The view applies that offset outside the grid's
+background, so the rest-day cut moves with the cells while retaining exactly
+the row block's height.
 ## 2026-09-01 — Glow off occupies the preview, not a new Form section (#497)
 
 Settings reserves one fixed 120×40 preview inside a padded black band. At 1×,
