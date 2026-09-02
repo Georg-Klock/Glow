@@ -1040,6 +1040,16 @@ revision; it does not make each card fetch, construct every offscreen preview,
 or pass through an empty intermediate state. Empty state, habit order,
 accessibility and the production widget views themselves are unchanged.
 
+**A preview rasterizes its sockets; an installed widget does not** (#479).
+The Widgets tab sets one host-scoped environment value around each production
+widget view. `SlotMarkView` responds by flattening only the socket's pair of
+inner-shadow filters into one layer, using the same path as the scrolling week
+grid. The `SlotToggle`, its hit region, both optimistic faces, accessibility
+and persistence adapter remain outside that rasterized layer. The environment
+defaults off, so WidgetKit's independently baselined archive path is unchanged.
+Together with the lazy catalog above, cards outside the scroll neighborhood
+have neither a live shadow hierarchy nor a constructed body.
+
 **The production controls stay live inside the Widgets tab** (#465). Today's
 actionable mark in either week card and every month card is the same
 `SlotToggle` the Home Screen widget uses. WidgetKit supplies its AppIntent
