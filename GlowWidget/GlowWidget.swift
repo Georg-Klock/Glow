@@ -21,11 +21,11 @@ import WidgetKit
 /// shared sources (`WeekWidgetConfig.swift`) — see the note there; defined only
 /// in this target, the stored choice never reaches the provider.
 ///
-/// A widget already on a home screen when this ships arrives with the intent's
-/// default — `rows` nil — which is the case that keeps the app's own order, so
-/// the change is invisible to anyone who does not open the sheet. The kind
-/// string is unchanged for the same reason: it is what an existing widget is
-/// keyed by.
+/// A widget already on a home screen arrives with the intent's default —
+/// `rows` nil. Large keeps the app's order, including spacers; medium now skips
+/// automatic spacers so its measured capacity is spent on real habits (#496).
+/// A configured spacer is still honoured. The kind string is unchanged: it is
+/// what an existing widget is keyed by.
 struct GlowWidget: Widget {
     let kind = WidgetKind.week.rawValue
 
@@ -294,6 +294,7 @@ struct WeekProvider: AppIntentTimelineProvider {
                 date: step.date,
                 week: entry.week,
                 habits: entry.habits,
+                rowsAreConfigured: entry.rowsAreConfigured,
                 burstHabit: step.progress == nil ? nil : burst.habitID,
                 progress: step.progress ?? 1
             )
@@ -327,7 +328,8 @@ struct WeekProvider: AppIntentTimelineProvider {
             // Three outcomes, not two (#282): the store's answer arrives typed
             // and stays typed, so a failed container renders "unavailable"
             // rather than the new-user empty state.
-            habits: WeekWidgetStore.rows(chosen: configuration.rows?.map(\.id), in: week)
+            habits: WeekWidgetStore.rows(chosen: configuration.rows?.map(\.id), in: week),
+            rowsAreConfigured: configuration.rows?.isEmpty == false
         )
     }
 
@@ -354,7 +356,8 @@ struct WeekProvider: AppIntentTimelineProvider {
         return WeekEntry(
             date: midnight,
             week: WeekCalendar.week(containing: midnight),
-            habits: entry.habits
+            habits: entry.habits,
+            rowsAreConfigured: entry.rowsAreConfigured
         )
     }
 

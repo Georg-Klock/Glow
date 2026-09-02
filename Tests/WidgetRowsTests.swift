@@ -20,22 +20,32 @@ struct WidgetRowsTests {
         [row("Workout"), row("Stretch"), row("", isSpacer: true), row("Study"), row("Read")]
     }
 
-    @Test("An unconfigured widget keeps the app's order, unchanged")
-    func unconfiguredIsUntouched() {
-        // The requirement this feature is allowed to ship under: every widget
-        // already on a home screen arrives here with nil the first time this
-        // runs, and none of them may move.
+    @Test("An unconfigured large widget keeps the app's order, including spacers")
+    func unconfiguredLargeIsUntouched() {
         let all = appOrder()
-        #expect(WidgetRows.rows(from: all, chosen: nil) == all)
+        #expect(WidgetRows.rows(from: all, chosen: nil, automaticSpacers: .include) == all)
     }
 
-    @Test("An empty choice is the same as no choice")
+    @Test("An unconfigured medium widget skips automatic spacers before its cut")
+    func unconfiguredMediumSkipsSpacers() {
+        let all = appOrder()
+        let rows = WidgetRows.rows(from: all, chosen: nil, automaticSpacers: .exclude)
+
+        #expect(rows.map(\.name) == ["Workout", "Stretch", "Study", "Read"])
+        #expect(rows.allSatisfy { !$0.isSpacer })
+    }
+
+    @Test("An empty choice is unconfigured and follows the family's spacer policy")
     func emptyIsUnconfigured() {
         // A picker that has been opened and left empty is not a request for an
         // empty widget. There is no way to ask for one, and a blank home screen
         // panel would be indistinguishable from the store having failed to open.
         let all = appOrder()
-        #expect(WidgetRows.rows(from: all, chosen: []) == all)
+        #expect(WidgetRows.rows(from: all, chosen: [], automaticSpacers: .include) == all)
+        #expect(
+            WidgetRows.rows(from: all, chosen: [], automaticSpacers: .exclude)
+                .allSatisfy { !$0.isSpacer }
+        )
     }
 
     @Test("The app's order is the drawn order, whatever order was chosen in")
@@ -49,7 +59,10 @@ struct WidgetRowsTests {
         // `WidgetRows`.
         let all = appOrder()
         let chosen = [all[4].id, all[0].id, all[3].id]
-        #expect(WidgetRows.rows(from: all, chosen: chosen).map(\.name) == ["Workout", "Study", "Read"])
+        #expect(
+            WidgetRows.rows(from: all, chosen: chosen, automaticSpacers: .include).map(\.name)
+                == ["Workout", "Study", "Read"]
+        )
     }
 
     @Test("The same selection draws the same rows however it was tapped")
@@ -64,7 +77,9 @@ struct WidgetRowsTests {
             [ids[2], ids[1], ids[0]],
             [ids[1], ids[2], ids[0]],
         ]
-        let drawn = orderings.map { WidgetRows.rows(from: all, chosen: $0).map(\.name) }
+        let drawn = orderings.map {
+            WidgetRows.rows(from: all, chosen: $0, automaticSpacers: .include).map(\.name)
+        }
         #expect(Set(drawn).count == 1, "the tap order changed what was drawn: \(drawn)")
     }
 
@@ -75,11 +90,24 @@ struct WidgetRowsTests {
         let all = appOrder()
         let spacer = all[2]
         let chosen = [all[3].id, spacer.id, all[0].id]
-        let rows = WidgetRows.rows(from: all, chosen: chosen)
+        let rows = WidgetRows.rows(from: all, chosen: chosen, automaticSpacers: .exclude)
         // The app's order, so the blank row sits where the app has it —
         // between Workout and Study — rather than where it was tapped.
         #expect(rows.map(\.name) == ["Workout", "", "Study"])
         #expect(rows.map(\.isSpacer) == [false, true, false])
+    }
+
+    @Test("A configured medium honours a deliberately chosen spacer")
+    func configuredMediumKeepsSpacer() {
+        let all = appOrder()
+        let rows = WidgetRows.rows(
+            from: all,
+            chosen: [all[0].id, all[2].id, all[3].id],
+            automaticSpacers: .exclude
+        )
+
+        #expect(rows.map(\.name) == ["Workout", "", "Study"])
+        #expect(rows[1].isSpacer)
     }
 
     @Test("A row that no longer exists is dropped, not held as a gap")
@@ -89,7 +117,10 @@ struct WidgetRowsTests {
         // A deleted habit is not a blank row. Someone who wants a gap has a
         // real one to pick, and leaving a hole would make a deletion look like
         // a layout choice.
-        #expect(WidgetRows.rows(from: all, chosen: chosen).map(\.name) == ["Workout", "Study"])
+        #expect(
+            WidgetRows.rows(from: all, chosen: chosen, automaticSpacers: .include).map(\.name)
+                == ["Workout", "Study"]
+        )
     }
 
     @Test("A repeated choice appears once")
@@ -100,7 +131,10 @@ struct WidgetRowsTests {
         // produce one is unconfirmed — this makes it not matter.
         let all = appOrder()
         let chosen = [all[0].id, all[3].id, all[0].id]
-        #expect(WidgetRows.rows(from: all, chosen: chosen).map(\.name) == ["Workout", "Study"])
+        #expect(
+            WidgetRows.rows(from: all, chosen: chosen, automaticSpacers: .include).map(\.name)
+                == ["Workout", "Study"]
+        )
     }
 
     @Test("Two blank rows are two rows, because they are two habits")
@@ -110,14 +144,16 @@ struct WidgetRowsTests {
         // the duplicate rule must not fold them together.
         let all = [row("Workout"), row("", isSpacer: true), row("", isSpacer: true), row("Study")]
         let chosen = [all[1].id, all[2].id]
-        #expect(WidgetRows.rows(from: all, chosen: chosen).count == 2)
+        #expect(WidgetRows.rows(from: all, chosen: chosen, automaticSpacers: .include).count == 2)
     }
 
     @Test("Nothing comes out that was not in the store's list")
     func nothingIsInvented() {
         let all = appOrder()
         let known = Set(all.map(\.id))
-        let rows = WidgetRows.rows(from: all, chosen: [UUID(), all[1].id, UUID()])
+        let rows = WidgetRows.rows(
+            from: all, chosen: [UUID(), all[1].id, UUID()], automaticSpacers: .include
+        )
         #expect(rows.allSatisfy { known.contains($0.id) })
         #expect(rows.count == 1)
     }
@@ -129,12 +165,31 @@ struct WidgetRowsTests {
         // the empty state rather than silently becoming the app's first rows,
         // which is the same rule the month widget follows for its one deleted
         // habit — see `MonthStore.month(of:containing:)`.
-        #expect(WidgetRows.rows(from: appOrder(), chosen: [UUID()]).isEmpty)
+        #expect(
+            WidgetRows.rows(
+                from: appOrder(), chosen: [UUID()], automaticSpacers: .include
+            ).isEmpty
+        )
     }
 
     @Test("No rows at all is no rows, configured or not")
     func emptyStore() {
-        #expect(WidgetRows.rows(from: [], chosen: nil).isEmpty)
-        #expect(WidgetRows.rows(from: [], chosen: [UUID()]).isEmpty)
+        #expect(WidgetRows.rows(from: [], chosen: nil, automaticSpacers: .exclude).isEmpty)
+        #expect(WidgetRows.rows(from: [], chosen: [UUID()], automaticSpacers: .include).isEmpty)
+    }
+
+    @Test("A medium with fewer than four real habits shows what exists")
+    func fewerRealHabitsStopNaturally() {
+        let rows = [row("One"), row("", isSpacer: true), row("Two")]
+        #expect(
+            WidgetRows.rows(from: rows, chosen: nil, automaticSpacers: .exclude).map(\.name)
+                == ["One", "Two"]
+        )
+    }
+
+    @Test("An unconfigured medium made only of spacers has no rows")
+    func allSpacersBecomeEmpty() {
+        let rows = [row("", isSpacer: true), row("", isSpacer: true)]
+        #expect(WidgetRows.rows(from: rows, chosen: nil, automaticSpacers: .exclude).isEmpty)
     }
 }

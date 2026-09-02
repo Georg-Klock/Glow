@@ -13,6 +13,10 @@ struct WeekEntry: TimelineEntry {
     /// fetch arrives here as `.unavailable` and renders as such, never as the
     /// new-user empty state.
     let habits: StoreRead<[HabitSnapshot]>
+    /// Whether the row list came from a non-empty widget selection. The view
+    /// needs this beside its family so an automatic medium can skip spacers
+    /// without dropping one somebody deliberately chose (#496).
+    var rowsAreConfigured: Bool = false
     /// The habit whose completion is mid-animation, if any.
     var burstHabit: UUID?
     /// How far through the completion cross-fade this frame is, 0 through 1:

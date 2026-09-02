@@ -143,10 +143,11 @@ struct SelectWeekLayoutIntent: WidgetConfigurationIntent {
         "Which habits the week shows — and which habit the small size shows."
     )
 
-    /// Nil until someone opens the sheet, and nil is the answer that keeps
-    /// today's behaviour — see `WidgetRows.rows`. It is also what every widget
-    /// already on a home screen arrives with when this ships, which is what
-    /// makes the change invisible to anyone who does not want it.
+    /// Nil until someone opens the sheet, and nil is the automatic layout —
+    /// see `WidgetRows.rows`. Large keeps the app's list including spacers;
+    /// medium deliberately skips automatic spacers before its measured cut
+    /// (#496). A non-empty selection honours every chosen row, including a
+    /// spacer.
     /// **Capped per family, by the system** (#366). A medium widget draws four
     /// rows and a large one ten, and the picker now refuses an eleventh rather
     /// than taking it and letting the view cut it silently.
@@ -165,8 +166,8 @@ struct SelectWeekLayoutIntent: WidgetConfigurationIntent {
     /// literal — the constraint is on the source, so the source is the only
     /// place to check it.
     ///
-    /// `min: 0` keeps the existing meaning of an empty selection: a widget
-    /// nobody configured, which draws the app's own list. See `WidgetRows`.
+    /// `min: 0` keeps an empty selection equivalent to a widget nobody
+    /// configured, so it follows that family's automatic spacer policy.
     @Parameter(title: "Habits", size: [
         .systemMedium: IntentCollectionSize(min: 0, max: 4),
         .systemLarge: IntentCollectionSize(min: 0, max: 10),
@@ -250,8 +251,10 @@ enum WeekWidgetStore {
     /// The rows this widget draws over `week`, in the app's own order.
     ///
     /// `chosen` is the configured selection, or nil on a widget nobody has
-    /// configured. Which rows come out is `WidgetRows`' decision and is tested
-    /// there; this reads the store and hands it the answer.
+    /// configured. This boundary cannot know the rendered family, so it keeps
+    /// the complete automatic list. The view applies the family-specific
+    /// spacer policy before its measured cut; a configured selection is
+    /// already resolved here and later marked as such on `WeekEntry` (#496).
     ///
     /// Every chosen row comes back, uncut. How many of them fit is the
     /// view's question, because only the view has measured a frame — see
@@ -279,7 +282,11 @@ enum WeekWidgetStore {
             let all = try Habit.fetchedSnapshots(
                 of: context.fetch(descriptor), within: week.dayIDs()
             )
-            return StoreRead(read: WidgetRows.rows(from: all, chosen: chosen))
+            return StoreRead(read: WidgetRows.rows(
+                from: all,
+                chosen: chosen,
+                automaticSpacers: .include
+            ))
         } catch {
             // Counts and outcomes only, per `WidgetTrace` — never the error's
             // own text, which can carry a path.
