@@ -399,6 +399,16 @@ different layout rather than a smaller one. `WeekWidgetView.familyOverride`
 exists for the same reason the render harness needs it — `widgetFamily` is
 read-only outside WidgetKit and reports medium everywhere else.
 
+**The previews use the production optimistic state with an app-host adapter.**
+WidgetKit owns touch delivery for its archived `Toggle(intent:)`, but the same
+custom `ToggleStyle` receives no automatic press handling in an ordinary
+SwiftUI hierarchy. `SlotMarkToggleStyle` therefore renders the same two faces
+for both hosts while wrapping only the app-hosted face in a plain button that
+mutates the supplied binding. That binding remains `SlotToggle`'s serialized,
+optimistic operation path, so rapid taps still replace the pending value and
+reconcile from the store. Socket flattening is orthogonal: only its decorative
+background is rasterized, and that subtree never participates in hit testing.
+
 **The catalog is the extension's own list.** `WidgetKind.families` declares
 which families each kind supports and `supportedFamilies` is set from it, so
 the page's list and the extension's are one list — read largest-first by
@@ -685,6 +695,15 @@ models, so only those two frames use a measured 0.75-point black tolerance;
 direct frames retain 0.5. A change that is deliberate is approved by copying
 the manifest the run attached over the committed file; `Tools/test.sh` prints
 that command with the run's own path in it.
+
+`GlowUITests` is the process-level interaction exception. Its single fixture
+launches Glow with a Debug-only, in-memory store containing one deterministic
+daily habit, opens the Widgets tab, and taps the first visible preview mark at
+screen coordinates. The assertion waits for the spoken control label to flip,
+which proves both physical hit delivery and the optimistic face. The fixture
+cannot inherit or mutate App Group history. This target exists because hosted
+accessibility activation bypasses the physical-touch path that failed in #494;
+logic remains in `GlowTests` and visual geometry remains in `GlowRenderTests`.
 
 The grid is a gate on **geometry**, and it took #199 to say so: a mean dilutes,
 and the marks that carry the unlit colour are thin, so #194 moved the whole

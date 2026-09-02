@@ -118,9 +118,16 @@ contradiction left standing reads as an instruction to whoever finds it next.
   evidence. All of those exit 0 from `xcodebuild`; one of them was observed on
   this repository the day the check landed. See #138.
 
-  Adding tests never touches the inventory — the floors are minima. **Lowering
-  one is the reviewable event**, and it belongs in the same change as the
-  deletion that caused it.
+  Adding a test to an existing bundle never changes its floor — floors are
+  minima. A new bundle must be declared with a reviewed starting floor.
+  **Lowering one is the reviewable event**, and it belongs in the same change
+  as the deletion that caused it.
+
+  `GlowUITests` stays deliberately narrow. It launches a deterministic,
+  in-memory Debug store and sends a screen-coordinate tap through the Widgets
+  tab, covering interaction delivery that neither a still render nor
+  `accessibilityActivate()` proves. Unit and render suites remain the owners of
+  logic and pixels.
 
   It also switches accessibility on for the simulator it chose, because
   `EmptyStateAccessibilityTests` hosts a live view and walks the tree UIKit

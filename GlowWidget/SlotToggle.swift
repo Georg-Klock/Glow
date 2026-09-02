@@ -111,6 +111,10 @@ struct SlotToggle<OnMark: View, OffMark: View>: View {
                 // optimistic bit as the pixels.
                 .accessibilityLabel(displayedIsDone ? onLabel : offLabel)
                 .accessibilityHint(SlotVoice.hint(isDone: displayedIsDone))
+                // Repeated deliberately across preview sizes. The process-level
+                // touch gate chooses the first visible copy, then proves a
+                // screen-coordinate tap reaches this shipping control (#494).
+                .accessibilityIdentifier("widget-preview-mark-\(habitID.uuidString)")
         } else {
             installedWidgetControl
         }
@@ -130,7 +134,8 @@ struct SlotToggle<OnMark: View, OffMark: View>: View {
             EmptyView()
         }
         .toggleStyle(SlotMarkToggleStyle(
-            onMark: onMark, offMark: offMark, onLabel: onLabel, offLabel: offLabel
+            onMark: onMark, offMark: offMark, onLabel: onLabel, offLabel: offLabel,
+            handlesPresses: false
         ))
     }
 
@@ -145,7 +150,8 @@ struct SlotToggle<OnMark: View, OffMark: View>: View {
             EmptyView()
         }
         .toggleStyle(SlotMarkToggleStyle(
-            onMark: onMark, offMark: offMark, onLabel: onLabel, offLabel: offLabel
+            onMark: onMark, offMark: offMark, onLabel: onLabel, offLabel: offLabel,
+            handlesPresses: true
         ))
     }
 
@@ -191,8 +197,24 @@ private struct SlotMarkToggleStyle<OnMark: View, OffMark: View>: ToggleStyle {
     let offMark: OffMark
     let onLabel: String
     let offLabel: String
+    /// WidgetKit owns delivery for an archived AppIntent toggle. An ordinary
+    /// SwiftUI host does not: a custom ToggleStyle must change the supplied
+    /// binding when its rendered face is pressed (#494).
+    let handlesPresses: Bool
 
+    @ViewBuilder
     func makeBody(configuration: Configuration) -> some View {
+        if handlesPresses {
+            Button { configuration.isOn.toggle() } label: {
+                mark(configuration: configuration)
+            }
+            .buttonStyle(.plain)
+        } else {
+            mark(configuration: configuration)
+        }
+    }
+
+    private func mark(configuration: Configuration) -> some View {
         Group {
             if configuration.isOn {
                 onMark

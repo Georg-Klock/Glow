@@ -43,10 +43,29 @@ struct GlowApp: App {
         // wipes on creation, and this is over before any test writes a key.
         WeekPreferences.retireRestDay()
 
-        // A test host opens nothing and draws nothing. See `body`.
-        let attempt = GlowSettings.isRunningTests
-            ? (container: ModelContainer?.none, failure: String?.none)
-            : Self.open()
+        // A unit-test host opens nothing and draws nothing. A UI test is a
+        // different process: it must launch the real interface and drive a
+        // screen-coordinate touch, but it must not inherit or mutate whatever
+        // App Group history happens to be on the selected simulator (#494).
+        #if DEBUG
+        let runsWidgetPreviewUITest = ProcessInfo.processInfo.arguments.contains(
+            "-glow-widget-preview-ui-test"
+        )
+        #else
+        let runsWidgetPreviewUITest = false
+        #endif
+        let attempt: (container: ModelContainer?, failure: String?)
+        if GlowSettings.isRunningTests {
+            attempt = (nil, nil)
+        } else if runsWidgetPreviewUITest {
+        #if DEBUG
+            attempt = Self.openWidgetPreviewUITestStore()
+        #else
+            attempt = Self.open()
+        #endif
+        } else {
+            attempt = Self.open()
+        }
 
         // Second, and only when a real store was opened: the sweep that takes
         // the per-day habits out (#239). It used to hang off `WeeklyGridView`
@@ -90,6 +109,36 @@ struct GlowApp: App {
     }
 
     #if DEBUG
+    /// One deterministic, process-local habit for the physical-touch UI gate.
+    /// Debug-only and in memory: a failed test cannot alter a person's or a
+    /// simulator's existing Glow history, and each launch begins open again.
+    private static func openWidgetPreviewUITestStore()
+        -> (container: ModelContainer?, failure: String?)
+    {
+        do {
+            let container = try ModelContainer(
+                for: GlowStore.schema,
+                configurations: ModelConfiguration(
+                    schema: GlowStore.schema,
+                    isStoredInMemoryOnly: true,
+                    cloudKitDatabase: .none
+                )
+            )
+            let context = ModelContext(container)
+            context.insert(Habit(
+                name: "Preview Touch Fixture",
+                icon: "hand.tap",
+                frequency: .daily,
+                createdAt: WeekCalendar.today(),
+                sortOrder: 0
+            ))
+            try context.save()
+            return (container, nil)
+        } catch {
+            return (nil, error.localizedDescription)
+        }
+    }
+
     /// Fires the goal pop without a goal, so its presentations can be looked
     /// at from a tethered Mac — the same reason `-glow-force-burst` exists for
     /// the widget's burst. The real pop lasts two seconds and only fires when

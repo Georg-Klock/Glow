@@ -466,6 +466,10 @@ struct WidgetPlacementTests {
         #expect(widgets.contains("MonthWidgetView(entry:"))
         #expect(slotToggle.contains("Toggle(isOn: isDone, intent: MarkHabitIntent("))
         #expect(slotToggle.contains("Toggle(isOn: Binding("))
+        #expect(slotToggle.contains("handlesPresses: false"))
+        #expect(slotToggle.contains("handlesPresses: true"))
+        #expect(slotToggle.contains("Button { configuration.isOn.toggle() }"))
+        #expect(slotToggle.contains("widget-preview-mark-"))
         #expect(widgets.contains("MarkHabitOperation.perform("))
     }
 
@@ -492,6 +496,7 @@ struct WidgetPlacementTests {
             ".flattened(flattensSocket || flattensWidgetSockets)"
         ))
         #expect(mark.contains("if flattens { drawingGroup() } else { self }"))
+        #expect(mark.contains(".allowsHitTesting(false)"))
         #expect(!toggle.contains("drawingGroup"), "the interactive control must stay live")
     }
 

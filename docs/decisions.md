@@ -7632,3 +7632,29 @@ Animation/SwiftUI procedure and result table live in
 `docs/widget-preview-scroll-trace.md`; merge and issue closure wait for its
 8- and 30-habit phone rows to meet the stated frame-time limits, including Low
 Power Mode and Reduce Motion.
+
+## 2026-09-01 — App-hosted widget controls own their press adapter (#494)
+
+The rasterized preview sockets from #479 kept the Widgets catalog scrolling
+well, but the marks in the TestFlight app did not respond to touch. Removing
+the socket from hit testing and even moving it into a sibling layer did not
+make a real screen-coordinate tap change the control. The missing boundary was
+the custom toggle style: WidgetKit delivers an archived `Toggle(intent:)`,
+whereas an ordinary SwiftUI host does not make a custom `ToggleStyle` mutate
+its binding merely because the style rendered a face.
+
+`SlotMarkToggleStyle` now has an explicit host policy. WidgetKit keeps the
+unchanged archived face and AppIntent delivery. The in-app preview wraps that
+same face in a plain button that toggles the supplied binding, which is already
+the serialized optimistic path used by rapid preview taps. The decorative
+socket subtree is also excluded from hit testing, but its host-scoped
+`drawingGroup()` remains: interactivity no longer trades away #479's scrolling
+improvement.
+
+The gate is a new, deliberately one-test `GlowUITests` bundle. It launches a
+Debug-only in-memory store, opens Widgets, locates the production mark by its
+accessibility identifier, and calls `XCUIElement.tap()` at screen coordinates.
+The unchanged code reproduced the TestFlight failure while still reporting a
+hittable accessibility element; the fix flips the label optimistically. This
+test is intentionally different from `accessibilityActivate()`, which had
+already passed while physical touch was broken.
