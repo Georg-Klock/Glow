@@ -37,6 +37,37 @@ struct GlowSettingsTests {
         #expect(GlowSettings.range.contains(GlowSettings.defaultValue))
     }
 
+    @Test("The fixed preview slot names glow, off, and Low Power in priority order")
+    func previewStateKeepsOneFootprint() {
+        let floor = GlowSettings.range.lowerBound
+
+        #expect(GlowSettings.previewState(peak: floor + 1, lowPower: false) == .glow)
+        #expect(GlowSettings.previewState(peak: floor, lowPower: false) == .off)
+        #expect(GlowSettings.previewState(peak: floor, lowPower: true) == .lowPower)
+        #expect(GlowSettings.previewState(peak: floor + 1, lowPower: true) == .lowPower)
+    }
+
+    @Test("Glow off is a preview replacement, never a conditional Form section")
+    func offStateCannotReflowTheForm() throws {
+        // The bug is structural: a conditional Section changes the Form's row
+        // count, while a branch inside `previewContent` keeps the already
+        // reserved band. A still image cannot distinguish those two trees, so
+        // hold the source boundary the same way the widget overload and
+        // hit-testing contracts are held elsewhere in this suite.
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: root.appending(path: "Glow/Views/SettingsView.swift"),
+            encoding: .utf8
+        )
+
+        #expect(source.contains("switch GlowSettings.previewState"))
+        #expect(source.contains("GlowOffPreviewNotice(size: Self.previewSize)"))
+        #expect(!source.contains("if peak <= GlowSettings.range.lowerBound"))
+        #expect(source.contains("Glow off. Today's slot still shows, unlit."))
+    }
+
     @Test("Intensity drives the encoded headroom", arguments: [2.0, 4.0, 8.0])
     func intensityReachesTheEncoder(peak: Double) throws {
         // The setting is only meaningful if it survives all the way into the

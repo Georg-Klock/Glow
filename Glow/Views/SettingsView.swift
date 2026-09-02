@@ -181,27 +181,6 @@ struct SettingsView: View {
                 // reads as the first section having drifted down the screen.
                 .listSectionSpacing(0)
 
-                // Directly under the thing it explains. It used to sit three
-                // sections down, below the Glow slider and the whole "Say well
-                // done" cluster, so a dark preview was two unrelated controls
-                // away from the one line saying why it is dark.
-                //
-                // **No `.listSectionSpacing(0)` of its own, and #201 asked for
-                // one.** The modifier sets the gap *below* the section it is on,
-                // not above it: the preview's own zero already lands on whatever
-                // follows, so the banner arrives tight against the reserved band
-                // either way. Measured, glow at minimum, both builds — the
-                // banner sits at 418–470pt in both; carrying the modifier only
-                // pulls the Glow section up from 528pt to 510pt, closing the
-                // one gap #201 asked to keep.
-                if peak <= GlowSettings.range.lowerBound {
-                    Section {
-                        Label("Glow off. Today's slot still shows, unlit.", systemImage: "info.circle")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
                 // Glow leads: it is the one control here that is the product
                 // rather than a preference about it.
                 Section {
@@ -382,13 +361,11 @@ struct SettingsView: View {
     /// nothing derives this: a lit mark ends at its own silhouette, and what is
     /// left is how much black the preview wants around it.
     ///
-    /// **Under Low Power Mode there is nothing real to show** (#396). iOS cuts
-    /// the headroom the HDR tile needs, so `GlowImageView` tone-maps back to
-    /// ordinary white and the slider's one demonstration becomes a flat white
-    /// lozenge with nothing said about why. `LowPowerPreviewNotice` takes its
-    /// place, in its size and its capsule, and opens the explanation the grid
-    /// already gives. That is untouched by the halo's removal: what the notice
-    /// replaces is the *tile*, which is still what carries the headroom.
+    /// The footprint always stays occupied (#396, #497). Low Power Mode takes
+    /// priority because it is the condition the person cannot leave from this
+    /// screen; otherwise 1× puts a neutral "Glow off" capsule where the live
+    /// tile stood. Both alternatives have the tile's exact size, so moving the
+    /// slider never inserts a Form section or moves anything below it.
     private var preview: some View {
         previewContent
             .padding(.vertical, Self.previewPadding)
@@ -398,11 +375,14 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var previewContent: some View {
-        if lowPower.isLowPowerMode {
+        switch GlowSettings.previewState(peak: peak, lowPower: lowPower.isLowPowerMode) {
+        case .lowPower:
             LowPowerPreviewNotice(size: Self.previewSize) {
                 isShowingLowPowerNotice = true
             }
-        } else {
+        case .off:
+            GlowOffPreviewNotice(size: Self.previewSize)
+        case .glow:
             GlowImageView(size: Self.previewSize)
         }
     }
@@ -725,6 +705,32 @@ struct SettingsView: View {
         "A brighter glow makes the open habits stand out. Your eye adapts to "
             + "it, so everything else reads duller in exchange."
 
+}
+
+/// The neutral state that replaces the preview at 1× (#497).
+///
+/// It is deliberately not the amber Low Power surface: this is a slider
+/// position somebody chose, not a condition imposed by iOS. The visible copy
+/// fits the preview's capsule; the complete reassurance remains available to
+/// VoiceOver without making the fixed footprint grow.
+private struct GlowOffPreviewNotice: View {
+    let size: CGSize
+
+    var body: some View {
+        Label("Glow off", systemImage: "info.circle")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(width: size.width, height: size.height)
+            .background {
+                Capsule(style: .continuous).fill(Color.white.opacity(0.08))
+            }
+            .overlay {
+                Capsule(style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.20), lineWidth: 1)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Glow off. Today's slot still shows, unlit.")
+    }
 }
 
 /// A named pair because UIKit's two headroom properties answer different
