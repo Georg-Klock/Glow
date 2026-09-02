@@ -6,6 +6,19 @@ import Foundation
 /// encode the same tile from it, and one that ignored the setting would make
 /// the two disagree about how bright this app is meant to be.
 enum GlowSettings {
+    /// Which one object occupies Settings' fixed preview footprint.
+    enum PreviewState: Equatable {
+        case glow
+        case off
+        case lowPower
+    }
+
+    static func previewState(peak: Double, lowPower: Bool) -> PreviewState {
+        if lowPower { return .lowPower }
+        if peak <= range.lowerBound { return .off }
+        return .glow
+    }
+
     static let key = "glowPeakHeadroom"
 
     /// Multiples of SDR white. 1x is no headroom at all, which is a legitimate

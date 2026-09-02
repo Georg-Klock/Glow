@@ -7735,3 +7735,21 @@ No motion policy changes with this guarantee. Completing still closes only in
 the forward direction, undo remains an instant correction, and Reduce Motion
 still snaps both paths. Since no view is replaced, those instant paths have no
 intermediate background frame to expose.
+## 2026-09-01 — Glow off occupies the preview, not a new Form section (#497)
+
+Settings reserves one fixed 120×40 preview inside a padded black band. At 1×,
+the old layout kept that preview and inserted a separate explanatory section
+below it, so the Glow control and every later section moved while the slider
+was being dragged. The off state now replaces the preview itself with a capsule
+of the exact same size. No conditional Form row is inserted or removed.
+
+Low Power Mode wins when both conditions are true. It is imposed by iOS and
+cannot be changed from this control, so the existing amber, tappable explanation
+remains the honest one. A chosen 1× setting instead draws a neutral, inert
+"Glow off" capsule. Its full accessibility label keeps the reassurance that
+today's slot still shows unlit; compressing the visible sentence is what lets
+the footprint remain fixed rather than what removes that information.
+
+`GlowSettings.previewState(peak:lowPower:)` owns the three-state priority as a
+pure rule. The view switches all three outcomes inside `previewContent`, so the
+testable decision and the no-reflow structure stay separate.
