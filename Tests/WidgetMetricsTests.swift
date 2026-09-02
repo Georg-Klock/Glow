@@ -32,6 +32,38 @@ struct WidgetMetricsTests {
         )
     }
 
+    @Test(
+        "Four-, five-, and six-row months split the space below the title",
+        arguments: [(4, 19.5), (5, 10.0), (6, 0.5)]
+    )
+    func shortMonthsCentreTheirRowBlock(rows: Int, expectedOffset: CGFloat) {
+        // The small widget's 158pt frame leaves a 134pt content box inside its
+        // 10/14 vertical insets. A month cell is 16pt on a 19pt pitch, and the
+        // title plus its gap occupies 22pt. These are the authored metrics, so
+        // the margins below are the actual 4/5/6-row placements from #505.
+        let contentHeight: CGFloat = 158 - WidgetMetrics.padTop - WidgetMetrics.padBottom
+        let slot: CGFloat = 16
+        let gap: CGFloat = 3
+        let header = WidgetMetrics.monthTitleHeight + WidgetMetrics.headerGap
+        let offset = WidgetMetrics.rowsOffset(
+            contentHeight: contentHeight,
+            slot: slot,
+            gap: gap,
+            rows: rows,
+            headerFootprint: header
+        )
+        let block = CGFloat(rows) * slot + CGFloat(rows - 1) * gap
+        let bottom = contentHeight - header - offset - block
+
+        #expect(abs(offset - expectedOffset) < 0.001)
+        #expect(abs(offset - bottom) < 0.001)
+        if rows == 6 {
+            // The file's six-row month stays at y=32.5 — within the deliberate
+            // half-point of the y=32 placement #493 established.
+            #expect(abs(WidgetMetrics.padTop + header + offset - 32.5) < 0.001)
+        }
+    }
+
     @Test("The large widget holds ten habits")
     func largeHoldsTen() {
         // **Eleven until #331.** Ten is not a stored number anywhere either: it

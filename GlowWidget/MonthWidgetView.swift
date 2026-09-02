@@ -83,6 +83,13 @@ struct MonthWidgetView: View {
             let rowGap = rows > 1
                 ? max(1, min(gap, (available - CGFloat(rows) * side) / CGFloat(rows - 1)))
                 : 0
+            let rowsOffset = WidgetMetrics.rowsOffset(
+                contentHeight: proxy.size.height,
+                slot: side,
+                gap: rowGap,
+                rows: rows,
+                headerFootprint: WidgetMetrics.monthTitleHeight + WidgetMetrics.headerGap
+            )
 
             VStack(alignment: .leading, spacing: 0) {
                 Group {
@@ -121,6 +128,12 @@ struct MonthWidgetView: View {
                         side: side, gap: gap, rows: rows, rowGap: rowGap
                     )
                 }
+                // Apply the shared row-block offset outside the background.
+                // The padding therefore moves the grid and its rest cut as one
+                // layout unit without making the cut itself rowsOffset taller
+                // (#505). Six rows move only half a point; short months split
+                // their otherwise-dead space above and below the block.
+                .padding(.top, rowsOffset)
                 Spacer(minLength: 0)
             }
         }
