@@ -728,6 +728,7 @@ struct WidgetRenderDiffTests {
             .frame(width: size.width, height: size.height)
             .background { GlowPalette.widgetSurface }
             .environment(\.colorScheme, .dark)
+            .widgetPixelHarness()
         let renderer = ImageRenderer(content: framed)
         renderer.scale = Self.scale
         renderer.proposedSize = ProposedViewSize(size)
@@ -1098,6 +1099,7 @@ struct WidgetRenderDiffTests {
             .frame(width: Self.size.width, height: Self.size.height)
             .background { GlowPalette.widgetSurface }
             .environment(\.colorScheme, .dark)
+            .widgetPixelHarness()
 
         let renderer = ImageRenderer(content: view)
         renderer.scale = Self.scale
