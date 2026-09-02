@@ -194,12 +194,19 @@ identical on both surfaces and only the actions differ.
 
 **`WeekSpans` owns claimable rep windows** (#476). In the current week a
 completion owns the window ending on its logged day, today's open rep reaches
-back over unused days but ends on today, and future reps divide only future
-columns with shorter windows nearest today. A lost rep is a one-day cross on
-the earliest blank day it could have used. Completing today changes only the
-open window's state; tomorrow's date change is what redistributes the remaining
-future windows. A final completed span can reach Sunday, but a final open span
-cannot: future columns are not part of the control a person is pressing.
+back over unused days and ends on today while another rep follows, and future
+reps divide only future columns with shorter windows nearest today. A final open
+rep instead owns the remainder of the week, just as a final completion does
+(#495). A lost rep is a one-day cross on the earliest blank day it could have
+used. Completing today changes only the open window's state; tomorrow's date
+change is what redistributes any remaining future windows.
+
+Span geometry does not grant editing. An ordinary week surface still resolves a
+widened final open span to today, and the widget remains `.todayOnly`. The
+demo-seeded week explicitly uses `allowingFuture: true`; there, future columns
+inside that final span remain real demo controls and the fallback action is its
+last column. That is the existing demo-only permission applied to the new shape,
+not a permission leaked into production (#495).
 
 Once an unmet week is entirely past, `WeekSpans` stops forecasting reps and
 returns seven day-sized diary spans: completed, missed, or inactive before the

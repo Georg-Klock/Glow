@@ -33,7 +33,7 @@ struct MarkFixtureTests {
     }
 
     /// §4.3, "Week start, nothing logged". The remainder-right division, and
-    /// the open mark ending at today.
+    /// the open mark ending at today while another rep follows.
     @Test("Monday, nothing logged: singles first and the slack at the weekend")
     func weekStart() {
         #expect(shape(target: 7, today: 0)
@@ -45,8 +45,9 @@ struct MarkFixtureTests {
         #expect(shape(target: 4, today: 0) == "open:0-0 inactive:1-2 inactive:3-4 inactive:5-6")
         #expect(shape(target: 3, today: 0) == "open:0-0 inactive:1-3 inactive:4-6")
         #expect(shape(target: 2, today: 0) == "open:0-0 inactive:1-6")
-        // Even the final open rep stops at today; the future is not a control.
-        #expect(shape(target: 1, today: 0) == "open:0-0")
+        // The final open rep owns the remaining track, but normal input still
+        // writes today (#495).
+        #expect(shape(target: 1, today: 0) == "open:0-6")
     }
 
     /// §4.3, "Monday logged, still Monday". Today is spent, so no row has an
@@ -83,11 +84,11 @@ struct MarkFixtureTests {
         #expect(shape(target: 2, done: [0, 2], today: 2) == "filled:0-0 filled:1-6")
     }
 
-    /// #476: the last rep still reaches back over blank days, but its open
-    /// drawing stops at today like every other open rep.
-    @Test("The last rep owed stops at today")
+    /// #495: the last rep still reaches back over blank days, then owns the
+    /// remainder of the week because no later rep needs those columns.
+    @Test("The last rep owed reaches the end of the week")
     func oneRepOwedOnSaturday() {
-        #expect(shape(target: 3, done: [0, 1], today: 5) == "filled:0-0 filled:1-1 open:2-5")
+        #expect(shape(target: 3, done: [0, 1], today: 5) == "filled:0-0 filled:1-1 open:2-6")
     }
 
     /// §4.3, "3x, only Monday done, Saturday". Two owed, two days: Saturday and

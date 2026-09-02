@@ -175,7 +175,7 @@ struct CreationCreditTests {
         #expect(open?.actionDay == week.days[2], what)
     }
 
-    @Test("A backfilled week never moves the ring off today")
+    @Test("A backfilled week never moves today's action off today")
     func theRingStaysOnTodayThroughEveryBackfill() {
         // The whole space this suite can reach: every target, every one of the
         // 128 completion patterns, every today, and every creation day up to
@@ -197,21 +197,26 @@ struct CreationCreditTests {
                             "\(target)x, today \(todayColumn), made \(created), done \(done): "
                                 + row.map { "\($0.state.rawValue):\($0.firstDay)-\($0.lastDay)" }
                                     .joined(separator: " "))
-                        // Credit still decides how many rep marks exist. #476
-                        // deliberately leaves future columns blank when the
-                        // open rep is last, and a one-day loss can leave a
-                        // pre-creation day unclaimed, so full-week tiling is no
-                        // longer an invariant of a live row.
+                        // Credit still decides how many rep marks exist. A
+                        // one-day loss can leave a pre-creation day unclaimed,
+                        // so this older credit sweep asserts ordering without
+                        // duplicating the no-credit tiling sweep.
                         #expect(row.count == target, what)
                         for (a, b) in zip(row, row.dropFirst()) {
                             #expect(b.firstDay > a.lastDay, what)
                         }
-                        // Invariant 4, and §4.2.
+                        // Invariant 4 and §4.2: a final ring may own the rest of
+                        // the track, but it still contains and acts on today.
                         let open = row.filter { $0.state == .open }
                         #expect(open.count <= 1, what)
                         guard let mark = open.first else { continue }
                         #expect(mark.firstDay <= todayColumn && todayColumn <= mark.lastDay, what)
-                        #expect(mark.lastDay == todayColumn, what)
+                        if mark.index == row.last?.index {
+                            #expect(mark.lastDay == 6, what)
+                        } else {
+                            #expect(mark.lastDay == todayColumn, what)
+                        }
+                        #expect(mark.actionDay == week.days[todayColumn], what)
                     }
                 }
             }

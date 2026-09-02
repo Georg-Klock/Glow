@@ -111,16 +111,16 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
 /// ends on the day its rep happened, so the mark's left edge carries when.
 ///
 ///  - **A live or met row has exactly `target` marks.** Each is at least one
-///    column wide and their ranges are ordered and contiguous. A final open
-///    mark stops on today, leaving future columns blank; a finished unmet row
-///    instead has seven day-sized diary marks (#476).
+///    column wide and their ranges are ordered and contiguous. A final mark
+///    owns the remainder of the week; a finished unmet row instead has seven
+///    day-sized diary marks (#476, #495).
 ///  - **A completion anchors on the day it was logged**, a lost rep is a
-///    one-day cross on the earliest blank day it could have used, and the open
-///    mark ends on today. Marks still to come divide only the days after today,
-///    **remainder to the right** (#340, #476).
-///  - **A completed final mark ends on the final column.** A met 1x row is one
-///    lit bar. An open final mark is the deliberate exception: it never claims
-///    a future day, even when no future rep follows it (#476).
+///    one-day cross on the earliest blank day it could have used. An open mark
+///    ends on today while reps follow it; those reps divide the days after
+///    today, **remainder to the right** (#340, #476).
+///  - **A completed or open final mark ends on the final column.** A met 1x row
+///    is one lit bar; an unmet 1x row is one open bar. The latter still writes
+///    today on normal surfaces — geometry does not grant future editing (#495).
 ///  - **A completion logged today closes the row.** There is nothing open once
 ///    today is spent, so what follows the completions is arithmetic that
 ///    divides rather than a mark that ends on today.
@@ -499,11 +499,12 @@ enum WeekSpans {
 
     /// The shipping seven-day division settled in #476.
     ///
-    /// An open rep owns every still-claimable day through today and no day
-    /// after it. Future reps divide only the days after today, with shorter
-    /// windows nearest today. When the current day is logged, the open window
-    /// becomes a completion at the same division and those future windows do
-    /// not move; tomorrow's pass redistributes them.
+    /// An open rep owns every still-claimable day through today. While another
+    /// rep follows, it stops there and future reps divide only future days,
+    /// with shorter windows nearest today. When the open rep is final, it owns
+    /// the remainder of the week (#495). Logging today changes that window to
+    /// filled without moving its division; tomorrow's pass redistributes any
+    /// future windows that remain.
     ///
     /// A rep that has run out is no longer a stretched mark ending on the day
     /// the week became unwinnable. It is one cross on the first blank day the
@@ -791,16 +792,16 @@ enum WeekSpans {
     ///    evenly as whole days allow, **remainder to the right** (#340). That
     ///    is the early bias: the near days are single columns and the slack
     ///    collects at the end of the week.
-    ///  - A final mark normally ends on the final column. A caller can keep a
-    ///    final anchored open mark on its anchor so it does not paint future
-    ///    days (#476).
+    ///  - A final filled or open mark ends on the final column. A caller can
+    ///    keep another kind of final anchor on its own day by declining the
+    ///    default extension (#476, #495).
     ///  - A caller can make anchored misses one day wide; the next mark then
     ///    absorbs the range the miss would otherwise have swallowed (#476).
     ///
     /// The result is ordered and non-overlapping, with exactly one span per
-    /// mark and at least one column per span. Except for an intentionally
-    /// truncated final open mark it covers all seven columns. The property
-    /// sweep in `WeekSpansTests` checks those claims rather than trusting them.
+    /// mark and at least one column per span, and it covers all seven columns.
+    /// The property sweep in `WeekSpansTests` checks those claims rather than
+    /// trusting them.
     private static func assignColumns(
         _ marks: some Collection<Mark>,
         lastColumn: Int,
@@ -811,10 +812,10 @@ enum WeekSpans {
         guard !marks.isEmpty else { return [] }
         let count = marks.count
 
-        // Pass one: where every anchored mark ends. A final anchor normally
-        // runs to the end of the week, which makes a met 1x row one lit bar.
-        // The live seven-day path opts out for an open anchor: future days are
-        // left blank instead of being painted as part of today's action.
+        // Pass one: where every anchored mark ends. A final filled or open
+        // anchor runs to the end of the week, which makes a 1x row one settled
+        // or actionable bar. The surface's editing policy still decides which
+        // day that shape can write (#495).
         var ends = [Int?](repeating: nil, count: count)
         var previousEnd = -1
         var previousIndex = -1
@@ -826,11 +827,13 @@ enum WeekSpans {
             // target of 1...7 guarantee.
             let low = previousEnd + (index - previousIndex)
             let high = lastColumn - (count - 1 - index)
-            // A completed final rep owns the remainder of the week. The only
-            // final anchor #476 truncates is an open one: drawing its owned
-            // future columns would make those days look tappable.
+            // A completed or open final rep owns the remainder of the week.
+            // Name both states: a final loss must never inherit this rule just
+            // because the live path declined the general extension (#495).
             let end = index == count - 1
-                && (finalAnchorExtendsToEnd || marks[index].state == .filled)
+                && (finalAnchorExtendsToEnd
+                    || marks[index].state == .filled
+                    || marks[index].state == .open)
                 ? lastColumn
                 : max(low, min(anchor, high))
             ends[index] = end
