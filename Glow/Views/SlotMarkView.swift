@@ -114,6 +114,11 @@ struct SlotMarkView: View {
             sized(socket(size.height * GlowShape.pillHeight, circle: !spansDays))
                 .flattened(flattensSocket || flattensWidgetSockets)
                 .restWindowRemoved(restWindow)
+                // The socket is decorative at every call site. Keep its
+                // composited surface out of hit testing so the control owns
+                // the entire mark, independently of whether this host elects
+                // to rasterize the bevel for scrolling performance (#494).
+                .allowsHitTesting(false)
         }
     }
 

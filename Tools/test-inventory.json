@@ -71,7 +71,8 @@
   ],
   "bundles": {
     "GlowTests": { "minimum": 449 },
-    "GlowRenderTests": { "minimum": 13 }
+    "GlowRenderTests": { "minimum": 13 },
+    "GlowUITests": { "minimum": 1 }
   },
   "release": {
     "appGroup": "group.com.georgklock.glow",

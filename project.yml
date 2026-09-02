@@ -204,6 +204,22 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.georgklock.glow.tests
 
+  # A real process-level touch gate for interactions a hosted accessibility
+  # activation cannot exercise. Keep this target narrow: the unit suites own
+  # logic and rendering; this one owns screen-coordinate delivery through the
+  # shipping app hierarchy (#494).
+  GlowUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: Glow
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.georgklock.glow.uitests
+
   # Renders the widget's real view and diffs it against a committed design
   # export (#6). Its own target rather than more of GlowTests, because
   # GlowTests reaches the *app* module and the widget's view is not in it —
@@ -290,4 +306,6 @@ schemes:
         - name: GlowTests
           parallelizable: false
         - name: GlowRenderTests
+          parallelizable: false
+        - name: GlowUITests
           parallelizable: false
