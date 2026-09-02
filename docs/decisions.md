@@ -7658,3 +7658,19 @@ The unchanged code reproduced the TestFlight failure while still reporting a
 hittable accessibility element; the fix flips the label optimistically. This
 test is intentionally different from `accessibilityActivate()`, which had
 already passed while physical touch was broken.
+
+## 2026-09-01 — A month title is not a weekday header (#493)
+
+The 158pt month design puts its habit name at the same 10pt top inset as Glow,
+then starts the six-row grid at y=32. The implementation started it at y=28:
+`MonthWidgetView` borrowed the 14pt `headerHeight` measured for the week
+widget's compact weekday letters and added the shared 4pt gap. The grid itself
+was the correct 130 × 111; its four surplus points collected below it, making
+both the title and the entire grid read high.
+
+`WidgetMetrics.monthTitleHeight` is a separate 18pt text line box. Together
+with the existing top inset and gap it makes the authored 32pt grid origin.
+`headerHeight` remains 14 and every week capacity, row offset and weekday
+header continues to derive from it. The two render lanes therefore approve a
+move to `month small` only; movement in any week frame would be a regression,
+not collateral to accept.

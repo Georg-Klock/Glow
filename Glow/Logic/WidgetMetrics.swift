@@ -355,6 +355,13 @@ enum WidgetMetrics {
     /// and a slot does not.
     static let headerHeight: CGFloat = 14
 
+    /// The month habit name's line box. It occupies the header position but is
+    /// not the week widget's compact row of weekday letters: the authored
+    /// 158pt month frame places its grid at y=32, four points below the shared
+    /// weekday-header geometry. Keep that distinction explicit so correcting
+    /// the month never moves either week surface (#493).
+    static let monthTitleHeight: CGFloat = headerHeight + 4
+
     /// How far the row block sits below whatever precedes it, so that it is
     /// centred in the height the header leaves (#368).
     ///

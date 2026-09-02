@@ -399,6 +399,12 @@ different layout rather than a smaller one. `WeekWidgetView.familyOverride`
 exists for the same reason the render harness needs it — `widgetFamily` is
 read-only outside WidgetKit and reports medium everywhere else.
 
+The small month uses the same top inset and type size, but its habit name owns
+`WidgetMetrics.monthTitleHeight` rather than borrowing the week widget's
+`headerHeight`. The latter is the compact weekday-letter row. The former is an
+18pt text line box, which puts the month grid at y=32 in the authored 158pt
+frame while leaving every week grid untouched (#493).
+
 **The previews use the production optimistic state with an app-host adapter.**
 WidgetKit owns touch delivery for its archived `Toggle(intent:)`, but the same
 custom `ToggleStyle` receives no automatic press handling in an ordinary
