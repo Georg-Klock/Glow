@@ -7736,6 +7736,19 @@ the forward direction, undo remains an instant correction, and Reduce Motion
 still snaps both paths. Since no view is replaced, those instant paths have no
 intermediate background frame to expose.
 
+## 2026-09-02 — Glow encoding never runs in a view body (#507)
+
+`GlowTile.body` performs only a cache lookup and falls back to flat white while
+an uncached image is prepared. HEIF encoding runs in a detached utility task;
+the main actor only decodes the returned bytes, stores the image and publishes
+it to that tile. Duplicate requests for one intensity share one encoder task.
+
+App launch warms the saved intensity first and then all eight integer slider
+stops. Widget snapshot and timeline providers await their current tile before
+WidgetKit archives the view, preserving HDR without relying on a view task.
+Settings also guards its once-per-second headroom sample, so an unchanged value
+does not invalidate the slider's owning view while a drag is beginning.
+
 ## 2026-09-02 — 1× previews ordinary white and says so in the readout (#506)
 
 The Settings preview keeps the real 120×40 tile across the full glow slider.

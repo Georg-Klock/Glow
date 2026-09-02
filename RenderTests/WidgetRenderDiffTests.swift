@@ -785,6 +785,9 @@ struct WidgetRenderDiffTests {
         defer { GlowSettings.store.set(previous, forKey: GlowSettings.key) }
         GlowSettings.store.set(GlowSettings.range.lowerBound, forKey: GlowSettings.key)
         GlowImageCache.shared.removeAll()
+        GlowImageCache.shared.prepareForSynchronousRendering(
+            peak: GlowSettings.range.lowerBound
+        )
         return try body()
     }
 
@@ -904,6 +907,9 @@ struct WidgetRenderDiffTests {
             // way in and not on the way out, so a lit render following a dark
             // one would otherwise draw the previous family's unlit tiles.
             GlowImageCache.shared.removeAll()
+            GlowImageCache.shared.prepareForSynchronousRendering(
+                peak: GlowSettings.peakHeadroom
+            )
             let image = try renderFamily(view, size: size)
             let lit = try rgba(of: image)
             let dark = try withGlowDown { try rgba(of: try renderFamily(view, size: size)) }

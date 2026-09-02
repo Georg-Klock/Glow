@@ -954,6 +954,13 @@ struct RenderBaselineTests {
         GlowSettings.store.set(GlowSettings.defaultValue, forKey: GlowSettings.key)
         GlowSettings.store.set(0, forKey: WeekPreferences.restDayKey)
         GlowImageCache.shared.removeAll()
+        // Production prepares before a widget snapshot or app interaction.
+        // The synchronous `ImageRenderer` below cannot run a view task, so the
+        // gate uses the explicit test-only equivalent without yielding shared
+        // cache state to another render test (#507).
+        GlowImageCache.shared.prepareForSynchronousRendering(
+            peak: GlowSettings.defaultValue
+        )
 
         var out: [String: RenderSignature] = [:]
         for frame in frames {

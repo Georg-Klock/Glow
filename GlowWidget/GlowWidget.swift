@@ -120,6 +120,11 @@ struct WeekProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: SelectWeekLayoutIntent, in context: Context) async -> WeekEntry {
+        // A widget view cannot rely on a SwiftUI task completing before
+        // WidgetKit archives its still image. Prepare the current tile here,
+        // off the main actor, so #507's body fix keeps the Home Screen's HDR.
+        _ = await GlowImageCache.shared.prepare(peak: GlowSettings.peakHeadroom)
+
         // **The gallery gets the sample, not the store** (#365). Measured in
         // the simulator: this is called with `isPreview` true once per install
         // of the extension, and the render is cached — re-opening the gallery
@@ -188,6 +193,10 @@ struct WeekProvider: AppIntentTimelineProvider {
     func timeline(
         for configuration: SelectWeekLayoutIntent, in context: Context
     ) async -> Timeline<WeekEntry> {
+        // See `snapshot`: the provider is the asynchronous boundary where a
+        // widget's current HDR tile must be ready before its view is archived.
+        _ = await GlowImageCache.shared.prepare(peak: GlowSettings.peakHeadroom)
+
         // One entry, and a refresh at midnight. The open slot is defined as
         // "today", so the day rolling over is the only moment the widget goes
         // stale on its own. Everything else is a write, and writes reload the
