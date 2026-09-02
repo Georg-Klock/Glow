@@ -7793,3 +7793,23 @@ the footprint remain fixed rather than what removes that information.
 `GlowSettings.previewState(peak:lowPower:)` owns the three-state priority as a
 pure rule. The view switches all three outcomes inside `previewContent`, so the
 testable decision and the no-reflow structure stay separate.
+
+## 2026-09-02 — Week widgets correct the past without trusting stale pixels (#508)
+
+Every non-future day drawn by a week widget now carries the same optimistic
+absolute-state `SlotToggle` as today. The Widgets tab hosts those production
+controls through its binding adapter, so it acknowledges immediately too.
+Monthly widgets remain deliberately today-only: a dense month is a history
+overview, not thirty-one small edit targets.
+
+Each archived intent carries both the day it means and the civil day the
+surface believed was today. The operation accepts the request only when the
+surface day still equals real today, the requested day is not in the future,
+and it belongs to that rendered week. A midnight-stale, old-build, corrupt or
+out-of-range control fails closed, clears any pending animation, and reloads;
+it never falls back to today or writes a plausible wrong day.
+
+Weekly spans retain the one fallback action day `WeekSpans` already assigns to
+location-less activation. Daily rows have one control per eligible column.
+Completion bursts are keyed by habit and day, so a past-day tap animates only
+the mark that changed rather than every live control in that row.

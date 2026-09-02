@@ -154,9 +154,11 @@ struct WidgetBurstTests {
         // mattering.
         let id = UUID()
         let started = Date()
-        WidgetBurst.record(habitID: id, at: started, reduceMotion: false)
+        WidgetBurst.record(habitID: id, day: started, at: started, reduceMotion: false)
 
         #expect(WidgetBurst.pending(now: started.addingTimeInterval(0.1))?.habitID == id)
+        #expect(WidgetBurst.pending(now: started.addingTimeInterval(0.1))?.day
+            == DayID(started, calendar: WeekCalendar.calendar))
         // Past the fade and still valid: this is the whole point of the split.
         #expect(WidgetBurst.pending(
             now: started.addingTimeInterval(WidgetBurst.duration + 0.1)
@@ -223,7 +225,7 @@ struct WidgetBurstTests {
         let completed = UUID()
         let other = UUID()
 
-        WidgetBurst.record(habitID: completed, at: Date(), reduceMotion: false)
+        WidgetBurst.record(habitID: completed, day: Date(), at: Date(), reduceMotion: false)
         WidgetBurst.clear(habitID: other)
         #expect(WidgetBurst.pending()?.habitID == completed, "another habit's undo took this note")
 
@@ -237,10 +239,10 @@ struct WidgetBurstTests {
         // `TimelineProvider` is not. The intent that records the note is, so
         // the value is read there and carried — see `WidgetBurst.record`.
         let id = UUID()
-        WidgetBurst.record(habitID: id, at: Date(), reduceMotion: true)
+        WidgetBurst.record(habitID: id, day: Date(), at: Date(), reduceMotion: true)
         #expect(WidgetBurst.reduceMotion)
 
-        WidgetBurst.record(habitID: id, at: Date(), reduceMotion: false)
+        WidgetBurst.record(habitID: id, day: Date(), at: Date(), reduceMotion: false)
         #expect(!WidgetBurst.reduceMotion)
     }
 

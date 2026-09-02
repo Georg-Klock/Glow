@@ -305,6 +305,7 @@ struct WeekProvider: AppIntentTimelineProvider {
                 habits: entry.habits,
                 rowsAreConfigured: entry.rowsAreConfigured,
                 burstHabit: step.progress == nil ? nil : burst.habitID,
+                burstDay: step.progress == nil ? nil : burst.day,
                 progress: step.progress ?? 1
             )
         } + (nextMidnightEntry(after: entry).map { [$0] } ?? [])

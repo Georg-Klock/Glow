@@ -112,7 +112,8 @@ struct MonthWidgetView: View {
                                 MonthCellView(
                                     cell: cells.first { $0.row == row && $0.column == column },
                                     side: side,
-                                    habit: habit
+                                    habit: habit,
+                                    renderedDay: today
                                 )
                             }
                         }
@@ -187,6 +188,7 @@ private struct MonthCellView: View {
     let cell: MonthCell?
     let side: CGFloat
     let habit: HabitSnapshot
+    let renderedDay: Date
 
     var body: some View {
         if let cell {
@@ -203,6 +205,8 @@ private struct MonthCellView: View {
                 SlotToggle(
                     habitID: habit.id,
                     isDone: cell.mark == .doneToday,
+                    day: cell.date,
+                    renderedDay: renderedDay,
                     onLabel: SlotVoice.label(
                         habitName: habit.name, mark: .doneToday, day: cell.date
                     ),
