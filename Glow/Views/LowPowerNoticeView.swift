@@ -141,3 +141,43 @@ struct LowPowerPreviewNotice: View {
         .accessibilityLabel(lowPowerAccessibilityLabel)
     }
 }
+
+
+/// The neutral notice: the glow is off because the slider is at its floor.
+///
+/// Stands in the preview's own place and its own size, the way
+/// `LowPowerPreviewNotice` does. It used to be a separate `Section` below the
+/// preview, which meant turning the glow off pushed every control under it
+/// down the screen and turning it back on pulled them up again — a layout that
+/// moved as a side effect of a setting that is about brightness (#497).
+///
+/// Neutral rather than amber. Low Power is a condition iOS imposed and the
+/// warning colour says so; this is a position the slider was deliberately put
+/// in, and colouring it as a problem would argue with the person who chose it.
+struct GlowOffPreviewNotice: View {
+    /// The preview's own size, passed in rather than repeated here.
+    let size: CGSize
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "info.circle")
+            Text("Glow off")
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .frame(width: size.width, height: size.height)
+        .background { Capsule(style: .continuous).fill(.fill.tertiary) }
+        // Chrome, not a mark: this borrows the system's own separator rather
+        // than reaching into `GlowPalette`. The palette's greys are a
+        // `ShapeStyle` precisely so the environment resolves them — accented
+        // widget rendering and Increase Contrast both change the answer — and
+        // resolving one here against a fresh `EnvironmentValues` would throw
+        // that away to draw a hairline.
+        .overlay { Capsule(style: .continuous).strokeBorder(.separator, lineWidth: 1) }
+        // The sentence the removed section used to carry, kept where it still
+        // reaches someone: a capsule this size cannot hold it, and it is the
+        // reassurance that matters most to a person who cannot see the grid.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Glow off. Today's slot still shows, unlit.")
+    }
+}

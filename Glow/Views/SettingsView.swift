@@ -181,27 +181,6 @@ struct SettingsView: View {
                 // reads as the first section having drifted down the screen.
                 .listSectionSpacing(0)
 
-                // Directly under the thing it explains. It used to sit three
-                // sections down, below the Glow slider and the whole "Say well
-                // done" cluster, so a dark preview was two unrelated controls
-                // away from the one line saying why it is dark.
-                //
-                // **No `.listSectionSpacing(0)` of its own, and #201 asked for
-                // one.** The modifier sets the gap *below* the section it is on,
-                // not above it: the preview's own zero already lands on whatever
-                // follows, so the banner arrives tight against the reserved band
-                // either way. Measured, glow at minimum, both builds — the
-                // banner sits at 418–470pt in both; carrying the modifier only
-                // pulls the Glow section up from 528pt to 510pt, closing the
-                // one gap #201 asked to keep.
-                if peak <= GlowSettings.range.lowerBound {
-                    Section {
-                        Label("Glow off. Today's slot still shows, unlit.", systemImage: "info.circle")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
                 // Glow leads: it is the one control here that is the product
                 // rather than a preference about it.
                 Section {
@@ -396,12 +375,17 @@ struct SettingsView: View {
             .background(Color.black)
     }
 
+    /// Low Power first, because it is the state you cannot leave from here: the
+    /// slider is still whatever you set it to, and saying "glow off" over a
+    /// glow iOS has taken away would blame the wrong thing.
     @ViewBuilder
     private var previewContent: some View {
         if lowPower.isLowPowerMode {
             LowPowerPreviewNotice(size: Self.previewSize) {
                 isShowingLowPowerNotice = true
             }
+        } else if peak <= GlowSettings.range.lowerBound {
+            GlowOffPreviewNotice(size: Self.previewSize)
         } else {
             GlowImageView(size: Self.previewSize)
         }
