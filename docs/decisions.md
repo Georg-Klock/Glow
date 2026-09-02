@@ -7674,3 +7674,26 @@ with the existing top inset and gap it makes the authored 32pt grid origin.
 header continues to derive from it. The two render lanes therefore approve a
 move to `month small` only; movement in any week frame would be a regression,
 not collateral to accept.
+
+## 2026-09-01 — Medium skips only automatic spacer rows (#496)
+
+An unconfigured medium week widget now filters spacer rows before applying its
+measured capacity, so the shipped seed draws Gratitude, Stretch, Read Book and
+Workout instead of spending the fourth slot on an automatic cluster gap. This
+intentionally moves medium widgets already on a Home Screen: those nil/empty
+configurations are the population #188 previously kept unchanged, and changing
+their default content is the requirement here. Large remains a full-height
+reflection of the weekly list and continues to include spacers.
+
+The decision stays pure without learning capacity or family. `WidgetRows`
+accepts only an `automaticSpacers` include/exclude policy; `WeekWidgetView`,
+which alone knows the family and measured frame, supplies it before `prefix`.
+`WeekEntry.rowsAreConfigured` distinguishes a real non-empty selection from an
+automatic layout and travels unchanged through burst and midnight entries. A
+configured medium therefore honours a spacer somebody explicitly chose even
+though its automatic layout excludes them.
+
+With fewer than four real habits, medium shows the real habits that exist and
+stops. An all-spacer automatic list yields no rows. Neither case invents habits,
+converts a spacer into content, nor pushes family or capacity into the pure row
+selection rule.

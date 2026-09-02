@@ -663,11 +663,20 @@ struct WidgetRenderDiffTests {
         // reaching the render, every assertion below would land on the wrong
         // row.
         let all = [beta, spacer, alpha]
-        let rows = WidgetRows.rows(from: all, chosen: [alpha.id, spacer.id, beta.id])
+        let rows = WidgetRows.rows(
+            from: all,
+            chosen: [alpha.id, spacer.id, beta.id],
+            automaticSpacers: .include
+        )
         #expect(rows.map(\.name) == ["Beta", "", "Alpha"])
 
         // Friday, so Monday and Wednesday are both behind it and both readable.
-        let entry = WeekEntry(date: week.days[4], week: week, habits: .loaded(rows))
+        let entry = WeekEntry(
+            date: week.days[4],
+            week: week,
+            habits: .loaded(rows),
+            rowsAreConfigured: true
+        )
 
         try withRestColumn(6, of: week) {
             // Rendered at the bottom of the glow range. It used to be

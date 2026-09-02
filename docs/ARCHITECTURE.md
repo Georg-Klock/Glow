@@ -910,11 +910,15 @@ Which rows it draws is a per-widget choice (#188): `SelectWeekLayoutIntent`,
 `WeekRowEntity` and `WeekRowQuery` in `Glow/Store/WeekWidgetConfig.swift` —
 shared sources, for the reason the month widget's own note below gives. The
 provider reads the store through `WeekWidgetStore` and hands the chosen ids to
-`WidgetRows.rows(from:chosen:)`, which is the decision and lives in `Logic/`.
-An unconfigured widget — nil, and also empty — keeps the app's own order, and
-the view cuts whatever it is given to what its measured frame holds. What the
-system's configuration sheet turned out to offer, and what has not been
-confirmed on hardware, is on `SelectWeekLayoutIntent` and in #191.
+`WidgetRows.rows(from:chosen:automaticSpacers:)`, which is the decision and
+lives in `Logic/`. An unconfigured widget — nil, and also empty — follows the
+view's family policy before the view cuts the eligible order to what its
+measured frame holds: medium excludes automatic spacers, while large includes
+them (#496). A non-empty configured selection always honours a chosen spacer.
+`WeekEntry.rowsAreConfigured` carries that distinction through burst and
+midnight entries. What the system's configuration sheet turned out to offer,
+and what has not been confirmed on hardware, is on `SelectWeekLayoutIntent`
+and in #191.
 
 The Today widget is gone with the kind it drew (#209), and its two kind
 strings — `GlowTodaySmall`, `GlowTodayMedium` — are removed rather than

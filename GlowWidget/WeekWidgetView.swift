@@ -99,12 +99,24 @@ struct WeekWidgetView: View {
             )
             let side = rows.slot
             let track = SlotLayout.trackWidth(dailySlot: side)
+            // A medium widget nobody configured spends its measured capacity
+            // on habits, not the app's automatic cluster gaps (#496). Large
+            // keeps those gaps, and a configured medium keeps a spacer the
+            // person explicitly selected. The pure policy stays frame-free;
+            // only this view knows both the family and the measured cut.
+            let automaticSpacers: WidgetRows.AutomaticSpacers =
+                family == .systemMedium && !entry.rowsAreConfigured ? .exclude : .include
+            let eligible = WidgetRows.rows(
+                from: habits,
+                chosen: nil,
+                automaticSpacers: automaticSpacers
+            )
             // As many as fit, then a hard cut. A row spent saying how much
             // is missing is a row not showing a habit (docs/vision.md).
             // The app marks the boundary in its own grid, which is where
             // there is room to say it.
             let capacity = rows.capacity
-            let shown = Array(habits.prefix(capacity))
+            let shown = Array(eligible.prefix(capacity))
             // **The widget's one read of the rest day** (#181). A widget
             // renders out of process from an archived surface, so there is
             // no `@AppStorage` to observe and nothing to observe it for:
@@ -117,7 +129,7 @@ struct WeekWidgetView: View {
             let restIndex = entry.week.days.firstIndex(where: {
                 WeekPreferences.isRestDay($0, restDay: restDay)
             })
-            let cut = RestCut.rows(habits, capacity: capacity)
+            let cut = RestCut.rows(eligible, capacity: capacity)
 
             VStack(alignment: .leading, spacing: WidgetMetrics.rowGap) {
                 if showsHeader {
@@ -128,7 +140,7 @@ struct WeekWidgetView: View {
                         labelWidth: labelWidth,
                         labelGap: labelGap,
                         anyOpen: TypeTier.anyOpen(
-                            in: habits, week: entry.week, today: entry.date, restDay: restDay
+                            in: eligible, week: entry.week, today: entry.date, restDay: restDay
                         )
                     )
                     // The header stands further from the first row than the

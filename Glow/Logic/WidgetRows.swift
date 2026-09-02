@@ -19,16 +19,23 @@ import Foundation
 /// its own `proxy.size` and applies `WidgetMetrics.rowCapacity` to it. A
 /// capacity computed here would have to guess the family's point size, which
 /// differs by phone — right on the 6.1" the design is authored for and wrong on
-/// every other one. So this returns the whole chosen order and the view cuts
-/// it, which is the same hard cut an unconfigured widget has always made.
+/// every other one. The view supplies only the family's spacer policy; this
+/// returns the whole eligible order and the view cuts it (#496).
 enum WidgetRows {
+    /// Whether an automatic, unconfigured layout includes the app's spacer
+    /// rows. A configured selection always honours a spacer that was chosen.
+    enum AutomaticSpacers {
+        case include
+        case exclude
+    }
+
     /// The rows to draw, given the app's own order and a widget's own choice.
     ///
     /// `chosen` is the configured selection — `SelectWeekLayoutIntent.rows`
-    /// mapped to ids. Nil or empty is a widget nobody has configured, and it
-    /// keeps the whole of the app's list: that is the requirement, because
-    /// every widget already on a home screen arrives here with nil the first
-    /// time this ships and must not move under anyone.
+    /// mapped to ids. Nil or empty is a widget nobody has configured. Its
+    /// family supplies `automaticSpacers`: large keeps the whole app list,
+    /// while medium skips blank rows before the view applies its measured cut
+    /// (#496).
     ///
     /// **The order is the app's, and the choice is only which** — which is a
     /// decision rather than a limitation, because the array does arrive
@@ -68,11 +75,20 @@ enum WidgetRows {
     ///   each row once — but the filter is written as a set membership test
     ///   rather than relying on that.
     ///
-    /// Spacers need no special case at either end. A blank row is a `Habit`
-    /// with `isSpacer` and its own stable `id`, so it is chosen and dropped by
-    /// exactly the same rules as a habit.
-    static func rows(from all: [HabitSnapshot], chosen: [UUID]?) -> [HabitSnapshot] {
-        guard let chosen, !chosen.isEmpty else { return all }
+    /// A configured spacer needs no special case: it is a `Habit` with
+    /// `isSpacer` and its own stable `id`, so a selection honours it exactly
+    /// like a habit. The policy applies only to the automatic nil/empty path.
+    static func rows(
+        from all: [HabitSnapshot],
+        chosen: [UUID]?,
+        automaticSpacers: AutomaticSpacers
+    ) -> [HabitSnapshot] {
+        guard let chosen, !chosen.isEmpty else {
+            switch automaticSpacers {
+            case .include: return all
+            case .exclude: return all.filter { !$0.isSpacer }
+            }
+        }
         // Walking `all` rather than `chosen` is the whole of it: the result is
         // in the app's order by construction, and an id the store no longer
         // holds cannot appear because it was never walked.

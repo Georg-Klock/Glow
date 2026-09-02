@@ -868,7 +868,12 @@ struct RenderBaselineTests {
             return WeekEntry(
                 date: base.date,
                 week: base.week,
-                habits: .loaded(WidgetRows.rows(from: all, chosen: chosen))
+                habits: .loaded(WidgetRows.rows(
+                    from: all,
+                    chosen: chosen,
+                    automaticSpacers: .include
+                )),
+                rowsAreConfigured: true
             )
         }
 
