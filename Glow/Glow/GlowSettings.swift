@@ -64,6 +64,10 @@ enum GlowSettings {
     /// about.
     static let range: ClosedRange<Double> = 1...8
 
+    /// Every value the integer-stepped Settings slider can reach. Kept beside
+    /// the range so launch warming cannot silently miss a newly added stop.
+    static let sliderStops = (Int(range.lowerBound)...Int(range.upperBound)).map(Double.init)
+
     /// 2x on an 8x ceiling: the glow opens at a quarter strength, on purpose.
     ///
     /// This reverses the rule the default used to carry — "the glow is the

@@ -665,7 +665,8 @@ struct SettingsView: View {
     @MainActor
     private func refreshHeadroomWhileVisible() async {
         while !Task.isCancelled {
-            headroom = .mainScreen
+            let sampled = EDRHeadroomSnapshot.mainScreen
+            if sampled != headroom { headroom = sampled }
             do {
                 try await Task.sleep(for: .seconds(1))
             } catch {

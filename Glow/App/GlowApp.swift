@@ -43,6 +43,17 @@ struct GlowApp: App {
         // wipes on creation, and this is over before any test writes a key.
         WeekPreferences.retireRestDay()
 
+        // Initialise the HEIF codec away from the main actor before Settings
+        // can receive its first touch, then fill every integer slider stop
+        // (#507). The saved value goes first; if it is an integer, the later
+        // duplicate is a dictionary hit. A test host does not draw and should
+        // not launch background image work while its suites are starting.
+        if !GlowSettings.isRunningTests {
+            GlowImageCache.shared.prewarm(
+                peaks: [GlowSettings.peakHeadroom] + GlowSettings.sliderStops
+            )
+        }
+
         // A unit-test host opens nothing and draws nothing. A UI test is a
         // different process: it must launch the real interface and drive a
         // screen-coordinate touch, but it must not inherit or mutate whatever
