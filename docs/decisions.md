@@ -7813,3 +7813,18 @@ Weekly spans retain the one fallback action day `WeekSpans` already assigns to
 location-less activation. Daily rows have one control per eligible column.
 Completion bursts are keyed by habit and day, so a past-day tap animates only
 the mark that changed rather than every live control in that row.
+
+## 2026-09-02 — Pixel tests render the widget style without archiving intents (#513)
+
+The installed week widget keeps one AppIntent-backed toggle for every
+interactive nonfuture day. Pixel tests do not: `ImageRenderer` is not
+WidgetKit, and on iOS 18 flattening that expanded archived-control graph ran
+past CI's one-hour ceiling after all 708 logic tests had already passed.
+
+The render harness now selects `SlotToggle`'s ordinary app-hosted adapter with
+a no-op action. That adapter and the installed widget both render the same
+`SlotMarkToggleStyle`, so the committed signatures and pixel assertions still
+cover the shipping faces. No test delivers a tap through the no-op adapter;
+production AppIntent construction and in-app delivery remain covered by their
+source, operation and physical-touch gates. The choice is confined to the
+three `ImageRenderer` entry points and does not change app or widget behavior.

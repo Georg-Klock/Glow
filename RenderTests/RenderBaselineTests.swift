@@ -927,6 +927,7 @@ struct RenderBaselineTests {
             .frame(width: frame.size.width, height: frame.size.height)
             .background { GlowPalette.widgetSurface }
             .environment(\.colorScheme, .dark)
+            .widgetPixelHarness()
         let renderer = ImageRenderer(content: framed)
         renderer.scale = scale
         renderer.proposedSize = ProposedViewSize(frame.size)
