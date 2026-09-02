@@ -7736,6 +7736,19 @@ the forward direction, undo remains an instant correction, and Reduce Motion
 still snaps both paths. Since no view is replaced, those instant paths have no
 intermediate background frame to expose.
 
+## 2026-09-02 — 1× previews ordinary white and says so in the readout (#506)
+
+The Settings preview keeps the real 120×40 tile across the full glow slider.
+At 1× that tile is ordinary SDR white; the inert bordered `ⓘ Glow off` capsule
+is removed. Low Power Mode remains the only preview replacement and keeps its
+real explanation sheet.
+
+The fixed readout row—not an extra row—turns amber at 1× and reads “Glow off —
+white looks like ordinary white.” It omits the screen's unused EDR capacity and
+carries the former capsule's fuller VoiceOver reassurance. Above 1×, the grey
+aim and live/maximum headroom sentence is unchanged. Neither transition changes
+the section's footprint.
+
 ## 2026-09-02 — Short months centre one fixed-pitch row block (#505)
 
 The small month widget keeps its 16pt cells on a 19pt pitch. Four- and five-row

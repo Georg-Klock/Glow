@@ -9,14 +9,36 @@ enum GlowSettings {
     /// Which one object occupies Settings' fixed preview footprint.
     enum PreviewState: Equatable {
         case glow
-        case off
         case lowPower
     }
 
-    static func previewState(peak: Double, lowPower: Bool) -> PreviewState {
-        if lowPower { return .lowPower }
-        if peak <= range.lowerBound { return .off }
-        return .glow
+    static func previewState(lowPower: Bool) -> PreviewState {
+        lowPower ? .lowPower : .glow
+    }
+
+    struct Readout: Equatable {
+        let text: String
+        let isWarning: Bool
+        let accessibilityLabel: String
+    }
+
+    /// One fixed-height status row beneath the slider (#506).
+    ///
+    /// At the floor, screen headroom is deliberately absent: it describes
+    /// capacity the glow is not asking for and made ordinary white sound lit.
+    /// VoiceOver keeps the fuller reassurance that used to live on the inert
+    /// preview capsule. Above the floor, the established headroom sentence is
+    /// unchanged.
+    static func readout(peak: Double, headroomSummary: String) -> Readout {
+        guard peak > range.lowerBound else {
+            return Readout(
+                text: "Glow off — white looks like ordinary white.",
+                isWarning: true,
+                accessibilityLabel: "Glow off. Today's slot still shows, unlit."
+            )
+        }
+        let text = String(format: "Aiming for %.0f×", peak) + " — " + headroomSummary
+        return Readout(text: text, isWarning: false, accessibilityLabel: text)
     }
 
     static let key = "glowPeakHeadroom"
