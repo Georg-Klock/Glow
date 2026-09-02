@@ -117,24 +117,33 @@ struct EmptyStateAccessibilityTests {
     }
 
     /// The Widgets tab used to hide each production widget view wholesale.
-    /// Hosting the real page proves the `SlotToggle` labels and action hints
-    /// now reach UIKit's accessibility tree in all three cards (#465).
+    /// Hosting and scrolling the real lazy page proves the `SlotToggle` labels
+    /// and action hints reach UIKit's accessibility tree in all three cards
+    /// when each card is on screen (#465, #478).
     @Test func widgetPreviewsExposeTheirProductionControls() throws {
         let screen = try WidgetScreen()
         defer { screen.tearDown() }
 
-        let elements = screen.contentElements()
-        let controls = elements.filter {
+        let initialElements = screen.contentElements()
+        let wideControls = initialElements.filter {
             ($0.accessibilityLabel ?? "").hasPrefix("Preview Habit,")
                 && $0.accessibilityHint == "Mark as done"
         }
         #expect(
-            controls.count >= 3,
+            wideControls.count >= 2,
             """
-            expected Large, Medium and Month controls; found \(controls.count). Tree: \
-            \(elements.map { "\($0.accessibilityLabel ?? "<nil>") | \($0.accessibilityHint ?? "<nil>")" })
+            expected Large and Medium controls; found \(wideControls.count). Tree: \
+            \(initialElements.map { "\($0.accessibilityLabel ?? "<nil>") | \($0.accessibilityHint ?? "<nil>")" })
             """
         )
+
+        screen.scrollToBottom()
+        let monthElements = screen.contentElements()
+        #expect(monthElements.contains { $0.accessibilityLabel == "Monthly View per Habit" })
+        #expect(monthElements.contains {
+            ($0.accessibilityLabel ?? "").hasPrefix("Preview Habit,")
+                && $0.accessibilityHint == "Mark as done"
+        })
     }
 
     /// #465 proved that the controls were present; #477 closes the gap between
@@ -153,14 +162,20 @@ struct EmptyStateAccessibilityTests {
         await screen.settleAfterAction()
 
         #expect(try screen.persistedIsDone())
-        let doneControls = screen.contentElements().filter {
+        let doneWideControls = screen.contentElements().filter {
             ($0.accessibilityLabel ?? "").hasPrefix("Preview Habit,")
                 && $0.accessibilityHint == "Mark as not done"
         }
-        #expect(doneControls.count >= 3, "every preview must reconcile after the write")
+        #expect(doneWideControls.count >= 2, "both visible week previews must reconcile")
 
-        let doneControl = try #require(doneControls.first)
-        #expect(doneControl.accessibilityActivate())
+        screen.scrollToBottom()
+        let monthElements = screen.contentElements()
+        #expect(monthElements.contains { $0.accessibilityLabel == "Monthly View per Habit" })
+        let doneMonthControl = try #require(monthElements.first {
+            ($0.accessibilityLabel ?? "").hasPrefix("Preview Habit,")
+                && $0.accessibilityHint == "Mark as not done"
+        })
+        #expect(doneMonthControl.accessibilityActivate())
         await screen.settleAfterAction()
         #expect(try screen.persistedIsDone() == false)
     }
@@ -378,6 +393,13 @@ struct EmptyStateAccessibilityTests {
             host.view.layoutIfNeeded()
         }
 
+        func scrollToBottom() {
+            guard let scroll = Self.findScrollView(in: host.view) else { return }
+            let bottom = max(0, scroll.contentSize.height - scroll.bounds.height)
+            scroll.setContentOffset(CGPoint(x: 0, y: bottom), animated: false)
+            settle()
+        }
+
         func persistedIsDone() throws -> Bool {
             let context = ModelContext(container)
             let id = habitID
@@ -429,6 +451,14 @@ struct EmptyStateAccessibilityTests {
                     walk(subview, into: &found, seen: &seen, depth: depth + 1)
                 }
             }
+        }
+
+        private static func findScrollView(in view: UIView) -> UIScrollView? {
+            if let scroll = view as? UIScrollView { return scroll }
+            for child in view.subviews {
+                if let found = findScrollView(in: child) { return found }
+            }
+            return nil
         }
     }
 }

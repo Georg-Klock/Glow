@@ -274,6 +274,7 @@ struct HabitStore {
             context.rollback()
             throw error
         }
+        NotificationCenter.default.post(name: StoreChange.committed, object: nil)
         WidgetRefresh.invalidate()
     }
 

@@ -76,6 +76,11 @@ struct WidgetsView: View {
     /// scrolling screen, not a substitute view, can join the pixel gate with a
     /// stable calendar input (#386).
     private let pinnedToday: Date?
+    /// A hosted-test observation seam for the lazy catalog. Production leaves
+    /// it empty; measuring `onAppear` proves which shipping previews SwiftUI
+    /// actually realised before and after a scroll without replacing the view
+    /// with a test double (#478).
+    private let previewDidAppear: (WidgetCard.ID) -> Void
     @State private var today: Date
 
     /// An AppIntent writes through a peer SwiftData container, so `@Query`
@@ -84,6 +89,13 @@ struct WidgetsView: View {
     /// take fresh bounded snapshots and reconcile their optimistic marks.
     @State private var intentRevision = 0
 
+    /// The shared week/month projection is retained across ordinary SwiftUI
+    /// redraws. A successful write advances this revision from the one commit
+    /// boundary; a peer-intent verdict still advances `intentRevision` above
+    /// to reconcile its optimistic face without manufacturing another fetch.
+    @State private var storeRevision = 0
+    @State private var projectionCache = WidgetPreviewProjectionCache()
+
     /// The week's first day, observed — the previews are widgets, and a widget
     /// draws seven columns from this. Read here for the same reason
     /// `WeeklyGridView` reads it: a value read only inside `WeekCalendar` is a
@@ -91,9 +103,13 @@ struct WidgetsView: View {
     @AppStorage(WeekPreferences.firstWeekdayKey, store: GlowSettings.store)
     private var firstWeekday: Int = WeekPreferences.defaultFirstWeekday
 
-    init(today: Date? = nil) {
+    init(
+        today: Date? = nil,
+        previewDidAppear: @escaping (WidgetCard.ID) -> Void = { _ in }
+    ) {
         let initialToday = WeekCalendar.day(today ?? WeekCalendar.today())
         pinnedToday = today == nil ? nil : initialToday
+        self.previewDidAppear = previewDidAppear
         _today = State(initialValue: initialToday)
     }
 
@@ -115,6 +131,16 @@ struct WidgetsView: View {
                 // its track once and hands it to every row. The previews scale
                 // to whatever is left after the page's own margins.
                 let width = max(0, proxy.size.width - Self.margin * 2)
+                // Reading the intent-only revision keeps stale/refused intent
+                // verdicts a redraw signal. The projection key deliberately
+                // excludes it: only a committed write changes stored history.
+                let _ = intentRevision
+                let projection = projectionCache.projection(
+                    habits: habits,
+                    today: today,
+                    firstWeekday: firstWeekday,
+                    storeRevision: storeRevision
+                )
                 ScrollView {
                     // **Two stacks, and the outer one has no spacing** (#439).
                     // `DebugTodayBanner` draws nothing while the override is
@@ -132,10 +158,10 @@ struct WidgetsView: View {
                         // drawn half-dimmed. Its horizontal margin is the
                         // stack's, so it is passed nothing of its own.
                         DebugTodayBanner(horizontalPadding: 0)
-                        VStack(alignment: .leading, spacing: 32) {
+                        LazyVStack(alignment: .leading, spacing: 32) {
                             instructions
                             ForEach(groups) { group in
-                                card(group, width: width)
+                                card(group, width: width, projection: projection)
                             }
                         }
                     }
@@ -180,6 +206,12 @@ struct WidgetsView: View {
         // finished, whether it saved, was delivered twice, or was refused.
         .onReceive(NotificationCenter.default.publisher(for: StoreChange.fromIntent)) { _ in
             intentRevision &+= 1
+        }
+        // Unlike the historically intent-named signal above, this comes from
+        // the store's save boundary and covers marks made on This Week too.
+        // It is the complete invalidation contract a retained projection needs.
+        .onReceive(NotificationCenter.default.publisher(for: StoreChange.committed)) { _ in
+            storeRevision &+= 1
         }
         // **And once on the way in, which the notification cannot cover.**
         // `onReceive` subscribes when this view appears, and this tab may never
@@ -237,7 +269,11 @@ struct WidgetsView: View {
     /// showing, not several widgets (#237). The one paragraph left on the page
     /// is `instructions`, which describes a long-press no preview can
     /// demonstrate.
-    private func card(_ group: WidgetCardGroup, width: CGFloat) -> some View {
+    private func card(
+        _ group: WidgetCardGroup,
+        width: CGFloat,
+        projection: WidgetPreviewProjection
+    ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(group.placement.cardName)
                 .font(.headline)
@@ -257,11 +293,11 @@ struct WidgetsView: View {
                 // one before the settled width arrives.
                 ? max(0, (width - Self.gutter * CGFloat(perRow - 1)) / CGFloat(perRow))
                 : width
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(Array(group.rows.enumerated()), id: \.offset) { _, row in
+            LazyVStack(alignment: .leading, spacing: 12) {
+                ForEach(group.rows, id: \.self) { row in
                     HStack(alignment: .top, spacing: Self.gutter) {
                         ForEach(row) { card in
-                            preview(card, width: cardWidth)
+                            preview(card, width: cardWidth, projection: projection)
                         }
                     }
                 }
@@ -283,10 +319,14 @@ struct WidgetsView: View {
     /// gets the same AppIntent-backed optimistic frame, idempotent write and
     /// today-only scope as the Home Screen widget. The transforms around them
     /// change size, not behaviour or accessibility.
-    private func preview(_ card: WidgetCard, width: CGFloat) -> some View {
+    private func preview(
+        _ card: WidgetCard,
+        width: CGFloat,
+        projection: WidgetPreviewProjection
+    ) -> some View {
         let size = WidgetMetrics.size(of: card.placement.family)
         let scale = size.width > 0 ? min(1, width / size.width) : 1
-        return content(for: card)
+        return content(for: card, projection: projection)
             // The production mark remains one `SlotToggle`, but an ordinary
             // app view needs a binding-backed delivery adapter where WidgetKit
             // supplies an AppIntent adapter. Both call the same absolute-state
@@ -347,6 +387,7 @@ struct WidgetsView: View {
             // is actually drawn — `scaleEffect` alone changes nothing about the
             // space the view takes.
             .frame(width: size.width * scale, height: size.height * scale)
+            .onAppear { previewDidAppear(card.id) }
     }
 
     /// The space between two widgets sitting side by side, from the sizes
@@ -361,59 +402,23 @@ struct WidgetsView: View {
     private static let corner: CGFloat = 30
 
     @ViewBuilder
-    private func content(for card: WidgetCard) -> some View {
+    private func content(
+        for card: WidgetCard,
+        projection: WidgetPreviewProjection
+    ) -> some View {
         // Content follows the family since #322, exactly as the one kind's
         // provider decides it: small is a habit's month, the rest the week.
         if card.placement.family == .systemSmall {
-            MonthWidgetView(entry: monthEntry(for: card.habitID))
+            MonthWidgetView(entry: projection.monthEntry(for: card.habitID))
         } else {
             // `familyOverride` because `widgetFamily` is read-only outside
             // WidgetKit — a `WeekWidgetView` rendered anywhere else reports
             // medium and silently drops the header. The render harness needs
             // the same door.
-            WeekWidgetView(entry: weekEntry, familyOverride: card.placement.family)
+            WeekWidgetView(
+                entry: projection.weekEntry,
+                familyOverride: card.placement.family
+            )
         }
-    }
-
-    /// The week the week widget would draw, from the app's own live query
-    /// rather than from a second read-only container.
-    private var weekEntry: WeekEntry {
-        _ = intentRevision
-        let week = WeekCalendar.week(containing: today)
-        return WeekEntry(
-            date: today,
-            week: week,
-            // Bounded to the week it draws, exactly as the provider bounds it
-            // (#135). This preview reads the app's own live query, which is a
-            // read that already succeeded — so the entry is loaded or empty,
-            // never unavailable, and `StoreRead(read:)` makes that mapping the
-            // same one the provider makes (#282).
-            habits: StoreRead(read: Habit.snapshots(of: habits, within: week.dayIDs()))
-        )
-    }
-
-    /// The month the month widget would draw for one of the person's habits.
-    ///
-    /// **Several of these, one per habit** (#237). The month widget asks which
-    /// habit as it is placed (the unified intent's `habit` parameter, #322),
-    /// so a single preview
-    /// illustrates one arbitrary answer to a question the page is trying to
-    /// show you being asked. `WidgetCatalog` decides how many and which;
-    /// `MonthStore.offered` decides what is eligible, so the previews and the
-    /// picker cannot disagree.
-    ///
-    /// `nil` means "whatever an unconfigured widget would show", which is the
-    /// first offered habit — the widget's own rule — and, when there are no
-    /// weekly habits at all, nothing. Then `MonthWidgetView` draws its own
-    /// empty state, which is the honest preview of what adding the widget
-    /// today would get you.
-    private func monthEntry(for habitID: UUID?) -> MonthEntry {
-        _ = intentRevision
-        let offered = previewHabits
-        let chosen = habitID.map { id in offered.first { $0.id == id } } ?? offered.first
-        guard let chosen, let days = MonthGrid.dayRange(containing: today),
-              let snapshot = Habit.snapshots(of: [chosen], within: days).first
-        else { return MonthEntry(date: today, habit: .empty) }
-        return MonthEntry(date: today, habit: .loaded(snapshot))
     }
 }
