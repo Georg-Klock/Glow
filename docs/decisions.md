@@ -7716,3 +7716,22 @@ With fewer than four real habits, medium shows the real habits that exist and
 stops. An all-spacer automatic list yields no rows. Neither case invents habits,
 converts a spacer into content, nor pushes family or capacity into the pure row
 selection rule.
+## 2026-09-01 — A touched span never changes identity (#498)
+
+`SpanView` can animate an open mark closing only while SwiftUI keeps the same
+view alive across `.open` to `.filled`. Its identity therefore remains the
+range-only `SlotSpan.Division`: adding state to the ID would replace even a
+stable shape and prevent the existing close animation from starting.
+
+#495 makes the final open mark own the same remainder it will own when filled.
+That removes the last production path where meeting the goal changed the
+touched range and briefly exposed bare background. An exhaustive regression
+sweep now checks every target, every weekday and every completion subset. For
+each real open action, the same Division must exist filled after completion;
+the same pair read backward covers undo. A future arithmetic change that moves
+the touched range therefore fails CI instead of silently restoring the blink.
+
+No motion policy changes with this guarantee. Completing still closes only in
+the forward direction, undo remains an instant correction, and Reduce Motion
+still snaps both paths. Since no view is replaced, those instant paths have no
+intermediate background frame to expose.

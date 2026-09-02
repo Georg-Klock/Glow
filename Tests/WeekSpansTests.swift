@@ -1262,6 +1262,44 @@ struct SpanIdentityTests {
         )
     }
 
+    @Test("Every touched span keeps its division through completion and undo")
+    func everyTouchedSpanKeepsIdentity() {
+        var checkedTransitions = 0
+
+        // Sweep every target, weekday and completion subset. A configuration
+        // participates only when today owns an open action: adding today is
+        // then the exact production completion, and reading the same pair in
+        // reverse is its undo. Keeping the Division across both directions is
+        // what lets SpanView change state in place instead of disappearing for
+        // one background-only frame (#498).
+        for target in 1...7 {
+            for todayColumn in 0...6 {
+                for mask in 0..<(1 << 7) where mask & (1 << todayColumn) == 0 {
+                    let done = (0...6).filter { mask & (1 << $0) != 0 }
+                    let before = row(target: target, done: done, todayColumn: todayColumn)
+                    guard let touched = before.first(where: {
+                        $0.state == .open && $0.actionDay == day(todayColumn)
+                    }) else { continue }
+
+                    let after = row(
+                        target: target,
+                        done: done + [todayColumn],
+                        todayColumn: todayColumn
+                    )
+                    let settled = after.first(where: { $0.id == touched.id })
+                    let what = "\(target)x, today \(todayColumn), done \(done): "
+                        + "\(shape(before)) -> \(shape(after))"
+
+                    #expect(settled?.state == .filled, "identity changed — \(what)")
+                    #expect(settled?.actionDay == day(todayColumn), "wrong undo day — \(what)")
+                    checkedTransitions += 1
+                }
+            }
+        }
+
+        #expect(checkedTransitions > 0, "the sweep found no tappable open spans")
+    }
+
     @Test("A span that is redivided is a different span")
     func redivisionChangesIdentity() {
         // Same Wednesday, today already logged, and now Monday is logged too —
