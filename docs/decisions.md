@@ -8179,3 +8179,30 @@ accessibility and future platform behavior for a decoration that disappears
 the instant the finger lifts. The physical regression therefore proves that
 native reordering still works after the swipe-bound adjustment rather than
 pretending an ancestor mask can constrain the proxy.
+
+## 2026-09-03 — WidgetKit owns device frame truth; design metrics stay design metrics (#544)
+
+The `158 × 158`, `338 × 158` and `338 × 354` frames are the design file's
+coordinate system, not universal WidgetKit sizes. A placed Small and Medium on
+the iPhone 17e simulator measured `162 × 162` and `342 × 162`; existing traces
+already name still different Medium/Large frames on other phones. Replacing
+the constants with the 17e values would make one device exact by making the
+reference stale on every other one, including any differing 14 Pro result.
+
+The exact public answer exists only inside the extension:
+`TimelineProviderContext.displaySize`. `WeekProvider` now records it per family
+at all three provider boundaries—placeholder, snapshot and timeline—in the App
+Group. `WidgetsView` snapshots those values when built and whenever the app
+becomes active, lays each shipping view out at the recorded frame, then applies
+its existing fit scale. Two Small previews use the measured Small-to-Medium
+gutter only when both frames were observed; mixing a measured number with a
+fallback would manufacture a spacing WidgetKit never reported.
+
+Before WidgetKit has rendered a family there can be no exact public answer, so
+the authored frame remains the explicit fallback. It is not extrapolated from
+screen width or a device-name table. Render baselines deliberately do not move:
+they continue to pin the design coordinate system. Nor does
+`largeRowCapacity`: the design promises ten rows, and the runtime
+`WidgetMetrics.rowLayout` already adapts the slot to the actual frame so every
+measured Large frame keeps that promise. This separates design intent from
+environmental measurement instead of letting either masquerade as the other.

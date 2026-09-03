@@ -26,8 +26,11 @@ import WidgetKit
 ///
 /// **The previews are the shipping views.** `WeekWidgetView` and
 /// `MonthWidgetView` are compiled into the app as well as into the extension,
-/// laid out at the point size the family really gets and then scaled down to
-/// fit — so what is on this page cannot drift from what is on the Home Screen.
+/// laid out at the point size WidgetKit recorded for this family on this
+/// device and then scaled down to fit — so what is on this page cannot drift
+/// from what is on the Home Screen. Before WidgetKit has rendered a family,
+/// the authored design frame is the explicit fallback rather than a guessed
+/// device table.
 /// The slot size falls out of the track width, so drawing them at a
 /// convenient width instead would have been a different layout, not a smaller
 /// one.
@@ -97,6 +100,13 @@ struct WidgetsView: View {
     @State private var storeRevision = 0
     @State private var projectionCache = WidgetPreviewProjectionCache()
 
+    /// WidgetKit's last exact frame for each family on this device. The
+    /// extension writes these App Group values at its provider boundary; this
+    /// view refreshes them when it is built and whenever the app becomes
+    /// active. `WidgetMetrics` remains the authored fallback, not a claim that
+    /// every device gets the same Home Screen frame (#544).
+    @State private var widgetDisplaySizes: WidgetDisplaySize.Snapshot
+
     /// The week's first day, observed — the previews are widgets, and a widget
     /// draws seven columns from this. Read here for the same reason
     /// `WeeklyGridView` reads it: a value read only inside `WeekCalendar` is a
@@ -112,6 +122,7 @@ struct WidgetsView: View {
         pinnedToday = today == nil ? nil : initialToday
         self.previewDidAppear = previewDidAppear
         _today = State(initialValue: initialToday)
+        _widgetDisplaySizes = State(initialValue: WidgetDisplaySize.snapshot())
     }
 
     /// The habits a per-habit preview can be drawn against, in the person's
@@ -186,10 +197,10 @@ struct WidgetsView: View {
         // nothing here is running. Same trigger `WeeklyGridView` uses.
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
-            refreshToday()
+            refreshEnvironment()
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
-            refreshToday()
+            refreshEnvironment()
         }
         // And the debug override, which is a defaults key in the App Group
         // rather than a scalar `@AppStorage` can bind to (#204). Settings is a
@@ -200,7 +211,7 @@ struct WidgetsView: View {
         .onReceive(
             NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
         ) { _ in
-            refreshToday()
+            refreshEnvironment()
         }
         // The preview's `SlotToggle` acknowledges immediately. This signal is
         // the second half: re-read the shared store when the same intent has
@@ -222,15 +233,17 @@ struct WidgetsView: View {
         // while the previews underneath it still drew Saturday's open ring.
         // `DebugTodayBanner` carries the same pair for the same reason, and
         // says so in its own note.
-        .task { refreshToday() }
+        .task { refreshEnvironment() }
     }
 
-    /// Re-reads the day the previews are drawn for, from the one place the app
-    /// decides it. Assigning unconditionally would redraw four lit previews on
-    /// every defaults change in the App Group, most of which are not this.
-    private func refreshToday() {
+    /// Re-reads both environmental inputs the extension can change while this
+    /// tab is alive. Assigning only on change avoids redrawing every lit
+    /// preview for unrelated App Group writes.
+    private func refreshEnvironment() {
         let current = pinnedToday ?? WeekCalendar.today()
         if current != today { today = current }
+        let sizes = WidgetDisplaySize.snapshot()
+        if sizes != widgetDisplaySizes { widgetDisplaySizes = sizes }
     }
 
     /// The page's side margin. Wider than a list's, because the previews are
@@ -287,16 +300,19 @@ struct WidgetsView: View {
             // Smalls in it are placed, so two previews here sit as far apart
             // as two widgets do.
             let perRow = WidgetMetrics.perRow(group.placement.family)
+            let gutter = group.placement.family == .systemSmall
+                ? widgetDisplaySizes.smallGutter
+                : Self.designGutter
             let cardWidth = perRow > 1
                 // A `GeometryReader` can briefly propose zero while the
                 // hosted screen is entering the hierarchy. A negative frame
                 // is never a meaningful preview size, and SwiftUI diagnoses
                 // one before the settled width arrives.
-                ? max(0, (width - Self.gutter * CGFloat(perRow - 1)) / CGFloat(perRow))
+                ? max(0, (width - gutter * CGFloat(perRow - 1)) / CGFloat(perRow))
                 : width
             LazyVStack(alignment: .leading, spacing: 12) {
                 ForEach(group.rows, id: \.self) { row in
-                    HStack(alignment: .top, spacing: Self.gutter) {
+                    HStack(alignment: .top, spacing: gutter) {
                         ForEach(row) { card in
                             preview(card, width: cardWidth, projection: projection)
                         }
@@ -325,7 +341,7 @@ struct WidgetsView: View {
         width: CGFloat,
         projection: WidgetPreviewProjection
     ) -> some View {
-        let size = WidgetMetrics.size(of: card.placement.family)
+        let size = widgetDisplaySizes.referenceSize(of: card.placement.family)
         let scale = size.width > 0 ? min(1, width / size.width) : 1
         return content(for: card, projection: projection)
             // The production mark remains one `SlotToggle`, but an ordinary
@@ -402,7 +418,7 @@ struct WidgetsView: View {
 
     /// The space between two widgets sitting side by side, from the sizes
     /// themselves: what is left of a Medium's width once two Smalls are in it.
-    private static var gutter: CGFloat {
+    private static var designGutter: CGFloat {
         WidgetMetrics.largeWidth - WidgetMetrics.smallSide * 2
     }
 

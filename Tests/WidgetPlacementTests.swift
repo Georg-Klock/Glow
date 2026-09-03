@@ -456,7 +456,7 @@ struct WidgetPlacementTests {
         )
         let previewStart = try #require(widgets.range(of: "private func preview("))
         let previewTail = widgets[previewStart.lowerBound...]
-        let previewEnd = try #require(previewTail.range(of: "private static var gutter"))
+        let previewEnd = try #require(previewTail.range(of: "private static var designGutter"))
         let preview = previewTail[..<previewEnd.lowerBound]
 
         #expect(!preview.contains(".allowsHitTesting(false)"))
@@ -557,8 +557,9 @@ struct WidgetPlacementTests {
         }
     }
 
-    /// The sizes the previews are laid out at are the sizes the render harness
-    /// renders at — one source, so a preview cannot be a layout no phone shows.
+    /// The stable sizes are the authored design coordinate system. Device
+    /// frames are recorded separately by WidgetKit; changing one must not
+    /// silently rewrite the other or its render baselines (#544).
     @Test("Each family has the size the design is authored against")
     func familySizes() {
         #expect(WidgetMetrics.size(of: .systemSmall)
