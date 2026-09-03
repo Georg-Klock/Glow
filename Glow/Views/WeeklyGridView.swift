@@ -491,10 +491,8 @@ struct WeeklyGridView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 ForEach(Array(habits.enumerated()), id: \.element.id) { index, habit in
-                    let bottomInset: CGFloat = if index == habits.count - 1 {
-                        geometry.padBottom
-                    } else if showsWidgetBoundary,
-                              index == WidgetMetrics.largeRowCapacity - 1 {
+                    let bottomInset: CGFloat = if showsWidgetBoundary,
+                                                  index == WidgetMetrics.largeRowCapacity - 1 {
                         geometry.rowInset + geometry.widgetBoundaryGap
                     } else {
                         geometry.rowInset
@@ -519,9 +517,11 @@ struct WeeklyGridView: View {
                     .listRowInsets(EdgeInsets(
                         top: geometry.rowInset,
                         leading: rowPadding + geometry.padLeading,
-                        // The last row stands the widget's `padBottom` off
-                        // the panel's edge; every other row stands half a
-                        // row gap off its neighbour.
+                        // Every editable cell has the same ordinary bottom
+                        // inset. The panel's larger bottom breathing room is
+                        // a separate row below the `ForEach`; putting it in
+                        // the final cell makes the native edit controls centre
+                        // themselves 15.6 pixels below the habit (#546).
                         bottom: bottomInset,
                         trailing: rowPadding + geometry.padTrailing
                     ))
@@ -582,6 +582,22 @@ struct WeeklyGridView: View {
                 }
                 .onMove(perform: move)
                 .onDelete(perform: deleteAt)
+                // The widget's bottom inset belongs to the panel, not to the
+                // last editable cell (#546). `List` centres its native remove
+                // and reorder controls in a cell's full height, including row
+                // insets. Keeping `padBottom` on the last habit made that one
+                // cell taller by `padBottom - rowInset` and moved both system
+                // controls down by half the difference — 5.2pt / 15.6px on
+                // the measured iPhone 17e — even though the habit label kept
+                // the ordinary pitch. This inert trailing row preserves the
+                // exact panel and scroll height without acquiring edit
+                // controls or changing any habit's geometry.
+                Color.clear
+                    .frame(height: max(0, geometry.padBottom - geometry.rowInset))
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .accessibilityHidden(true)
             }
             .listStyle(.plain)
             // No floor. The row is exactly the widget's slot at the screen's

@@ -95,7 +95,7 @@ struct RowGeometryTests {
     /// same primitives `WeeklyGridView` gives its rows, independently of
     /// `panelHeight`'s own expression: a header block, then every row with the
     /// insets the grid sets on it, the last one standing `padBottom` off the
-    /// edge instead of `rowInset`.
+    /// edge through the inert trailing row after the editable `ForEach`.
     @Test("The panel is exactly as tall as the rows on it")
     func panelHeightMatchesTheRows() {
         for width in [338, 402, 430, 1024] as [CGFloat] {
@@ -104,10 +104,10 @@ struct RowGeometryTests {
                 let header = g.padTop + g.headerHeight
                     + (g.headerGap - WidgetMetrics.rowGap * g.scale / 2)
                 var summed = header
-                for index in 0..<rows {
-                    summed += g.rowInset + g.slotHeight
-                    summed += index == rows - 1 ? g.padBottom : g.rowInset
+                for _ in 0..<rows {
+                    summed += g.rowInset + g.slotHeight + g.rowInset
                 }
+                summed += max(0, g.padBottom - g.rowInset)
                 #expect(
                     abs(g.panelHeight(rows: rows) - summed) < 0.0001,
                     "width \(width), rows \(rows): \(g.panelHeight(rows: rows)) vs \(summed)"

@@ -98,8 +98,10 @@ struct RowGeometry: Equatable {
     func panelHeight(rows: Int, includesWidgetBoundary: Bool = false) -> CGFloat {
         guard rows > 0 else { return 0 }
         let header = padTop + headerHeight + (headerGap - WidgetMetrics.rowGap * scale / 2)
-        // Every row stands `rowInset` off the row above; the last one stands
-        // the widget's `padBottom` off the panel's edge instead.
+        // Every editable row keeps its ordinary inset on both sides. The
+        // remainder of the widget's `padBottom` is the inert trailing List row
+        // after the `ForEach` (#546), so it cannot make the last editable cell
+        // taller and displace the native edit controls.
         let rowsBlock = CGFloat(rows) * (rowInset + slotHeight)
             + CGFloat(rows - 1) * rowInset
             + padBottom
