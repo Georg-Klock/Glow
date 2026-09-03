@@ -362,6 +362,13 @@ enum WidgetMetrics {
     /// the month never moves either week surface (#493).
     static let monthTitleHeight: CGFloat = headerHeight + 4
 
+    /// Extra space above only the small month widget's title (#527).
+    ///
+    /// The shared `padTop` belongs to all three families. Keeping this delta
+    /// beside the month's own title metric moves the title and grid together
+    /// without moving either week widget.
+    static let monthTopInset: CGFloat = padTop
+
     /// How far the row block sits below whatever precedes it, so that it is
     /// centred in the height the header leaves (#368).
     ///

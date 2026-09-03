@@ -8076,3 +8076,15 @@ its family, so the extension responds independently of whether the app process
 is alive. Existing pixel baselines remain the normal appearance contract; a
 logic test pins the alternate branch and a source test pins all four shipping
 readers without treating blur rendered off-screen as accessibility evidence.
+## 2026-09-02 — The month title starts at twice the shared top inset (#527)
+
+The small month widget adds its own 10pt top inset inside the generic 10pt
+widget inset. The habit name therefore begins 20pt below the frame, and its
+grid moves down with it on the Home Screen and in the Widgets-tab preview.
+Large and medium week widgets keep the shared inset unchanged.
+
+The densest six-row month gives vertical spacing before cell size, following
+the rule already established for that grid: its 16pt cells and 3pt horizontal
+gaps remain fixed while the vertical gap tightens to 1.2pt. Four- and five-row
+months retain the natural 3pt gap and centre their shorter row blocks in the
+space below the newly positioned title.
