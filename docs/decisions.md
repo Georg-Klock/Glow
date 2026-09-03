@@ -8062,3 +8062,17 @@ The source gate now also rejects the argument-free `withAnimation { … }` form
 throughout production code. A file-level check could pass merely because some
 other call in the same file mentioned Reduce Motion; requiring an explicit
 argument at every call site makes an omitted motion-or-snap decision visible.
+## 2026-09-02 — Reduce Transparency removes every material surface (#521)
+
+The weekly grid, Widgets-tab previews, installed Home Screen widget and symbol
+section headers all read `accessibilityReduceTransparency`. Their normal paths
+keep the existing material exactly. Their reduced paths draw the palette's
+opaque true-black widget background, so text and marks never sit directly on
+blur when the system setting asks for solid surfaces.
+
+`TransparencyPolicy` owns the pure material/no-material decision. The widget
+reads the SwiftUI environment from `WidgetContentInset`, where it already reads
+its family, so the extension responds independently of whether the app process
+is alive. Existing pixel baselines remain the normal appearance contract; a
+logic test pins the alternate branch and a source test pins all four shipping
+readers without treating blur rendered off-screen as accessibility evidence.

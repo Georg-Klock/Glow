@@ -58,6 +58,7 @@ struct WidgetsView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     /// The day the previews are drawn for. Same reason `WeeklyGridView` holds
     /// one: the open slot is defined as today, so today has to be re-read when
@@ -387,7 +388,9 @@ struct WidgetsView: View {
             // black plate under it — was reasoned for a page previewing the
             // *Tinted/Clear* appearance. Matching Default supersedes it; see
             // docs/decisions.md.
-            .background { GlowPalette.widgetSurface }
+            .background {
+                GlowPalette.widgetSurface(reduceTransparency: reduceTransparency)
+            }
             .clipShape(RoundedRectangle(cornerRadius: Self.corner, style: .continuous))
             .scaleEffect(scale, anchor: .topLeading)
             // The scaled footprint, so the layout above and below reserves what

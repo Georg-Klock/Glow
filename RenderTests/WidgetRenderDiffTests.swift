@@ -726,7 +726,7 @@ struct WidgetRenderDiffTests {
             .padding(.top, top)
             .padding(.bottom, bottom)
             .frame(width: size.width, height: size.height)
-            .background { GlowPalette.widgetSurface }
+            .background { GlowPalette.widgetSurface(reduceTransparency: false) }
             .environment(\.colorScheme, .dark)
             .widgetPixelHarness()
         let renderer = ImageRenderer(content: framed)
@@ -1097,7 +1097,7 @@ struct WidgetRenderDiffTests {
             .padding(.top, WidgetMetrics.padTop)
                 .padding(.bottom, WidgetMetrics.padBottom)
             .frame(width: Self.size.width, height: Self.size.height)
-            .background { GlowPalette.widgetSurface }
+            .background { GlowPalette.widgetSurface(reduceTransparency: false) }
             .environment(\.colorScheme, .dark)
             .widgetPixelHarness()
 

@@ -240,10 +240,24 @@ enum GlowPalette {
     /// Declared here as one view so the widget and the render harness cannot
     /// disagree about what the surface is: a baseline rendered over a different
     /// ground than the widget ships is a baseline of nothing.
-    static var widgetSurface: some View {
+    @ViewBuilder
+    static func widgetSurface(reduceTransparency: Bool) -> some View {
         ZStack {
             widgetBackground
-            Rectangle().fill(.ultraThinMaterial)
+            if TransparencyPolicy.drawsMaterial(reduceTransparency: reduceTransparency) {
+                Rectangle().fill(.ultraThinMaterial)
+            }
+        }
+    }
+
+    /// The symbol section's system bar, with the same opaque fallback as every
+    /// other surface carrying text when Reduce Transparency is enabled.
+    @ViewBuilder
+    static func barSurface(reduceTransparency: Bool) -> some View {
+        if TransparencyPolicy.drawsMaterial(reduceTransparency: reduceTransparency) {
+            Rectangle().fill(.bar)
+        } else {
+            widgetBackground
         }
     }
 

@@ -925,7 +925,7 @@ struct RenderBaselineTests {
             .padding(.top, frame.insets.top)
             .padding(.bottom, frame.insets.bottom)
             .frame(width: frame.size.width, height: frame.size.height)
-            .background { GlowPalette.widgetSurface }
+            .background { GlowPalette.widgetSurface(reduceTransparency: false) }
             .environment(\.colorScheme, .dark)
             .widgetPixelHarness()
         let renderer = ImageRenderer(content: framed)

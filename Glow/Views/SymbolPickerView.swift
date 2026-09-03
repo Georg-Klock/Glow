@@ -9,6 +9,7 @@ struct SymbolPickerView: View {
     @Binding var selection: String
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var mode: Mode = .symbols
     @State private var query = ""
 
@@ -231,6 +232,8 @@ struct SymbolPickerView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
-            .background(.bar)
+            .background {
+                GlowPalette.barSurface(reduceTransparency: reduceTransparency)
+            }
     }
 }
