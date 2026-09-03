@@ -7954,3 +7954,16 @@ in the list's one reorderable collection, so a drag can cross the boundary and
 the gap can never acquire selection, swipe, delete, move or drop behavior. The
 line keeps the row's existing width and the conditions controlling whether it
 appears are unchanged.
+## 2026-09-02 — Completion feedback is one Settings subject (#519)
+
+The Glow slider and “Say well done” picker share one Feedback section. They are
+the visual and spoken ways the app answers a completion, so two one-control
+sections hid a relationship that already existed. The ordered Never / Goals /
+Everything scale remains a segmented control: all three choices stay visible
+for comparison instead of moving behind a disclosure screen. Week and Data
+remain separate, coherent subjects; short sections do not need filler.
+
+Export History keeps Glow's grey-on-black palette and gains a fixed 18pt icon
+frame with a 15pt glyph. This borrows the containment that keeps Apple's own
+Settings symbols from determining row weight, without borrowing saturated
+badges that would compete with Glow's one reserved colour.
