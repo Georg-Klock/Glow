@@ -57,6 +57,15 @@ enum MotionPolicy {
         !reduceMotion
     }
 
+    /// Whether entering or leaving list edit mode moves the rows and chrome.
+    ///
+    /// This transition is neither a completion reward nor a row removal, so it
+    /// owns a named rule rather than borrowing either one's meaning. The
+    /// reduced path is the same instant state change with no frames between.
+    static func changesEditMode(reduceMotion: Bool) -> Bool {
+        !reduceMotion
+    }
+
     /// How far a press pushes a mark past its resting size.
     ///
     /// A press growing 32% and springing back is the same overshoot the

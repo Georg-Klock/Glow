@@ -52,6 +52,12 @@ struct MotionPolicyTests {
         #expect(!MotionPolicy.collapsesRemoval(reduceMotion: true))
     }
 
+    @Test("Edit mode moves normally and snaps under Reduce Motion")
+    func editModeTransition() {
+        #expect(MotionPolicy.changesEditMode(reduceMotion: false))
+        #expect(!MotionPolicy.changesEditMode(reduceMotion: true))
+    }
+
     /// The claim no unit test can make on its own.
     ///
     /// Reduce Motion is an environment value; a suite cannot set it and watch a
@@ -79,10 +85,17 @@ struct MotionPolicyTests {
 
         var animating: [String] = []
         var offenders: [String] = []
+        var implicitWithAnimation: [String] = []
         for file in files {
             guard let text = try? String(contentsOf: file, encoding: .utf8) else { continue }
             guard text.contains("withAnimation(") || text.contains(".animation(") else { continue }
             animating.append(file.lastPathComponent)
+            if text.range(
+                of: #"withAnimation\s*\{"#,
+                options: .regularExpression
+            ) != nil {
+                implicitWithAnimation.append(file.lastPathComponent)
+            }
             // Either the view reads the environment itself, or it takes the
             // decision from the one place that owns it. The widget's burst is
             // the third shape: it reads the setting at the tap and leaves a
@@ -104,5 +117,9 @@ struct MotionPolicyTests {
         // the sources rather than the app having stopped moving.
         #expect(animating.count >= 4, "found \(animating.count) animating file(s)")
         #expect(offenders.isEmpty, "animates without reading Reduce Motion: \(offenders)")
+        #expect(
+            implicitWithAnimation.isEmpty,
+            "withAnimation omits an explicit motion-or-snap choice: \(implicitWithAnimation)"
+        )
     }
 }

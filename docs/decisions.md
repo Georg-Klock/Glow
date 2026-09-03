@@ -8050,3 +8050,15 @@ reload replaces it with the row's authoritative redivision. Filled spans keep
 their single control because they contain one real completion to undo. Each
 open control names its exact date and “not done” state to VoiceOver rather than
 calling a past day “due today.”
+## 2026-09-02 — Edit mode snaps under Reduce Motion (#522)
+
+Entering and leaving edit mode is its own named `MotionPolicy` decision. It
+uses the system transition normally and passes `nil` to `withAnimation` when
+Reduce Motion is enabled, so the exact same state change arrives immediately.
+It does not borrow the completion or row-removal rules, whose names describe
+different behavior.
+
+The source gate now also rejects the argument-free `withAnimation { … }` form
+throughout production code. A file-level check could pass merely because some
+other call in the same file mentioned Reduce Motion; requiring an explicit
+argument at every call site makes an omitted motion-or-snap decision visible.
