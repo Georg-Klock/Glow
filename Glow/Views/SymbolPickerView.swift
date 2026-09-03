@@ -110,7 +110,7 @@ struct SymbolPickerView: View {
         LazyVGrid(columns: columns, spacing: Self.gridSpacing) {
             ForEach(symbols, id: \.self) { symbol in
                 symbolTile(symbol)
-                    .accessibilityLabel(symbol.replacingOccurrences(of: ".", with: " "))
+                    .accessibilityLabel(HabitSymbol.spokenName(for: symbol))
                     .accessibilityAddTraits(
                         selection == symbol ? [.isSelected, .isButton] : .isButton
                     )

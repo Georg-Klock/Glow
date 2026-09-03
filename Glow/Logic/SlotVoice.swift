@@ -69,6 +69,19 @@ enum SlotVoice {
         "\(habitName), \(self.day(day, calendar: calendar)), \(state(mark))"
     }
 
+    /// One exact-date widget control inside an otherwise continuous open span.
+    /// "Due today" is wrong for a past column; the toggle's actual state is
+    /// the useful fact, and its hint already says what activating it will do.
+    static func actionLabel(
+        habitName: String,
+        day: Date,
+        isDone: Bool,
+        calendar: Calendar = WeekCalendar.calendar
+    ) -> String {
+        "\(habitName), \(self.day(day, calendar: calendar)), "
+            + (isDone ? "done" : "not done")
+    }
+
     /// A span's state, which is not a mark's.
     ///
     /// A filled span and one still to come draw the same unlit line — a span

@@ -486,6 +486,14 @@ struct WeeklyGridView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 ForEach(Array(habits.enumerated()), id: \.element.id) { index, habit in
+                    let bottomInset: CGFloat = if index == habits.count - 1 {
+                        geometry.padBottom
+                    } else if showsWidgetBoundary,
+                              index == WidgetMetrics.largeRowCapacity - 1 {
+                        geometry.rowInset + geometry.widgetBoundaryGap
+                    } else {
+                        geometry.rowInset
+                    }
                     HabitRowView(
                         snapshot: snapshots[index],
                         week: week,
@@ -509,8 +517,7 @@ struct WeeklyGridView: View {
                         // The last row stands the widget's `padBottom` off
                         // the panel's edge; every other row stands half a
                         // row gap off its neighbour.
-                        bottom: index == habits.count - 1
-                            ? geometry.padBottom : geometry.rowInset,
+                        bottom: bottomInset,
                         trailing: GridMetrics.rowPadding + geometry.padTrailing
                     ))
                     .listRowSeparator(.hidden)
@@ -539,7 +546,7 @@ struct WeeklyGridView: View {
                             Rectangle()
                                 .fill(GlowPalette.grey)
                                 .frame(height: 0.5)
-                                .offset(y: 6)
+                                .offset(y: geometry.widgetBoundaryGap / 2)
                         }
                     }
                     // Swipe actions rather than a long-press menu: this is
@@ -655,7 +662,10 @@ struct WeeklyGridView: View {
     /// sits exactly where it did before that split.
     private func panel(geometry: RowGeometry, inset: CGFloat) -> some View {
         GlowPalette.widgetSurface
-            .frame(height: geometry.panelHeight(rows: habits.count))
+            .frame(height: geometry.panelHeight(
+                rows: habits.count,
+                includesWidgetBoundary: showsWidgetBoundary
+            ))
             .clipShape(RoundedRectangle(
                 cornerRadius: GridMetrics.panelCorner, style: .continuous
             ))

@@ -181,6 +181,30 @@ struct SymbolCatalogueTests {
             #expect(HabitSymbol.isSymbol(name), "\(name) is offered but does not validate")
         }
     }
+
+    @Test("Every browsable symbol has a human spoken description")
+    func browsableSymbolsHaveSpokenNames() throws {
+        for symbol in HabitSymbol.all {
+            let spoken = HabitSymbol.spokenName(for: symbol)
+            #expect(!spoken.isEmpty, "\(symbol) has no spoken name")
+            #expect(!spoken.contains("."), "\(symbol) still speaks an identifier: \(spoken)")
+        }
+        #expect(
+            HabitSymbol.spokenName(for: "figure.strengthtraining.traditional")
+                == "Traditional strength training"
+        )
+        #expect(HabitSymbol.spokenName(for: "figure.yoga") == "Yoga")
+
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let picker = try String(
+            contentsOf: root.appending(path: "Glow/Views/SymbolPickerView.swift"),
+            encoding: .utf8
+        )
+        #expect(picker.contains("HabitSymbol.spokenName(for: symbol)"))
+        #expect(!picker.contains("symbol.replacingOccurrences(of:"))
+    }
 }
 
 @Suite("Suggested symbols")
