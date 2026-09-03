@@ -115,10 +115,12 @@ struct WeekProvider: AppIntentTimelineProvider {
     /// missing month half can only be a provider bug. Neither is a preview of
     /// anything. See `WidgetPreviewSample`.
     func placeholder(in context: Context) -> WeekEntry {
-        previewEntry(at: context.family)
+        WidgetDisplaySize.record(context.displaySize, for: context.family)
+        return previewEntry(at: context.family)
     }
 
     func snapshot(for configuration: SelectWeekLayoutIntent, in context: Context) async -> WeekEntry {
+        WidgetDisplaySize.record(context.displaySize, for: context.family)
         // A widget view cannot rely on a SwiftUI task completing before
         // WidgetKit archives its still image. Prepare the current tile here,
         // off the main actor, so #507's body fix keeps the Home Screen's HDR.
@@ -192,6 +194,7 @@ struct WeekProvider: AppIntentTimelineProvider {
     func timeline(
         for configuration: SelectWeekLayoutIntent, in context: Context
     ) async -> Timeline<WeekEntry> {
+        WidgetDisplaySize.record(context.displaySize, for: context.family)
         // See `snapshot`: the provider is the asynchronous boundary where a
         // widget's current HDR tile must be ready before its view is archived.
         _ = await GlowImageCache.shared.prepare(peak: GlowSettings.peakHeadroom)

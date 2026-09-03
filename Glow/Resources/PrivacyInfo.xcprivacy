@@ -14,7 +14,8 @@
     1C8F.1  The App Group's defaults. GlowSettings.store is
             UserDefaults(suiteName: "group.com.georgklock.glow"), and it is how
             the app and the widget extension share the glow level, the week
-            preferences, the pop switch, the tap burst and the widget trace.
+            preferences, the pop switch, the tap burst, the widget trace and
+            WidgetKit's per-family display sizes.
             Read and written only within this app group.
 
     CA92.1  The app's own defaults. DailyHabitMigration records whether this

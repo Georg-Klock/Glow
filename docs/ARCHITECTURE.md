@@ -409,12 +409,18 @@ what it is.
 `GlowWidget/MonthWidgetView.swift` and the two entry types are compiled into
 the *app* target as well as into the extension — the same sharing
 `GlowRenderTests` does, and the reason each view sits in a file with its entry
-and neither a `@main` bundle nor a provider. The view is laid out at
-`WidgetMetrics.size(of:)` for its family and then scaled to fit, because slot
-size is derived from track width: drawn at a convenient width it would be a
-different layout rather than a smaller one. `WeekWidgetView.familyOverride`
-exists for the same reason the render harness needs it — `widgetFamily` is
-read-only outside WidgetKit and reports medium everywhere else.
+and neither a `@main` bundle nor a provider. The extension records
+`TimelineProviderContext.displaySize` for each family in the App Group whenever
+WidgetKit asks for a placeholder, snapshot or timeline. The app lays the
+production view out at that exact device frame and then scales it to fit,
+because slot size is derived from track width: drawn at a convenient width it
+would be a different layout rather than a smaller one. Until WidgetKit has
+rendered a family, `WidgetMetrics.size(of:)` is the explicit fallback. Those
+metrics remain the stable authored coordinate system for render baselines and
+row-count intent, not a claim that every phone gets the same frame (#544).
+`WeekWidgetView.familyOverride` exists for the same reason the render harness
+needs it — `widgetFamily` is read-only outside WidgetKit and reports medium
+everywhere else.
 
 The small month uses the same top inset and type size, but its habit name owns
 `WidgetMetrics.monthTitleHeight` rather than borrowing the week widget's

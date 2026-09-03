@@ -8,36 +8,34 @@ import WidgetKit
 /// boundary, and a second copy of the figure in the app would be a copy that
 /// could drift.
 ///
-/// Node `83:1676` is authored at 1x — 338 × 354, which is the real point size of
-/// a large widget on this phone — so these are read straight off it rather than
-/// halved from a 2x frame or measured off a render.
+/// Node `83:1676` is authored at 1x — 338 × 354 — so these are read straight
+/// off it rather than halved from a 2x frame or measured off a render. That is
+/// the design's frame, not a universal claim about a phone (#544).
 ///
 /// Every value here is a *design* number. Nothing is derived from a screenshot
 /// and nothing is rounded to something tidier; where the file is on a half point
 /// this is too, because half a point is a real pixel at 2x and two of them at 3x.
 enum WidgetMetrics {
-    /// The large widget's own size, on a 6.1" iPhone. The design file is
-    /// authored at exactly this, at 1x.
+    /// The large widget's authored reference size. The design file is exactly
+    /// this at 1x; WidgetKit's live size belongs to `WidgetDisplaySize`.
     static let largeWidth: CGFloat = 338
     static let largeHeight: CGFloat = 354
 
-    /// A small widget's own size, on the same phone. Square, and the width the
-    /// medium and large families share is two of these plus the gap between
-    /// them.
+    /// The small widget's authored reference size. Square, and the width the
+    /// medium and large design frames share is two of these plus the gap.
     static let smallSide: CGFloat = 158
 
-    /// What the system gives each family on a 6.1" iPhone.
+    /// The stable frame the design gives each family.
     ///
-    /// One list, three readers: the render harness renders every family at its
-    /// own size, the Widgets tab previews the real views at theirs (#210), and
-    /// `largeRowCapacity` above is the same numbers by another name. A preview
-    /// at a size no phone gives is a preview of a layout nobody sees — the slot
-    /// size falls out of the track width, so a widget drawn 20pt narrow is not
-    /// the same widget slightly smaller.
+    /// Two readers deliberately remain: the render harness renders every
+    /// family in this stable design coordinate system, and
+    /// `largeRowCapacity` is the same numbers by another name. The Widgets tab
+    /// no longer treats these as device truth: `WidgetDisplaySize` supplies
+    /// WidgetKit's last exact frame on that device and uses this only until
+    /// WidgetKit has rendered the family (#544).
     ///
     /// Sizes do vary by device; this is the phone the design is authored
-    /// against, and the previews scale from here rather than measuring the
-    /// screen they are on.
+    /// against, not a prediction made from the screen it is running on.
     ///
     /// **No phone measured gives these numbers** (#367). WidgetKit names the
     /// frame it renders into in the archive path it hands the extension, and
@@ -60,10 +58,9 @@ enum WidgetMetrics {
     /// medium fit of the four rather than the one the fit held on — the mirror
     /// image of the large family. `WidgetMetricsTests` pins that ordering.
     ///
-    /// So what a wrong constant still misinforms here is the harness and the
-    /// previews: both draw four rows, a percent or two small. Replacing these
-    /// numbers with one phone's would pin a phone rather than pin none, and it
-    /// moves both committed render baselines — a decision, not a repair.
+    /// Replacing these numbers with one phone's would pin a phone rather than
+    /// pin none and move both committed render baselines. The environmental
+    /// frame therefore lives separately in `WidgetDisplaySize` (#544).
     static func size(of family: WidgetFamily) -> CGSize {
         switch family {
         case .systemMedium: CGSize(width: largeWidth, height: smallSide)
