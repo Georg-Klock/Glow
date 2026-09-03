@@ -35,10 +35,6 @@ struct WeeklyGridView: View {
     @State private var isDemoSeeded = false
     @State private var editingHabit: Habit?
     @State private var isAddingHabit = false
-    /// The native `List`'s vertical displacement from its resting position.
-    /// The rows already move by this amount; #454 gives the single panel behind
-    /// them the same transform without replacing any of the List interactions.
-    @State private var gridScrollOffset: CGFloat = 0
     /// Edit mode, owned rather than left to the `NavigationStack` (#207).
     ///
     /// The list's editing controls are offered on the current week and nowhere
@@ -584,24 +580,13 @@ struct WeeklyGridView: View {
             // It stays behind the List, so a horizontal row swipe still reveals
             // material (#398). Vertically it receives the same content offset
             // as the rows, so its top and bottom corners travel with them.
-            .background(alignment: .top) {
-                GeometryReader { _ in
-                    panel(geometry: geometry, inset: GridMetrics.rowPadding)
-                        .offset(y: -gridScrollOffset)
-                }
-                // Like the List rows, the travelling card is allowed under the
-                // navigation and tab bars. `TopFade` dissolves it at the top;
-                // clipping this reader would strand those rows on black again.
-            }
-            // At rest `contentOffset.y` is the negative top inset. Adding that
-            // inset gives zero; after a drag it is the exact distance by which
-            // the List moved its content. This iOS 18 API observes the native
-            // scroller without putting another scroller around it.
-            .onScrollGeometryChange(for: CGFloat.self) { scroll in
-                scroll.contentOffset.y + scroll.contentInsets.top
-            } action: { _, offset in
-                gridScrollOffset = offset
-            }
+            //
+            // **The offset lives in the modifier, not on this screen.** See
+            // `ScrollingPanel` for the measurement: as this view's own `@State`
+            // it re-evaluated the whole grid on every frame of a scroll.
+            .modifier(ScrollingPanel(
+                panel: panel(geometry: geometry, inset: GridMetrics.rowPadding)
+            ))
             // **The edit controls' breathing room, taken from the `List`**
             // (#400). The delete circle and the reorder handle are the
             // system's, laid out against the `List`'s own bounds — measured,
@@ -1178,6 +1163,55 @@ struct WeeklyGridView: View {
 @MainActor
 private final class TaskHolder {
     var task: Task<Void, Never>?
+}
+
+/// The grid's panel, moved by the `List`'s own scroll offset (#454) — with
+/// the offset owned here rather than by the screen.
+///
+/// **The offset changes on every frame of a scroll, and whatever holds it is
+/// re-evaluated on every one of them.** It was `WeeklyGridView`'s own
+/// `@State`, so a flick re-ran the screen's body, the `GeometryReader`
+/// closure that reads the week's snapshots out of SwiftData, and every row's
+/// body — measured on a 26-row grid in the simulator: one two-second drag
+/// produced 38 offset updates, and each of them cost one completion fetch and
+/// 52 row-body passes, 1,976 in all, for pixels that only ever move by a
+/// translation. Held in a modifier, the state invalidates the modifier's own
+/// body and nothing above it: the panel takes its new offset and the `List`
+/// it sits behind is not asked to redraw.
+///
+/// The panel arrives as a value rather than being built in here, so it is
+/// rebuilt when the geometry or the row count changes and not when the offset
+/// does. Everything else is exactly the modifier chain the screen applied
+/// directly: the same `background(alignment: .top)`, the same
+/// `GeometryReader`, the same normalised offset read.
+private struct ScrollingPanel<Panel: View>: ViewModifier {
+    let panel: Panel
+
+    /// The native `List`'s vertical displacement from its resting position.
+    /// The rows already move by this amount; the panel behind them takes the
+    /// same transform without replacing any of the List interactions.
+    @State private var offset: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .background(alignment: .top) {
+                GeometryReader { _ in
+                    panel.offset(y: -offset)
+                }
+                // Like the List rows, the travelling card is allowed under the
+                // navigation and tab bars. `TopFade` dissolves it at the top;
+                // clipping this reader would strand those rows on black again.
+            }
+            // At rest `contentOffset.y` is the negative top inset. Adding that
+            // inset gives zero; after a drag it is the exact distance by which
+            // the List moved its content. This iOS 18 API observes the native
+            // scroller without putting another scroller around it.
+            .onScrollGeometryChange(for: CGFloat.self) { scroll in
+                scroll.contentOffset.y + scroll.contentInsets.top
+            } action: { _, new in
+                offset = new
+            }
+    }
 }
 
 #Preview {
