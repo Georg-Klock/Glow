@@ -386,7 +386,8 @@ private struct WidgetRow: View {
                     ForEach(spans) { span in
                         WidgetSpan(
                             span: span, track: track, side: side, habit: habit,
-                            restIndex: restIndex, renderedDay: today
+                            week: week, restIndex: restIndex, restDay: restDay,
+                            renderedDay: today
                         )
                     }
                 }
@@ -450,17 +451,21 @@ private struct WidgetRow: View {
     }
 }
 
-/// A span on a widget row. Every non-future span the week-editing policy can
-/// resolve is tappable. WidgetKit does not expose a touch location inside a
-/// custom toggle, so a span keeps `WeekSpans`' one fallback `actionDay`: the
-/// last writable day its range contains (#116, #508).
+/// A span on a widget row. Every non-future day the week-editing policy can
+/// resolve is tappable. WidgetKit does not expose a touch location inside one
+/// custom toggle, so an open span keeps one continuous drawn socket and lays
+/// one transparent `SlotToggle` over each exact eligible day (#523). Filled
+/// spans still have one meaningful action — their real completion — and keep
+/// their one fallback control from #508.
 private struct WidgetSpan: View {
     let span: SlotSpan
     let track: CGFloat
     let side: CGFloat
     let habit: HabitSnapshot
+    let week: Week
     /// Which column the rest day falls in, decided once by the row.
     let restIndex: Int?
+    let restDay: Int?
     let renderedDay: Date
 
     private var size: CGSize {
@@ -481,7 +486,15 @@ private struct WidgetSpan: View {
         )
     }
 
+    private var openActions: [WidgetSpanActions.Action] {
+        WidgetSpanActions.openActions(
+            for: span, habit: habit, week: week, today: renderedDay,
+            restDay: restDay
+        )
+    }
+
     var body: some View {
+        let actions = openActions
         let mark = SlotMarkView(
             mark: span.mark,
             size: size,
@@ -494,7 +507,9 @@ private struct WidgetSpan: View {
         let label = SlotVoice.span(
             habitName: habit.name, state: span.state, actionDay: span.actionDay
         )
-        if let actionDay = span.actionDay {
+        if span.state == .open, !actions.isEmpty {
+            openSpan(mark: mark, actions: actions)
+        } else if let actionDay = span.actionDay {
             let offState: SlotState = span.state == .missed ? .missed : .open
             let offMark: SlotMark = offState == .missed ? .missed : .openToday
             // A `Toggle`, not a `Button` (#292) — see `WidgetSlot`. The two
@@ -543,6 +558,59 @@ private struct WidgetSpan: View {
                 .accessibilityElement()
                 .accessibilityLabel(label)
         }
+    }
+
+    /// One uninterrupted socket, with one exact-date control per column.
+    ///
+    /// The off faces are clear because the socket is drawn once behind them;
+    /// duplicating its two inner shadows per day would restore the scrolling
+    /// cost removed in #479 and would draw seams. An optimistic completion
+    /// overlays one lit, day-sized mark immediately. The provider's reload
+    /// then replaces that acknowledgement with `WeekSpans`' authoritative
+    /// redivision of the row.
+    private func openSpan(
+        mark: SlotMarkView,
+        actions: [WidgetSpanActions.Action]
+    ) -> some View {
+        let byColumn = Dictionary(uniqueKeysWithValues: actions.map { ($0.column, $0.day) })
+        let zoneWidth = size.width / CGFloat(span.dayCount)
+
+        return ZStack {
+            mark
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            HStack(spacing: 0) {
+                ForEach(span.firstDay...span.lastDay, id: \.self) { column in
+                    if let day = byColumn[column] {
+                        SlotToggle(
+                            habitID: habit.id,
+                            isDone: false,
+                            day: day,
+                            renderedDay: renderedDay,
+                            onLabel: SlotVoice.actionLabel(
+                                habitName: habit.name, day: day, isDone: true
+                            ),
+                            offLabel: SlotVoice.actionLabel(
+                                habitName: habit.name, day: day, isDone: false
+                            )
+                        ) {
+                            SlotMarkView(
+                                mark: day == renderedDay ? .doneToday : .donePast,
+                                size: CGSize(width: side, height: side)
+                            )
+                            .frame(width: zoneWidth, height: side)
+                        } offMark: {
+                            Color.clear
+                                .frame(width: zoneWidth, height: side)
+                                .contentShape(Rectangle())
+                        }
+                    } else {
+                        Color.clear.frame(width: zoneWidth, height: side)
+                    }
+                }
+            }
+        }
+        .frame(width: size.width, height: size.height)
     }
 }
 
