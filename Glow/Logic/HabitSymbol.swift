@@ -45,6 +45,8 @@ enum HabitSymbol {
 
     private struct Catalogue: Decodable {
         let groups: [Group]
+        /// Human descriptions for every symbol the picker browses.
+        let spokenNames: [String: String]
         /// Every supported symbol name, browsable or not.
         let all: [String]
     }
@@ -116,6 +118,17 @@ enum HabitSymbol {
     /// created before symbols existed and any name a future OS drops.
     static func isSymbol(_ icon: String) -> Bool {
         known.contains(icon)
+    }
+
+    /// A short VoiceOver description for a tile in the curated picker (#525).
+    ///
+    /// The generator carries these beside the symbols so an Xcode catalogue
+    /// refresh cannot add a visible tile without adding its spoken name. The
+    /// fallback keeps a damaged or older bundled catalogue usable, but the
+    /// committed catalogue and tests cover every offered symbol.
+    static func spokenName(for symbol: String) -> String {
+        catalogue?.spokenNames[symbol]
+            ?? symbol.replacingOccurrences(of: ".", with: " ")
     }
 
     /// Symbols whose name contains every word of the query.
