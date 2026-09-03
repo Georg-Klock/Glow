@@ -196,10 +196,14 @@ def main():
 
     # Pass two: keep what an emoji would have said, in the emoji keyboard's
     # own categories.
-    groups, matched, unmatched = emoji_groups(browsable, symbol_categories)
+    groups, spoken_names, matched, unmatched = emoji_groups(browsable, symbol_categories)
 
     payload = {
         "groups": groups,
+        # Human descriptions for the exact curated set the picker exposes.
+        # Most preserve the Unicode emoji name that selected the symbol; the
+        # extra activity figures receive short descriptions below.
+        "spokenNames": spoken_names,
         # Every supported name, browsable or not. This is what decides whether a
         # *stored* icon is drawn as a symbol, so it must not shrink with the
         # picker — see the note at the top of this file.
@@ -303,6 +307,56 @@ def activity_figures(browsable, symbol_categories):
     )
 
 
+ACTIVITY_SPOKEN_NAMES = {
+    "figure.cooldown": "Cooling down",
+    "figure.flexibility": "Stretching",
+    "figure.hand.cycling": "Hand cycling",
+    "figure.highintensity.intervaltraining": "High-intensity interval training",
+    "figure.indoor.cycle": "Indoor cycling",
+    "figure.jumprope": "Jump rope",
+    "figure.mind.and.body": "Mind and body",
+    "figure.open.water.swim": "Open water swimming",
+    "figure.outdoor.cycle": "Outdoor cycling",
+    "figure.play": "Playing",
+    "figure.pool.swim": "Pool swimming",
+    "figure.roll": "Wheelchair rolling",
+    "figure.roll.runningpace": "Wheelchair racing",
+    "figure.rolling": "Wheelchair rolling",
+    "figure.run": "Running",
+    "figure.run.square.stack": "Running",
+    "figure.run.treadmill": "Treadmill running",
+    "figure.skiing.crosscountry": "Cross-country skiing",
+    "figure.skiing.downhill": "Downhill skiing",
+    "figure.socialdance": "Social dance",
+    "figure.strengthtraining.functional": "Functional strength training",
+    "figure.strengthtraining.traditional": "Traditional strength training",
+    "figure.taichi": "Tai chi",
+    "figure.walk": "Walking",
+    "figure.walk.diamond": "Walking",
+    "figure.walk.motion": "Walking",
+    "figure.walk.treadmill": "Treadmill walking",
+    "figure.waterpolo": "Water polo",
+}
+
+
+def activity_spoken_name(symbol):
+    """A short description for an activity Apple names as an identifier."""
+    if symbol in ACTIVITY_SPOKEN_NAMES:
+        return ACTIVITY_SPOKEN_NAMES[symbol]
+    words = symbol.removeprefix("figure.").split(".")
+    readable = {
+        "highintensity": "high-intensity",
+        "intervaltraining": "interval training",
+        "jumprope": "jump rope",
+        "runningpace": "running pace",
+        "socialdance": "social dance",
+        "strengthtraining": "strength training",
+        "taichi": "tai chi",
+        "waterpolo": "water polo",
+    }
+    return " ".join(readable.get(word, word) for word in words).capitalize()
+
+
 def emoji_groups(browsable, symbol_categories):
     """The emoji catalogue's categories, rendered in SF Symbols."""
     if not EMOJI.exists():
@@ -311,6 +365,7 @@ def emoji_groups(browsable, symbol_categories):
     catalogue = json.loads(EMOJI.read_text(encoding="utf-8"))
     groups = []
     used = set()
+    spoken_names = {}
     matched = 0
     unmatched = 0
 
@@ -329,6 +384,7 @@ def emoji_groups(browsable, symbol_categories):
                 continue
             used.add(symbol)
             symbols.append(symbol)
+            spoken_names[symbol] = entry["n"]
 
         if symbols:
             groups.append({
@@ -358,11 +414,14 @@ def emoji_groups(browsable, symbol_categories):
             if n not in used and n not in activity["symbols"]
         ]
         used.update(activity["symbols"])
+        for symbol in activity["symbols"]:
+            if symbol.startswith("figure."):
+                spoken_names[symbol] = activity_spoken_name(symbol)
 
     groups = [g for g in groups if g["symbols"]]
     for group in groups:
         group["icon"] = group["symbols"][0]
-    return groups, len(used), unmatched
+    return groups, spoken_names, len(used), unmatched
 
 
 if __name__ == "__main__":
