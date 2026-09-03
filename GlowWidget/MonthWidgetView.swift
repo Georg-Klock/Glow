@@ -195,29 +195,38 @@ private struct MonthCellView: View {
         if let cell {
             let mark = SlotMarkView(mark: cell.mark, size: CGSize(width: side, height: side))
             if cell.isTappable {
-                // Only today: `MonthGrid` asks `WeekGrid` with
-                // `SlotEditing.todayOnly`, so this grid edits what every widget
-                // surface edits and nothing more (#116). The same intent as the
-                // week widget's slot, so the store's rules — including a
-                // refusal — cannot differ by surface. And the same control
-                // (#292): a `Toggle` whose faces are today's two marks, so the
-                // tap draws the state it asked for instead of waiting on the
-                // provider.
+                let isToday = cell.date == renderedDay
+                let isDone = cell.mark == .doneToday || cell.mark == .donePast
+                let doneMark: SlotMark = isToday ? .doneToday : .donePast
+                let undoneMark = MonthGrid.undoneMark(
+                    for: cell, habit: habit, today: renderedDay
+                )
+                // The month now has the week widget's exact-date, nonfuture
+                // editing horizon (#526). The same optimistic `SlotToggle`
+                // changes this cell before persistence; its resting face stays
+                // `cell.mark`, so adding controls does not move a rendered
+                // pixel. A completed past cell asks for undo rather than being
+                // mistaken for an off toggle.
                 SlotToggle(
                     habitID: habit.id,
-                    isDone: cell.mark == .doneToday,
+                    isDone: isDone,
                     day: cell.date,
                     renderedDay: renderedDay,
                     onLabel: SlotVoice.label(
-                        habitName: habit.name, mark: .doneToday, day: cell.date
+                        habitName: habit.name, mark: doneMark, day: cell.date
                     ),
                     offLabel: SlotVoice.label(
-                        habitName: habit.name, mark: .openToday, day: cell.date
+                        habitName: habit.name,
+                        mark: isDone ? undoneMark : cell.mark,
+                        day: cell.date
                     )
                 ) {
-                    SlotMarkView(mark: .doneToday, size: CGSize(width: side, height: side))
+                    SlotMarkView(mark: doneMark, size: CGSize(width: side, height: side))
                 } offMark: {
-                    SlotMarkView(mark: .openToday, size: CGSize(width: side, height: side))
+                    SlotMarkView(
+                        mark: isDone ? undoneMark : cell.mark,
+                        size: CGSize(width: side, height: side)
+                    )
                 }
             } else {
                 // Still hidden, and now with something saying what they were:
