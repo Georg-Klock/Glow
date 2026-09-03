@@ -60,6 +60,14 @@ struct RowGeometry: Equatable {
     /// twice.
     var slotHeight: CGFloat { SlotLayout.slotHeight(trackWidth: trackWidth) }
 
+    /// One deliberately empty row in the app grid (#515).
+    ///
+    /// The widget boundary is space inside the existing list, not a synthetic
+    /// list row: one slot plus the same half-gap above and below every habit.
+    /// Keeping the number here lets the row inset, line offset and panel height
+    /// share one value instead of approximating the same visual rhythm.
+    var widgetBoundaryGap: CGFloat { slotHeight + 2 * rowInset }
+
     /// How tall the grid's panel is for `rows` habits: the header block, then
     /// every row with the insets `WeeklyGridView` gives it.
     ///
@@ -70,7 +78,7 @@ struct RowGeometry: Equatable {
     /// `RowGeometryTests` sums the same primitives independently.
     ///
     /// Zero rows has no panel: the grid is not drawn on an empty store.
-    func panelHeight(rows: Int) -> CGFloat {
+    func panelHeight(rows: Int, includesWidgetBoundary: Bool = false) -> CGFloat {
         guard rows > 0 else { return 0 }
         let header = padTop + headerHeight + (headerGap - WidgetMetrics.rowGap * scale / 2)
         // Every row stands `rowInset` off the row above; the last one stands
@@ -78,7 +86,8 @@ struct RowGeometry: Equatable {
         let rowsBlock = CGFloat(rows) * (rowInset + slotHeight)
             + CGFloat(rows - 1) * rowInset
             + padBottom
-        return header + rowsBlock
+        let boundary = includesWidgetBoundary ? widgetBoundaryGap : 0
+        return header + rowsBlock + boundary
     }
 
     /// How far a name may run before truncating: into the gap, never into the

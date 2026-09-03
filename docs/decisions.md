@@ -7941,3 +7941,16 @@ percentage described the thumb's position in a 1–8 range and did not match any
 number on screen. The focused control now says the actual whole multiplier at
 every lit stop. At 1× it says “Glow off,” matching the amber readout rather
 than implying that ordinary white is still an active glow.
+## 2026-09-02 — The widget boundary is empty list space, not a row (#515)
+
+When more than ten rows exist, the boundary beneath the tenth is centred in an
+extra gap exactly one habit row tall: one slot plus the ordinary half-row inset
+on each edge. The tenth row contributes that space through its bottom inset,
+and the single panel grows by the same amount, so the gap shows material rather
+than cutting the list over black.
+
+The gap is deliberately not data and not another `ForEach`. All habits remain
+in the list's one reorderable collection, so a drag can cross the boundary and
+the gap can never acquire selection, swipe, delete, move or drop behavior. The
+line keeps the row's existing width and the conditions controlling whether it
+appears are unchanged.

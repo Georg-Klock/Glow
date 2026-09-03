@@ -39,6 +39,7 @@ struct RowGeometryTests {
             ("editControlOverhang", geometry.editControlOverhang),
             ("editingNameMaxWidth", geometry.editingNameMaxWidth),
             ("slotHeight", geometry.slotHeight),
+            ("widgetBoundaryGap", geometry.widgetBoundaryGap),
             ("panelHeight(0)", geometry.panelHeight(rows: 0)),
             ("panelHeight(1)", geometry.panelHeight(rows: 1)),
             ("panelHeight(11)", geometry.panelHeight(rows: 11)),
@@ -134,6 +135,25 @@ struct RowGeometryTests {
             #expect(
                 abs((g.panelHeight(rows: rows + 1) - g.panelHeight(rows: rows)) - step) < 0.0001
             )
+        }
+    }
+
+    /// #515: the boundary occupies one missing habit's rhythm without becoming
+    /// a list row. That preserves one reorderable `ForEach` while the panel
+    /// still grows by exactly the space the list adds to its tenth row.
+    @Test("The widget boundary gap is exactly one empty row")
+    func widgetBoundaryGapIsOneEmptyRow() {
+        for width in [338, 402, 430, 1024] as [CGFloat] {
+            let geometry = RowGeometry(totalWidth: width)
+            #expect(
+                geometry.widgetBoundaryGap
+                    == geometry.slotHeight + 2 * geometry.rowInset
+            )
+            let addedHeight = geometry.panelHeight(
+                rows: 11,
+                includesWidgetBoundary: true
+            ) - geometry.panelHeight(rows: 11)
+            #expect(abs(addedHeight - geometry.widgetBoundaryGap) < 0.0001)
         }
     }
 
