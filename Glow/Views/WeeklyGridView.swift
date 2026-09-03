@@ -546,12 +546,15 @@ struct WeeklyGridView: View {
                     // Drawn only once there is a row beneath it, so it never
                     // appears on a fresh install and never explains a limit
                     // nobody has reached.
+                    //
+                    // See `RowGeometry.widgetBoundaryLineOffset` (#542) for
+                    // why this is not simply half of `widgetBoundaryGap`.
                     .overlay(alignment: .bottom) {
                         if showsWidgetBoundary, index == WidgetMetrics.largeRowCapacity - 1 {
                             Rectangle()
                                 .fill(GlowPalette.grey)
                                 .frame(height: 0.5)
-                                .offset(y: geometry.widgetBoundaryGap / 2)
+                                .offset(y: geometry.widgetBoundaryLineOffset)
                         }
                     }
                     // Swipe actions rather than a long-press menu: this is
