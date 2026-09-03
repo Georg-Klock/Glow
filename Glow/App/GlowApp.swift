@@ -59,11 +59,18 @@ struct GlowApp: App {
         // screen-coordinate touch, but it must not inherit or mutate whatever
         // App Group history happens to be on the selected simulator (#494).
         #if DEBUG
-        let runsWidgetPreviewUITest = ProcessInfo.processInfo.arguments.contains(
+        let arguments = ProcessInfo.processInfo.arguments
+        let runsWidgetPreviewUITest = arguments.contains(
             "-glow-widget-preview-ui-test"
         )
+        let editPitchUITestCount = arguments.first { argument in
+            argument.hasPrefix("-glow-edit-pitch-ui-test=")
+        }.flatMap { argument in
+            Int(argument.dropFirst("-glow-edit-pitch-ui-test=".count))
+        }
         #else
         let runsWidgetPreviewUITest = false
+        let editPitchUITestCount: Int? = nil
         #endif
         let attempt: (container: ModelContainer?, failure: String?)
         if GlowSettings.isRunningTests {
@@ -71,6 +78,12 @@ struct GlowApp: App {
         } else if runsWidgetPreviewUITest {
         #if DEBUG
             attempt = Self.openWidgetPreviewUITestStore()
+        #else
+            attempt = Self.open()
+        #endif
+        } else if let editPitchUITestCount {
+        #if DEBUG
+            attempt = Self.openEditPitchUITestStore(habitCount: editPitchUITestCount)
         #else
             attempt = Self.open()
         #endif
@@ -143,6 +156,41 @@ struct GlowApp: App {
                 createdAt: WeekCalendar.today(),
                 sortOrder: 0
             ))
+            try context.save()
+            return (container, nil)
+        } catch {
+            return (nil, error.localizedDescription)
+        }
+    }
+
+    /// A deterministic list long enough to exercise the edit-mode row boundary.
+    ///
+    /// Like the physical widget-tap fixture above, this is debug-only and
+    /// in-memory. The UI gate launches it at eight through eleven rows so it can
+    /// distinguish an ordinary last-row pitch from the deliberate widget
+    /// boundary that exists only once an eleventh row is present (#546).
+    private static func openEditPitchUITestStore(habitCount: Int)
+        -> (container: ModelContainer?, failure: String?)
+    {
+        do {
+            let container = try ModelContainer(
+                for: GlowStore.schema,
+                configurations: ModelConfiguration(
+                    schema: GlowStore.schema,
+                    isStoredInMemoryOnly: true,
+                    cloudKitDatabase: .none
+                )
+            )
+            let context = ModelContext(container)
+            for index in 0..<max(0, habitCount) {
+                context.insert(Habit(
+                    name: "Pitch Fixture \(index + 1)",
+                    icon: "circle",
+                    frequency: .daily,
+                    createdAt: WeekCalendar.today(),
+                    sortOrder: index
+                ))
+            }
             try context.save()
             return (container, nil)
         } catch {

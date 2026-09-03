@@ -8136,3 +8136,20 @@ the ordinary 20pt screen margin after the List's outer padding, so it is 10pt
 at rest and zero while editing. Vertical geometry is unchanged. The existing
 edit transaction animates the horizontal change, with Reduce Motion retaining
 the snap established by #522.
+
+## 2026-09-03 — The panel's bottom air is not part of its last edit row (#546)
+
+The final habit keeps the same `rowInset` above and below that every ordinary
+habit keeps. The remainder of the widget-derived `padBottom` is one inert,
+transparent List row after the editable `ForEach`. Total scroll height and the
+single material panel therefore do not move, but the system no longer treats
+the final habit as a taller cell.
+
+That distinction is visible only in native edit chrome. On the iPhone 17e / iOS
+26.5 test surface, ordinary cells measured 33.3pt and the former last cell
+43.7pt. SwiftUI left the habit label on its ordinary pitch but centred the
+delete circle and reorder handle in the whole taller cell, moving them down
+5.2pt — 15.6 pixels at 3x, the reported 16px gap. A physical UI gate now opens
+the real edit mode at 8, 9, 10 and 11 habits, requires every ordinary editable
+cell to keep one height and one pitch, and separately allows the deliberate
+widget-boundary cell only when the eleventh habit exists.
