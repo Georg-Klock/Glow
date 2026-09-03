@@ -157,6 +157,26 @@ struct RowGeometryTests {
         }
     }
 
+    /// #542: the line sits centred in the gap the boundary row's bottom inset
+    /// actually creates, not in `widgetBoundaryGap` on its own — a smaller
+    /// span that skips the row's own ordinary `rowInset` and put the line one
+    /// `rowInset` above centre, confirmed on a device before this was fixed.
+    @Test("The widget boundary line is centred in the true gap, not half of it")
+    func widgetBoundaryLineIsCentred() {
+        for width in [338, 402, 430, 1024] as [CGFloat] {
+            let geometry = RowGeometry(totalWidth: width)
+            // The row's own bottom inset plus the next row's ordinary top
+            // inset — see `showsWidgetBoundary`'s bottomInset in
+            // `WeeklyGridView` and #542.
+            let totalGap = geometry.rowInset + geometry.widgetBoundaryGap + geometry.rowInset
+            #expect(
+                abs(geometry.widgetBoundaryLineOffset - totalGap / 2) < 0.0001
+            )
+            // The old, wrong offset — regression guard against reverting to it.
+            #expect(geometry.widgetBoundaryLineOffset != geometry.widgetBoundaryGap / 2)
+        }
+    }
+
     /// #458: the step faces breathe evenly inside the frequency platter.
     /// These are production values rather than a scan of the view's source,
     /// and the subtraction is the relationship the eye sees.

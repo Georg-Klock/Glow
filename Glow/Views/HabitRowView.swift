@@ -68,6 +68,23 @@ struct RowGeometry: Equatable {
     /// share one value instead of approximating the same visual rhythm.
     var widgetBoundaryGap: CGFloat { slotHeight + 2 * rowInset }
 
+    /// Where the boundary line sits, measured down from the boundary row's
+    /// own content edge — the edge `.overlay(alignment: .bottom)` draws
+    /// against, before `WeeklyGridView`'s `.listRowInsets` widens that row's
+    /// bottom margin to make room for the line at all.
+    ///
+    /// **Centred in the space that inset actually creates, not in
+    /// `widgetBoundaryGap` alone** (#542). The boundary row's bottom inset is
+    /// `rowInset + widgetBoundaryGap`, and the row after it keeps its own
+    /// ordinary top `rowInset` on top of that — so the true empty gap is
+    /// `rowInset + widgetBoundaryGap + rowInset`, and half of *that*, from the
+    /// same edge the inset is measured from, is this. Offsetting by half of
+    /// `widgetBoundaryGap` alone skips the leading `rowInset` and sits the
+    /// line one `rowInset` above centre — measured on a device, not
+    /// reasoned out: 497.83pt against a computed 496.80pt for the old offset
+    /// and 501.09pt for this one.
+    var widgetBoundaryLineOffset: CGFloat { rowInset + widgetBoundaryGap / 2 }
+
     /// How tall the grid's panel is for `rows` habits: the header block, then
     /// every row with the insets `WeeklyGridView` gives it.
     ///
