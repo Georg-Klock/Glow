@@ -68,6 +68,7 @@ struct WeeklyGridView: View {
     /// one of the three grid body passes a tap used to cost.
     @State private var popTask = TaskHolder()
     @Environment(\.accessibilityReduceMotion) private var gridReduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     /// Survives relaunches, so the notice appears once per time Low Power Mode
     /// is switched on rather than once per launch.
     @AppStorage("didAnnounceLowPower") private var didAnnounceLowPower = false
@@ -661,7 +662,7 @@ struct WeeklyGridView: View {
     /// padded by `editControlInset`, and the two sum back to 20pt. The panel
     /// sits exactly where it did before that split.
     private func panel(geometry: RowGeometry, inset: CGFloat) -> some View {
-        GlowPalette.widgetSurface
+        GlowPalette.widgetSurface(reduceTransparency: reduceTransparency)
             .frame(height: geometry.panelHeight(
                 rows: habits.count,
                 includesWidgetBoundary: showsWidgetBoundary

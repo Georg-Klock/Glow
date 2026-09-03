@@ -83,7 +83,6 @@ struct GlowWidget: Widget {
                 //    its own continuous-corner squircle regardless. The file's
                 //    *interior* corners are plain circular arcs and those are
                 //    reproduced.
-                .containerBackground(for: .widget) { GlowPalette.widgetSurface }
                 // The marks act in place through their intents; everything
                 // else opens the app on this widget's own screen.
                 .widgetURL(DeepLink.week)
@@ -418,6 +417,7 @@ struct GlowWidgetBundle: WidgetBundle {
 /// environment to read it from.
 private struct WidgetContentInset<Content: View>: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -426,5 +426,8 @@ private struct WidgetContentInset<Content: View>: View {
             .padding(.trailing, WidgetMetrics.padTrailing(for: family))
             .padding(.top, WidgetMetrics.padTop)
             .padding(.bottom, WidgetMetrics.padBottom)
+            .containerBackground(for: .widget) {
+                GlowPalette.widgetSurface(reduceTransparency: reduceTransparency)
+            }
     }
 }
