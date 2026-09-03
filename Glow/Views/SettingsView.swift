@@ -4,9 +4,10 @@ import UIKit
 import UniformTypeIdentifiers
 import WidgetKit
 
-/// Settings, in three clusters: **Glow**, **Week**, **Data**.
+/// Settings, in three clusters: **Feedback**, **Week**, **Data**.
 ///
-/// Glow leads because it is the product rather than a preference about it.
+/// Feedback leads because it holds the two ways Glow answers a completion:
+/// the lit mark and the optional Dynamic Island encouragement.
 /// Week holds both controls that decide what a week is — where it starts and
 /// which day the app stops asking about — which were two sections, one of them
 /// headerless. Data holds the export beside the one control that writes
@@ -181,8 +182,8 @@ struct SettingsView: View {
                 // reads as the first section having drifted down the screen.
                 .listSectionSpacing(0)
 
-                // Glow leads: it is the one control here that is the product
-                // rather than a preference about it.
+                // The two ways Glow answers a completion live together: the
+                // mark's light and the optional Dynamic Island encouragement.
                 Section {
                     // One step per whole multiple of SDR white — eight stops
                     // for an eight-times ceiling (`GlowSettings.range`), not
@@ -218,41 +219,31 @@ struct SettingsView: View {
                         )
                         .accessibilityLabel(readout.accessibilityLabel)
 
-                } header: {
-                    Text("Glow")
-                } footer: {
-                    // Outside the platter again (#474). The compact wording
-                    // from #395 stays: moving the explainer does not restore
-                    // the repetition that was removed with it.
-                    Text(Self.glowNote)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section {
                     // Three states, so it is a picker rather than a toggle
                     // (#119). Segmented rather than a menu because the three
                     // are a scale — quiet, the rare thing, everything — and a
                     // scale reads better laid out than hidden behind its own
                     // current value.
-                    Picker("Say well done", selection: popBinding) {
-                        ForEach(Self.popChoices, id: \.0) { level, title in
-                            Text(title).tag(level)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Say well done")
+                            .font(.subheadline)
+                        Picker("Say well done", selection: popBinding) {
+                            ForEach(Self.popChoices, id: \.0) { level, title in
+                                Text(title).tag(level)
+                            }
                         }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
                     }
-                    .pickerStyle(.segmented)
-                    // The label goes in the header, because a segmented picker
-                    // in a `Form` drops it — leaving three unlabelled words
-                    // where a row used to say what it was for.
-                    .labelsHidden()
                 } header: {
-                    Text("Say well done")
+                    Text("Feedback")
                 } footer: {
-                    // The explainer belongs outside the control's platter
-                    // again; all three shortened variants remain (#474).
-                    Text(popNote)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(Self.glowNote)
+                        Text(popNote)
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 }
 
                 // One row now. This section held the rest day too — a toggle
@@ -284,6 +275,7 @@ struct SettingsView: View {
                         isChoosingFormat = true
                     } label: {
                         Label("Export History", systemImage: "square.and.arrow.up")
+                            .labelStyle(ExportHistoryLabelStyle())
                     }
                     .disabled(habits.isEmpty)
 
@@ -707,6 +699,25 @@ struct SettingsView: View {
         "A brighter glow makes the open habits stand out. Your eye adapts to "
             + "it, so everything else reads duller in exchange."
 
+}
+
+/// A text-scale export glyph, independent of the SF Symbol's own bounds.
+///
+/// Apple's Settings contains its glyphs in fixed badges. Glow borrows the
+/// containment, not the saturated badges: its one colour remains the glow.
+struct ExportHistoryLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 8) {
+            configuration.icon
+                .font(.system(size: SettingsMetrics.exportIconSize))
+                .frame(
+                    width: SettingsMetrics.exportIconFrame,
+                    height: SettingsMetrics.exportIconFrame
+                )
+                .foregroundStyle(GlowPalette.controlTint)
+            configuration.title
+        }
+    }
 }
 
 /// A named pair because UIKit's two headroom properties answer different
