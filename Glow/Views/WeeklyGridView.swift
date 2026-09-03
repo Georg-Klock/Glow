@@ -247,7 +247,7 @@ struct WeeklyGridView: View {
                         // to New Habit and Blank Row while editing.
                         if editMode.isEditing {
                             Button {
-                                withAnimation { editMode = .inactive }
+                                withAnimation(editModeAnimation) { editMode = .inactive }
                             } label: {
                                 Label("Done", systemImage: "checkmark")
                             }
@@ -279,7 +279,7 @@ struct WeeklyGridView: View {
                             if !habits.isEmpty, !editMode.isEditing {
                                 Divider()
                                 Button("Edit", systemImage: "pencil") {
-                                    withAnimation { editMode = .active }
+                                    withAnimation(editModeAnimation) { editMode = .active }
                                 }
                             }
                         } label: {
@@ -1142,6 +1142,14 @@ struct WeeklyGridView: View {
     private var rowRemoval: Animation? {
         MotionPolicy.collapsesRemoval(reduceMotion: gridReduceMotion)
             ? .easeInOut(duration: 0.3)
+            : nil
+    }
+
+    /// The system's ordinary edit-mode transition, or an immediate snap when
+    /// Reduce Motion is enabled (#522).
+    private var editModeAnimation: Animation? {
+        MotionPolicy.changesEditMode(reduceMotion: gridReduceMotion)
+            ? .default
             : nil
     }
 
