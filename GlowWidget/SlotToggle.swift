@@ -21,7 +21,7 @@ extension EnvironmentValues {
 /// `SlotToggle` yields one frame after changing its local binding, then runs
 /// the bounded write on the main actor in delivery order.
 struct InAppWidgetMarkAction {
-    let perform: @MainActor (UUID, Bool) throws -> Void
+    let perform: @MainActor (UUID, Date, Date, Bool) throws -> Void
 }
 
 private struct InAppWidgetMarkActionKey: EnvironmentKey {
@@ -80,6 +80,8 @@ struct SlotToggle<OnMark: View, OffMark: View>: View {
 
     private let habitID: UUID
     private let isDone: Bool
+    private let day: Date
+    private let renderedDay: Date
     private let onLabel: String
     private let offLabel: String
     private let onMark: OnMark
@@ -88,6 +90,8 @@ struct SlotToggle<OnMark: View, OffMark: View>: View {
     init(
         habitID: UUID,
         isDone: Bool,
+        day: Date,
+        renderedDay: Date,
         onLabel: String,
         offLabel: String,
         @ViewBuilder onMark: () -> OnMark,
@@ -95,6 +99,8 @@ struct SlotToggle<OnMark: View, OffMark: View>: View {
     ) {
         self.habitID = habitID
         self.isDone = isDone
+        self.day = day
+        self.renderedDay = renderedDay
         self.onLabel = onLabel
         self.offLabel = offLabel
         self.onMark = onMark()
@@ -114,7 +120,10 @@ struct SlotToggle<OnMark: View, OffMark: View>: View {
                 // Repeated deliberately across preview sizes. The process-level
                 // touch gate chooses the first visible copy, then proves a
                 // screen-coordinate tap reaches this shipping control (#494).
-                .accessibilityIdentifier("widget-preview-mark-\(habitID.uuidString)")
+                .accessibilityIdentifier(
+                    "widget-preview-mark-\(habitID.uuidString)-"
+                        + DayID(day, calendar: WeekCalendar.calendar).text
+                )
         } else {
             installedWidgetControl
         }
@@ -126,6 +135,8 @@ struct SlotToggle<OnMark: View, OffMark: View>: View {
         Toggle(isOn: isDone, intent: MarkHabitIntent(
             habitID: habitID,
             done: !isDone,
+            day: day,
+            renderedDay: renderedDay,
             presentsIsland: true
         )) {
             // Never drawn: the style below draws the mark and ignores its
@@ -173,7 +184,7 @@ struct SlotToggle<OnMark: View, OffMark: View>: View {
             await Task.yield()
             while let next = pendingRequest {
                 pendingRequest = nil
-                try? action.perform(habitID, next)
+                try? action.perform(habitID, day, renderedDay, next)
                 // Let the notification-driven entry redraw land, and accept a
                 // newer tap before deciding that this control is settled.
                 await Task.yield()

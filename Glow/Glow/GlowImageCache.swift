@@ -14,37 +14,108 @@ final class GlowImageCache {
     /// Intensities that failed to render, so a broken combination is attempted
     /// once rather than on every layout pass.
     private var failures: Set<Int> = []
+    /// One encoder job per intensity. The task itself is detached, so waiting
+    /// for the result never occupies the main actor (#507).
+    private var inFlight: [Int: Task<Data?, Never>] = [:]
+    /// Invalidates results which finish after `removeAll()`.
+    private var generation = 0
 
     /// Rounded to a tenth: a slider drag would otherwise mint a distinct
     /// encode per pixel of travel.
-    private func key(_ peak: Double) -> Int { Int((peak * 10).rounded()) }
+    static func key(for peak: Double) -> Int {
+        Int((GlowSettings.clamp(peak) * 10).rounded())
+    }
 
-    /// The lit tile at a given intensity, or nil if it could not be rendered.
-    /// Callers fall back to a flat shape, which is also what a screen with no
-    /// headroom shows, so there is no visually broken state either way.
-    func litTile(peak: Double) -> UIImage? {
-        let k = key(peak)
+    /// A dictionary lookup only. Safe to call while SwiftUI evaluates a body;
+    /// it never renders, encodes or decodes an image.
+    func cachedTile(peak: Double) -> UIImage? {
+        tiles[Self.key(for: peak)]
+    }
+
+    /// Render and decode one tile without blocking the main actor.
+    ///
+    /// Duplicate callers share the same encoder task. Only the inexpensive
+    /// `UIImage` decode and dictionary mutation return to the main actor.
+    func prepare(peak: Double) async -> UIImage? {
+        let clamped = GlowSettings.clamp(peak)
+        let k = Self.key(for: clamped)
         if let tile = tiles[k] { return tile }
         if failures.contains(k) { return nil }
 
-        var renderer = GlowRenderer()
-        renderer.peakHeadroom = CGFloat(GlowSettings.clamp(peak))
-
-        do {
-            let data = try renderer.imageData(color: GlowPalette.components)
-            guard let image = UIImage(data: data) else {
-                failures.insert(k)
-                return nil
+        let requestedGeneration = generation
+        let task: Task<Data?, Never>
+        if let existing = inFlight[k] {
+            task = existing
+        } else {
+            let components = GlowPalette.components
+            task = Task.detached(priority: .utility) {
+                Self.renderData(peak: clamped, components: components)
             }
-            tiles[k] = image
-            return image
-        } catch {
+            inFlight[k] = task
+        }
+
+        let data = await task.value
+        guard generation == requestedGeneration else { return nil }
+        inFlight[k] = nil
+
+        // Another waiter may have resumed first and installed the same tile.
+        if let tile = tiles[k] { return tile }
+        guard let data, let image = UIImage(data: data) else {
             failures.insert(k)
             return nil
+        }
+        tiles[k] = image
+        return image
+    }
+
+    nonisolated private static func renderData(
+        peak: Double,
+        components: (red: CGFloat, green: CGFloat, blue: CGFloat)
+    ) -> Data? {
+        var renderer = GlowRenderer()
+        renderer.peakHeadroom = CGFloat(peak)
+        return try? renderer.imageData(color: components)
+    }
+
+    #if DEBUG
+    /// `ImageRenderer` is synchronous and does not run a view's task. Render
+    /// suites use this explicit test-only boundary before taking their still;
+    /// shipping app and widget paths never call it (#507).
+    func prepareForSynchronousRendering(peak: Double) {
+        let clamped = GlowSettings.clamp(peak)
+        let k = Self.key(for: clamped)
+        guard tiles[k] == nil, !failures.contains(k) else { return }
+        guard let data = Self.renderData(
+            peak: clamped, components: GlowPalette.components
+        ), let image = UIImage(data: data) else {
+            failures.insert(k)
+            return
+        }
+        tiles[k] = image
+    }
+    #endif
+
+    /// Prepare a finite set in order. App launch puts the saved intensity
+    /// first, then the eight slider stops; a duplicate is a free cache hit.
+    func prepare(peaks: [Double]) async {
+        for peak in peaks {
+            _ = await prepare(peak: peak)
+        }
+    }
+
+    /// Fire-and-forget launch warming. `prepare` performs the expensive work
+    /// in detached utility tasks; this inherited main-actor task only installs
+    /// each result and advances to the next stop.
+    func prewarm(peaks: [Double]) {
+        Task { [weak self] in
+            await self?.prepare(peaks: peaks)
         }
     }
 
     func removeAll() {
+        generation &+= 1
+        for task in inFlight.values { task.cancel() }
+        inFlight.removeAll()
         tiles.removeAll()
         failures.removeAll()
     }
@@ -180,28 +251,43 @@ enum GlowShape: Equatable {
 /// either way.
 private struct GlowTile: View {
     let peak: Double
+    @State private var preparedTile: UIImage?
+    @State private var preparedKey: Int?
 
     var body: some View {
-        if let tile = GlowImageCache.shared.litTile(peak: peak) {
-            Image(uiImage: tile)
-                .resizable()
-                // Without this the image is tone-mapped to SDR and the whole
-                // exercise is a slightly bright rectangle.
-                .allowedDynamicRange(.high)
-                // And without this, a widget on a Tinted or Clear home screen
-                // renders in accented mode, which tints an opaque image to a
-                // single flat white — discarding the headroom that is the entire
-                // point of this file. Apple reserves `.fullColor` for media like
-                // album art; the argument for it here is that the light *is* the
-                // content, not a decoration applied to it.
-                //
-                // Whether it is honoured there is still unmeasured, and the
-                // simulator cannot settle it: with no EDR headroom the tile is
-                // tone-mapped anyway, and against glass a flattened white and a
-                // lit white are the same pixels. #53.
-                .widgetAccentedRenderingMode(.fullColor)
-        } else {
-            GlowPalette.color
+        let key = GlowImageCache.key(for: peak)
+        let tile = preparedKey == key
+            ? preparedTile
+            : GlowImageCache.shared.cachedTile(peak: peak)
+
+        Group {
+            if let tile {
+                Image(uiImage: tile)
+                    .resizable()
+                    // Without this the image is tone-mapped to SDR and the whole
+                    // exercise is a slightly bright rectangle.
+                    .allowedDynamicRange(.high)
+                    // And without this, a widget on a Tinted or Clear home screen
+                    // renders in accented mode, which tints an opaque image to a
+                    // single flat white — discarding the headroom that is the entire
+                    // point of this file. Apple reserves `.fullColor` for media like
+                    // album art; the argument for it here is that the light *is* the
+                    // content, not a decoration applied to it.
+                    //
+                    // Whether it is honoured there is still unmeasured, and the
+                    // simulator cannot settle it: with no EDR headroom the tile is
+                    // tone-mapped anyway, and against glass a flattened white and a
+                    // lit white are the same pixels. #53.
+                    .widgetAccentedRenderingMode(.fullColor)
+            } else {
+                GlowPalette.color
+            }
+        }
+        .task(id: key) {
+            let tile = await GlowImageCache.shared.prepare(peak: peak)
+            guard !Task.isCancelled else { return }
+            preparedTile = tile
+            preparedKey = key
         }
     }
 }

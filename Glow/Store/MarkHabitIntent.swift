@@ -4,7 +4,7 @@ import UIKit
 import SwiftData
 import WidgetKit
 
-/// Marks today done, or undoes it, from the widget.
+/// Marks the widget's chosen day done, or undoes it.
 ///
 /// **It sets, it does not toggle, and the name says so** (#272, #292). It was
 /// `ToggleHabitIntent` and it flipped whatever the store held. A widget is the
@@ -30,7 +30,7 @@ import WidgetKit
 /// screen, and that is still true.
 struct MarkHabitIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Mark Habit"
-    static let description = IntentDescription("Marks today's slot done, or undoes it.")
+    static let description = IntentDescription("Marks a widget slot done, or undoes it.")
 
     /// Deliberately not `openAppWhenRun`. The point is to never leave the home
     /// screen — and `LiveActivityIntent` does not change that: it runs the
@@ -49,6 +49,18 @@ struct MarkHabitIntent: LiveActivityIntent {
     @Parameter(title: "Done")
     var done: Bool
 
+    /// The civil day the rendered control acts on. Optional so a control
+    /// archived by an older build fails closed and asks for a fresh timeline
+    /// instead of silently falling back to today (#508).
+    @Parameter(title: "Day")
+    var day: Date?
+
+    /// What the archived surface believed "today" was. A midnight rollover
+    /// makes that surface stale; carrying this separately lets the operation
+    /// refuse it rather than writing yesterday after the day has changed.
+    @Parameter(title: "Rendered Day")
+    var renderedDay: Date?
+
     /// Whether this archived control lives where the Island can be seen.
     /// Installed widgets pass true; the same control hosted inside Glow's
     /// Widgets tab passes false (#465). The app keeps its own foreground pop.
@@ -57,9 +69,17 @@ struct MarkHabitIntent: LiveActivityIntent {
 
     init() {}
 
-    init(habitID: UUID, done: Bool, presentsIsland: Bool = true) {
+    init(
+        habitID: UUID,
+        done: Bool,
+        day: Date,
+        renderedDay: Date,
+        presentsIsland: Bool = true
+    ) {
         self.habitID = habitID.uuidString
         self.done = done
+        self.day = day
+        self.renderedDay = renderedDay
         self.presentsIsland = presentsIsland
     }
 
@@ -72,6 +92,8 @@ struct MarkHabitIntent: LiveActivityIntent {
         try MarkHabitOperation.perform(
             habitID: id,
             done: done,
+            day: day,
+            renderedDay: renderedDay,
             presentsIsland: presentsIsland,
             context: context
         )
@@ -93,7 +115,12 @@ enum MarkHabitOperation {
     static func perform(
         habitID id: UUID,
         done: Bool,
+        day: Date?,
+        renderedDay: Date?,
         presentsIsland: Bool,
+        actualToday: Date = WeekCalendar.today(),
+        calendar: Calendar = WeekCalendar.calendar,
+        restDay: Int? = WeekPreferences.restDay,
         context: ModelContext
     ) throws -> HabitStore.ToggleOutcome? {
         let descriptor = FetchDescriptor<Habit>(predicate: #Predicate { $0.id == id })
@@ -106,29 +133,37 @@ enum MarkHabitOperation {
             WidgetRefresh.invalidate()
         }
 
+        let request = WidgetMarkRequest(day: day, renderedDay: renderedDay)
+        guard let actionDay = request.resolvedDay(
+            actualToday: actualToday, calendar: calendar
+        ) else {
+            WidgetBurst.clear(habitID: id)
+            let outcome = "tap \(id.uuidString) [\(WidgetTrace.origin)]: refused, stale day; burst skipped"
+            GlowLog.widget.notice("\(outcome, privacy: .public)")
+            WidgetTrace.record(outcome)
+            return nil
+        }
+
         guard let habit = try context.fetch(descriptor).first else { return nil }
-        // One reading of "today" for the whole tap (#204), for the reason
-        // `TapHabitIntent` gives: the widget's write has to land on the day the
-        // widget drew as open, and this asked the clock three times.
-        let today = WeekCalendar.today()
 
         // The ring has already flipped optimistically. Give the Island the
         // same timing: decide from the bounded pre-write snapshot and launch
         // the eligible pop before persistence (#464). An undo or a day this
         // snapshot already holds is silent; a refusal after this point is the
         // accepted rollback cost of optimistic acknowledgement.
-        let week = WeekCalendar.week(containing: today)
+        let week = WeekCalendar.week(containing: actionDay, calendar: calendar)
         if presentsIsland {
             GoalPopCentre.popIfRequestedCompletion(
                 requestedDone: done,
-                habit: habit.snapshot(within: week.dayIDs()),
+                habit: habit.snapshot(within: week.dayIDs(in: calendar), calendar: calendar),
                 in: week,
-                today: today
+                today: actionDay,
+                calendar: calendar
             )
         }
 
-        let result = try HabitStore(context: context)
-            .setCompletion(for: habit, on: today, done: done)
+        let result = try HabitStore(context: context, calendar: calendar, restDay: restDay)
+            .setCompletion(for: habit, on: actionDay, done: done)
 
         // A tap already costs a timeline reload, so the completion can animate
         // inside the timeline that reload produces. This is the note the
@@ -143,7 +178,10 @@ enum MarkHabitOperation {
             // Read here, on the main actor, and carried with the note — see
             // `WidgetBurst.record`.
             WidgetBurst.record(
-                habitID: id, reduceMotion: UIAccessibility.isReduceMotionEnabled
+                habitID: id,
+                day: actionDay,
+                calendar: calendar,
+                reduceMotion: UIAccessibility.isReduceMotionEnabled
             )
         } else {
             // Anything that is not a completion drops this habit's note, if it
@@ -167,10 +205,37 @@ enum MarkHabitOperation {
         // The origin is here and not on every line (#272): a single tap has
         // been seen performing this intent twice, 13ms apart, and what the
         // trace could not say was whether that was one process or two.
-        let outcome = "tap \(id.uuidString) [\(WidgetTrace.origin)]: \(verdict), burst \(result == .completed ? "recorded" : "skipped")"
+        let dayID = DayID(actionDay, calendar: calendar)
+        let outcome = "tap \(id.uuidString) on \(dayID.text) [\(WidgetTrace.origin)]: \(verdict), burst \(result == .completed ? "recorded" : "skipped")"
         GlowLog.widget.notice("\(outcome, privacy: .public)")
         WidgetTrace.record(outcome)
 
         return result
+    }
+}
+
+/// Resolves an archived control's requested day without trusting stale pixels.
+struct WidgetMarkRequest: Equatable, Sendable {
+    let day: Date?
+    let renderedDay: Date?
+
+    func resolvedDay(
+        actualToday: Date,
+        calendar: Calendar = WeekCalendar.calendar
+    ) -> Date? {
+        guard let day, let renderedDay else { return nil }
+        let actual = DayID(actualToday, calendar: calendar)
+        let surface = DayID(renderedDay, calendar: calendar)
+        guard surface == actual else { return nil }
+
+        let requested = DayID(day, calendar: calendar)
+        guard requested <= actual else { return nil }
+
+        // The week widget only creates controls for the seven days it drew.
+        // Holding this boundary here also makes a manually invoked or corrupt
+        // intent fail closed instead of becoming an arbitrary history writer.
+        let renderedWeek = WeekCalendar.week(containing: renderedDay, calendar: calendar)
+        guard renderedWeek.dayIDs(in: calendar).contains(requested) else { return nil }
+        return requested.date(in: calendar)
     }
 }

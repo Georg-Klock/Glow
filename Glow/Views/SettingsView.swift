@@ -208,9 +208,12 @@ struct SettingsView: View {
                     // What the glow aims for and what the panel is granting are
                     // a single fact in two halves; read as a sentence, the gap
                     // between them is obvious instead of arithmetic.
-                    Text(readout)
+                    Text(readout.text)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(
+                            readout.isWarning ? GlowPalette.warning : Color.secondary
+                        )
+                        .accessibilityLabel(readout.accessibilityLabel)
 
                 } header: {
                     Text("Glow")
@@ -361,11 +364,11 @@ struct SettingsView: View {
     /// nothing derives this: a lit mark ends at its own silhouette, and what is
     /// left is how much black the preview wants around it.
     ///
-    /// The footprint always stays occupied (#396, #497). Low Power Mode takes
-    /// priority because it is the condition the person cannot leave from this
-    /// screen; otherwise 1× puts a neutral "Glow off" capsule where the live
-    /// tile stood. Both alternatives have the tile's exact size, so moving the
-    /// slider never inserts a Form section or moves anything below it.
+    /// The footprint always stays occupied (#396, #497, #506). Low Power Mode
+    /// takes priority because it is the condition the person cannot leave from
+    /// this screen; otherwise the live tile stays in place across the entire
+    /// slider, including the ordinary-white 1× floor. Moving the slider never
+    /// inserts a Form section or moves anything below it.
     private var preview: some View {
         previewContent
             .padding(.vertical, Self.previewPadding)
@@ -375,13 +378,11 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var previewContent: some View {
-        switch GlowSettings.previewState(peak: peak, lowPower: lowPower.isLowPowerMode) {
+        switch GlowSettings.previewState(lowPower: lowPower.isLowPowerMode) {
         case .lowPower:
             LowPowerPreviewNotice(size: Self.previewSize) {
                 isShowingLowPowerNotice = true
             }
-        case .off:
-            GlowOffPreviewNotice(size: Self.previewSize)
         case .glow:
             GlowImageView(size: Self.previewSize)
         }
@@ -651,14 +652,11 @@ struct SettingsView: View {
     /// distinction beside the slider instead of making either value explain
     /// itself elsewhere.
     ///
-    /// At the bottom of the range the aim is dropped rather than printed as
-    /// "off": the amber notice directly below already says the glow is off, and
-    /// what is still worth reading is what the screen grants and could grant.
-    private var readout: String {
-        guard peak > GlowSettings.range.lowerBound else {
-            return headroom.summary
-        }
-        return String(format: "Aiming for %.0f×", peak) + " — " + headroom.summary
+    /// At the bottom of the range this row itself becomes the amber off-state
+    /// notice (#506), replacing—not supplementing—the irrelevant headroom
+    /// numbers. Above 1× it keeps the established grey aim and screen summary.
+    private var readout: GlowSettings.Readout {
+        GlowSettings.readout(peak: peak, headroomSummary: headroom.summary)
     }
 
     /// Samples immediately and then once a second until SwiftUI cancels the
@@ -667,7 +665,8 @@ struct SettingsView: View {
     @MainActor
     private func refreshHeadroomWhileVisible() async {
         while !Task.isCancelled {
-            headroom = .mainScreen
+            let sampled = EDRHeadroomSnapshot.mainScreen
+            if sampled != headroom { headroom = sampled }
             do {
                 try await Task.sleep(for: .seconds(1))
             } catch {
@@ -705,32 +704,6 @@ struct SettingsView: View {
         "A brighter glow makes the open habits stand out. Your eye adapts to "
             + "it, so everything else reads duller in exchange."
 
-}
-
-/// The neutral state that replaces the preview at 1× (#497).
-///
-/// It is deliberately not the amber Low Power surface: this is a slider
-/// position somebody chose, not a condition imposed by iOS. The visible copy
-/// fits the preview's capsule; the complete reassurance remains available to
-/// VoiceOver without making the fixed footprint grow.
-private struct GlowOffPreviewNotice: View {
-    let size: CGSize
-
-    var body: some View {
-        Label("Glow off", systemImage: "info.circle")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .frame(width: size.width, height: size.height)
-            .background {
-                Capsule(style: .continuous).fill(Color.white.opacity(0.08))
-            }
-            .overlay {
-                Capsule(style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.20), lineWidth: 1)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Glow off. Today's slot still shows, unlit.")
-    }
 }
 
 /// A named pair because UIKit's two headroom properties answer different

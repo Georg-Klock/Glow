@@ -479,6 +479,33 @@ struct WidgetPlacementTests {
         #expect(widgets.contains("MarkHabitOperation.perform("))
     }
 
+    /// The week and month deliberately do not share an editing horizon (#508).
+    /// Source is the boundary here: a still render cannot reveal which day an
+    /// archived AppIntent will write when its control is tapped.
+    @Test("Week controls carry their day while the month remains today-only")
+    func widgetDaysAreExplicitAndBounded() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        func source(_ path: String) throws -> String {
+            try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+        }
+
+        let week = try source("GlowWidget/WeekWidgetView.swift")
+        let monthGrid = try source("Glow/Logic/MonthGrid.swift")
+        let toggle = try source("GlowWidget/SlotToggle.swift")
+        let intent = try source("Glow/Store/MarkHabitIntent.swift")
+
+        #expect(week.components(separatedBy: ".week(allowingFuture: false)").count >= 3)
+        #expect(monthGrid.contains("editing: .todayOnly"))
+        #expect(toggle.contains("day: day"))
+        #expect(toggle.contains("renderedDay: renderedDay"))
+        #expect(intent.contains("@Parameter(title: \"Day\")"))
+        #expect(intent.contains("@Parameter(title: \"Rendered Day\")"))
+        #expect(intent.contains("guard surface == actual"))
+        #expect(intent.contains("guard requested <= actual"))
+    }
+
     /// Rasterization is selected by the host, not baked into the production
     /// widget view. The default therefore protects WidgetKit's independently
     /// baselined archive path, while the scrolling app host flattens only the

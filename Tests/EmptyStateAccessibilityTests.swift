@@ -157,10 +157,10 @@ struct EmptyStateAccessibilityTests {
         let screen = try WidgetScreen()
         defer { screen.tearDown() }
 
-        let openControl = try #require(screen.contentElements().first {
-            ($0.accessibilityLabel ?? "").hasPrefix("Preview Habit,")
-                && $0.accessibilityHint == "Mark as done"
-        })
+        let openControl = try #require(screen.contentElements().filter { element in
+            element.accessibilityLabel == screen.todayOpenLabel
+                && element.accessibilityHint == "Mark as done"
+        }.first)
         #expect(openControl.accessibilityActivate())
         await screen.settleAfterAction()
 
@@ -174,10 +174,10 @@ struct EmptyStateAccessibilityTests {
         screen.scrollToBottom()
         let monthElements = screen.contentElements()
         #expect(monthElements.contains { $0.accessibilityLabel == "Monthly View per Habit" })
-        let doneMonthControl = try #require(monthElements.first {
-            ($0.accessibilityLabel ?? "").hasPrefix("Preview Habit,")
-                && $0.accessibilityHint == "Mark as not done"
-        })
+        let doneMonthControl = try #require(monthElements.filter { element in
+            element.accessibilityLabel == screen.todayDoneLabel
+                && element.accessibilityHint == "Mark as not done"
+        }.first)
         #expect(doneMonthControl.accessibilityActivate())
         await screen.settleAfterAction()
         #expect(try screen.persistedIsDone() == false)
@@ -346,6 +346,14 @@ struct EmptyStateAccessibilityTests {
         let window: UIWindow
         let habitID: UUID
         let today: Date
+
+        var todayOpenLabel: String {
+            SlotVoice.label(habitName: "Preview Habit", mark: .openToday, day: today)
+        }
+
+        var todayDoneLabel: String {
+            SlotVoice.label(habitName: "Preview Habit", mark: .doneToday, day: today)
+        }
 
         init() throws {
             container = try ModelContainer(

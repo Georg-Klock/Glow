@@ -8,10 +8,12 @@ import Foundation
 /// for a new timeline. That timeline can carry a second's worth of entries
 /// before it settles, so the completion animates for free.
 ///
-/// This type is the note the intent leaves for the provider: which habit was
-/// tapped, and when.
+/// This type is the note the intent leaves for the provider: which habit and
+/// civil day were tapped, and when. The day matters once a row has several
+/// live controls: only the mark actually completed may animate (#508).
 enum WidgetBurst {
     private static let habitKey = "burstHabitID"
+    private static let dayKey = "burstDay"
     private static let timeKey = "burstAt"
     private static let motionKey = "burstReduceMotion"
 
@@ -127,8 +129,15 @@ enum WidgetBurst {
     /// render time. For a note that survives at most `maximumLag` that is a
     /// distinction without a difference — and if anything the more honest of
     /// the two, since the tap is what the animation is about.
-    static func record(habitID: UUID, at date: Date = Date(), reduceMotion: Bool) {
+    static func record(
+        habitID: UUID,
+        day: Date,
+        at date: Date = Date(),
+        calendar: Calendar = WeekCalendar.calendar,
+        reduceMotion: Bool
+    ) {
         store.set(habitID.uuidString, forKey: habitKey)
+        store.set(DayID(day, calendar: calendar).text, forKey: dayKey)
         store.set(date.timeIntervalSince1970, forKey: timeKey)
         store.set(reduceMotion, forKey: motionKey)
     }
@@ -150,6 +159,7 @@ enum WidgetBurst {
     static func clear(habitID: UUID) {
         guard store.string(forKey: habitKey) == habitID.uuidString else { return }
         store.removeObject(forKey: habitKey)
+        store.removeObject(forKey: dayKey)
         store.removeObject(forKey: timeKey)
         store.removeObject(forKey: motionKey)
     }
@@ -159,14 +169,16 @@ enum WidgetBurst {
     /// Returns nil once the note has outlived `maximumLag`, so an ordinary
     /// reload — a midnight rollover, an edit in the app — renders a still
     /// widget rather than replaying somebody's last tap.
-    static func pending(now: Date = Date()) -> (habitID: UUID, startedAt: Date)? {
+    static func pending(now: Date = Date()) -> (habitID: UUID, day: DayID, startedAt: Date)? {
         guard let raw = store.string(forKey: habitKey),
-              let id = UUID(uuidString: raw)
+              let id = UUID(uuidString: raw),
+              let dayText = store.string(forKey: dayKey),
+              let day = DayID(dayText)
         else { return nil }
         let stamp = store.double(forKey: timeKey)
         guard stamp > 0 else { return nil }
         let started = Date(timeIntervalSince1970: stamp)
         guard now.timeIntervalSince(started) < maximumLag else { return nil }
-        return (id, started)
+        return (id, day, started)
     }
 }
