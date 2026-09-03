@@ -8076,6 +8076,19 @@ its family, so the extension responds independently of whether the app process
 is alive. Existing pixel baselines remain the normal appearance contract; a
 logic test pins the alternate branch and a source test pins all four shipping
 readers without treating blur rendered off-screen as accessibility evidence.
+## 2026-09-02 — Every past day drawn by the month can be corrected (#526)
+
+The small month widget uses the same nonfuture week-editing policy as the week
+widget for every week it displays, not only the current week. A month of mostly
+inert history would make identical marks mean different things by surface; the
+existing week rule already treats a fully past week as editable end to end.
+
+Daily cells take their actions directly from `WeekGrid`. Weekly cells use one
+`WeekSpans` projection per row and resolve the exact touched column rather than
+using a span's fallback day. Each cell remains a production `SlotToggle`, so a
+past add or undo updates optimistically in both the Home Screen widget and the
+in-app preview. Resting marks and render baselines do not change.
+
 ## 2026-09-02 — The month title starts at twice the shared top inset (#527)
 
 The small month widget adds its own 10pt top inset inside the generic 10pt

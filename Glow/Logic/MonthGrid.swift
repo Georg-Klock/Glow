@@ -10,11 +10,9 @@ struct MonthCell: Identifiable, Equatable, Sendable {
     /// order every other grid in the app uses.
     let column: Int
     let mark: SlotMark
-    /// The day a tap would toggle, or nil when the cell is not tappable. Only
-    /// today ever carries one: the month is a widget's grid and a read-only
-    /// screen, so it passes `SlotEditing.todayOnly` and edits today alone. What
-    /// changed with #116 is the justification, not the behaviour — R2 used to
-    /// say no grid could edit the past, and now the week view can.
+    /// The day a tap would toggle, or nil when the cell is not tappable. The
+    /// month uses the week surface's nonfuture editing rule, so this is always
+    /// this cell's own date — never a span's fallback date (#526).
     let actionDay: Date?
 
     var id: Date { date }
@@ -32,14 +30,15 @@ struct MonthCell: Identifiable, Equatable, Sendable {
 ///
 /// - **Daily habits** are day-pinned, so each week of the month is handed to
 ///   `WeekGrid.slots` and the columns read straight off it. Every settled rule
-///   — missed only in the past, only today open, a rest day never missed —
-///   arrives from the one place it is defined, and any future change there is
-///   inherited here without a second edit.
+///   — missed only in the past, only today open, every nonfuture day editable,
+///   a rest day never missed — arrives from the one place it is defined, and
+///   any future change there is inherited here without a second edit.
 /// - **N×/week habits** are not day-pinned, so the week row has no opinion
 ///   about which weekday a completion sits on — but the month is a calendar,
 ///   so a completion shows on the day it really happened. Whether *today* is
 ///   open is still the week row's own verdict: `WeekGrid.slots` decides, and
-///   this asks.
+///   this asks. Which exact days accept a correction is `WeekSpans.day`'s
+///   verdict under the same nonfuture editing policy the week widget uses.
 ///
 ///   **A lost week Xs its past unlogged days** (#82). It used to decline this
 ///   verdict — "a week already lost is a judgement this grid does not invent" —
@@ -54,6 +53,25 @@ struct MonthCell: Identifiable, Equatable, Sendable {
 ///   an X on a day you can still act on would be a prediction, which is the one
 ///   thing this mark must never be.
 enum MonthGrid {
+    /// The immediate face an undo shows before WidgetKit reloads the row.
+    /// Daily cells use the same past/today/pre-creation rule as `WidgetSlot`;
+    /// weekly cells mirror `WidgetSpan`'s open optimistic face because the
+    /// provider owns the span re-division that follows the write.
+    static func undoneMark(
+        for cell: MonthCell, habit: HabitSnapshot, today: Date
+    ) -> SlotMark {
+        guard cell.mark == .doneToday || cell.mark == .donePast else {
+            return cell.mark
+        }
+        switch habit.frequency {
+        case .daily:
+            guard habit.existed(on: cell.date) else { return .upcoming }
+            return cell.date == WeekCalendar.day(today) ? .openToday : .missed
+        case .timesPerWeek:
+            return .openToday
+        }
+    }
+
     /// The civil days this grid draws for the month `day` falls in — whole
     /// weeks, so the ends run into the neighbouring months exactly as the
     /// cells do.
@@ -92,18 +110,16 @@ enum MonthGrid {
         let todayStart = WeekCalendar.day(today, calendar: calendar)
         guard let month = calendar.dateInterval(of: .month, for: todayStart) else { return [] }
 
-        // The week row's verdict on today, asked once rather than re-derived:
-        // is anything open, and is a completion made today still undoable? For
-        // a daily habit the per-day marks below come from the same call, so
-        // the two grids can never disagree about today — and whatever the week
-        // row withholds (a rest day, a spent week), this inherits.
+        let editing = SlotEditing.week(allowingFuture: false)
+
+        // The week row's verdict on today, asked once rather than re-derived.
+        // Whatever it withholds (a rest day or a spent week), this inherits.
         let thisWeek = WeekCalendar.week(containing: todayStart, calendar: calendar)
         let weekVerdict = WeekGrid.slots(
             for: habit, in: thisWeek, today: todayStart,
-            editing: .todayOnly, restDay: restDay, calendar: calendar
+            editing: editing, restDay: restDay, calendar: calendar
         )
         let todayIsOpen = weekVerdict.contains { $0.state == .open }
-        let todayHasUndo = weekVerdict.contains { $0.isTappable && $0.state == .filled }
 
         // A per-week habit's target, for the lost-rep verdict below. Daily rows
         // take their marks straight off `WeekGrid` and never need it.
@@ -117,34 +133,43 @@ enum MonthGrid {
             let slots: [Slot]? = habit.frequency == .daily
                 ? WeekGrid.slots(
                     for: habit, in: week, today: todayStart,
-                    editing: .todayOnly, restDay: restDay, calendar: calendar
+                    editing: editing, restDay: restDay, calendar: calendar
                 )
                 : nil
 
-            // How many reps this week has run out of days for. Asked of
-            // `WeekSpans` rather than re-derived, so the month and the week row
-            // cannot disagree about whether a week is lost.
-            let lostThisWeek = weeklyTarget.map { target in
+            // One span projection supplies both the lost-rep verdict and each
+            // exact column's action. The latter is resolved with `day(...)`,
+            // not the span's location-less fallback, so Monday always edits
+            // Monday even when a pill continues through Wednesday (#526).
+            let spans = weeklyTarget.map { target in
                 WeekSpans.spans(
                     for: habit, in: week, today: todayStart, target: target,
-                    editing: .todayOnly, restDay: restDay, calendar: calendar
-                ).count { $0.state == .missed }
-            } ?? 0
+                    editing: editing, restDay: restDay, calendar: calendar
+                )
+            }
+            let lostThisWeek = spans?.count { $0.state == .missed } ?? 0
 
             for (column, day) in week.days.enumerated() where month.contains(day) && day < month.end {
                 let mark: SlotMark
-                let actionDay: Date?
+                let actionDay: Date? = if let slots {
+                    slots[column].actionDay
+                } else if let span = spans?.first(where: {
+                    ($0.firstDay...$0.lastDay).contains(column)
+                }) {
+                    WeekSpans.day(
+                        atColumn: column, of: span, for: habit, in: week,
+                        today: todayStart, editing: editing, restDay: restDay,
+                        calendar: calendar
+                    )
+                } else {
+                    nil
+                }
                 if let slots {
                     mark = slots[column].mark
-                    actionDay = slots[column].actionDay
                 } else if habit.count(on: day) > 0 {
                     mark = day == todayStart ? .doneToday : .donePast
-                    // Today's completion is undoable exactly when the week
-                    // row says its own tap is — same rule, one place.
-                    actionDay = day == todayStart && todayHasUndo ? todayStart : nil
                 } else if day == todayStart, todayIsOpen {
                     mark = .openToday
-                    actionDay = todayStart
                 } else if lostThisWeek > 0, day < todayStart,
                           !WeekPreferences.isRestDay(
                               day, restDay: restDay, calendar: calendar
@@ -153,10 +178,8 @@ enum MonthGrid {
                     // today and the days after it can still be acted on, and an
                     // X there would be a prediction.
                     mark = .missed
-                    actionDay = nil
                 } else {
                     mark = .upcoming
-                    actionDay = nil
                 }
                 cells.append(MonthCell(
                     date: day, row: row, column: column, mark: mark, actionDay: actionDay

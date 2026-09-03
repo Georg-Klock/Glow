@@ -48,14 +48,17 @@ struct MonthGridTests {
         }
 
         #expect(byDay(10)?.mark == .donePast)
-        // Yesterday, unlogged: a daily habit misses.
+        #expect(byDay(10)?.actionDay == done)
+        // Yesterday, unlogged: a daily habit misses and can be corrected.
         #expect(byDay(18)?.mark == .missed)
-        // Today, unlogged: the one open — and the one tappable — cell.
+        #expect(byDay(18)?.actionDay == TestCalendar.date(2026, 8, 18))
+        // Today remains open and tappable.
         #expect(byDay(19)?.mark == .openToday)
         #expect(byDay(19)?.isTappable == true)
-        #expect(cells.count(where: \.isTappable) == 1)
+        #expect(cells.count(where: \.isTappable) == 19)
         // Still to come.
         #expect(byDay(25)?.mark == .upcoming)
+        #expect(byDay(25)?.isTappable == false)
     }
 
     @Test("A rest day draws nothing in the month either")
@@ -99,14 +102,16 @@ struct MonthGridTests {
 
         #expect(cells.count { $0.mark == .donePast } == 2)
         // This week holds nothing yet, so today is open by the week row's own
-        // verdict, and it is the only tappable cell.
+        // verdict. Every nonfuture column its open span covers is correctable.
         let todayCell = cells.first { $0.date == today }
         #expect(todayCell?.mark == .openToday)
-        #expect(cells.count(where: \.isTappable) == 1)
+        let thisWeek = WeekCalendar.week(containing: today, calendar: calendar)
+        #expect(cells.first { $0.date == thisWeek.days[0] }?.isTappable == true)
+        #expect(cells.first { $0.date == thisWeek.days[1] }?.isTappable == true)
+        #expect(todayCell?.isTappable == true)
 
         // Nothing in this week or later is crossed: today and the days after
         // it can still be acted on.
-        let thisWeek = WeekCalendar.week(containing: today, calendar: calendar)
         #expect(!cells.contains { $0.mark == .missed && $0.date >= thisWeek.start })
     }
 
@@ -127,7 +132,7 @@ struct MonthGridTests {
         // Two logged, five crossed — every unlogged day of it is in the past.
         #expect(inWeek.count { $0.mark == .donePast } == 2)
         #expect(inWeek.count { $0.mark == .missed } == 5)
-        #expect(inWeek.allSatisfy { !$0.isTappable })
+        #expect(inWeek.allSatisfy { $0.isTappable })
     }
 
     @Test("A lost week never crosses the rest day")
@@ -162,7 +167,8 @@ struct MonthGridTests {
 
     @Test("A met week closes today, and a completion today can be undone")
     func frequencyFollowsTheWeekVerdict() {
-        // Goal met this week without today: nothing open, nothing tappable.
+        // Goal met this week without today: nothing open. Its two actual
+        // completions remain individually undoable.
         let monday = TestCalendar.date(2026, 8, 17)
         let tuesday = TestCalendar.date(2026, 8, 18)
         let met = HabitSnapshot.fixture(
@@ -170,7 +176,9 @@ struct MonthGridTests {
         )
         let metCells = MonthGrid.cells(for: met, today: today, restDay: nil, calendar: calendar)
         #expect(!metCells.contains { $0.mark == .openToday })
-        #expect(metCells.allSatisfy { !$0.isTappable })
+        let thisWeek = WeekCalendar.week(containing: today, calendar: calendar)
+        let tappableThisWeek = metCells.filter { thisWeek.contains($0.date) && $0.isTappable }
+        #expect(Set(tappableThisWeek.map(\.date)) == Set([monday, tuesday]))
 
         // Done today: the mark says so, and the tap is the undo — the same
         // rule the week row applies to its own pill.
@@ -181,6 +189,94 @@ struct MonthGridTests {
         let todayCell = doneCells.first { $0.date == today }
         #expect(todayCell?.mark == .doneToday)
         #expect(todayCell?.isTappable == true)
+    }
+
+    @Test("Every action matches the week surface for the same exact day")
+    func actionsMatchWeekSurfaces() {
+        let habits: [HabitSnapshot] = [
+            .fixture(completedDays: [TestCalendar.date(2026, 8, 10)]),
+            .fixture(
+                frequency: .timesPerWeek(3),
+                completedDays: [
+                    TestCalendar.date(2026, 8, 3),
+                    TestCalendar.date(2026, 8, 10),
+                    TestCalendar.date(2026, 8, 12),
+                    TestCalendar.date(2026, 8, 19),
+                ]
+            ),
+        ]
+        let editing = SlotEditing.week(allowingFuture: false)
+
+        for habit in habits {
+            let cells = MonthGrid.cells(
+                for: habit, today: today, restDay: nil, calendar: calendar
+            )
+            for cell in cells {
+                let week = WeekCalendar.week(containing: cell.date, calendar: calendar)
+                let expected: Date?
+                switch habit.frequency {
+                case .daily:
+                    expected = WeekGrid.slots(
+                        for: habit, in: week, today: today, editing: editing,
+                        restDay: nil, calendar: calendar
+                    )[cell.column].actionDay
+                case .timesPerWeek(let target):
+                    let spans = WeekSpans.spans(
+                        for: habit, in: week, today: today, target: target,
+                        editing: editing, restDay: nil, calendar: calendar
+                    )
+                    let span = spans.first {
+                        ($0.firstDay...$0.lastDay).contains(cell.column)
+                    }
+                    expected = span.flatMap {
+                        WeekSpans.day(
+                            atColumn: cell.column, of: $0, for: habit, in: week,
+                            today: today, editing: editing, restDay: nil,
+                            calendar: calendar
+                        )
+                    }
+                }
+                let mismatch = Comment(rawValue:
+                    "\(habit.frequency), \(cell.date): \(String(describing: cell.actionDay)) "
+                        + "!= \(String(describing: expected))"
+                )
+                #expect(cell.actionDay == expected, mismatch)
+            }
+        }
+    }
+
+    @Test("An optimistic month undo uses the same face as its week control")
+    func optimisticUndoFacesMatchWeekControls() {
+        let past = TestCalendar.date(2026, 8, 18)
+        let daily = HabitSnapshot.fixture(completedDays: [past])
+        let dailyCell = MonthGrid.cells(
+            for: daily, today: today, restDay: nil, calendar: calendar
+        ).first { $0.date == past }!
+        #expect(MonthGrid.undoneMark(for: dailyCell, habit: daily, today: today) == .missed)
+
+        let weekly = HabitSnapshot.fixture(
+            frequency: .timesPerWeek(1), completedDays: [past]
+        )
+        let weeklyCell = MonthGrid.cells(
+            for: weekly, today: today, restDay: nil, calendar: calendar
+        ).first { $0.date == past }!
+        #expect(
+            MonthGrid.undoneMark(for: weeklyCell, habit: weekly, today: today) == .openToday
+        )
+
+        let beforeCreation = HabitSnapshot(
+            id: UUID(), name: "Inherited", icon: "book", frequency: .daily,
+            completionCounts: [past: 1],
+            createdDay: TestCalendar.date(2026, 8, 19)
+        )
+        let inheritedCell = MonthGrid.cells(
+            for: beforeCreation, today: today, restDay: nil, calendar: calendar
+        ).first { $0.date == past }!
+        #expect(
+            MonthGrid.undoneMark(
+                for: inheritedCell, habit: beforeCreation, today: today
+            ) == .upcoming
+        )
     }
 
     @Test("Blank rows have no month")
