@@ -138,6 +138,7 @@ struct MonthWidgetView: View {
                 Spacer(minLength: 0)
             }
         }
+        .padding(.top, WidgetMetrics.monthTopInset)
     }
 }
 

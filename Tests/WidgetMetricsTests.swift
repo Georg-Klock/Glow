@@ -21,30 +21,41 @@ struct WidgetMetricsTests {
         return SlotLayout.slotHeight(trackWidth: track)
     }
 
-    @Test("The month title puts the design grid at 32 without moving the weekday header")
+    @Test("The month title starts at twice the shared top inset")
     func monthTitleOwnsItsLineBox() {
         #expect(WidgetMetrics.headerHeight == 14)
         #expect(WidgetMetrics.monthTitleHeight == 18)
+        #expect(WidgetMetrics.monthTopInset == WidgetMetrics.padTop)
+        #expect(WidgetMetrics.padTop + WidgetMetrics.monthTopInset == 20)
         #expect(
             WidgetMetrics.padTop
+                + WidgetMetrics.monthTopInset
                 + WidgetMetrics.monthTitleHeight
-                + WidgetMetrics.headerGap == 32
+                + WidgetMetrics.headerGap == 42
         )
     }
 
     @Test(
         "Four-, five-, and six-row months split the space below the title",
-        arguments: [(4, 19.5), (5, 10.0), (6, 0.5)]
+        arguments: [(4, 14.5), (5, 5.0), (6, 0.0)]
     )
     func shortMonthsCentreTheirRowBlock(rows: Int, expectedOffset: CGFloat) {
         // The small widget's 158pt frame leaves a 134pt content box inside its
-        // 10/14 vertical insets. A month cell is 16pt on a 19pt pitch, and the
-        // title plus its gap occupies 22pt. These are the authored metrics, so
-        // the margins below are the actual 4/5/6-row placements from #505.
-        let contentHeight: CGFloat = 158 - WidgetMetrics.padTop - WidgetMetrics.padBottom
+        // 10/14 shared vertical insets and a second month-only 10pt top inset.
+        // A month cell is 16pt on a 19pt pitch, and the title plus its gap
+        // occupies 22pt. These are the actual 4/5/6-row placements from #527.
+        let contentHeight: CGFloat = 158
+            - WidgetMetrics.padTop - WidgetMetrics.padBottom - WidgetMetrics.monthTopInset
         let slot: CGFloat = 16
-        let gap: CGFloat = 3
+        let naturalGap: CGFloat = 3
         let header = WidgetMetrics.monthTitleHeight + WidgetMetrics.headerGap
+        let available = contentHeight - header
+        let gap = rows > 1
+            ? max(1, min(
+                naturalGap,
+                (available - CGFloat(rows) * slot) / CGFloat(rows - 1)
+            ))
+            : 0
         let offset = WidgetMetrics.rowsOffset(
             contentHeight: contentHeight,
             slot: slot,
@@ -58,9 +69,10 @@ struct WidgetMetricsTests {
         #expect(abs(offset - expectedOffset) < 0.001)
         #expect(abs(offset - bottom) < 0.001)
         if rows == 6 {
-            // The file's six-row month stays at y=32.5 — within the deliberate
-            // half-point of the y=32 placement #493 established.
-            #expect(abs(WidgetMetrics.padTop + header + offset - 32.5) < 0.001)
+            #expect(abs(gap - 1.2) < 0.001)
+            #expect(abs(
+                WidgetMetrics.padTop + WidgetMetrics.monthTopInset + header + offset - 42
+            ) < 0.001)
         }
     }
 
