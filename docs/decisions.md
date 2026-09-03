@@ -8088,3 +8088,16 @@ the rule already established for that grid: its 16pt cells and 3pt horizontal
 gaps remain fixed while the vertical gap tightens to 1.2pt. Four- and five-row
 months retain the natural 3pt gap and centre their shorter row blocks in the
 space below the newly positioned title.
+
+## 2026-09-02 — The weekday header travels with its rows (#517)
+
+This explicitly supersedes #368's choice to pin the large widget's weekday
+header at the top. A short large widget now centres the weekday header, its
+existing gap and the visible habit rows as one group. The header belongs to the
+columns it labels, so the air above it and below the last row is shared evenly
+instead of leaving the header behind when the rows move.
+
+A full ten-row large widget has no slack and therefore remains in exactly the
+same position. A medium widget has no header and keeps the same row-only
+centring. The month's title continues to use `rowsOffset`; `groupOffset` is a
+separate week-only expression so this reversal cannot move that title.

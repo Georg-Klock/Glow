@@ -422,6 +422,22 @@ enum WidgetMetrics {
         return max(0, (available - block) / 2)
     }
 
+    /// How far a week widget's header-and-rows group sits from the top (#517).
+    ///
+    /// This is deliberately a sibling of `rowsOffset`, even though the two
+    /// reduce to the same arithmetic for the week's fixed metrics. Their
+    /// meanings differ: `rowsOffset` places rows in the space left *after* a
+    /// title or header, while this places the header inside the centred group.
+    /// Keeping the APIs distinct prevents the month's title from travelling
+    /// when only the weekday header was asked to move.
+    static func groupOffset(
+        contentHeight: CGFloat, slot: CGFloat, rows: Int, hasHeader: Bool
+    ) -> CGFloat {
+        let header = hasHeader ? headerHeight + headerGap : 0
+        let rowsHeight = CGFloat(rows) * slot + CGFloat(max(0, rows - 1)) * rowGap
+        return max(0, (contentHeight - header - rowsHeight) / 2)
+    }
+
     /// How many habit rows fit in a given height.
     ///
     /// Derived rather than written down, so it cannot drift when the padding,

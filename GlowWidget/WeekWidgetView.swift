@@ -130,6 +130,12 @@ struct WeekWidgetView: View {
                 WeekPreferences.isRestDay($0, restDay: restDay)
             })
             let cut = RestCut.rows(eligible, capacity: capacity)
+            let groupOffset = WidgetMetrics.groupOffset(
+                contentHeight: proxy.size.height,
+                slot: side,
+                rows: shown.count,
+                hasHeader: showsHeader
+            )
 
             VStack(alignment: .leading, spacing: WidgetMetrics.rowGap) {
                 if showsHeader {
@@ -147,12 +153,6 @@ struct WeekWidgetView: View {
                     // rows stand from each other.
                     .padding(.bottom, WidgetMetrics.headerGap - WidgetMetrics.rowGap)
                 }
-                // **The rows centre in what the header leaves** (#368). The
-                // offset is `WidgetMetrics.rowsOffset`, which the render
-                // harness also samples by, so the widget and the thing
-                // measuring it cannot disagree about where a row is. Where the
-                // rows fill the family the offset is zero, which is why a large
-                // widget at capacity is untouched.
                 VStack(alignment: .leading, spacing: WidgetMetrics.rowGap) {
                     ForEach(Array(shown.enumerated()), id: \.element.id) { index, habit in
                         WidgetRow(
@@ -173,12 +173,6 @@ struct WeekWidgetView: View {
                         )
                     }
                 }
-                .padding(.top, WidgetMetrics.rowsOffset(
-                    contentHeight: proxy.size.height,
-                    slot: side,
-                    rows: shown.count,
-                    hasHeader: showsHeader
-                ))
                 // **§8.4's fourth recipe is not drawn here.** It belongs to
                 // `Frame 14`, and that frame has no fill, so in the file its
                 // inner shadow falls on the union of the marks' own alpha
@@ -194,19 +188,18 @@ struct WeekWidgetView: View {
                 // has no such shape, and it read as a box drawn around the
                 // grid.
             }
-            // The stack fills the frame so the rows above have a leftover to
-            // centre in; the header stays where it is.
-            //
-            // **The header does not travel with the rows** (#368). It labels the
-            // columns under it, and the family that has one is the family with
-            // the most rows — so pinning it costs nothing at capacity and keeps
-            // the weekday letters at the top edge, where a person looks for
-            // them, rather than floating them down beside a short grid.
+            // **Header and rows travel as one centred group** (#517,
+            // superseding #368). The shared offset is applied outside both,
+            // while the header keeps its existing gap before the first row.
+            // At ten rows there is no slack, so a full large widget does not
+            // move. With no header this reduces to the medium widget's existing
+            // row-block centring.
             //
             // What replaced a trailing `Spacer(minLength: 0)` is the greedy
             // frame on the rows, not this: a spacer could only ever push the
             // slack downwards, which is why two habits on a medium sat against
             // the top edge with the frame empty under them.
+            .padding(.top, groupOffset)
             .frame(
                 width: proxy.size.width, height: proxy.size.height, alignment: .topLeading
             )

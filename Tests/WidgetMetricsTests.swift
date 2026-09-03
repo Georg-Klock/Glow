@@ -76,6 +76,48 @@ struct WidgetMetricsTests {
         }
     }
 
+    @Test("A short large widget centres its header and rows as one group")
+    func shortWeekCentresHeaderAndRowsTogether() {
+        for rows in [1, 4, 5, 8, 10] {
+            let offset = WidgetMetrics.groupOffset(
+                contentHeight: contentHeight,
+                slot: largeSlot,
+                rows: rows,
+                hasHeader: true
+            )
+            let groupHeight = WidgetMetrics.headerHeight + WidgetMetrics.headerGap
+                + CGFloat(rows) * largeSlot
+                + CGFloat(max(0, rows - 1)) * WidgetMetrics.rowGap
+            let bottom = contentHeight - offset - groupHeight
+
+            #expect(abs(offset - bottom) < 0.001)
+            if rows == 10 {
+                #expect(offset < 0.001)
+            } else {
+                #expect(offset > 0)
+            }
+        }
+    }
+
+    @Test("A headerless medium keeps its existing row centring")
+    func headerlessGroupMatchesRowsOffset() {
+        let mediumContent: CGFloat = 158
+            - WidgetMetrics.padTop - WidgetMetrics.padBottom
+        for rows in 1...4 {
+            #expect(WidgetMetrics.groupOffset(
+                contentHeight: mediumContent,
+                slot: largeSlot,
+                rows: rows,
+                hasHeader: false
+            ) == WidgetMetrics.rowsOffset(
+                contentHeight: mediumContent,
+                slot: largeSlot,
+                rows: rows,
+                hasHeader: false
+            ))
+        }
+    }
+
     @Test("The large widget holds ten habits")
     func largeHoldsTen() {
         // **Eleven until #331.** Ten is not a stored number anywhere either: it
