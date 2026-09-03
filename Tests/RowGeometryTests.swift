@@ -346,6 +346,59 @@ struct RowGeometryTests {
         #expect(GridMetrics.rowPadding > 0)
     }
 
+    /// #548: at rest the List's trailing edge moves inward so its native
+    /// swipe actions stop where the row's day track stops. The row and panel
+    /// pay the opposite adjustment, so neither visible surface moves.
+    @Test("Only the native swipe edge moves; the row and panel stay put")
+    func trailingSwipeEdgeStopsAtTheTrack() {
+        for width in [200, 320, 338, 350, 353, 393, 402, 430, 1024] as [CGFloat] {
+            let geometry = RowGeometry(totalWidth: width)
+            let resting = GridHorizontalInsets(
+                isEditing: false,
+                padLeading: geometry.padLeading,
+                padTrailing: geometry.padTrailing
+            )
+            let editing = GridHorizontalInsets(
+                isEditing: true,
+                padLeading: geometry.padLeading,
+                padTrailing: geometry.padTrailing
+            )
+
+            #expect(
+                abs(
+                    resting.listTrailing - resting.listLeading
+                        - geometry.padTrailing
+                ) < 1e-9
+            )
+            #expect(
+                resting.listLeading + resting.rowLeading
+                    == GridMetrics.rowOuterInset(isEditing: false) + geometry.padLeading
+            )
+            #expect(
+                resting.listTrailing + resting.rowTrailing
+                    == GridMetrics.rowOuterInset(isEditing: false) + geometry.padTrailing
+            )
+            #expect(
+                resting.listLeading + resting.panelLeading
+                    == GridMetrics.horizontalPadding
+            )
+            #expect(
+                resting.listTrailing + resting.panelTrailing
+                    == GridMetrics.horizontalPadding
+            )
+
+            #expect(editing.listLeading == editing.listTrailing)
+            #expect(
+                editing.listLeading + editing.panelLeading
+                    == GridMetrics.horizontalPadding
+            )
+            #expect(
+                editing.listTrailing + editing.panelTrailing
+                    == GridMetrics.horizontalPadding
+            )
+        }
+    }
+
     /// #440: while the list is being edited the row is not a label column and
     /// a track, it is one width with a centred name in it — so the cap on the
     /// name is a different number, and it is the one the row grants.

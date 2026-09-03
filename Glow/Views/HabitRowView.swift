@@ -341,6 +341,40 @@ enum GridMetrics {
     static let editControlReach: CGFloat = 39
 }
 
+/// The three horizontal layers of the app grid: List, row and panel.
+///
+/// The trailing side has one extra job at rest. SwiftUI positions a native
+/// swipe action from the List's trailing bound, not from the content inside a
+/// row. Moving only that bound inward by the widget's trailing inset makes the
+/// action stop at the day track; subtracting the same amount from the row and
+/// panel padding keeps both of those exactly where they were (#548).
+///
+/// Edit mode does not offer the swipe actions (its native remove control owns
+/// that gesture). It therefore keeps the symmetric List bounds #400/#520 use
+/// to position the remove and reorder controls.
+struct GridHorizontalInsets: Equatable {
+    let listLeading: CGFloat
+    let listTrailing: CGFloat
+    let rowLeading: CGFloat
+    let rowTrailing: CGFloat
+    let panelLeading: CGFloat
+    let panelTrailing: CGFloat
+
+    init(isEditing: Bool, padLeading: CGFloat, padTrailing: CGFloat) {
+        let list = GridMetrics.listInset(isEditing: isEditing)
+        let row = GridMetrics.contentInset(isEditing: isEditing)
+        let panel = GridMetrics.panelInset(isEditing: isEditing)
+        let swipe = isEditing ? 0 : padTrailing
+
+        listLeading = list
+        listTrailing = list + swipe
+        rowLeading = row + padLeading
+        rowTrailing = row + padTrailing - swipe
+        panelLeading = panel
+        panelTrailing = panel - swipe
+    }
+}
+
 /// One habit: icon and name on the left, a fixed-width status track on the right.
 struct HabitRowView: View {
     let snapshot: HabitSnapshot

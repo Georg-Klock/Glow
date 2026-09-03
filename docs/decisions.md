@@ -8153,3 +8153,29 @@ delete circle and reorder handle in the whole taller cell, moving them down
 the real edit mode at 8, 9, 10 and 11 habits, requires every ordinary editable
 cell to keep one height and one pitch, and separately allows the deliberate
 widget-boundary cell only when the eleventh habit exists.
+
+## 2026-09-03 — Swipe ends at the track; the native drag proxy stays native (#548)
+
+The List has asymmetric bounds while it is not being edited. Its trailing
+bound comes inward by the widget-derived `padTrailing`, which makes SwiftUI's
+native Edit and Delete swipe actions stop where the row's day track stops.
+The row gives that same amount back through its trailing inset, and the panel
+extends by the same amount behind the narrower List, so the track, header and
+material surface do not move. On the iPhone 17e / iOS 26.5 test surface, the
+Delete action's right edge moved from 369.7pt to the track's 355.5pt. A
+physical UI gate derives that track edge from the production design geometry.
+
+Edit mode keeps symmetric List bounds. Its native remove and reorder controls
+already use those bounds for the doubled breathing room from #520, while
+swipe actions are unavailable in that mode.
+
+The reorder drag proxy is accepted as system-owned transient chrome. Holding a
+real native reorder drag toward the screen's leading edge proved that the
+proxy is rendered outside the List and follows the finger beyond the panel;
+clipping the List or its panel does not reach that separate presentation
+layer. Preventing that movement would mean replacing native `List.onMove`
+with a custom drag recognizer and proxy, losing the system's reorder session,
+accessibility and future platform behavior for a decoration that disappears
+the instant the finger lifts. The physical regression therefore proves that
+native reordering still works after the swipe-bound adjustment rather than
+pretending an ancestor mask can constrain the proxy.
