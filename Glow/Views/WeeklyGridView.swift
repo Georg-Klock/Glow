@@ -427,9 +427,11 @@ struct WeeklyGridView: View {
             let geometry = RowGeometry(totalWidth: max(0, proxy.size.width - inset * 2))
             let snapshots = self.snapshots
             let isEditing = editMode.isEditing
-            let rowPadding = GridMetrics.contentInset(isEditing: isEditing)
-            let listInset = GridMetrics.listInset(isEditing: isEditing)
-            let panelInset = GridMetrics.panelInset(isEditing: isEditing)
+            let horizontal = GridHorizontalInsets(
+                isEditing: isEditing,
+                padLeading: geometry.padLeading,
+                padTrailing: geometry.padTrailing
+            )
             // The rest day's line ends on a habit, and it ends where the widget
             // ends: the same `largeRowCapacity` that decides the boundary
             // hairline below, so the cut stops on that line rather than running
@@ -479,8 +481,8 @@ struct WeeklyGridView: View {
                 // counts as the header block.
                 WeekdayHeader(geometry: geometry, week: week, today: today, snapshots: snapshots)
                     .padding(.top, geometry.padTop)
-                    .padding(.leading, rowPadding + geometry.padLeading)
-                    .padding(.trailing, rowPadding + geometry.padTrailing)
+                    .padding(.leading, horizontal.rowLeading)
+                    .padding(.trailing, horizontal.rowTrailing)
                     // The widget's header stands further from the first
                     // row than the rows stand from each other.
                     .padding(
@@ -516,14 +518,14 @@ struct WeeklyGridView: View {
                     }
                     .listRowInsets(EdgeInsets(
                         top: geometry.rowInset,
-                        leading: rowPadding + geometry.padLeading,
+                        leading: horizontal.rowLeading,
                         // Every editable cell has the same ordinary bottom
                         // inset. The panel's larger bottom breathing room is
                         // a separate row below the `ForEach`; putting it in
                         // the final cell makes the native edit controls centre
                         // themselves 15.6 pixels below the habit (#546).
                         bottom: bottomInset,
-                        trailing: rowPadding + geometry.padTrailing
+                        trailing: horizontal.rowTrailing
                     ))
                     .listRowSeparator(.hidden)
                     // **Nothing behind a row any more** (#398). The panel
@@ -616,22 +618,27 @@ struct WeeklyGridView: View {
             // `ScrollingPanel` for the measurement: as this view's own `@State`
             // it re-evaluated the whole grid on every frame of a scroll.
             .modifier(ScrollingPanel(
-                panel: panel(geometry: geometry, inset: panelInset)
+                panel: panel(geometry: geometry, horizontal: horizontal)
             ))
             // **The edit controls' breathing room, taken from the `List`**
-            // (#400, doubled while editing by #520). The delete circle and the reorder handle are the
-            // system's, laid out against the `List`'s own bounds — measured,
-            // they ignore `listRowInsets` completely — so the only way to
-            // move them without drawing replacements is to move the bounds.
+            // (#400, doubled while editing by #520). The delete circle and the
+            // reorder handle are the system's, laid out against the `List`'s
+            // own bounds — measured, they ignore `listRowInsets` completely —
+            // so the only way to move them without drawing replacements is to
+            // move the bounds.
             //
             // **After `.background`, and that ordering is load-bearing.** At
-            // rest, the List and panel still pay 10pt each. In edit mode the
-            // List pays 20pt and the panel's inner remainder falls to zero, so
-            // the visible card stays at the ordinary 20pt screen margin while
-            // the system controls and row content both slide another 10pt in.
+            // rest, the List's trailing edge also comes in by the scaled
+            // widget trailing inset so a native swipe action ends at the day
+            // track (#548); the row and panel compensate in the opposite
+            // direction, so neither visible thing moves. In edit mode swipe
+            // actions are unavailable and the List returns to symmetric 20pt
+            // bounds for the native remove/reorder controls. The visible card
+            // stays at the ordinary 20pt screen margin in both modes.
             // The toolbar's existing edit transaction animates these values;
             // #522 removes that transaction under Reduce Motion.
-            .padding(.horizontal, listInset)
+            .padding(.leading, horizontal.listLeading)
+            .padding(.trailing, horizontal.listTrailing)
             // **The collapse a removed row leaves behind** (#398), driven off
             // the count rather than out of `delete`.
             //
@@ -673,10 +680,13 @@ struct WeeklyGridView: View {
     /// All four corners, where the header carried the top two and the last row
     /// the bottom two. One shape, one radius.
     ///
-    /// `inset` is the remainder after the List's own inset, not the row's
-    /// content inset (#400, #520). The two sum back to the ordinary 20pt in
-    /// both modes, so the panel does not follow the rows inward while editing.
-    private func panel(geometry: RowGeometry, inset: CGFloat) -> some View {
+    /// The panel insets are the remainders after the List's own insets, not the
+    /// row's content insets (#400, #520, #548). Each side sums back to the
+    /// ordinary 20pt, so the panel does not follow the system controls inward.
+    private func panel(
+        geometry: RowGeometry,
+        horizontal: GridHorizontalInsets
+    ) -> some View {
         GlowPalette.widgetSurface(reduceTransparency: reduceTransparency)
             .frame(height: geometry.panelHeight(
                 rows: habits.count,
@@ -685,7 +695,8 @@ struct WeeklyGridView: View {
             .clipShape(RoundedRectangle(
                 cornerRadius: GridMetrics.panelCorner, style: .continuous
             ))
-            .padding(.horizontal, inset)
+            .padding(.leading, horizontal.panelLeading)
+            .padding(.trailing, horizontal.panelTrailing)
         // Nothing here is readable and the marks above it are what a screen
         // reader walks. A decorative rectangle in the tree is one more stop on
         // the way to them.
