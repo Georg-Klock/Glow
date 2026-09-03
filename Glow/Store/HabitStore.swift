@@ -160,8 +160,11 @@ struct HabitStore {
     /// store means one thing and the flag had nothing left to say.
     @discardableResult
     func resetToDefaults(now: Date = Date()) throws -> Int {
+        // No by-hand `habit.completions` mutation on the way out (#318 took
+        // it off the tap; this takes it off the rest). `context.delete` clears
+        // the inverse itself, and the cached array is what must not be read:
+        // see `clearHistory`.
         for completion in try context.fetch(FetchDescriptor<Completion>()) {
-            completion.habit?.completions?.removeAll { $0.id == completion.id }
             context.delete(completion)
         }
         for habit in try context.fetch(FetchDescriptor<Habit>()) {
@@ -232,11 +235,30 @@ struct HabitStore {
     /// Explicitly rather than by cascade: a row being blanked is not a row
     /// being deleted, so nothing would cascade off it, and a reused row that
     /// kept its old days would show them under the new habit's name.
+    ///
+    /// **Fetched, not read off `habit.completions`** — the rule
+    /// `Habit.liveCompletions` states (#145), applied to the last writer that
+    /// still broke it. The cached array is the rows this context fetched
+    /// once; a row the widget's intent has since deleted through its own
+    /// container is still in it, and touching that element is the
+    /// `_InvalidFutureBackingData` trap, a precondition inside SwiftData
+    /// rather than an error. A fetch cannot return a row that is gone. It is
+    /// also the cheaper read: the array faults every completion the habit
+    /// has ever had, and this needs only their identities to delete them.
+    ///
+    /// `habit.completions = []` went with it. SwiftData maintains the inverse
+    /// from `Completion.habit` when a row is deleted —
+    /// `PersistenceTests.theInverseIsMaintainedWithoutBeingTold` holds the
+    /// framework to that — so assigning the array was a second write of the
+    /// same fact, and one that read the array to do it.
     private func clearHistory(of habit: Habit) throws {
-        for completion in habit.completions ?? [] {
+        let habitID = habit.id
+        let descriptor = FetchDescriptor<Completion>(
+            predicate: #Predicate { $0.habit?.id == habitID }
+        )
+        for completion in try context.fetch(descriptor) {
             context.delete(completion)
         }
-        habit.completions = []
     }
 
     /// Rewrites `sortOrder` across the whole list so the stored order matches
@@ -608,7 +630,6 @@ struct HabitStore {
             day: dayID.date(in: calendar), habit: habit, calendar: calendar
         )
         context.insert(completion)
-        habit.completions?.append(completion)
         try commit()
         return try completions(of: habit, on: dayID).count
     }
@@ -620,8 +641,6 @@ struct HabitStore {
         let doomed = try completions(of: habit, on: DayID(date, calendar: calendar))
         guard !doomed.isEmpty else { return 0 }
 
-        let ids = Set(doomed.map(\.id))
-        habit.completions?.removeAll { ids.contains($0.id) }
         for completion in doomed {
             context.delete(completion)
         }
