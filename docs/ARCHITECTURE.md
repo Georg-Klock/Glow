@@ -135,15 +135,19 @@ demo's seed and removal, the reset, `addCompletion`, `clearDay` and
 reaching it faults every completion the habit has ever had, and — the reason
 that mattered more — it is the cached array #145 made every reader stop
 trusting, so a writer iterating it after a peer container deleted one of its
-rows was the same trap on a different tap. The lines are gone everywhere and
+rows was the same trap on a different tap. The reads are gone everywhere and
 SwiftData maintains the inverse from `Completion.habit`, which the initializer
 sets and `context.delete` clears — `PersistenceTests` and `StaleWriterTests`
 assert that rather than assuming it, because it is a claim about the
-framework. `clearHistory` fetches the habit's rows by predicate. Nothing reads
-the cached array on a live store: `Habit.liveCompletions` fetches, and falls
-back to the array only for a model object that was never inserted. See
-decisions.md, 2026-09-02, for the one exposure that remains inside SwiftData's
-own cascade.
+framework. `clearHistory` fetches the habit's rows by predicate and then
+assigns `habit.completions = []` — an assignment, not a read — because the
+framework maintains the inverse for a habit that survives the save and not
+for the one being deleted in it: on iOS 18 a deleted habit otherwise keeps its
+cached array and, having lost its context, reports it. Nothing reads the
+cached array on a live store: `Habit.liveCompletions` fetches, and falls back
+to the array only for a model object without a context — one never inserted,
+or one already deleted. See decisions.md, 2026-09-02, for the one exposure
+that remains inside SwiftData's own cascade.
 
 The snapshot it hands back therefore holds only those days, which is the one
 thing to know before passing one on. Everything week-shaped asks only about days

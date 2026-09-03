@@ -246,11 +246,20 @@ struct HabitStore {
     /// also the cheaper read: the array faults every completion the habit
     /// has ever had, and this needs only their identities to delete them.
     ///
-    /// `habit.completions = []` went with it. SwiftData maintains the inverse
-    /// from `Completion.habit` when a row is deleted —
+    /// **`habit.completions = []` stays, and it is the last line for a
+    /// reason.** SwiftData maintains the inverse from `Completion.habit` for
+    /// a habit that survives the save —
     /// `PersistenceTests.theInverseIsMaintainedWithoutBeingTold` holds the
-    /// framework to that — so assigning the array was a second write of the
-    /// same fact, and one that read the array to do it.
+    /// framework to that on both runtimes — but not for the habit being
+    /// deleted in the same save. On iOS 18 the deleted model keeps its
+    /// cached array, loses its context, and `Habit.liveCompletions` then
+    /// falls back to that array: a deleted habit reported the days it used to
+    /// have (`SeedingTests.deleteRemovesEverythingButThePosition`, iOS 18.5
+    /// lane, 2026-09-02; iOS 26.5 passed the same test without this line).
+    /// Written after the rows are deleted, so nothing here iterates the
+    /// array; the one exposure left is the assignment itself diffing against
+    /// an element a peer container deleted, which `context.delete(habit)`'s
+    /// own cascade meets anyway — see `docs/decisions.md`.
     private func clearHistory(of habit: Habit) throws {
         let habitID = habit.id
         let descriptor = FetchDescriptor<Completion>(
@@ -259,6 +268,7 @@ struct HabitStore {
         for completion in try context.fetch(descriptor) {
             context.delete(completion)
         }
+        habit.completions = []
     }
 
     /// Rewrites `sortOrder` across the whole list so the stored order matches

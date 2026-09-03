@@ -7822,10 +7822,22 @@ mutations gone, the demo-removal and reset tests pass, and a fourth test holds
 the inverse SwiftData maintains on its own for `addCompletion`, `clearDay`,
 `seed` and `remove`, the way `PersistenceTests` holds it for the tap.
 
-**Decision.** No writer touches `habit.completions` any more. `context.delete`
+**Decision.** No writer *reads* `habit.completions` any more. `context.delete`
 and `Completion.init` maintain the inverse, and `clearHistory` fetches the
 habit's rows by predicate — the read `HabitStore.completions(of:on:)` already
 makes — rather than iterating an array it must not trust.
+
+**One assignment stays, and the iOS 18 lane is why.** `clearHistory` still
+ends with `habit.completions = []`, after the rows are deleted. The first cut
+dropped it on the reasoning that SwiftData maintains the inverse itself —
+which it does, for a habit that survives the save, and does not for the habit
+being deleted in it: on iOS 18.5 the deleted model kept its cached array and
+lost its context, `Habit.liveCompletions` fell back to the array, and
+`SeedingTests.deleteRemovesEverythingButThePosition` found a deleted habit
+still reporting its days. iOS 26.5 passed the same test without the line.
+Assigning an empty array iterates nothing; what it can still meet is an
+element a peer container deleted, which `context.delete(habit)`'s cascade
+meets a line later regardless.
 
 **What is left, stated plainly.** Deleting a habit whose array *has* been read
 after a peer delete still dies — inside SwiftData's own cascade, which walks
