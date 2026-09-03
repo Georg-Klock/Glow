@@ -41,6 +41,17 @@ enum GlowSettings {
         return Readout(text: text, isWarning: false, accessibilityLabel: text)
     }
 
+    /// What VoiceOver says while the Settings slider has focus (#524).
+    ///
+    /// SwiftUI's default percentage describes the thumb's position inside the
+    /// range, not the brightness the control sets. Name the product value
+    /// instead, and keep the floor consistent with the amber readout above:
+    /// ordinary white is "Glow off", not an apparently active 1x glow.
+    static func sliderAccessibilityValue(peak: Double) -> String {
+        guard peak > range.lowerBound else { return "Glow off" }
+        return String(format: "%.0f×", peak)
+    }
+
     static let key = "glowPeakHeadroom"
 
     /// Multiples of SDR white. 1x is no headroom at all, which is a legitimate

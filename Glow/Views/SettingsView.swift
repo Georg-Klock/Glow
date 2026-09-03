@@ -203,6 +203,9 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                     .tint(GlowPalette.color)
+                    .accessibilityValue(
+                        GlowSettings.sliderAccessibilityValue(peak: peak)
+                    )
 
                     // One sentence rather than two labelled rows of jargon.
                     // What the glow aims for and what the panel is granting are

@@ -86,6 +86,27 @@ struct GlowSettingsTests {
         #expect(readout.accessibilityLabel == readout.text)
     }
 
+    @Test("The slider speaks brightness rather than its percentage through the range")
+    func sliderSpeaksTheProductValue() throws {
+        #expect(
+            GlowSettings.sliderAccessibilityValue(
+                peak: GlowSettings.range.lowerBound
+            ) == "Glow off"
+        )
+        #expect(GlowSettings.sliderAccessibilityValue(peak: 2) == "2×")
+        #expect(GlowSettings.sliderAccessibilityValue(peak: 8) == "8×")
+
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: root.appending(path: "Glow/Views/SettingsView.swift"),
+            encoding: .utf8
+        )
+        #expect(source.contains(".accessibilityValue("))
+        #expect(source.contains("GlowSettings.sliderAccessibilityValue(peak: peak)"))
+    }
+
     @Test("Intensity drives the encoded headroom", arguments: [2.0, 4.0, 8.0])
     func intensityReachesTheEncoder(peak: Double) throws {
         // The setting is only meaningful if it survives all the way into the
