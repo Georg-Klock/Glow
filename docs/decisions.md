@@ -7794,6 +7794,58 @@ the footprint remain fixed rather than what removes that information.
 pure rule. The view switches all three outcomes inside `previewContent`, so the
 testable decision and the no-reflow structure stay separate.
 
+## 2026-09-02 — One tap, one refresh: the grid stops answering every defaults write with three fetches
+
+**Question.** `WeeklyGridView` re-read the demo-history flag and the record's
+two ends on every `UserDefaults.didChangeNotification`, on the reasoning that
+demo history lived in the defaults and the debug override still does. What
+does that cost per tap, now that a tap writes the defaults?
+
+**Measured**, iPhone 17 Pro simulator, iOS 26.5, a Debug build with counters
+on the store's fetches and the grid's handlers, ten rows with demo history on,
+one completion tap on the grid, host load 6–14:
+
+| | rounds of the defaults handler | store queries it ran | grid body passes |
+| --- | ---: | ---: | ---: |
+| `main` | 3 | 9 | 4 |
+| this change | 0 that touch the store | 0 | 4 |
+
+The three rounds were the pop's shuffle state (#452) and the trace line the
+widget reload records (#121), both written on the tap's own turn — each one a
+`fetchCount` over the completions and two sorted, limit-one fetches for the
+reach, for a day that had not moved. A tap on the Widgets tab, whose burst note
+is three more writes, ran the same three queries five times, on a screen that
+was not showing. End to end a grid tap went from sixteen SwiftData fetches to
+ten; the rest are the redraw's own.
+
+**Decision.** The defaults handler reads the override and touches the store
+only when today has changed. Demo history and the reach follow
+`StoreChange.committed`, which every save already posts — `HabitStore` and
+`DemoHistory` both — and which is the signal they were reaching through the
+trace line's write by accident. The behaviour is unchanged: the reach was
+refreshed after every toggle already, one turn late and three times over.
+
+**A claim corrected rather than restored.** `refreshReach` said it was *not*
+called from `toggle`, so that un-logging the earliest completion on record
+while standing on its week could not move the screen. That had been false
+since 2026-08-31 — the trace line's write called it after every toggle — and
+this change keeps the behaviour the code actually had and makes the comment
+say so. Whether the guard should come back is a question about what that tap
+should do, and it is left open rather than settled inside a performance change.
+
+**Two smaller redraws on the same tap.** The pop's dismissal task was a
+`@State`, so replacing it on each pop was a body pass with nothing to draw; it
+is held in a box now. And `delete` asked `WidgetCenter` for a reload directly
+after the store's commit had already queued one through `WidgetRefresh` — a
+second, uncoalesced, untraced reload per deleted row, the thing #134 exists to
+stop.
+
+**What is left, named rather than fixed.** The grid body still runs once after
+the widget reload's trace line is written, with a fetch and a body pass per
+row. That is `@AppStorage` on the App Group suite — the grid's first weekday,
+every row's rest day — answering a write to any key of that suite. It is the
+same shape as the finding above, one layer down, and it belongs to a decision
+about where the trace is written rather than to this change.
 ## 2026-09-02 — The scroll offset lives in a modifier, and a scroll stops redrawing the grid
 
 **Question.** #454 moved the grid's panel with the `List` by reading the
