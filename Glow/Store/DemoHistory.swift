@@ -123,7 +123,6 @@ struct DemoHistory {
                     day: day, habit: habit, demoSessionID: session, calendar: calendar
                 )
                 context.insert(completion)
-                habit.completions?.append(completion)
             }
         }
 
@@ -146,8 +145,18 @@ struct DemoHistory {
         let invented = try context.fetch(FetchDescriptor<Completion>(predicate: Self.invented))
         guard !invented.isEmpty else { return }
 
+        // `context.delete` alone. This used to take each row out of its
+        // habit's `completions` array by hand as well — the array #145 made
+        // every *reader* stop trusting, still trusted by the writer that
+        // removes a demo. It is the rows this context fetched once, so a
+        // completion the widget's intent has deleted since — through its own
+        // container, on a day the demo also filled — is still in it, and
+        // `$0.id` on that element is the `_InvalidFutureBackingData` trap: a
+        // precondition inside SwiftData, not an error, taken on the tap that
+        // switches the demo off. It was also the expensive half of this call,
+        // faulting every completion of every habit to scan them once per
+        // invented row. SwiftData maintains the inverse itself.
         for completion in invented {
-            completion.habit?.completions?.removeAll { $0.id == completion.id }
             context.delete(completion)
         }
 

@@ -7794,6 +7794,60 @@ the footprint remain fixed rather than what removes that information.
 pure rule. The view switches all three outcomes inside `previewContent`, so the
 testable decision and the no-reflow structure stay separate.
 
+## 2026-09-02 — The writers stop reading the cached relationship array
+
+**Question.** #318 removed `setCompletion`'s by-hand mutation of
+`habit.completions` and scoped that to one method: "`addCompletion`,
+`clearDay`, `resetToDefaults` and `clearHistory` keep their by-hand mutation.
+None of them is on the tap, and widening this would spend the same judgement
+on paths that are not paying for it." Were they paying?
+
+**They were, in the other currency.** #145 established why no *reader* may
+trust that array: it is the rows this context fetched once, and the widget's
+tap intent deletes rows through a container of its own without telling anyone,
+so a stored attribute read on a deleted element is `_InvalidFutureBackingData`
+— a precondition inside SwiftData, not an error. `DemoHistory.remove` read
+every element of every habit's array to take each invented row out by hand;
+`resetToDefaults` did the same over every completion in the store;
+`clearHistory` iterated the array to delete it. Seed a demo, un-mark one of
+its days from a Home Screen widget, then switch the demo off — or reset — and
+the app dies on that tap.
+
+**Reproduced rather than argued.** `StaleWriterTests` seeds through the app's
+context, deletes one row through a peer context, and runs each writer. Against
+`origin/main` the host aborted three times in one run — `SwiftData/
+BackingData.swift: Fatal error: This model instance was invalidated because
+its backing data could no longer be found` — once per writer. With the
+mutations gone, the demo-removal and reset tests pass, and a fourth test holds
+the inverse SwiftData maintains on its own for `addCompletion`, `clearDay`,
+`seed` and `remove`, the way `PersistenceTests` holds it for the tap.
+
+**Decision.** No writer *reads* `habit.completions` any more. `context.delete`
+and `Completion.init` maintain the inverse, and `clearHistory` fetches the
+habit's rows by predicate — the read `HabitStore.completions(of:on:)` already
+makes — rather than iterating an array it must not trust.
+
+**One assignment stays, and the iOS 18 lane is why.** `clearHistory` still
+ends with `habit.completions = []`, after the rows are deleted. The first cut
+dropped it on the reasoning that SwiftData maintains the inverse itself —
+which it does, for a habit that survives the save, and does not for the habit
+being deleted in it: on iOS 18.5 the deleted model kept its cached array and
+lost its context, `Habit.liveCompletions` fell back to the array, and
+`SeedingTests.deleteRemovesEverythingButThePosition` found a deleted habit
+still reporting its days. iOS 26.5 passed the same test without the line.
+Assigning an empty array iterates nothing; what it can still meet is an
+element a peer container deleted, which `context.delete(habit)`'s cascade
+meets a line later regardless.
+
+**What is left, stated plainly.** Deleting a habit whose array *has* been read
+after a peer delete still dies — inside SwiftData's own cascade, which walks
+the cached array on `context.delete(habit)` and meets the dead element below
+anything this code can reach. Nothing in the app reads that array on a live
+store any more, which is what keeps the path clean; a test that reads it first
+cannot be kept, because the host does not survive it. Getting rid of the last
+exposure means deleting a habit without the object graph — a batch delete, or
+a delete rule that is not `.cascade` — and either is a store decision rather
+than a plumbing change.
 ## 2026-09-02 — One tap, one refresh: the grid stops answering every defaults write with three fetches
 
 **Question.** `WeeklyGridView` re-read the demo-history flag and the record's

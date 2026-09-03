@@ -160,8 +160,11 @@ struct HabitStore {
     /// store means one thing and the flag had nothing left to say.
     @discardableResult
     func resetToDefaults(now: Date = Date()) throws -> Int {
+        // No by-hand `habit.completions` mutation on the way out (#318 took
+        // it off the tap; this takes it off the rest). `context.delete` clears
+        // the inverse itself, and the cached array is what must not be read:
+        // see `clearHistory`.
         for completion in try context.fetch(FetchDescriptor<Completion>()) {
-            completion.habit?.completions?.removeAll { $0.id == completion.id }
             context.delete(completion)
         }
         for habit in try context.fetch(FetchDescriptor<Habit>()) {
@@ -232,8 +235,37 @@ struct HabitStore {
     /// Explicitly rather than by cascade: a row being blanked is not a row
     /// being deleted, so nothing would cascade off it, and a reused row that
     /// kept its old days would show them under the new habit's name.
+    ///
+    /// **Fetched, not read off `habit.completions`** — the rule
+    /// `Habit.liveCompletions` states (#145), applied to the last writer that
+    /// still broke it. The cached array is the rows this context fetched
+    /// once; a row the widget's intent has since deleted through its own
+    /// container is still in it, and touching that element is the
+    /// `_InvalidFutureBackingData` trap, a precondition inside SwiftData
+    /// rather than an error. A fetch cannot return a row that is gone. It is
+    /// also the cheaper read: the array faults every completion the habit
+    /// has ever had, and this needs only their identities to delete them.
+    ///
+    /// **`habit.completions = []` stays, and it is the last line for a
+    /// reason.** SwiftData maintains the inverse from `Completion.habit` for
+    /// a habit that survives the save —
+    /// `PersistenceTests.theInverseIsMaintainedWithoutBeingTold` holds the
+    /// framework to that on both runtimes — but not for the habit being
+    /// deleted in the same save. On iOS 18 the deleted model keeps its
+    /// cached array, loses its context, and `Habit.liveCompletions` then
+    /// falls back to that array: a deleted habit reported the days it used to
+    /// have (`SeedingTests.deleteRemovesEverythingButThePosition`, iOS 18.5
+    /// lane, 2026-09-02; iOS 26.5 passed the same test without this line).
+    /// Written after the rows are deleted, so nothing here iterates the
+    /// array; the one exposure left is the assignment itself diffing against
+    /// an element a peer container deleted, which `context.delete(habit)`'s
+    /// own cascade meets anyway — see `docs/decisions.md`.
     private func clearHistory(of habit: Habit) throws {
-        for completion in habit.completions ?? [] {
+        let habitID = habit.id
+        let descriptor = FetchDescriptor<Completion>(
+            predicate: #Predicate { $0.habit?.id == habitID }
+        )
+        for completion in try context.fetch(descriptor) {
             context.delete(completion)
         }
         habit.completions = []
@@ -608,7 +640,6 @@ struct HabitStore {
             day: dayID.date(in: calendar), habit: habit, calendar: calendar
         )
         context.insert(completion)
-        habit.completions?.append(completion)
         try commit()
         return try completions(of: habit, on: dayID).count
     }
@@ -620,8 +651,6 @@ struct HabitStore {
         let doomed = try completions(of: habit, on: DayID(date, calendar: calendar))
         guard !doomed.isEmpty else { return 0 }
 
-        let ids = Set(doomed.map(\.id))
-        habit.completions?.removeAll { ids.contains($0.id) }
         for completion in doomed {
             context.delete(completion)
         }
