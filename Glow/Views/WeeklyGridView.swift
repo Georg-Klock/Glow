@@ -426,6 +426,10 @@ struct WeeklyGridView: View {
             let inset = GridMetrics.horizontalPadding
             let geometry = RowGeometry(totalWidth: max(0, proxy.size.width - inset * 2))
             let snapshots = self.snapshots
+            let isEditing = editMode.isEditing
+            let rowPadding = GridMetrics.contentInset(isEditing: isEditing)
+            let listInset = GridMetrics.listInset(isEditing: isEditing)
+            let panelInset = GridMetrics.panelInset(isEditing: isEditing)
             // The rest day's line ends on a habit, and it ends where the widget
             // ends: the same `largeRowCapacity` that decides the boundary
             // hairline below, so the cut stops on that line rather than running
@@ -475,8 +479,8 @@ struct WeeklyGridView: View {
                 // counts as the header block.
                 WeekdayHeader(geometry: geometry, week: week, today: today, snapshots: snapshots)
                     .padding(.top, geometry.padTop)
-                    .padding(.leading, GridMetrics.rowPadding + geometry.padLeading)
-                    .padding(.trailing, GridMetrics.rowPadding + geometry.padTrailing)
+                    .padding(.leading, rowPadding + geometry.padLeading)
+                    .padding(.trailing, rowPadding + geometry.padTrailing)
                     // The widget's header stands further from the first
                     // row than the rows stand from each other.
                     .padding(
@@ -514,12 +518,12 @@ struct WeeklyGridView: View {
                     }
                     .listRowInsets(EdgeInsets(
                         top: geometry.rowInset,
-                        leading: GridMetrics.rowPadding + geometry.padLeading,
+                        leading: rowPadding + geometry.padLeading,
                         // The last row stands the widget's `padBottom` off
                         // the panel's edge; every other row stands half a
                         // row gap off its neighbour.
                         bottom: bottomInset,
-                        trailing: GridMetrics.rowPadding + geometry.padTrailing
+                        trailing: rowPadding + geometry.padTrailing
                     ))
                     .listRowSeparator(.hidden)
                     // **Nothing behind a row any more** (#398). The panel
@@ -593,29 +597,22 @@ struct WeeklyGridView: View {
             // `ScrollingPanel` for the measurement: as this view's own `@State`
             // it re-evaluated the whole grid on every frame of a scroll.
             .modifier(ScrollingPanel(
-                panel: panel(geometry: geometry, inset: GridMetrics.rowPadding)
+                panel: panel(geometry: geometry, inset: panelInset)
             ))
             // **The edit controls' breathing room, taken from the `List`**
-            // (#400). The delete circle and the reorder handle are the
+            // (#400, doubled while editing by #520). The delete circle and the reorder handle are the
             // system's, laid out against the `List`'s own bounds — measured,
             // they ignore `listRowInsets` completely — so the only way to
             // move them without drawing replacements is to move the bounds.
             //
-            // **After `.background`, and that ordering is the whole trick.**
-            // The panel is drawn behind the `List` and then padded with it, so
-            // the two come in together and the rows hand back what the `List`
-            // took: every absolute position on this screen is what it was,
-            // and only the system's controls move. Sampled on an iPhone 17
-            // Pro / iOS 26.5, the whole grid outside edit mode is
-            // pixel-identical across this change. Put `.padding` *before*
-            // `.background` and the panel stays where it is while the rows
-            // move, which is the same picture with the grid 10pt narrower.
-            //
-            // It applies at all times rather than only while editing: a
-            // conditional would move the panel and the rows on the way into
-            // edit mode, and nothing on this screen should move because a
-            // control appeared beside it.
-            .padding(.horizontal, GridMetrics.editControlInset)
+            // **After `.background`, and that ordering is load-bearing.** At
+            // rest, the List and panel still pay 10pt each. In edit mode the
+            // List pays 20pt and the panel's inner remainder falls to zero, so
+            // the visible card stays at the ordinary 20pt screen margin while
+            // the system controls and row content both slide another 10pt in.
+            // The toolbar's existing edit transaction animates these values;
+            // #522 removes that transaction under Reduce Motion.
+            .padding(.horizontal, listInset)
             // **The collapse a removed row leaves behind** (#398), driven off
             // the count rather than out of `delete`.
             //
@@ -657,10 +654,9 @@ struct WeeklyGridView: View {
     /// All four corners, where the header carried the top two and the last row
     /// the bottom two. One shape, one radius.
     ///
-    /// `inset` is `GridMetrics.rowPadding`, not the full
-    /// `horizontalPadding` (#400): the `List` this is drawn behind is itself
-    /// padded by `editControlInset`, and the two sum back to 20pt. The panel
-    /// sits exactly where it did before that split.
+    /// `inset` is the remainder after the List's own inset, not the row's
+    /// content inset (#400, #520). The two sum back to the ordinary 20pt in
+    /// both modes, so the panel does not follow the rows inward while editing.
     private func panel(geometry: RowGeometry, inset: CGFloat) -> some View {
         GlowPalette.widgetSurface(reduceTransparency: reduceTransparency)
             .frame(height: geometry.panelHeight(

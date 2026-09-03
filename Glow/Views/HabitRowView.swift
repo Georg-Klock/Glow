@@ -102,10 +102,18 @@ struct RowGeometry: Equatable {
     /// has been logging at test-host startup.
     var nameMaxWidth: CGFloat { max(0, labelWidth - iconWidth - iconGap) }
 
-    /// Everything between the row's own edges: the label column, the gap after
-    /// it and the track. What the `List` proposes to a row, and — once the
-    /// track has gone — the whole of what edit mode has to divide up.
+    /// Everything between the resting row's own edges: the label column, the
+    /// gap after it and the track.
     var contentWidth: CGFloat { labelWidth + labelGap + trackWidth }
+
+    /// The narrower proposal edit mode actually leaves to the row (#520).
+    /// Both outer edges move from 20pt to 40pt, so the available width loses
+    /// the delta twice. Vertical geometry deliberately keeps the resting scale.
+    var editingContentWidth: CGFloat {
+        let insetDelta = GridMetrics.rowOuterInset(isEditing: true)
+            - GridMetrics.rowOuterInset(isEditing: false)
+        return max(0, contentWidth - insetDelta * 2)
+    }
 
     /// How far past the row's own edge the system's edit controls reach,
     /// whichever end reaches further.
@@ -113,7 +121,7 @@ struct RowGeometry: Equatable {
     /// The delete circle and the reorder handle are laid out against the
     /// `List`'s bounds and ignore `listRowInsets` (#400), so they stand *over*
     /// the row rather than beside it: the row's leading edge is
-    /// `rowPadding + padLeading` inside the `List` and the controls come
+    /// `editingRowPadding + padLeading` inside the `List` and the controls come
     /// `GridMetrics.editControlReach` in, and the difference is the part of the
     /// row they cover. `padLeading` is the smaller inset, so the leading end is
     /// the one that reaches further and `min` is what picks it.
@@ -121,7 +129,12 @@ struct RowGeometry: Equatable {
     /// Floored at zero for `nameMaxWidth`'s reason: it is a difference, and a
     /// wide enough proposal makes the row's own insets larger than the reach.
     var editControlOverhang: CGFloat {
-        max(0, GridMetrics.editControlReach - GridMetrics.rowPadding - min(padLeading, padTrailing))
+        max(
+            0,
+            GridMetrics.editControlReach
+                - GridMetrics.editingRowPadding
+                - min(padLeading, padTrailing)
+        )
     }
 
     /// How far a name may run **while the list is being edited** (#440).
@@ -137,7 +150,7 @@ struct RowGeometry: Equatable {
     ///
     /// **Capped rather than uncapped.** Uncapped, a long enough name pushes
     /// both spacers to zero and stops being centred, which is a different
-    /// picture from the one being fixed. This is the row's own width less
+    /// picture from the one being fixed. This is the row's edit-mode width less
     /// everything that genuinely stands beside the name in it:
     ///
     ///  - the two `labelGap`s the editing `HStack` puts on either side of the
@@ -148,14 +161,16 @@ struct RowGeometry: Equatable {
     ///    symmetrically because the label is centred: reserving one end only
     ///    would move the centre.
     ///
-    /// On a 402pt screen that is 256.3pt against `nameMaxWidth`'s 69.6, and a
-    /// label at full extension spans 53.3–340.2 against a delete circle that
-    /// ends at 48.7 and a handle that starts at 353.0 — both sampled on an
-    /// iPhone 17 Pro / iOS 26.5.
+    /// On a 402pt screen this remains much wider than `nameMaxWidth`, while the
+    /// doubled outer inset and the controls' reach are both reserved. The
+    /// exact decomposition is pinned in `RowGeometryTests` rather than copied
+    /// here as another set of coordinates.
     var editingNameMaxWidth: CGFloat {
         max(
             0,
-            contentWidth - 2 * (editControlOverhang + labelGap) - iconWidth - iconGap
+            editingContentWidth
+                - 2 * (editControlOverhang + labelGap)
+                - iconWidth - iconGap
         )
     }
 
@@ -259,6 +274,34 @@ enum GridMetrics {
     /// which is what keeps the grid where it was; `RowGeometryTests` asserts
     /// it rather than leaving it to the two call sites to stay in step.
     static var rowPadding: CGFloat { horizontalPadding - editControlInset }
+
+    /// Edit mode deliberately doubles both halves of the resting 20pt margin
+    /// (#520): the native controls move in with the `List`, and the row content
+    /// moves the same distance inside it.
+    static var editingEditControlInset: CGFloat { editControlInset * 2 }
+    static var editingRowPadding: CGFloat { rowPadding * 2 }
+
+    static func listInset(isEditing: Bool) -> CGFloat {
+        isEditing ? editingEditControlInset : editControlInset
+    }
+
+    static func contentInset(isEditing: Bool) -> CGFloat {
+        isEditing ? editingRowPadding : rowPadding
+    }
+
+    /// The row content's horizontal inset before `RowGeometry` adds its
+    /// proportional padding. This is the sum a person sees from the grid's
+    /// outer edge: the List moves in first, then the row moves inside it.
+    static func rowOuterInset(isEditing: Bool) -> CGFloat {
+        listInset(isEditing: isEditing) + contentInset(isEditing: isEditing)
+    }
+
+    /// The panel keeps its ordinary 20pt screen margin while the `List` around
+    /// it narrows. Since the background is inside the List's outer padding,
+    /// only the remainder belongs to the panel itself.
+    static func panelInset(isEditing: Bool) -> CGFloat {
+        max(0, horizontalPadding - listInset(isEditing: isEditing))
+    }
 
     /// How far in from the `List`'s own edge the system's edit controls reach.
     ///
