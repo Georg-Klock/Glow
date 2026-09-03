@@ -223,17 +223,14 @@ struct WidgetRenderDiffTests {
         // Eight habits under a header, all in points, derived rather than
         // measured off the render this is checking.
         let side = SlotLayout.slotHeight(trackWidth: track)
-        let headerBottom = WidgetMetrics.padTop + WidgetMetrics.headerHeight
-        // Centred, not flush under the header (#368): eight rows in a frame
-        // that holds ten leave a gap above them, and `WidgetMetrics.rowsOffset`
-        // is where the widget gets that gap from.
+        let groupOffset = WidgetMetrics.groupOffset(
+            contentHeight: Self.size.height - WidgetMetrics.padTop - WidgetMetrics.padBottom,
+            slot: side,
+            rows: 8,
+            hasHeader: true
+        )
+        let headerBottom = WidgetMetrics.padTop + groupOffset + WidgetMetrics.headerHeight
         let firstRowTop = headerBottom + WidgetMetrics.headerGap
-            + WidgetMetrics.rowsOffset(
-                contentHeight: Self.size.height - WidgetMetrics.padTop - WidgetMetrics.padBottom,
-                slot: side,
-                rows: 8,
-                hasHeader: true
-            )
         let lastRowBottom = firstRowTop + 8 * side + 7 * WidgetMetrics.rowGap
 
         func yRange(from top: CGFloat, to bottom: CGFloat) -> Range<Int> {
@@ -291,23 +288,22 @@ struct WidgetRenderDiffTests {
     /// configured widget had to be checked row by row (#188).
     ///
     /// `rows` is how many the widget under test draws, because the block is
-    /// centred in what the header leaves (#368) and so its top edge moves with
-    /// the count. The offset comes from `WidgetMetrics.rowsOffset` — the same
-    /// call the widget centres by — rather than being worked out again here,
-    /// which would be a copy that keeps agreeing with itself after the widget
-    /// has moved.
+    /// centred with the header (#517) and so its top edge moves with the count.
+    /// The offset comes from `WidgetMetrics.groupOffset` — the same call the
+    /// widget centres by — rather than being worked out again here.
     private func brightest(
         atColumn centre: CGFloat, row: Int = 0, rows: Int = 1, in pixels: [UInt8]
     ) -> Int {
         let width = Int(Self.size.width * Self.scale)
         let side = SlotLayout.slotHeight(trackWidth: track)
-        let top = WidgetMetrics.padTop + WidgetMetrics.headerHeight + WidgetMetrics.headerGap
-            + WidgetMetrics.rowsOffset(
+        let top = WidgetMetrics.padTop
+            + WidgetMetrics.groupOffset(
                 contentHeight: Self.size.height - WidgetMetrics.padTop - WidgetMetrics.padBottom,
                 slot: side,
                 rows: rows,
                 hasHeader: true
             )
+            + WidgetMetrics.headerHeight + WidgetMetrics.headerGap
             + CGFloat(row) * (side + WidgetMetrics.rowGap)
         let x = Int((centre * Self.scale).rounded())
         var best = 0
