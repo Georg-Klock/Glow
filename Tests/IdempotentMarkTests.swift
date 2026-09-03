@@ -115,3 +115,113 @@ struct IdempotentMarkTests {
         #expect(try store.setCompletion(for: habit, on: tomorrow, done: false) == .refused)
     }
 }
+
+/// #508: a widget control names both the civil day it means and the day its
+/// archived surface believed was today. The first enables back-filling; the
+/// second prevents an old timeline from becoming a wrong-day writer at
+/// midnight.
+@Suite("Past-day widget marking", .serialized)
+@MainActor
+struct PastDayWidgetMarkTests {
+    private let calendar = TestCalendar.monday
+    private let monday = TestCalendar.date(2026, 8, 17)
+    private let tuesday = TestCalendar.date(2026, 8, 18)
+    private let thursday = TestCalendar.date(2026, 8, 20)
+
+    @Test("A current surface accepts only non-future days in its rendered week")
+    func requestBoundary() {
+        let accepted = WidgetMarkRequest(day: tuesday, renderedDay: thursday)
+        #expect(accepted.resolvedDay(actualToday: thursday, calendar: calendar)
+            .map { DayID($0, calendar: calendar) } == DayID(tuesday, calendar: calendar))
+
+        let future = WidgetMarkRequest(
+            day: TestCalendar.date(2026, 8, 21), renderedDay: thursday
+        )
+        #expect(future.resolvedDay(actualToday: thursday, calendar: calendar) == nil)
+
+        let priorWeek = WidgetMarkRequest(
+            day: TestCalendar.date(2026, 8, 10), renderedDay: thursday
+        )
+        #expect(priorWeek.resolvedDay(actualToday: thursday, calendar: calendar) == nil)
+
+        let stale = WidgetMarkRequest(
+            day: tuesday, renderedDay: TestCalendar.date(2026, 8, 19)
+        )
+        #expect(stale.resolvedDay(actualToday: thursday, calendar: calendar) == nil)
+        #expect(WidgetMarkRequest(day: nil, renderedDay: thursday)
+            .resolvedDay(actualToday: thursday, calendar: calendar) == nil)
+        #expect(WidgetMarkRequest(day: tuesday, renderedDay: nil)
+            .resolvedDay(actualToday: thursday, calendar: calendar) == nil)
+    }
+
+    @Test("A past-day request writes that day once and never today")
+    func operationWritesTheRequestedPastDayIdempotently() throws {
+        let container = try ModelContainer(
+            for: Habit.self, Completion.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        let store = HabitStore(context: context, calendar: calendar, restDay: nil)
+        let habit = try store.addHabit(
+            name: "Read", icon: "📖", frequency: .daily, now: monday
+        )
+        defer { WidgetBurst.clear(habitID: habit.id) }
+
+        let first = try MarkHabitOperation.perform(
+            habitID: habit.id,
+            done: true,
+            day: tuesday,
+            renderedDay: thursday,
+            presentsIsland: false,
+            actualToday: thursday,
+            calendar: calendar,
+            restDay: nil,
+            context: context
+        )
+        let duplicate = try MarkHabitOperation.perform(
+            habitID: habit.id,
+            done: true,
+            day: tuesday,
+            renderedDay: thursday,
+            presentsIsland: false,
+            actualToday: thursday,
+            calendar: calendar,
+            restDay: nil,
+            context: context
+        )
+
+        #expect(first == .completed)
+        #expect(duplicate == .unchanged)
+        let days = (habit.completions ?? []).map { DayID($0.day, calendar: calendar) }
+        #expect(days.count { $0 == DayID(tuesday, calendar: calendar) } == 1)
+        #expect(!days.contains(DayID(thursday, calendar: calendar)))
+    }
+
+    @Test("A stale archived surface fails closed without a write")
+    func staleSurfaceDoesNotWrite() throws {
+        let container = try ModelContainer(
+            for: Habit.self, Completion.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        let store = HabitStore(context: context, calendar: calendar, restDay: nil)
+        let habit = try store.addHabit(
+            name: "Read", icon: "📖", frequency: .daily, now: monday
+        )
+
+        let result = try MarkHabitOperation.perform(
+            habitID: habit.id,
+            done: true,
+            day: tuesday,
+            renderedDay: TestCalendar.date(2026, 8, 19),
+            presentsIsland: false,
+            actualToday: thursday,
+            calendar: calendar,
+            restDay: nil,
+            context: context
+        )
+
+        #expect(result == nil)
+        #expect((habit.completions ?? []).isEmpty)
+    }
+}

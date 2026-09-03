@@ -83,6 +83,13 @@ struct MonthWidgetView: View {
             let rowGap = rows > 1
                 ? max(1, min(gap, (available - CGFloat(rows) * side) / CGFloat(rows - 1)))
                 : 0
+            let rowsOffset = WidgetMetrics.rowsOffset(
+                contentHeight: proxy.size.height,
+                slot: side,
+                gap: rowGap,
+                rows: rows,
+                headerFootprint: WidgetMetrics.monthTitleHeight + WidgetMetrics.headerGap
+            )
 
             VStack(alignment: .leading, spacing: 0) {
                 Group {
@@ -105,7 +112,8 @@ struct MonthWidgetView: View {
                                 MonthCellView(
                                     cell: cells.first { $0.row == row && $0.column == column },
                                     side: side,
-                                    habit: habit
+                                    habit: habit,
+                                    renderedDay: today
                                 )
                             }
                         }
@@ -121,6 +129,12 @@ struct MonthWidgetView: View {
                         side: side, gap: gap, rows: rows, rowGap: rowGap
                     )
                 }
+                // Apply the shared row-block offset outside the background.
+                // The padding therefore moves the grid and its rest cut as one
+                // layout unit without making the cut itself rowsOffset taller
+                // (#505). Six rows move only half a point; short months split
+                // their otherwise-dead space above and below the block.
+                .padding(.top, rowsOffset)
                 Spacer(minLength: 0)
             }
         }
@@ -174,6 +188,7 @@ private struct MonthCellView: View {
     let cell: MonthCell?
     let side: CGFloat
     let habit: HabitSnapshot
+    let renderedDay: Date
 
     var body: some View {
         if let cell {
@@ -190,6 +205,8 @@ private struct MonthCellView: View {
                 SlotToggle(
                     habitID: habit.id,
                     isDone: cell.mark == .doneToday,
+                    day: cell.date,
+                    renderedDay: renderedDay,
                     onLabel: SlotVoice.label(
                         habitName: habit.name, mark: .doneToday, day: cell.date
                     ),

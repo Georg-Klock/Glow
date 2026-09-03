@@ -387,9 +387,31 @@ enum WidgetMetrics {
     static func rowsOffset(
         contentHeight: CGFloat, slot: CGFloat, rows: Int, hasHeader: Bool
     ) -> CGFloat {
-        let header = hasHeader ? headerHeight + headerGap : 0
-        let available = contentHeight - header
-        let block = CGFloat(rows) * slot + CGFloat(max(0, rows - 1)) * rowGap
+        rowsOffset(
+            contentHeight: contentHeight,
+            slot: slot,
+            gap: rowGap,
+            rows: rows,
+            headerFootprint: hasHeader ? headerHeight + headerGap : 0
+        )
+    }
+
+    /// The shared row-block centring calculation (#505).
+    ///
+    /// The week uses the overload above because its gap and optional header are
+    /// fixed. A month has the same geometry with two deliberate differences:
+    /// its title has its own line box, and its vertical gap can tighten to keep
+    /// six rows inside a real small-widget frame. Taking those values keeps one
+    /// centring rule rather than growing a second copy beside the month view.
+    static func rowsOffset(
+        contentHeight: CGFloat,
+        slot: CGFloat,
+        gap: CGFloat,
+        rows: Int,
+        headerFootprint: CGFloat
+    ) -> CGFloat {
+        let available = contentHeight - headerFootprint
+        let block = CGFloat(rows) * slot + CGFloat(max(0, rows - 1)) * gap
         return max(0, (available - block) / 2)
     }
 

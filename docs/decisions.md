@@ -7735,6 +7735,46 @@ No motion policy changes with this guarantee. Completing still closes only in
 the forward direction, undo remains an instant correction, and Reduce Motion
 still snaps both paths. Since no view is replaced, those instant paths have no
 intermediate background frame to expose.
+
+## 2026-09-02 — Glow encoding never runs in a view body (#507)
+
+`GlowTile.body` performs only a cache lookup and falls back to flat white while
+an uncached image is prepared. HEIF encoding runs in a detached utility task;
+the main actor only decodes the returned bytes, stores the image and publishes
+it to that tile. Duplicate requests for one intensity share one encoder task.
+
+App launch warms the saved intensity first and then all eight integer slider
+stops. Widget snapshot and timeline providers await their current tile before
+WidgetKit archives the view, preserving HDR without relying on a view task.
+Settings also guards its once-per-second headroom sample, so an unchanged value
+does not invalidate the slider's owning view while a drag is beginning.
+
+## 2026-09-02 — 1× previews ordinary white and says so in the readout (#506)
+
+The Settings preview keeps the real 120×40 tile across the full glow slider.
+At 1× that tile is ordinary SDR white; the inert bordered `ⓘ Glow off` capsule
+is removed. Low Power Mode remains the only preview replacement and keeps its
+real explanation sheet.
+
+The fixed readout row—not an extra row—turns amber at 1× and reads “Glow off —
+white looks like ordinary white.” It omits the screen's unused EDR capacity and
+carries the former capsule's fuller VoiceOver reassurance. Above 1×, the grey
+aim and live/maximum headroom sentence is unchanged. Neither transition changes
+the section's footprint.
+
+## 2026-09-02 — Short months centre one fixed-pitch row block (#505)
+
+The small month widget keeps its 16pt cells on a 19pt pitch. Four- and five-row
+months no longer leave all unused height below the grid; the row block splits
+the space remaining beneath the 18pt title and 4pt gap equally above and below.
+A six-row month moves only half a point, preserving the authored case #493
+aligned.
+
+The calculation is the week widget's existing `WidgetMetrics.rowsOffset`,
+generalized to accept the month title footprint and the month gap that can
+tighten on a short real frame. The view applies that offset outside the grid's
+background, so the rest-day cut moves with the cells while retaining exactly
+the row block's height.
 ## 2026-09-01 — Glow off occupies the preview, not a new Form section (#497)
 
 Settings reserves one fixed 120×40 preview inside a padded black band. At 1×,
@@ -7796,3 +7836,37 @@ cannot be kept, because the host does not survive it. Getting rid of the last
 exposure means deleting a habit without the object graph — a batch delete, or
 a delete rule that is not `.cascade` — and either is a store decision rather
 than a plumbing change.
+## 2026-09-02 — Week widgets correct the past without trusting stale pixels (#508)
+
+Every non-future day drawn by a week widget now carries the same optimistic
+absolute-state `SlotToggle` as today. The Widgets tab hosts those production
+controls through its binding adapter, so it acknowledges immediately too.
+Monthly widgets remain deliberately today-only: a dense month is a history
+overview, not thirty-one small edit targets.
+
+Each archived intent carries both the day it means and the civil day the
+surface believed was today. The operation accepts the request only when the
+surface day still equals real today, the requested day is not in the future,
+and it belongs to that rendered week. A midnight-stale, old-build, corrupt or
+out-of-range control fails closed, clears any pending animation, and reloads;
+it never falls back to today or writes a plausible wrong day.
+
+Weekly spans retain the one fallback action day `WeekSpans` already assigns to
+location-less activation. Daily rows have one control per eligible column.
+Completion bursts are keyed by habit and day, so a past-day tap animates only
+the mark that changed rather than every live control in that row.
+
+## 2026-09-02 — Pixel tests render the widget style without archiving intents (#513)
+
+The installed week widget keeps one AppIntent-backed toggle for every
+interactive nonfuture day. Pixel tests do not: `ImageRenderer` is not
+WidgetKit, and on iOS 18 flattening that expanded archived-control graph ran
+past CI's one-hour ceiling after all 708 logic tests had already passed.
+
+The render harness now selects `SlotToggle`'s ordinary app-hosted adapter with
+a no-op action. That adapter and the installed widget both render the same
+`SlotMarkToggleStyle`, so the committed signatures and pixel assertions still
+cover the shipping faces. No test delivers a tap through the no-op adapter;
+production AppIntent construction and in-app delivery remain covered by their
+source, operation and physical-touch gates. The choice is confined to the
+three `ImageRenderer` entry points and does not change app or widget behavior.

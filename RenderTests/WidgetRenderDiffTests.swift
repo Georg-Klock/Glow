@@ -728,6 +728,7 @@ struct WidgetRenderDiffTests {
             .frame(width: size.width, height: size.height)
             .background { GlowPalette.widgetSurface }
             .environment(\.colorScheme, .dark)
+            .widgetPixelHarness()
         let renderer = ImageRenderer(content: framed)
         renderer.scale = Self.scale
         renderer.proposedSize = ProposedViewSize(size)
@@ -785,6 +786,9 @@ struct WidgetRenderDiffTests {
         defer { GlowSettings.store.set(previous, forKey: GlowSettings.key) }
         GlowSettings.store.set(GlowSettings.range.lowerBound, forKey: GlowSettings.key)
         GlowImageCache.shared.removeAll()
+        GlowImageCache.shared.prepareForSynchronousRendering(
+            peak: GlowSettings.range.lowerBound
+        )
         return try body()
     }
 
@@ -904,6 +908,9 @@ struct WidgetRenderDiffTests {
             // way in and not on the way out, so a lit render following a dark
             // one would otherwise draw the previous family's unlit tiles.
             GlowImageCache.shared.removeAll()
+            GlowImageCache.shared.prepareForSynchronousRendering(
+                peak: GlowSettings.peakHeadroom
+            )
             let image = try renderFamily(view, size: size)
             let lit = try rgba(of: image)
             let dark = try withGlowDown { try rgba(of: try renderFamily(view, size: size)) }
@@ -1092,6 +1099,7 @@ struct WidgetRenderDiffTests {
             .frame(width: Self.size.width, height: Self.size.height)
             .background { GlowPalette.widgetSurface }
             .environment(\.colorScheme, .dark)
+            .widgetPixelHarness()
 
         let renderer = ImageRenderer(content: view)
         renderer.scale = Self.scale

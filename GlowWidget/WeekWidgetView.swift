@@ -168,7 +168,8 @@ struct WeekWidgetView: View {
                             cut: cut,
                             restIndex: restIndex,
                             restDay: restDay,
-                            burst: entry.burstHabit == habit.id ? entry.progress : nil
+                            burst: entry.burstHabit == habit.id ? entry.progress : nil,
+                            burstDay: entry.burstDay
                         )
                     }
                 }
@@ -278,12 +279,15 @@ private struct WidgetRow: View {
     let restDay: Int?
     /// Non-nil while this habit's completion is animating.
     let burst: Double?
+    /// The one day the pending completion animation belongs to (#508).
+    let burstDay: DayID?
 
     private var slots: [Slot] {
-        // The widget edits today and nothing else, whatever the app can
-        // reach — a glance and a single confirmed action. See `SlotEditing`.
+        // The week widget edits every non-future day it draws (#508), matching
+        // the app's week while leaving the month on its today-only contract.
         WeekGrid.slots(
-            for: habit, in: week, today: today, editing: .todayOnly, restDay: restDay
+            for: habit, in: week, today: today,
+            editing: .week(allowingFuture: false), restDay: restDay
         )
     }
 
@@ -293,7 +297,7 @@ private struct WidgetRow: View {
         guard case .timesPerWeek(let target) = habit.frequency else { return [] }
         return WeekSpans.spans(
             for: habit, in: week, today: today, target: target,
-            editing: .todayOnly, restDay: restDay
+            editing: .week(allowingFuture: false), restDay: restDay
         )
     }
 
@@ -368,14 +372,21 @@ private struct WidgetRow: View {
                             // the same seven things (#137).
                             day: week.days.indices.contains(slot.index)
                                 ? week.days[slot.index] : nil,
-                            burst: slot.isTappable ? burst : nil
+                            renderedDay: today,
+                            undoneMark: undoneMark(for: slot),
+                            burst: slot.isTappable
+                                && week.days.indices.contains(slot.index)
+                                && DayID(
+                                    week.days[slot.index], calendar: WeekCalendar.calendar
+                                ) == burstDay
+                                ? burst : nil
                         )
                     }
                 } else {
                     ForEach(spans) { span in
                         WidgetSpan(
                             span: span, track: track, side: side, habit: habit,
-                            restIndex: restIndex
+                            restIndex: restIndex, renderedDay: today
                         )
                     }
                 }
@@ -391,14 +402,26 @@ private struct WidgetRow: View {
                 Color.clear
                     .frame(width: 0, height: 0)
                 // One element for the run, no button trait: the days are a
-                // record, and a past day is not tappable here. The app row does
-                // the same from the same string. See #104.
+                // record, separate from the controls that may now correct any
+                // non-future day. The app row does the same from the same
+                // string. See #104 and #508.
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(voice.map { "\(habit.name), \($0)" } ?? "")
                 .accessibilityHidden(voice == nil)
             }
         }
         .frame(height: side)
+    }
+
+    /// The face a filled daily slot returns to when it is corrected. A past
+    /// day normally becomes missed, but a back-filled day before the habit
+    /// existed was never missed and returns to upcoming (#265, #508).
+    private func undoneMark(for slot: Slot) -> SlotMark {
+        guard slot.state == .filled else { return slot.mark }
+        guard week.days.indices.contains(slot.index) else { return .upcoming }
+        let day = week.days[slot.index]
+        guard habit.existed(on: day) else { return .upcoming }
+        return slot.isToday ? .openToday : .missed
     }
 
     @ViewBuilder
@@ -427,9 +450,10 @@ private struct WidgetRow: View {
     }
 }
 
-/// A span on a widget row. Tappable only when it is today's, same rule as a
-/// slot — and the widget has no touch location to resolve a column with, which
-/// is a second reason its spans write today or nothing (#116).
+/// A span on a widget row. Every non-future span the week-editing policy can
+/// resolve is tappable. WidgetKit does not expose a touch location inside a
+/// custom toggle, so a span keeps `WeekSpans`' one fallback `actionDay`: the
+/// last writable day its range contains (#116, #508).
 private struct WidgetSpan: View {
     let span: SlotSpan
     let track: CGFloat
@@ -437,6 +461,7 @@ private struct WidgetSpan: View {
     let habit: HabitSnapshot
     /// Which column the rest day falls in, decided once by the row.
     let restIndex: Int?
+    let renderedDay: Date
 
     private var size: CGSize {
         CGSize(
@@ -469,7 +494,9 @@ private struct WidgetSpan: View {
         let label = SlotVoice.span(
             habitName: habit.name, state: span.state, actionDay: span.actionDay
         )
-        if span.isTappable {
+        if let actionDay = span.actionDay {
+            let offState: SlotState = span.state == .missed ? .missed : .open
+            let offMark: SlotMark = offState == .missed ? .missed : .openToday
             // A `Toggle`, not a `Button` (#292) — see `WidgetSlot`. The two
             // faces are what this span's own two tappable states draw:
             // `.open` is the emitting ask, `.filled` is the lit mark it
@@ -480,11 +507,13 @@ private struct WidgetSpan: View {
             SlotToggle(
                 habitID: habit.id,
                 isDone: span.state == .filled,
+                day: actionDay,
+                renderedDay: renderedDay,
                 onLabel: SlotVoice.span(
                     habitName: habit.name, state: .filled, actionDay: span.actionDay
                 ),
                 offLabel: SlotVoice.span(
-                    habitName: habit.name, state: .open, actionDay: span.actionDay
+                    habitName: habit.name, state: offState, actionDay: span.actionDay
                 )
             ) {
                 // **The done face is lit** (#344). It was `.upcoming` — #47's
@@ -499,7 +528,7 @@ private struct WidgetSpan: View {
                 )
             } offMark: {
                 SlotMarkView(
-                    mark: .openToday,
+                    mark: offMark,
                     size: size,
                     spansDays: span.dayCount > 1,
                     restWindow: restWindow
@@ -524,15 +553,19 @@ private struct WidgetSlot: View {
     let habitName: String
     /// The calendar day this column stands for. See `SlotVoice`.
     let day: Date?
+    /// What this archived surface believed today was.
+    let renderedDay: Date
+    /// The exact face an optimistic undo returns to. Passed from the row so a
+    /// pre-creation backfill returns to upcoming rather than claiming a miss.
+    let undoneMark: SlotMark
     /// Set only on the slot that was just tapped.
     let burst: Double?
 
     var body: some View {
-        // Only today's slot acts, and since #116 that is the widget's own rule
-        // rather than the app's: the week view edits any day it shows, and a
-        // widget stays a glance and a single confirmed action. A control
-        // wrapping an untappable slot would still respond to touch and promise
-        // something it does not do.
+        // Every non-future day the week-editing policy hands us acts (#508).
+        // A control wrapping an untappable slot would still respond to touch
+        // and promise something it does not do, so future/rest slots remain
+        // ordinary marks.
         //
         // **Every column speaks, tappable or not** (#137). Only two of them did:
         // today's, and the rest day, which #72 gave a voice because it draws
@@ -541,22 +574,25 @@ private struct WidgetSlot: View {
         // often — and said none of it, while the app's identical row said all
         // of it. Seven dated facts is a row; it is a month and a year of them
         // that get counted into a sentence instead (`HistoryVoice`).
-        if slot.isTappable {
+        if slot.isTappable, let actionDay = slot.actionDay {
+            let completedMark: SlotMark = slot.isToday ? .doneToday : .donePast
             // A `Toggle`, not a `Button` (#292): the system draws the state
             // the tap asked for while the intent runs, instead of holding the
             // old mark until the provider is next scheduled — which #121
             // measured at seconds, and which is what made people tap twice
-            // (#272). A tappable slot is today's, so its two faces are today's
-            // two marks.
+            // (#272). Past controls keep their past-day cross/lit vocabulary;
+            // only today's control uses the emitting ring/checkmark.
             SlotToggle(
                 habitID: habitID,
                 isDone: slot.state == .filled,
-                onLabel: label(for: .doneToday),
-                offLabel: label(for: .openToday)
+                day: actionDay,
+                renderedDay: renderedDay,
+                onLabel: label(for: completedMark),
+                offLabel: label(for: undoneMark)
             ) {
-                doneShape
+                doneShape(from: undoneMark, to: completedMark)
             } offMark: {
-                SlotMarkView(mark: .openToday, size: size)
+                SlotMarkView(mark: undoneMark, size: size)
             }
         } else {
             // No control trait and no hint: there is nothing to do here.
@@ -579,7 +615,7 @@ private struct WidgetSlot: View {
 
     /// The completed face: the dot, or the tap's cross-fade arriving at it.
     @ViewBuilder
-    private var doneShape: some View {
+    private func doneShape(from undoneMark: SlotMark, to completedMark: SlotMark) -> some View {
         if let burst {
             // A cross-fade, not the app's closing spring. The app's ring is
             // one shape whose hole shuts; a widget is a handful of stills,
@@ -594,11 +630,11 @@ private struct WidgetSlot: View {
             // `.filled` — the same guard the old single-shape body spelled as
             // `slot.state == .filled`.
             ZStack {
-                SlotMarkView(mark: .openToday, size: size).opacity(1 - burst)
-                SlotMarkView(mark: .doneToday, size: size).opacity(burst)
+                SlotMarkView(mark: undoneMark, size: size).opacity(1 - burst)
+                SlotMarkView(mark: completedMark, size: size).opacity(burst)
             }
         } else {
-            SlotMarkView(mark: .doneToday, size: size)
+            SlotMarkView(mark: completedMark, size: size)
         }
     }
 

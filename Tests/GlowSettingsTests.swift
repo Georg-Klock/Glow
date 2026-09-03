@@ -37,23 +37,14 @@ struct GlowSettingsTests {
         #expect(GlowSettings.range.contains(GlowSettings.defaultValue))
     }
 
-    @Test("The fixed preview slot names glow, off, and Low Power in priority order")
+    @Test("The fixed preview keeps its tile unless Low Power takes priority")
     func previewStateKeepsOneFootprint() {
-        let floor = GlowSettings.range.lowerBound
-
-        #expect(GlowSettings.previewState(peak: floor + 1, lowPower: false) == .glow)
-        #expect(GlowSettings.previewState(peak: floor, lowPower: false) == .off)
-        #expect(GlowSettings.previewState(peak: floor, lowPower: true) == .lowPower)
-        #expect(GlowSettings.previewState(peak: floor + 1, lowPower: true) == .lowPower)
+        #expect(GlowSettings.previewState(lowPower: false) == .glow)
+        #expect(GlowSettings.previewState(lowPower: true) == .lowPower)
     }
 
-    @Test("Glow off is a preview replacement, never a conditional Form section")
-    func offStateCannotReflowTheForm() throws {
-        // The bug is structural: a conditional Section changes the Form's row
-        // count, while a branch inside `previewContent` keeps the already
-        // reserved band. A still image cannot distinguish those two trees, so
-        // hold the source boundary the same way the widget overload and
-        // hit-testing contracts are held elsewhere in this suite.
+    @Test("One tile stays in the preview and Low Power keeps its explanation")
+    func previewHasNoInertOffReplacement() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -63,9 +54,36 @@ struct GlowSettingsTests {
         )
 
         #expect(source.contains("switch GlowSettings.previewState"))
-        #expect(source.contains("GlowOffPreviewNotice(size: Self.previewSize)"))
-        #expect(!source.contains("if peak <= GlowSettings.range.lowerBound"))
-        #expect(source.contains("Glow off. Today's slot still shows, unlit."))
+        #expect(source.contains("GlowImageView(size: Self.previewSize)"))
+        #expect(source.contains("LowPowerPreviewNotice(size: Self.previewSize)"))
+        #expect(!source.contains("GlowOffPreviewNotice"))
+        #expect(source.contains("readout.isWarning ? GlowPalette.warning : Color.secondary"))
+        #expect(source.contains(".accessibilityLabel(readout.accessibilityLabel)"))
+    }
+
+    @Test("The floor replaces headroom with one amber off-state sentence")
+    func floorReadoutNamesWhatTheTileShows() {
+        let readout = GlowSettings.readout(
+            peak: GlowSettings.range.lowerBound,
+            headroomSummary: "2.8× right now · 8.0× maximum"
+        )
+
+        #expect(readout.text == "Glow off — white looks like ordinary white.")
+        #expect(readout.isWarning)
+        #expect(!readout.text.contains("2.8×"))
+        #expect(readout.accessibilityLabel == "Glow off. Today's slot still shows, unlit.")
+    }
+
+    @Test("Above the floor the grey headroom sentence is unchanged")
+    func litReadoutKeepsTheAimAndHeadroom() {
+        let readout = GlowSettings.readout(
+            peak: 3,
+            headroomSummary: "2.8× right now · 8.0× maximum"
+        )
+
+        #expect(readout.text == "Aiming for 3× — 2.8× right now · 8.0× maximum")
+        #expect(!readout.isWarning)
+        #expect(readout.accessibilityLabel == readout.text)
     }
 
     @Test("Intensity drives the encoded headroom", arguments: [2.0, 4.0, 8.0])
@@ -136,9 +154,11 @@ struct WidgetBurstTests {
         // mattering.
         let id = UUID()
         let started = Date()
-        WidgetBurst.record(habitID: id, at: started, reduceMotion: false)
+        WidgetBurst.record(habitID: id, day: started, at: started, reduceMotion: false)
 
         #expect(WidgetBurst.pending(now: started.addingTimeInterval(0.1))?.habitID == id)
+        #expect(WidgetBurst.pending(now: started.addingTimeInterval(0.1))?.day
+            == DayID(started, calendar: WeekCalendar.calendar))
         // Past the fade and still valid: this is the whole point of the split.
         #expect(WidgetBurst.pending(
             now: started.addingTimeInterval(WidgetBurst.duration + 0.1)
@@ -205,7 +225,7 @@ struct WidgetBurstTests {
         let completed = UUID()
         let other = UUID()
 
-        WidgetBurst.record(habitID: completed, at: Date(), reduceMotion: false)
+        WidgetBurst.record(habitID: completed, day: Date(), at: Date(), reduceMotion: false)
         WidgetBurst.clear(habitID: other)
         #expect(WidgetBurst.pending()?.habitID == completed, "another habit's undo took this note")
 
@@ -219,10 +239,10 @@ struct WidgetBurstTests {
         // `TimelineProvider` is not. The intent that records the note is, so
         // the value is read there and carried — see `WidgetBurst.record`.
         let id = UUID()
-        WidgetBurst.record(habitID: id, at: Date(), reduceMotion: true)
+        WidgetBurst.record(habitID: id, day: Date(), at: Date(), reduceMotion: true)
         #expect(WidgetBurst.reduceMotion)
 
-        WidgetBurst.record(habitID: id, at: Date(), reduceMotion: false)
+        WidgetBurst.record(habitID: id, day: Date(), at: Date(), reduceMotion: false)
         #expect(!WidgetBurst.reduceMotion)
     }
 
