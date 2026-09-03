@@ -293,6 +293,32 @@ struct RowGeometryTests {
             GridMetrics.rowPadding + GridMetrics.editControlInset
                 == GridMetrics.horizontalPadding
         )
+        #expect(
+            GridMetrics.editingRowPadding + GridMetrics.editingEditControlInset
+                == GridMetrics.horizontalPadding * 2
+        )
+        #expect(GridMetrics.listInset(isEditing: false) == GridMetrics.editControlInset)
+        #expect(GridMetrics.contentInset(isEditing: false) == GridMetrics.rowPadding)
+        #expect(GridMetrics.listInset(isEditing: true) == GridMetrics.editingEditControlInset)
+        #expect(GridMetrics.contentInset(isEditing: true) == GridMetrics.editingRowPadding)
+        #expect(
+            GridMetrics.rowOuterInset(isEditing: false)
+                == GridMetrics.horizontalPadding
+        )
+        #expect(
+            GridMetrics.rowOuterInset(isEditing: true)
+                == GridMetrics.horizontalPadding * 2
+        )
+        #expect(
+            GridMetrics.listInset(isEditing: false)
+                + GridMetrics.panelInset(isEditing: false)
+                == GridMetrics.horizontalPadding
+        )
+        #expect(
+            GridMetrics.listInset(isEditing: true)
+                + GridMetrics.panelInset(isEditing: true)
+                == GridMetrics.horizontalPadding
+        )
         // Neither end is allowed to be the whole thing. At zero there is no
         // breathing room and #400 is not fixed; at the full margin the rows
         // would inset by nothing and the panel would be drawn edge to edge.
@@ -314,7 +340,7 @@ struct RowGeometryTests {
     func editingNameRunIsTheRowsOwnWidth() {
         for width in [200, 320, 338, 353, 393, 402, 430, 1024] as [CGFloat] {
             let g = RowGeometry(totalWidth: width)
-            let summed = g.contentWidth
+            let summed = g.editingContentWidth
                 - g.editControlOverhang - g.labelGap
                 - g.iconWidth - g.iconGap
                 - g.labelGap - g.editControlOverhang
@@ -332,8 +358,19 @@ struct RowGeometryTests {
             // The label it caps still fits the row it is centred in, which is
             // what keeps both spacers non-negative.
             #expect(
-                g.editingNameMaxWidth + g.iconWidth + g.iconGap <= g.contentWidth
+                g.editingNameMaxWidth + g.iconWidth + g.iconGap <= g.editingContentWidth
             )
+        }
+    }
+
+    @Test("Editing narrows only the horizontal content proposal")
+    func editingContentUsesTheDoubledInset() {
+        for width in [200, 320, 338, 353, 393, 402, 430, 1024] as [CGFloat] {
+            let g = RowGeometry(totalWidth: width)
+            let insetDelta = GridMetrics.rowOuterInset(isEditing: true)
+                - GridMetrics.rowOuterInset(isEditing: false)
+            #expect(g.editingContentWidth == max(0, g.contentWidth - insetDelta * 2))
+            #expect(g.slotHeight == RowGeometry(totalWidth: width).slotHeight)
         }
     }
 

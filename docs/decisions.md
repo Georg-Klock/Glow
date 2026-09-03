@@ -8114,3 +8114,18 @@ A full ten-row large widget has no slack and therefore remains in exactly the
 same position. A medium widget has no header and keeps the same row-only
 centring. The month's title continues to use `rowsOffset`; `groupOffset` is a
 separate week-only expression so this reversal cannot move that title.
+
+## 2026-09-02 — Edit mode doubles the row-to-panel margin (#520)
+
+This deliberately supersedes #400's choice to keep the List's horizontal
+spacing fixed through edit mode. At rest its split remains 10pt outside the
+List plus 10pt inside each row. While editing both halves become 20pt: the
+system delete circle and reorder handle move inward with the List, and the row
+content moves inward by the same amount. The boundary line follows the row's
+own narrowed extent.
+
+The material panel does not move. Its inner padding becomes the remainder of
+the ordinary 20pt screen margin after the List's outer padding, so it is 10pt
+at rest and zero while editing. Vertical geometry is unchanged. The existing
+edit transaction animates the horizontal change, with Reduce Motion retaining
+the snap established by #522.
