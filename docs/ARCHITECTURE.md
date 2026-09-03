@@ -605,8 +605,15 @@ changes. Three paths, and all are needed:
   having been killed.
 - `UserDefaults.didChangeNotification` covers the debug override moving (#204).
   It is set from Settings, which is a sibling tab, so the screens that draw the
-  week stay alive and unredrawn while it moves — the same signal, and the same
-  reason, as demo history.
+  week stay alive and unredrawn while it moves. The handler compares the
+  override before it touches anything: the notification fires for every key
+  the process writes, and a tap writes several.
+- `StoreChange.committed` covers what the *record* decides — whether demo
+  history is in, which opens the days ahead, and how far back the pager
+  reaches. Every save posts it, from `HabitStore` and `DemoHistory` alike.
+  These used to ride on the defaults notification too, which a save reached
+  only through the trace line the widget reload writes; see decisions.md,
+  2026-09-02.
 
 ## Which day the app thinks it is
 

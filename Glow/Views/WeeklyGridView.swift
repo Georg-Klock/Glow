@@ -35,10 +35,6 @@ struct WeeklyGridView: View {
     @State private var isDemoSeeded = false
     @State private var editingHabit: Habit?
     @State private var isAddingHabit = false
-    /// The native `List`'s vertical displacement from its resting position.
-    /// The rows already move by this amount; #454 gives the single panel behind
-    /// them the same transform without replacing any of the List interactions.
-    @State private var gridScrollOffset: CGFloat = 0
     /// Edit mode, owned rather than left to the `NavigationStack` (#207).
     ///
     /// The list's editing controls are offered on the current week and nowhere
@@ -64,7 +60,13 @@ struct WeeklyGridView: View {
     @State private var pop: InAppPop.PopContent?
     /// Cancels a pop's own dismissal when a newer one replaces it, so the
     /// first tap's timer cannot cut short the second tap's pill.
-    @State private var popTask: Task<Void, Never>?
+    ///
+    /// A box rather than a `Task` in `@State`: the task is replaced on every
+    /// pop, and a `@State` assignment is a redraw. Nothing on screen depends
+    /// on which task is pending — `pop` is the state the screen draws — so
+    /// the handle is kept where changing it invalidates nothing. Measured as
+    /// one of the three grid body passes a tap used to cost.
+    @State private var popTask = TaskHolder()
     @Environment(\.accessibilityReduceMotion) private var gridReduceMotion
     /// Survives relaunches, so the notice appears once per time Low Power Mode
     /// is switched on rather than once per launch.
@@ -331,27 +333,42 @@ struct WeeklyGridView: View {
                 refreshDemoHistory()
             }
         }
-        // Demo history is a record of invented completion ids in the App
-        // Group's defaults, which is not something `@AppStorage` can observe —
-        // it holds no scalar to bind to. The defaults' own notification is the
-        // signal, and it has to be one: Settings is a sibling tab, so this view
-        // stays alive and unredrawn while the toggle moves, and a value read
-        // once at appear would leave the days ahead open after the demo went
-        // out.
+        // The debug override is a defaults key in the App Group (#204), and
+        // `@AppStorage` cannot bind to it — it is a `Date`. The defaults' own
+        // notification is the signal, and it has to be one: Settings is a
+        // sibling tab, so this view stays alive and unredrawn while the
+        // override moves, and a value read once at appear would leave the
+        // grid on the wrong day.
+        //
+        // **Compared before anything is fetched.** This notification fires
+        // for every key the process writes to any defaults store, and the app
+        // writes several per tap — the pop's shuffle state and the widget
+        // reload's trace line, on the same turn as the tap. The handler used
+        // to answer each of them with a demo-history count and two fetches
+        // for the reach, so one tap on the grid ran those three queries three
+        // times over, and a tap on the Widgets tab ran them five times, for a
+        // day that had not moved. Now a defaults change costs one read of the
+        // override, and the store is touched only when today has changed.
+        //
+        // Demo history used to be read here too, from the days when it was a
+        // list of ids in the defaults. It is a column on the row since #140,
+        // and seeding or removing it is a save — `StoreChange.committed`
+        // below is its signal.
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+            if (pinnedToday ?? WeekCalendar.today()) != today { refreshToday() }
+        }
+        // **Every successful save, from this screen or any other** — a mark,
+        // a demo seeded or removed in Settings, a reset, a widget tap written
+        // through the app's own context. The two things this screen derives
+        // from the record move on exactly those events: whether the invented
+        // past is in, which decides the days ahead (`editing`), and how far
+        // back the pager reaches. Both used to be re-read on the defaults
+        // notification above, which a save reached only by way of the trace
+        // line the widget reload writes — the right signal, through the wrong
+        // door, three times.
+        .onReceive(NotificationCenter.default.publisher(for: StoreChange.committed)) { _ in
             refreshDemoHistory()
-            // And the debug override, which is a defaults key in the same
-            // store (#204). Settings is a sibling tab, so this view stays
-            // alive and unredrawn while the override moves — the same reason
-            // demo history needs a notification rather than a value read once
-            // at appear.
-            //
-            // Through `refreshToday`, which also carries the pager's other
-            // end: switching the demo on puts ten weeks of past on record and
-            // switching it off takes them back out, and both move how far back
-            // this screen can go. That is `refreshReach`, which `refreshToday`
-            // calls — this handler used to call it directly.
-            refreshToday()
+            refreshReach()
         }
         .onReceive(NotificationCenter.default.publisher(for: StoreChange.fromIntent)) { _ in
             intentRevision &+= 1
@@ -563,24 +580,13 @@ struct WeeklyGridView: View {
             // It stays behind the List, so a horizontal row swipe still reveals
             // material (#398). Vertically it receives the same content offset
             // as the rows, so its top and bottom corners travel with them.
-            .background(alignment: .top) {
-                GeometryReader { _ in
-                    panel(geometry: geometry, inset: GridMetrics.rowPadding)
-                        .offset(y: -gridScrollOffset)
-                }
-                // Like the List rows, the travelling card is allowed under the
-                // navigation and tab bars. `TopFade` dissolves it at the top;
-                // clipping this reader would strand those rows on black again.
-            }
-            // At rest `contentOffset.y` is the negative top inset. Adding that
-            // inset gives zero; after a drag it is the exact distance by which
-            // the List moved its content. This iOS 18 API observes the native
-            // scroller without putting another scroller around it.
-            .onScrollGeometryChange(for: CGFloat.self) { scroll in
-                scroll.contentOffset.y + scroll.contentInsets.top
-            } action: { _, offset in
-                gridScrollOffset = offset
-            }
+            //
+            // **The offset lives in the modifier, not on this screen.** See
+            // `ScrollingPanel` for the measurement: as this view's own `@State`
+            // it re-evaluated the whole grid on every frame of a scroll.
+            .modifier(ScrollingPanel(
+                panel: panel(geometry: geometry, inset: GridMetrics.rowPadding)
+            ))
             // **The edit controls' breathing room, taken from the `List`**
             // (#400). The delete circle and the reorder handle are the
             // system's, laid out against the `List`'s own bounds — measured,
@@ -902,10 +908,16 @@ struct WeeklyGridView: View {
     /// switched off takes them away again. Clamping here is what stops the view
     /// standing on a week that has stopped existing.
     ///
-    /// Not called from `toggle`: logging a day cannot open a week the pager did
-    /// not already reach, and un-logging the earliest completion on record
-    /// while you are standing on its week would otherwise yank the screen out
-    /// from under the tap that did it.
+    /// Called after every save, a toggle included, through
+    /// `StoreChange.committed`. This used to say it was *not* called from
+    /// `toggle`, so that un-logging the earliest completion on record while
+    /// standing on its week could not yank the screen out from under the tap
+    /// — and that had stopped being true on 2026-08-31 without anyone
+    /// deciding it: the widget reload that every commit queues writes a
+    /// trace line to the defaults, and the defaults notification called this.
+    /// The subscription above keeps that behaviour where it can be seen; if
+    /// the guard is wanted back, it is a decision about what a tap on the
+    /// earliest week should do, not a plumbing change.
     private func refreshReach() {
         let start = store.earliestRecordedDay()
         if start != recordStart { recordStart = start }
@@ -1068,10 +1080,10 @@ struct WeeklyGridView: View {
         let met = GoalMet.justMet(habit: snapshot, in: week)
         guard PopPreferences.allows(justMetGoal: met) else { return }
 
-        popTask?.cancel()
+        popTask.task?.cancel()
         show(name: habit.name, habitID: habit.id, on: day)
 
-        popTask = Task { @MainActor in
+        popTask.task = Task { @MainActor in
             try? await Task.sleep(for: GoalPop.duration)
             guard !Task.isCancelled else { return }
             withAnimation(gridReduceMotion ? nil : .easeOut(duration: 0.2)) { pop = nil }
@@ -1125,12 +1137,14 @@ struct WeeklyGridView: View {
 
     private func delete(_ habit: Habit) {
         do {
-            try store.delete(habit)
             // The widget holds a rendered surface with this habit's row on it,
-            // and its buttons carry the id the store has just retired. Reloading
-            // replaces that surface; the store refuses the write either way, so
-            // this is about not offering a button that does nothing. See #129.
-            WidgetCenter.shared.reloadAllTimelines()
+            // and its buttons carry the id the store has just retired. The
+            // store's own commit asks for the reload that replaces that
+            // surface (#134), through the one door every write goes through —
+            // this used to call `WidgetCenter` directly as well, a second,
+            // uncoalesced and untraced reload per deleted row on top of the
+            // one the commit had already queued. See #129.
+            try store.delete(habit)
         } catch {
             HabitStore.report(error, operation: "delete")
             // Destructive: no retry is offered, and `OperationNotices` would
@@ -1138,6 +1152,65 @@ struct WeeklyGridView: View {
             // and going again means the same swipe (#282).
             OperationNotices.shared.report(.delete)
         }
+    }
+}
+
+/// A task handle a view can replace without redrawing.
+///
+/// `@State` holds the box; the box holds the task. Assigning the task changes
+/// nothing SwiftUI observes, which is the point: the view draws `pop`, not
+/// the timer that clears it.
+@MainActor
+private final class TaskHolder {
+    var task: Task<Void, Never>?
+}
+
+/// The grid's panel, moved by the `List`'s own scroll offset (#454) — with
+/// the offset owned here rather than by the screen.
+///
+/// **The offset changes on every frame of a scroll, and whatever holds it is
+/// re-evaluated on every one of them.** It was `WeeklyGridView`'s own
+/// `@State`, so a flick re-ran the screen's body, the `GeometryReader`
+/// closure that reads the week's snapshots out of SwiftData, and every row's
+/// body — measured on a 26-row grid in the simulator: one two-second drag
+/// produced 38 offset updates, and each of them cost one completion fetch and
+/// 52 row-body passes, 1,976 in all, for pixels that only ever move by a
+/// translation. Held in a modifier, the state invalidates the modifier's own
+/// body and nothing above it: the panel takes its new offset and the `List`
+/// it sits behind is not asked to redraw.
+///
+/// The panel arrives as a value rather than being built in here, so it is
+/// rebuilt when the geometry or the row count changes and not when the offset
+/// does. Everything else is exactly the modifier chain the screen applied
+/// directly: the same `background(alignment: .top)`, the same
+/// `GeometryReader`, the same normalised offset read.
+private struct ScrollingPanel<Panel: View>: ViewModifier {
+    let panel: Panel
+
+    /// The native `List`'s vertical displacement from its resting position.
+    /// The rows already move by this amount; the panel behind them takes the
+    /// same transform without replacing any of the List interactions.
+    @State private var offset: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .background(alignment: .top) {
+                GeometryReader { _ in
+                    panel.offset(y: -offset)
+                }
+                // Like the List rows, the travelling card is allowed under the
+                // navigation and tab bars. `TopFade` dissolves it at the top;
+                // clipping this reader would strand those rows on black again.
+            }
+            // At rest `contentOffset.y` is the negative top inset. Adding that
+            // inset gives zero; after a drag it is the exact distance by which
+            // the List moved its content. This iOS 18 API observes the native
+            // scroller without putting another scroller around it.
+            .onScrollGeometryChange(for: CGFloat.self) { scroll in
+                scroll.contentOffset.y + scroll.contentInsets.top
+            } action: { _, new in
+                offset = new
+            }
     }
 }
 

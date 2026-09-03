@@ -416,6 +416,14 @@ actual bug. Every line here is something that already happened.
   its baseline off by four points and produced three real code changes chasing
   an artifact. If a measurement disagrees with the screenshot, suspect the
   measurement.
+- **A screenshot comparison is only valid between identical interaction
+  histories.** The same Release build on a fresh launch is bit-identical to
+  itself across relaunches, and the same build differs from its own fresh
+  launch by about 1,400 pixels once the grid has been left for another tab and
+  returned to — the rasterised socket layers come back one level different on
+  their bevel edges. A first main-versus-branch diff read as "the change" and
+  was this. Compare fresh launch against fresh launch, same taps in the same
+  order, status bar pinned with `simctl status_bar … override`.
 - **The simulator has no EDR headroom, so the glow does not render there.**
   Geometry, layout, colour and animation are verifiable in the simulator. Glow
   is not — that needs a device. Say which one was checked.

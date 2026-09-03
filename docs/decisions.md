@@ -7848,6 +7848,111 @@ cannot be kept, because the host does not survive it. Getting rid of the last
 exposure means deleting a habit without the object graph — a batch delete, or
 a delete rule that is not `.cascade` — and either is a store decision rather
 than a plumbing change.
+## 2026-09-02 — One tap, one refresh: the grid stops answering every defaults write with three fetches
+
+**Question.** `WeeklyGridView` re-read the demo-history flag and the record's
+two ends on every `UserDefaults.didChangeNotification`, on the reasoning that
+demo history lived in the defaults and the debug override still does. What
+does that cost per tap, now that a tap writes the defaults?
+
+**Measured**, iPhone 17 Pro simulator, iOS 26.5, a Debug build with counters
+on the store's fetches and the grid's handlers, ten rows with demo history on,
+one completion tap on the grid, host load 6–14:
+
+| | rounds of the defaults handler | store queries it ran | grid body passes |
+| --- | ---: | ---: | ---: |
+| `main` | 3 | 9 | 4 |
+| this change | 0 that touch the store | 0 | 4 |
+
+The three rounds were the pop's shuffle state (#452) and the trace line the
+widget reload records (#121), both written on the tap's own turn — each one a
+`fetchCount` over the completions and two sorted, limit-one fetches for the
+reach, for a day that had not moved. A tap on the Widgets tab, whose burst note
+is three more writes, ran the same three queries five times, on a screen that
+was not showing. End to end a grid tap went from sixteen SwiftData fetches to
+ten; the rest are the redraw's own.
+
+**Decision.** The defaults handler reads the override and touches the store
+only when today has changed. Demo history and the reach follow
+`StoreChange.committed`, which every save already posts — `HabitStore` and
+`DemoHistory` both — and which is the signal they were reaching through the
+trace line's write by accident. The behaviour is unchanged: the reach was
+refreshed after every toggle already, one turn late and three times over.
+
+**A claim corrected rather than restored.** `refreshReach` said it was *not*
+called from `toggle`, so that un-logging the earliest completion on record
+while standing on its week could not move the screen. That had been false
+since 2026-08-31 — the trace line's write called it after every toggle — and
+this change keeps the behaviour the code actually had and makes the comment
+say so. Whether the guard should come back is a question about what that tap
+should do, and it is left open rather than settled inside a performance change.
+
+**Two smaller redraws on the same tap.** The pop's dismissal task was a
+`@State`, so replacing it on each pop was a body pass with nothing to draw; it
+is held in a box now. And `delete` asked `WidgetCenter` for a reload directly
+after the store's commit had already queued one through `WidgetRefresh` — a
+second, uncoalesced, untraced reload per deleted row, the thing #134 exists to
+stop.
+
+**What is left, named rather than fixed.** The grid body still runs once after
+the widget reload's trace line is written, with a fetch and a body pass per
+row. That is `@AppStorage` on the App Group suite — the grid's first weekday,
+every row's rest day — answering a write to any key of that suite. It is the
+same shape as the finding above, one layer down, and it belongs to a decision
+about where the trace is written rather than to this change.
+## 2026-09-02 — The scroll offset lives in a modifier, and a scroll stops redrawing the grid
+
+**Question.** #454 moved the grid's panel with the `List` by reading the
+`List`'s content offset through `onScrollGeometryChange` and holding it in
+`WeeklyGridView`'s own `@State`. What did that state cost while a person
+scrolls?
+
+**Measured**, on the iPhone 17 Pro simulator, iOS 26.5, a Debug build with
+counters printed from `WeeklyGridView.body`, its `snapshots` read and
+`HabitRowView.body`, over a 26-row store (the curated set three times, demo
+history on), one one-second drag from the bottom of the screen to the top,
+host load 5–16, 560–580 CoreSimulator processes:
+
+| | offset updates in the drag | grid body passes | completion fetches | row body passes |
+| --- | ---: | ---: | ---: | ---: |
+| `main` | 38 | 38 | 38 | 1,976 |
+| this change | 93 | 0 | 0 | 0 |
+
+Every offset update on `main` re-ran the screen's body, the `GeometryReader`
+closure that reads the week's snapshots out of SwiftData, and every row's body
+twice — for pixels that only ever move by a translation. The drag produced
+2.4× as many offset updates on the fixed build in the same time because the
+app stopped stalling between them.
+
+**Decision.** The offset belongs to a `ScrollingPanel` view modifier that
+applies exactly the modifier chain the screen applied directly — the same
+`background(alignment: .top)`, the same `GeometryReader`, the same normalised
+offset read — and owns the state. A scroll invalidates the modifier's body
+and nothing above it. The panel is passed in as a value, so it is rebuilt when
+the geometry or the row count changes and not when the offset does.
+
+**What it does not buy: the frame rate**, and that was measured rather than
+implied. `simctl io recordVideo` over the same drag, Release builds, frames
+split into bursts at half a second of idle: `main` 63 frames at a median of
+33.3ms (31 fps), this change 59 frames at 30.0ms (34 fps), on a machine whose
+load moved between the two captures. #442's finding stands — the compositor's
+socket layers bound the scroll — and what this removes is the app's own work
+underneath that bound: a SwiftData fetch and fifty-two row bodies per frame.
+
+**The screenshot gate, and a trap in it.** `simctl io screenshot` through the
+real compositor, both builds on the same device and the same planted store:
+This Week, Widgets and Settings are byte-identical between `main` and this
+change on a fresh launch, on the ten-row and the 26-row store, and This Week is
+identical to ten pixels of one level after the same drag on each. The first
+comparison said otherwise — 1,427 pixels, all of one or two levels, all on the
+antialiased edges of the socket bevels — and it was not the change: `main`'s
+own shot had been taken after switching to Widgets and Settings and back, and
+`main` fresh against `main` after those tab switches differs by exactly those
+1,427 pixels, while `main` fresh against this change fresh is identical. The
+rasterised socket layers come back one level different once the grid has been
+left and returned to. **A screenshot comparison is a comparison only between
+identical interaction histories**: the same launch, the same taps, in the same
+order, before the shot.
 ## 2026-09-02 — Week widgets correct the past without trusting stale pixels (#508)
 
 Every non-future day drawn by a week widget now carries the same optimistic
@@ -7882,3 +7987,11 @@ cover the shipping faces. No test delivers a tap through the no-op adapter;
 production AppIntent construction and in-app delivery remain covered by their
 source, operation and physical-touch gates. The choice is confined to the
 three `ImageRenderer` entry points and does not change app or widget behavior.
+
+## 2026-09-02 — The Glow slider speaks the brightness it sets (#524)
+
+VoiceOver no longer inherits SwiftUI's percentage for the Glow slider. That
+percentage described the thumb's position in a 1–8 range and did not match any
+number on screen. The focused control now says the actual whole multiplier at
+every lit stop. At 1× it says “Glow off,” matching the amber readout rather
+than implying that ordinary white is still an active glow.
