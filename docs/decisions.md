@@ -7881,3 +7881,11 @@ cover the shipping faces. No test delivers a tap through the no-op adapter;
 production AppIntent construction and in-app delivery remain covered by their
 source, operation and physical-touch gates. The choice is confined to the
 three `ImageRenderer` entry points and does not change app or widget behavior.
+
+## 2026-09-02 — The Glow slider speaks the brightness it sets (#524)
+
+VoiceOver no longer inherits SwiftUI's percentage for the Glow slider. That
+percentage described the thumb's position in a 1–8 range and did not match any
+number on screen. The focused control now says the actual whole multiplier at
+every lit stop. At 1× it says “Glow off,” matching the amber readout rather
+than implying that ordinary white is still an active glow.
