@@ -8021,6 +8021,13 @@ Export History keeps Glow's grey-on-black palette and gains a fixed 18pt icon
 frame with a 15pt glyph. This borrows the containment that keeps Apple's own
 Settings symbols from determining row weight, without borrowing saturated
 badges that would compete with Glow's one reserved colour.
+
+**Reverted the same day.** Georg preferred the previous layout on sight —
+separate Glow and Say Well Done sections, the export icon at `Label`'s default
+size. The audit's reasoning above was not wrong on its own terms; it simply
+lost to a direct look at the screen, which settles a question like this ahead
+of any argument for it. Nothing here is settled again unless it is reopened
+the way this entry was.
 ## 2026-09-02 — Symbol tiles speak descriptions, not identifiers (#525)
 
 The 311-symbol picker is a curated set, not the full SF Symbols library. Its
