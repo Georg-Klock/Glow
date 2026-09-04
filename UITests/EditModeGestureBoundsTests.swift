@@ -21,7 +21,10 @@ final class EditModeGestureBoundsTests: XCTestCase {
         // The app grid has a fixed 20pt panel margin, then scales the widget's
         // 14pt trailing inset from its 338pt design width. A native swipe
         // action used to end at the panel instead of at the track, one scaled
-        // trailing inset too far right (#548).
+        // trailing inset too far right (#548). The same expectation on every
+        // runtime: iOS 26 floats the action 10pt inside the List's bound and
+        // iOS 18 runs it out to the bound, and the List's bound is placed so
+        // the action lands on the track either way (#555).
         let scale = (app.frame.width - 40) / 338
         let expectedTrackEnd = app.frame.width - 20 - 14 * scale
         XCTAssertEqual(delete.frame.maxX, expectedTrackEnd, accuracy: 1)
@@ -40,16 +43,40 @@ final class EditModeGestureBoundsTests: XCTestCase {
         edit.tap()
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 3))
 
-        let handles = app.buttons.matching(NSPredicate(
-            format: "label == %@", "Reorder Remove"
-        ))
-        XCTAssertTrue(handles.firstMatch.waitForExistence(timeout: 3))
-        let handle = handles.element(boundBy: 2)
-        handle.press(forDuration: 1, thenDragTo: handles.element(boundBy: 0))
+        // Rows and handles by structure, not by the system's labels (#555);
+        // see `EditModeRows.swift`.
+        XCTAssertTrue(app.editRow(containing: "Pitch Fixture").waitForExistence(timeout: 3))
+        let rows = app.editRows(containing: "Pitch Fixture")
+        XCTAssertEqual(rows.count, 5, "edit rows were \(rows.map(\.frame))")
+        let source = try XCTUnwrap(app.reorderHandle(in: rows[2]))
+        let target = try XCTUnwrap(app.reorderHandle(in: rows[0]))
 
-        let labels = app.staticTexts.matching(NSPredicate(
-            format: "label BEGINSWITH %@", "Pitch Fixture"
-        )).allElementsBoundByIndex.sorted { $0.frame.minY < $1.frame.minY }
-        XCTAssertEqual(labels.first?.label, "Pitch Fixture 3")
+        // Evidence for the next intermittent failure (#556): which element is
+        // about to be dragged, where, and what the screen held at the drop.
+        let handles = rows.compactMap { app.reorderHandle(in: $0) }
+        print("reorder: \(handles.count) handles at \(handles.map(\.frame)); "
+            + "dragging \(source.frame) to \(target.frame)")
+        source.press(forDuration: 1, thenDragTo: target)
+        let drop = XCTAttachment(screenshot: app.screenshot())
+        drop.name = "after the drop"
+        drop.lifetime = .keepAlways
+        add(drop)
+
+        // A List commits a reorder on an animation, so give the rows the same
+        // moment everything else in this file waits for — and no more than
+        // that: #554 showed that three seconds after the drop the order was
+        // still unchanged on the runner, so waiting is not the fix, only the
+        // fair reading.
+        let moved = app.editRow(containing: "Pitch Fixture 3")
+        let topOfRows = { app.editRows(containing: "Pitch Fixture").first?.frame.minY }
+        let deadline = Date().addingTimeInterval(3)
+        while moved.frame.minY != topOfRows(), Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        XCTAssertEqual(
+            moved.frame.minY,
+            topOfRows(),
+            "rows after the drop were \(app.editRows(containing: "Pitch Fixture").map(\.frame))"
+        )
     }
 }
