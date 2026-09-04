@@ -45,11 +45,38 @@ final class EditModeGestureBoundsTests: XCTestCase {
         ))
         XCTAssertTrue(handles.firstMatch.waitForExistence(timeout: 3))
         let handle = handles.element(boundBy: 2)
-        handle.press(forDuration: 1, thenDragTo: handles.element(boundBy: 0))
+        // Slowly, and hold before lifting. The default two-argument form drags
+        // as fast as the device will accept, and a `List` that never tracks the
+        // row drops it back where it started — a pass or a fail depending on
+        // how busy the machine is, which is not what this test is asking.
+        handle.press(
+            forDuration: 1,
+            thenDragTo: handles.element(boundBy: 0),
+            withVelocity: .slow,
+            thenHoldForDuration: 0.5
+        )
 
-        let labels = app.staticTexts.matching(NSPredicate(
+        // Then wait for the move to commit, rather than reading the order the
+        // instant the drag returns. Every other check in this file waits; this
+        // one used to read straight through the reorder animation, and a row
+        // still mid-flight reads as the old order — exactly the "Pitch Fixture
+        // 1 is not Pitch Fixture 3" seen on CI at f236216 (#551), on a commit
+        // that touched only widget sizing and cannot have moved this row.
+        let deadline = Date().addingTimeInterval(3)
+        var top = topPitchFixtureLabel(app)
+        while top != "Pitch Fixture 3", Date() < deadline {
+            usleep(100_000)
+            top = topPitchFixtureLabel(app)
+        }
+        XCTAssertEqual(top, "Pitch Fixture 3")
+    }
+
+    /// The topmost fixture row's label, by on-screen position.
+    private func topPitchFixtureLabel(_ app: XCUIApplication) -> String? {
+        app.staticTexts.matching(NSPredicate(
             format: "label BEGINSWITH %@", "Pitch Fixture"
-        )).allElementsBoundByIndex.sorted { $0.frame.minY < $1.frame.minY }
-        XCTAssertEqual(labels.first?.label, "Pitch Fixture 3")
+        )).allElementsBoundByIndex
+            .sorted { $0.frame.minY < $1.frame.minY }
+            .first?.label
     }
 }
