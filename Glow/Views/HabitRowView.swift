@@ -339,15 +339,40 @@ enum GridMetrics {
     /// a little late, which is why it is a rounded measurement rather than a
     /// derivation — the controls are the system's and it owns their size.
     static let editControlReach: CGFloat = 39
+
+    /// How far in from the `List`'s trailing bound the system draws a trailing
+    /// swipe action. **Not the same on the two runtimes the app ships to**,
+    /// and both were measured (#555).
+    ///
+    /// iOS 26 floats its actions as pills, inset from the bound: on an iPhone
+    /// 17e / iOS 26.5 the Delete pill ended 10.33pt inside a `List` bound at
+    /// 365.67pt on a 390pt screen. iOS 18 runs a full-height action out to the
+    /// bound itself: on an iPhone 16e / iOS 18.5 the same action ended at
+    /// 365.67pt against the same bound, which is 365.5 rounded to a pixel.
+    ///
+    /// **A measurement, not a derivation**, like `editControlReach`: the
+    /// action is the system's and the system owns where it puts it. #548 was
+    /// measured on iOS 26 alone and relied on this inset happening to equal
+    /// `editControlInset`, so the resting `List` bound was only `padTrailing`
+    /// in, and on iOS 18 the action overshot the track by exactly this 10pt.
+    /// `GridHorizontalInsets` takes it as a parameter so both values are
+    /// testable on either runtime; this is only the default.
+    static var swipeActionInset: CGFloat {
+        if #available(iOS 26, *) { 10 } else { 0 }
+    }
 }
 
 /// The three horizontal layers of the app grid: List, row and panel.
 ///
 /// The trailing side has one extra job at rest. SwiftUI positions a native
 /// swipe action from the List's trailing bound, not from the content inside a
-/// row. Moving only that bound inward by the widget's trailing inset makes the
-/// action stop at the day track; subtracting the same amount from the row and
-/// panel padding keeps both of those exactly where they were (#548).
+/// row. Moving that bound inward until it sits the system's own
+/// `swipeActionInset` outside the day track makes the action stop at the
+/// track; subtracting the same amount from the row and panel padding keeps
+/// both of those exactly where they were (#548). On iOS 26 that extra inset
+/// is exactly the widget's `padTrailing`; on iOS 18, whose actions run out to
+/// the bound, it is `padTrailing` plus the 10pt iOS 26 provides on its own
+/// (#555).
 ///
 /// Edit mode does not offer the swipe actions (its native remove control owns
 /// that gesture). It therefore keeps the symmetric List bounds #400/#520 use
@@ -360,11 +385,23 @@ struct GridHorizontalInsets: Equatable {
     let panelLeading: CGFloat
     let panelTrailing: CGFloat
 
-    init(isEditing: Bool, padLeading: CGFloat, padTrailing: CGFloat) {
+    init(
+        isEditing: Bool,
+        padLeading: CGFloat,
+        padTrailing: CGFloat,
+        swipeActionInset: CGFloat = GridMetrics.swipeActionInset
+    ) {
         let list = GridMetrics.listInset(isEditing: isEditing)
         let row = GridMetrics.contentInset(isEditing: isEditing)
         let panel = GridMetrics.panelInset(isEditing: isEditing)
-        let swipe = isEditing ? 0 : padTrailing
+        // The track ends `horizontalPadding + padTrailing` in from the screen's
+        // trailing edge. At rest the List's bound sits `swipeActionInset`
+        // outside that, so the system's own inset lands the action on the
+        // track; whatever that needs beyond `list` is what the row and the
+        // panel give back below.
+        let swipe = isEditing
+            ? 0
+            : GridMetrics.horizontalPadding + padTrailing - swipeActionInset - list
 
         listLeading = list
         listTrailing = list + swipe

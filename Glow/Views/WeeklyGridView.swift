@@ -48,6 +48,19 @@ struct WeeklyGridView: View {
     /// about *reading* `@Environment(\.editMode)` from outside the stack, which
     /// is always inactive, and `EditModeTests` scans for it.
     @State private var editMode: EditMode = .inactive
+
+    #if DEBUG
+    /// Every `onMove` this screen has received, as the UI test can read it
+    /// (#556). The runner reorders differently from every local machine and
+    /// its recording alone cannot say what the `List` reported, so under the
+    /// edit-pitch fixture the calls are exposed on a hidden accessibility
+    /// element and the test prints them into the log. Debug-only, and only
+    /// with that launch argument.
+    @State private var moveTrace: [String] = []
+    private static let tracesMoves = ProcessInfo.processInfo.arguments.contains {
+        $0.hasPrefix("-glow-edit-pitch-ui-test=")
+    }
+    #endif
     @State private var isShowingLowPowerNotice = false
     @State private var lowPower = LowPowerMonitor()
     /// Advances when `MarkHabitIntent` settles a write from the Widgets tab or
@@ -614,6 +627,17 @@ struct WeeklyGridView: View {
             // already has the drag's own motion, and when a mark is toggled,
             // which has `MotionPolicy`'s.
             .animation(rowRemoval, value: habits.count)
+            #if DEBUG
+            .background(alignment: .topLeading) {
+                if Self.tracesMoves {
+                    Color.clear
+                        .frame(width: 1, height: 1)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(moveTraceLabel)
+                        .accessibilityIdentifier("reorder-trace")
+                }
+            }
+            #endif
         }
     }
 
@@ -1118,10 +1142,36 @@ struct WeeklyGridView: View {
         withAnimation(gridReduceMotion ? nil : .easeOut(duration: 0.2)) { pop = content }
     }
 
+    #if DEBUG
+    private var moveTraceLabel: String {
+        let calls = moveTrace.isEmpty ? "none" : moveTrace.joined(separator: " | ")
+        let query = habits.map { String($0.name.suffix(1)) }.joined()
+        let stored = habits.map { "\($0.name.suffix(1))\($0.sortOrder)" }.joined(separator: ",")
+        return "calls: \(calls) ; query=\(query) stored=\(stored)"
+    }
+    #endif
+
     private func move(from source: IndexSet, to destination: Int) {
+        #if DEBUG
+        if Self.tracesMoves {
+            let names = habits.map { String($0.name.suffix(1)) }.joined()
+            let stored = habits.sorted { $0.sortOrder < $1.sortOrder }
+                .map { String($0.name.suffix(1)) }.joined()
+            moveTrace.append("\(Array(source))->\(destination) query=\(names) stored=\(stored)")
+        }
+        #endif
         do {
             try store.reorder(habits, from: source, to: destination)
+            #if DEBUG
+            if Self.tracesMoves {
+                moveTrace[moveTrace.count - 1] += " wrote=" + habits
+                    .map { "\($0.name.suffix(1))\($0.sortOrder)" }.joined(separator: ",")
+            }
+            #endif
         } catch {
+            #if DEBUG
+            if Self.tracesMoves { moveTrace[moveTrace.count - 1] += " threw=\(error)" }
+            #endif
             HabitStore.report(error, operation: "reorder")
             // No retry closure: the captured offsets describe a list the next
             // render re-draws from the store, where nothing moved — so the

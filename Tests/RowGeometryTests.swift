@@ -344,15 +344,52 @@ struct RowGeometryTests {
         // would inset by nothing and the panel would be drawn edge to edge.
         #expect(GridMetrics.editControlInset > 0)
         #expect(GridMetrics.rowPadding > 0)
+        // The system's swipe-action inset is a measurement of two runtimes
+        // (#555), and the default has to be the one for the runtime this test
+        // is running on.
+        if #available(iOS 26, *) {
+            #expect(GridMetrics.swipeActionInset == 10)
+        } else {
+            #expect(GridMetrics.swipeActionInset == 0)
+        }
     }
 
     /// #548: at rest the List's trailing edge moves inward so its native
     /// swipe actions stop where the row's day track stops. The row and panel
     /// pay the opposite adjustment, so neither visible surface moves.
+    ///
+    /// #555: how far the system draws the action inside the List's bound is
+    /// its own number and differs by runtime — 10pt on iOS 26, 0 on iOS 18 —
+    /// so the bound has to sit that far *outside* the track for the action to
+    /// land on it. Both values are checked here whatever runtime the test is
+    /// on; only the default is the runtime's.
     @Test("Only the native swipe edge moves; the row and panel stay put")
     func trailingSwipeEdgeStopsAtTheTrack() {
         for width in [200, 320, 338, 350, 353, 393, 402, 430, 1024] as [CGFloat] {
             let geometry = RowGeometry(totalWidth: width)
+            let trackEnd = GridMetrics.horizontalPadding + geometry.padTrailing
+            for systemInset in [0, 10] as [CGFloat] {
+                let resting = GridHorizontalInsets(
+                    isEditing: false,
+                    padLeading: geometry.padLeading,
+                    padTrailing: geometry.padTrailing,
+                    swipeActionInset: systemInset
+                )
+                let short = trackEnd - resting.listTrailing - systemInset
+                #expect(
+                    abs(short) < 1e-9,
+                    "at width \(width) with the system inset at \(systemInset), the action ends \(short) short of the track"
+                )
+                #expect(
+                    resting.listTrailing + resting.rowTrailing
+                        == GridMetrics.rowOuterInset(isEditing: false) + geometry.padTrailing
+                )
+                #expect(
+                    resting.listTrailing + resting.panelTrailing
+                        == GridMetrics.horizontalPadding
+                )
+            }
+
             let resting = GridHorizontalInsets(
                 isEditing: false,
                 padLeading: geometry.padLeading,
@@ -366,8 +403,7 @@ struct RowGeometryTests {
 
             #expect(
                 abs(
-                    resting.listTrailing - resting.listLeading
-                        - geometry.padTrailing
+                    resting.listTrailing + GridMetrics.swipeActionInset - trackEnd
                 ) < 1e-9
             )
             #expect(

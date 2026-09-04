@@ -21,20 +21,16 @@ final class EditModeRowPitchTests: XCTestCase {
                 "edit mode did not open at \(habitCount) rows"
             )
 
-            // Native edit mode prefixes the row's own "Edit …" label with
-            // "Remove, ". Ask for the whole set in one accessibility snapshot
-            // rather than waiting on every row separately; the frame of this
-            // combined button is the List cell SwiftUI centres its system
-            // controls in, which is the geometry #546 exposed.
-            let rowQuery = app.buttons.matching(NSPredicate(
-                format: "label CONTAINS %@", "Edit Pitch Fixture"
-            ))
-            guard rowQuery.firstMatch.waitForExistence(timeout: 3) else {
+            // The List cell is the geometry #546 exposed: it is what SwiftUI
+            // centres its system controls in. Found through the app's own
+            // "Edit …" label inside it rather than through the system's edit
+            // chrome, whose wording differs by runtime and on iOS 18 repeats
+            // the habit's name inside the reorder handle (#555); see
+            // `EditModeRows.swift`.
+            guard app.editRow(containing: "Pitch Fixture").waitForExistence(timeout: 3) else {
                 throw MissingRows(actual: 0, expected: habitCount)
             }
-            let rows = rowQuery.allElementsBoundByIndex.sorted {
-                $0.frame.minY < $1.frame.minY
-            }
+            let rows = app.editRows(containing: "Pitch Fixture")
             guard rows.count == habitCount else {
                 throw MissingRows(actual: rows.count, expected: habitCount)
             }
