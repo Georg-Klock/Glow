@@ -4,7 +4,8 @@ import UIKit
 import UniformTypeIdentifiers
 import WidgetKit
 
-/// Settings, in three clusters: **Glow**, **Week**, **Data**.
+/// Settings, in three clusters — **Glow**, **Week**, **Data** — and one row
+/// after them, **Send Feedback** (#564).
 ///
 /// Glow leads because it is the product rather than a preference about it.
 /// Week holds both controls that decide what a week is — where it starts and
@@ -87,6 +88,14 @@ struct SettingsView: View {
     /// See `resetRow`.
     @State private var isConfirmingReset = false
     @State private var typedConfirmation = ""
+
+    /// Whether the feedback composer is up (#564). Only ever true on a device
+    /// with a Mail account; everywhere else the row opens a `mailto:` URL.
+    @State private var isComposingFeedback = false
+
+    /// For the `mailto:` fallback: the environment's action, the SwiftUI
+    /// spelling for handing a URL to the system.
+    @Environment(\.openURL) private var openURL
 
     @AppStorage(WeekPreferences.firstWeekdayKey, store: GlowSettings.store)
     private var firstWeekday: Int = WeekPreferences.defaultFirstWeekday
@@ -356,6 +365,24 @@ struct SettingsView: View {
                     Text(Self.version.label)
                         .onTapGesture { reveal.registerTap() }
                 }
+
+                // Last, on its own, header-less (#564). Not a fifth row in
+                // Data: Export leaves the device through a share sheet, but a
+                // message to the developer is a different kind of thing from
+                // an operation on the store, and the row's own label says
+                // everything a footer would — #317 took the last one off this
+                // screen for less.
+                Section {
+                    Button {
+                        sendFeedback()
+                    } label: {
+                        Label {
+                            Text("Send Feedback")
+                        } icon: {
+                            DataIconBadge(systemName: "envelope")
+                        }
+                    }
+                }
             }
             .scrollContentBackground(.hidden)
             // A choice of two, rather than a format setting nobody would ever
@@ -376,6 +403,13 @@ struct SettingsView: View {
             // them as two is how one of them gets missed.
             .sheet(item: $exportFile, onDismiss: { discardExport() }) { file in
                 ShareSheet(url: file.url)
+            }
+            // The composer is the system's, prefilled and then left alone: its
+            // own Cancel discards, and only a person's Send sends (#564).
+            .sheet(isPresented: $isComposingFeedback) {
+                FeedbackComposeView(version: Self.version) {
+                    isComposingFeedback = false
+                }
             }
             // The same sheet the grid's strip opens, reached from the same
             // condition — one explanation of why the glow is off, not two.
@@ -618,6 +652,34 @@ struct SettingsView: View {
                 WidgetRefresh.invalidate()
             }
         )
+    }
+
+    // MARK: - Feedback
+
+    /// Opens a way to write to the developer (#564).
+    ///
+    /// The in-app composer where Mail has an account; otherwise a `mailto:`
+    /// URL, which hands the same recipient, subject and version line to
+    /// whatever client registers the scheme — Gmail, Outlook, anything —
+    /// rather than assuming Apple Mail. `canSendMail()` is false on every
+    /// simulator, so the fallback is the arm a simulator exercises and the
+    /// composer is the arm that needs a signed-in phone.
+    ///
+    /// If no app takes the URL either, the person is told so and given the
+    /// address, through the same notice every other failed action uses (#282)
+    /// — a tap that does nothing is the one outcome this must not have.
+    private func sendFeedback() {
+        if FeedbackComposeView.canSendMail() {
+            isComposingFeedback = true
+            return
+        }
+        guard let url = FeedbackMail.mailtoURL(version: Self.version) else {
+            OperationNotices.shared.report(.feedback)
+            return
+        }
+        openURL(url) { accepted in
+            if !accepted { OperationNotices.shared.report(.feedback) }
+        }
     }
 
     // MARK: - Reset

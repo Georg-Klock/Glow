@@ -8404,3 +8404,40 @@ look like Apple's because they are drawn the way Apple draws them.
 Worth keeping in mind next time a system-styled text reads wrong here: the
 palette's own floor for text asking nothing is 4.0:1, and 2.27:1 was well under
 it — a number, not a taste, was what said the footers were broken.
+
+## 2026-09-04 — Send Feedback is a message to the developer, not Email My History returning (#564)
+
+Settings ends with one header-less row, **Send Feedback**, addressed to
+`glowup@georgklock.com` with the subject `Glow Up feedback` and a body whose
+last line is the installed marketing version and build — the two numbers a bug
+report always wants, placed so writing happens above them. Its own section
+rather than a fifth row in Data: Export already leaves the device through a
+share sheet, but a message to Georg is a different kind of thing from an
+operation on the store, and the row's label says all a footer would.
+
+**#317 is not reopened.** Email My History was a second route for the *export*
+to the person's own address, removed as a duplicate of the share sheet. This
+carries no file and no history and is the only way in the app to reach the
+developer. The shape #289 built — a `UIViewControllerRepresentable` around
+`MFMailComposeViewController`, the same shape `ShareSheet` is — comes back
+because it is the right shape, not because the feature does; #289's rule that
+MessageUI's error object is neither surfaced nor logged is kept, since it can
+carry account details.
+
+**Both arms are code, because `canSendMail()` is false on every simulator.**
+A device with a Mail account gets the in-app composer. Everywhere else the row
+hands a `mailto:` URL to whatever client registers the scheme — Gmail, Outlook,
+anything — encoded by hand to RFC 3986's unreserved set, because
+`URLComponents` leaves `+` alone and some clients read it as a space;
+`FeedbackMailTests` round-trips every field. If no app takes the URL either,
+`OperationNotices` says so and gives the address (#282: a tap that does nothing
+is the one outcome a failure may not have). Checked on the iPhone 17 simulator,
+which has no Mail account and no mail client: the row takes the `mailto:` arm
+and lands on the notice. **The composer arm is untested on a device** as of
+this entry — a signed-in phone should confirm the sheet opens addressed,
+Cancel discards, and Send genuinely leaves.
+
+The local-only invariant is untouched: a compose sheet a person reviews and
+can cancel, nothing attached beyond the version line, nothing sent by the app.
+`LocalOnlyContractTests`' forbidden spellings do not name MessageUI and its
+allowlist did not need an entry.
