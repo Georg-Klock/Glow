@@ -357,6 +357,36 @@ struct PersistenceTests {
         #expect(b.sortOrder == 2)
     }
 
+    /// #556: a `List` may report one drag as two moves, each relative to the
+    /// order after the previous one, while the view's `@Query` array still
+    /// holds the order from before the first. The runner's recording showed
+    /// row 3 carried to the top and the list then re-rendering as 2, 1, 3, 4,
+    /// 5 — "offset 1 to 0" applied to the stale array. The offsets belong to
+    /// the stored order.
+    @Test("Reordering applies the offsets to the stored order, not the array as handed in")
+    func reorderAppliesOffsetsToTheStoredOrder() throws {
+        let context = try makeContext()
+        let store = makeStore(context)
+        let habits = try ["A", "B", "C", "D", "E"].map {
+            try store.addHabit(name: $0, icon: "🔤", frequency: .daily)
+        }
+        let (a, b, c, d, e) = (habits[0], habits[1], habits[2], habits[3], habits[4])
+
+        // Row C carried upward past B: the first step the List reports.
+        try store.reorder(habits, from: IndexSet(integer: 2), to: 1)
+        #expect([a, c, b, d, e].map(\.sortOrder) == [0, 1, 2, 3, 4])
+
+        // The second step, C past A, arrives with offsets relative to the
+        // order after the first — and with the array the query has not yet
+        // republished. Applied literally to that array it would move B.
+        try store.reorder(habits, from: IndexSet(integer: 1), to: 0)
+        #expect([c, a, b, d, e].map(\.sortOrder) == [0, 1, 2, 3, 4])
+
+        // And a fresh array is unaffected: the sort is a no-op on it.
+        try store.reorder([c, a, b, d, e], from: IndexSet(integer: 4), to: 0)
+        #expect([e, c, a, b, d].map(\.sortOrder) == [0, 1, 2, 3, 4])
+    }
+
     @Test("A stored habit produces the snapshot the grid draws from")
     func snapshotReflectsStoredState() throws {
         let context = try makeContext()

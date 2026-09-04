@@ -8196,20 +8196,34 @@ other button in the cell, at its trailing edge. `EditModeRows.swift` is that
 reading, and both tests use it. The reorder test now also records what it is
 about to drag and screenshots the drop, which is the evidence #556 asked for.
 
-**The intermittent reorder failure reproduces under load, and it is the
-gesture, not the selector** (#556). With the structural selection above, the
-test on an iPhone 16 / iOS 18.5 and an iPhone 17 / iOS 26.5 at a load
-average around 240 failed within two and five iterations. Its evidence line
+**The intermittent reorder failure has two causes, and the one on the
+runner is the app's** (#556). Locally, with the structural selection above,
+the test on an iPhone 16 / iOS 18.5 and an iPhone 17 / iOS 26.5 at a load
+average around 240 failed within two and five iterations; its evidence line
 showed five handles at the right frames and the drag from the third to the
 first, and the failing iterations' own screen recordings hold no frame with
-the row lifted: the two-argument `press(forDuration:thenDragTo:)` lifts the
-finger the moment it arrives, and a loaded list discards the gesture whole.
-That refutes the `boundBy` hypothesis #556 raised. Slow drag and a one-second
-hold before lifting moved the row in every one of 30 iterations on each
-runtime at the same load, so the test uses that form. #554 tried a version of
-it with a half-second hold and failed once on the runner without a local
-reproduction, so this is measured to be better, not proven to be enough; the
-issue stays open until the required lane has shown it.
+the row lifted — the two-argument `press(forDuration:thenDragTo:)` lifts the
+finger the moment it arrives and a loaded list discards the gesture whole.
+That refutes the `boundBy` hypothesis #556 raised. A slow drag held for a
+second before lifting moved the row in 30 of 30 iterations on each runtime
+at the same load, so the test uses that form.
+
+The runner then failed the same assertion with that form, and its recording
+shows something else: row 3 lifts, passes row 2, lands at the top, the list
+sits at 3, 1, 2, 4, 5 for about a second, and then re-renders as 2, 1, 3, 4,
+5. That final order is "offset 1 to 0" applied to the *original* array,
+which is what falls out when the `List` reports one drag as two moves — past
+row 2, then past row 1, each relative to the order after the previous — and
+the second is applied to a `@Query` array that has not been republished
+since the first. The `Habit` objects are live and already carry the
+`sortOrder` the first move wrote, so `HabitStore.reorder` now sorts the
+array it is handed by stored order before applying the offsets, which is a
+no-op on a fresh array and the intended move on a stale one.
+`PersistenceTests` replays the runner's two steps against a stale array.
+A fast machine collapses the two steps into one call — measured, one
+`onMove` per drag across 18 local runs, loaded and not — which is why this
+never reproduced locally and why the runner's own recording was the only
+way to see it.
 
 ## 2026-09-03 — Swipe ends at the track; the native drag proxy stays native (#548)
 

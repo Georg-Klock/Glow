@@ -59,18 +59,14 @@ final class EditModeGestureBoundsTests: XCTestCase {
 
         // **Slow, and held before lifting** (#556). The two-argument form
         // drags at the default velocity and lifts the moment it arrives, and
-        // under load the list discards that gesture whole: the failing
-        // iterations' own screen recordings hold not one frame with the row
-        // lifted, and the row is still where it was three seconds later. The
-        // hold gives the list time to lift the row and settle it at the
-        // target before the finger goes. Measured on an iPhone 16 / iOS 18.5
-        // and an iPhone 17 / iOS 26.5 at a load average around 240, with the
-        // handle selection above in both: the default form failed within two
-        // and five iterations respectively; this form moved the row in every
-        // one of 30 iterations on each. A shorter press with a slower drag
-        // and a longer hold still lost one in eight, so the press length is
-        // part of it and none of this is a derivation — it is what was
-        // measured.
+        // under load the list can discard that gesture whole: locally, at a
+        // load average around 240, the failing iterations' own screen
+        // recordings held not one frame with the row lifted, and the default
+        // form failed within two and five iterations on iOS 18.5 and 26.5
+        // where this form moved the row in 30 of 30 on each. That is one of
+        // the two ways this test has failed; the other was the app's, on the
+        // runner, where the drag landed and a second `onMove` was applied to
+        // a stale query array — see `HabitStore.reorder`.
         source.press(
             forDuration: 1, thenDragTo: target, withVelocity: .slow, thenHoldForDuration: 1
         )
