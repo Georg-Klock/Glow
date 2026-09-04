@@ -56,7 +56,24 @@ final class EditModeGestureBoundsTests: XCTestCase {
         let handles = rows.compactMap { app.reorderHandle(in: $0) }
         print("reorder: \(handles.count) handles at \(handles.map(\.frame)); "
             + "dragging \(source.frame) to \(target.frame)")
-        source.press(forDuration: 1, thenDragTo: target)
+
+        // **Slow, and held before lifting** (#556). The two-argument form
+        // drags at the default velocity and lifts the moment it arrives, and
+        // under load the list discards that gesture whole: the failing
+        // iterations' own screen recordings hold not one frame with the row
+        // lifted, and the row is still where it was three seconds later. The
+        // hold gives the list time to lift the row and settle it at the
+        // target before the finger goes. Measured on an iPhone 16 / iOS 18.5
+        // and an iPhone 17 / iOS 26.5 at a load average around 240, with the
+        // handle selection above in both: the default form failed within two
+        // and five iterations respectively; this form moved the row in every
+        // one of 30 iterations on each. A shorter press with a slower drag
+        // and a longer hold still lost one in eight, so the press length is
+        // part of it and none of this is a derivation — it is what was
+        // measured.
+        source.press(
+            forDuration: 1, thenDragTo: target, withVelocity: .slow, thenHoldForDuration: 1
+        )
         let drop = XCTAttachment(screenshot: app.screenshot())
         drop.name = "after the drop"
         drop.lifetime = .keepAlways
@@ -65,8 +82,8 @@ final class EditModeGestureBoundsTests: XCTestCase {
         // A List commits a reorder on an animation, so give the rows the same
         // moment everything else in this file waits for — and no more than
         // that: #554 showed that three seconds after the drop the order was
-        // still unchanged on the runner, so waiting is not the fix, only the
-        // fair reading.
+        // still unchanged on the runner, so waiting here is only the fair
+        // reading, not the fix.
         let moved = app.editRow(containing: "Pitch Fixture 3")
         let topOfRows = { app.editRows(containing: "Pitch Fixture").first?.frame.minY }
         let deadline = Date().addingTimeInterval(3)

@@ -8196,6 +8196,21 @@ other button in the cell, at its trailing edge. `EditModeRows.swift` is that
 reading, and both tests use it. The reorder test now also records what it is
 about to drag and screenshots the drop, which is the evidence #556 asked for.
 
+**The intermittent reorder failure reproduces under load, and it is the
+gesture, not the selector** (#556). With the structural selection above, the
+test on an iPhone 16 / iOS 18.5 and an iPhone 17 / iOS 26.5 at a load
+average around 240 failed within two and five iterations. Its evidence line
+showed five handles at the right frames and the drag from the third to the
+first, and the failing iterations' own screen recordings hold no frame with
+the row lifted: the two-argument `press(forDuration:thenDragTo:)` lifts the
+finger the moment it arrives, and a loaded list discards the gesture whole.
+That refutes the `boundBy` hypothesis #556 raised. Slow drag and a one-second
+hold before lifting moved the row in every one of 30 iterations on each
+runtime at the same load, so the test uses that form. #554 tried a version of
+it with a half-second hold and failed once on the runner without a local
+reproduction, so this is measured to be better, not proven to be enough; the
+issue stays open until the required lane has shown it.
+
 ## 2026-09-03 — Swipe ends at the track; the native drag proxy stays native (#548)
 
 The List has asymmetric bounds while it is not being edited. Its trailing
