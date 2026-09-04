@@ -235,7 +235,7 @@ struct SettingsView: View {
                     // are a scale — quiet, the rare thing, everything — and a
                     // scale reads better laid out than hidden behind its own
                     // current value.
-                    Picker("Say well done", selection: popBinding) {
+                    Picker("Encouragement", selection: popBinding) {
                         ForEach(Self.popChoices, id: \.0) { level, title in
                             Text(title).tag(level)
                         }
@@ -246,7 +246,11 @@ struct SettingsView: View {
                     // where a row used to say what it was for.
                     .labelsHidden()
                 } header: {
-                    Text("Say well done")
+                    // "Encouragement", not "Say well done" (#561): the header
+                    // matches the one other place a person reads this concept
+                    // named, `MarkHabitIntent`'s "Present Island Encouragement"
+                    // parameter. The picker's three positions are unchanged.
+                    Text("Encouragement")
                 } footer: {
                     // The explainer belongs outside the control's platter
                     // again; all three shortened variants remain (#474).
@@ -703,9 +707,13 @@ struct SettingsView: View {
     /// actionable — `SlotMarkView` routes `.openToday` through `GlowImageView`,
     /// while `.doneToday` and `.donePast` take a flat fill and no tile at all.
     /// A completion genuinely does not brighten with this slider.
+    ///
+    /// **The trade-off is named outright** (#561): "your eye adapts" alone left
+    /// it implied, and the sentence is the one place this screen says what the
+    /// slider costs.
     private static let glowNote =
-        "A brighter glow makes the open habits stand out. Your eye adapts to "
-            + "it, so everything else reads duller in exchange."
+        "A brighter glow makes the open habits stand out — but it's a trade-off: "
+            + "your eye adapts, so everything else reads duller in exchange."
 
 }
 
