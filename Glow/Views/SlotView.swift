@@ -51,12 +51,10 @@ struct SlotView: View {
         Group {
             if slot.isTappable {
                 // **The hit area is the slot, not the ink** (#116). A `Button`
-                // takes its label's drawn shape, and a ✕ is two 1pt bars — so
-                // a past day was tappable only within about half a point of
-                // the crossing, which reads as a slot that ignores you. It
-                // never showed before, because until this change the only
-                // tappable marks were the ring and the dot, both of which fill
-                // their frame.
+                // otherwise takes its label's drawn shape; today's ring or dot
+                // must keep the whole day-sized target even when the ink is
+                // smaller than its frame (#543 later made today the only live
+                // cadence cell again).
                 Button { tap() } label: { mark.contentShape(Rectangle()) }
                     .buttonStyle(PressStyle(
                         scale: MotionPolicy.pressScale(Self.pressScale, reduceMotion: reduceMotion)

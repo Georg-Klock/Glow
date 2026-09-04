@@ -197,11 +197,10 @@ struct CreationCreditTests {
                             "\(target)x, today \(todayColumn), made \(created), done \(done): "
                                 + row.map { "\($0.state.rawValue):\($0.firstDay)-\($0.lastDay)" }
                                     .joined(separator: " "))
-                        // Credit still decides how many rep marks exist. A
-                        // one-day loss can leave a pre-creation day unclaimed,
-                        // so this older credit sweep asserts ordering without
-                        // duplicating the no-credit tiling sweep.
-                        #expect(row.count == target, what)
+                        // Credit fills the target while it is still needed;
+                        // once genuine completions exceed the target, each
+                        // bonus keeps its own mark (#543).
+                        #expect(row.count == max(target, done.count), what)
                         for (a, b) in zip(row, row.dropFirst()) {
                             #expect(b.firstDay > a.lastDay, what)
                         }

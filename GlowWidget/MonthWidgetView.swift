@@ -201,12 +201,10 @@ private struct MonthCellView: View {
                 let undoneMark = MonthGrid.undoneMark(
                     for: cell, habit: habit, today: renderedDay
                 )
-                // The month now has the week widget's exact-date, nonfuture
-                // editing horizon (#526). The same optimistic `SlotToggle`
+                // The month keeps an exact-date control for today and nothing
+                // else (#543, superseding #526). The optimistic `SlotToggle`
                 // changes this cell before persistence; its resting face stays
-                // `cell.mark`, so adding controls does not move a rendered
-                // pixel. A completed past cell asks for undo rather than being
-                // mistaken for an off toggle.
+                // `cell.mark`, so interactivity does not move a rendered pixel.
                 SlotToggle(
                     habitID: habit.id,
                     isDone: isDone,

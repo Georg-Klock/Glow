@@ -66,11 +66,9 @@ struct Slot: Identifiable, Equatable, Sendable {
 
     /// Whether this slot stands for today.
     ///
-    /// A real comparison, made by the grid, rather than the alias for
-    /// `actionDay != nil` it used to be. That alias was true only while today
-    /// was the one day that carried an action; the week view now hands six more
-    /// days one, and a Monday completion would have started drawing itself as
-    /// today's (#116).
+    /// A real comparison, made by the grid, rather than an alias for
+    /// `actionDay != nil`. The two happen to agree again after #543, but
+    /// rendering identity and editing permission remain different facts.
     let isToday: Bool
 
     var id: Int { index }
@@ -252,9 +250,9 @@ enum WeekGrid {
                 else { .inactive }
 
             // Which days carry an action is the surface's answer, not this
-            // grid's: the week view edits any day it shows, the widget and the
-            // month edit today. `SlotEditing` refuses the rest day on both, so
-            // the clause that used to be written out here lives in one place.
+            // grid's. Every cadence surface is today-only after #543;
+            // `SlotEditing` also refuses the rest day, so the clause lives in
+            // one place.
             return Slot(
                 index: index,
                 state: state,

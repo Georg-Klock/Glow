@@ -136,7 +136,7 @@ struct DayIdentityTests {
                 for: habit.snapshot(calendar: berlin),
                 in: week,
                 today: midday(2026, 8, 20, in: berlin),
-                editing: .week(allowingFuture: false),
+                editing: .todayOnly,
                 restDay: nil,
                 calendar: berlin
             )
@@ -166,7 +166,7 @@ struct DayIdentityTests {
                 for: habit.snapshot(calendar: losAngeles),
                 in: week,
                 today: midday(2026, 8, 20, in: losAngeles),
-                editing: .week(allowingFuture: false),
+                editing: .todayOnly,
                 restDay: nil,
                 calendar: losAngeles
             )

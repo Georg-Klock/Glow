@@ -677,9 +677,9 @@ struct RenderBaselineTests {
                         geometry: geometry,
                         index: index,
                         cut: cut,
-                        // What the screen hands its rows on a store nobody
-                        // seeded: the week is editable, the future is not.
-                        editing: .week(allowingFuture: false)
+                        // Cadence surfaces are a quick action for today only;
+                        // arbitrary-date correction belongs to Edit History.
+                        editing: .todayOnly
                     ) { _ in } onEdit: { }
                     .frame(width: geometry.labelWidth + geometry.labelGap + geometry.trackWidth)
                 }

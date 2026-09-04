@@ -11,8 +11,8 @@ struct WidgetSpanActionsTests {
         return calendar
     }()
 
-    @Test("Every nonfuture day in an open span gets its own dated control")
-    func openSpanHasPerDayActions() throws {
+    @Test("An open span exposes a dated control for today only")
+    func openSpanHasTodaysAction() throws {
         let monday = try #require(calendar.date(from: DateComponents(
             year: 2026, month: 8, day: 31
         )))
@@ -32,8 +32,8 @@ struct WidgetSpanActionsTests {
             restDay: nil, calendar: calendar
         )
 
-        #expect(actions.map(\.column) == [0, 1, 2])
-        #expect(actions.map(\.day) == Array(week.days[0...2]))
+        #expect(actions.map(\.column) == [2])
+        #expect(actions.map(\.day) == [today])
     }
 
     @Test("Future and rest columns never receive controls")
@@ -57,7 +57,7 @@ struct WidgetSpanActionsTests {
             restDay: 3, calendar: calendar
         )
 
-        #expect(actions.map(\.column) == [0, 2])
+        #expect(actions.map(\.column) == [2])
     }
 
     @Test("Filled spans retain their one completion control")

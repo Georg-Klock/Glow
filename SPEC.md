@@ -292,25 +292,27 @@ A build that violates one of these is broken regardless of what else works.
 
 - **R1.** At most one slot per habit is open at a time, and only ever for the
   current day.
-- **R2.** A slot responds to taps only where its surface allows it. The week
-  view edits any day of the week it shows; the widget, its intents and the month
-  grid edit today and nothing else. A rest day is never editable on any surface.
-  The days *ahead* are editable only with demo history in — outside it you can
-  correct the past, not claim the future. **The week it shows need not be this
-  one** (#117): the view pages back as far as the record reaches — all of it,
-  with no cap since #186 — and a week entirely in the past is editable end to
-  end. Forward stops at the current week.
+- **R2.** A cadence-shaped surface — This Week, an installed widget or its
+  in-app preview — edits today and nothing else. This Week may page backward
+  through the record-or-twelve-week reach, but those weeks are browse-only
+  (#543, superseding #116/#117/#508/#526). Arbitrary past and future
+  corrections belong to Edit History alone: every real habit against every day
+  as a plain selected/unselected circle, from the same backward floor through
+  exactly twelve weeks ahead. Its future write is explicit at the store call.
+  A rest day is never editable on the cadence surfaces.
 - **R3.** A day holds zero or one completion. Never two. The per-day kind was
   the exception — one row per repetition, up to the habit's target — and it is
   gone (#209).
 - **R4.** A completion names one civil day and keeps naming it. Changing time
   zone, crossing a DST transition or relaunching does not move it, and a
   completion the app can see is a completion the app can un-log.
-- **R5.** A daily row draws exactly 7 slots. A live or met N-times row draws
-  exactly N spans; a finished unmet N-times row draws a seven-day diary. A
-  span whose rep happened is lit (#344, #476).
+- **R5.** A daily row draws exactly 7 slots. A live N-times row draws N spans;
+  a met row keeps one span per real completion, including every bonus beyond N,
+  up to the week's natural seven-day maximum. A finished unmet N-times row
+  draws a seven-day diary. A span whose rep happened is lit (#344, #476, #543).
 - **R6.** Every row uses the same fixed-width seven-day track. A final open span
-  stops at today, so the future portion of that track can intentionally be blank.
+  may own the remaining future columns, but its sole action stays pinned to
+  today; geometry never grants editing scope (#495, #543).
 - **R7.** Weeks reset clean. A frequency habit's unmet goal does not carry over.
 - **R8.** The glow is encoded in a colour space with headroom above SDR white.
   Without EDR the app renders flat colour, never a broken or blank slot.
@@ -330,10 +332,9 @@ open, on exactly the day the app believes it is on, and the write path refuses
 anything after it.
 
 R1, R2, R5 and R7 are asserted in `Tests/WeekGridTests.swift`, including an
-exhaustive pass over all 128 possible completion histories of a week — run under
-each surface's rule, so R2 is asserted as the difference between them rather
-than as one answer, and run again over an earlier week, which is the branch with
-no today in it. `Tests/SlotEditingTests.swift` covers the rule itself and the
+exhaustive pass over all 128 possible completion histories of a week under the
+one cadence-surface rule, then again over an earlier browse-only week with no
+today in it. `Tests/SlotEditingTests.swift` covers the rule itself and the
 geometry that resolves a touch on a span into a weekday.
 `Tests/WeekReachTests.swift` covers how far back the pager goes, and asserts the
 pager's one invariant — an enabled back chevron always lands on a *different
@@ -354,7 +355,8 @@ the right.
 - **Daily:** 7 equal slots, one per weekday in the calendar's own week order,
   day-pinned.
 - **N per week:** spans align to the same seven-day lattice. A span's width is
-  the day columns it owns; the final open span can leave future columns blank.
+  the day columns it owns; a final open span may own the remaining future
+  columns while still acting on today only.
 
 Given track width `W` and inter-item margin `G`:
 
@@ -393,16 +395,15 @@ Every slot is in exactly one of five states.
 The states map to *marks* via `Slot.mark`, which is where the rendering
 distinctions live and where they are tested.
 
-**A state is what is true, not what can be tapped** (#116). The week view edits
-any day it shows, so a missed day is now something you can correct: tapping it
-stores a completion, the day becomes filled, and it draws `donePast` — lit,
-because §1 says every completion is, and not `doneToday`, because it is not
-today. `Slot.isToday` is a real comparison against today for exactly this
-reason; it used to be an alias for "carries an action", which was true only
-while today was the one day that did. Nothing about *open* moved: at most one
-slot is open, on today, on every surface (R1).
+**A state is what is true, not what can be tapped** (#116, superseded in scope
+by #543). A missed day remains missed while the cadence surface is browse-only;
+logging it through Edit History makes the day filled and draws `donePast` —
+lit, because §1 says every completion is, and not `doneToday`, because it is
+not today. `Slot.isToday` remains a real comparison rather than an alias for
+"carries an action". Nothing about *open* moved: at most one slot is open, on
+today, on every cadence surface (R1).
 
-For a habit due a number of times a week the same tap changes the arithmetic
+For a habit due a number of times a week the same exact-day edit changes the arithmetic
 rather than one column. A completion on a past day is one fewer rep still owed,
 so the week re-divides: the completed block grows, a ✕ that was there because
 the reps had run out of days may no longer be owed, and the lit dot appears on
@@ -425,8 +426,8 @@ earliest blank day it could have used. The open mark ends on today. Future reps
 divide only the days after today, **as evenly as whole days allow with the
 remainder to the right** (#340, #476), so the near windows are shortest and the
 slack collects at the end of the week. A completed final mark reaches the last
-column; a final open mark does not, because future days are not part of today's
-control.
+column; a final open mark does too, while its one action remains pinned to today
+(#495).
 
 **A habit made part-way into the week is granted credit** (#343). It has not
 failed the Monday it did not exist for, so it is given **the minimum number of
@@ -453,21 +454,28 @@ credit nobody earned. A row that never recorded a target is granted nothing: an
 unknown grant cannot be reconstructed, and claiming one would be the app
 inventing forgiveness it has no record of (the same rule `createdDay` follows).
 
-**A met goal keeps every completion on its day** (#342). It used to collapse to
+**A met goal keeps every completion on its day** (#342, widened by #543). It used to collapse to
 one shape across all seven columns, which forgot every day it had just
 recorded; now the last mark runs to the end and the earlier ones stay where the
-reps happened. Completions past the target get no mark of their own and fall
-inside the last one, so a 3x row logged four times looks exactly like a 3x row
-logged three times — the record keeps the fourth, the row has nothing left to
-say about it.
+reps happened. Every completion past the target gets its own bonus mark, so a
+3x row logged four times visibly has four completed marks. The latest
+chronological completion owns the remainder of the week even when it is a
+bonus. The one-completion-per-day invariant is the natural cap of seven.
+
+A completion recorded before the habit was created remains visible on every
+history surface. In a week entirely before creation, weekly rows use seven
+day-sized factual marks: completed where the record says completed and inactive
+everywhere else. Creation suppresses missed/open judgement; it does not hide a
+real completion.
 
 The rule used to be **inferred from the design rather than specified**; it is
 specified now, in `docs/week-marks.md` §4.
 
 **An achieved span is lit** (#344), drawing `donePast` — lit but not emitting,
 which is the two-tier rule of §1: the glow stays reserved for what is still
-actionable, and the open mark is what has it. A completion past the goal has no
-mark of its own and falls inside the last one, which is lit anyway.
+actionable, and the open mark is what has it. A bonus completion is another lit
+mark and is announced with its exact date and the words “bonus completion” in
+This Week and the week widget.
 
 **The days are spoken as one fact, and the speaking outlived the drawing**
 (#344). The lit dots went when the marks lit — the same light in the same
@@ -500,23 +508,24 @@ through one at a time. It is counted off the marks the grid actually draws, so
 what is spoken and what is drawn cannot disagree. (The year grid was the other
 counted surface, one sentence per week column, until #316 removed it.)
 
-**A live weekly row draws exactly N rep windows** (#476). They are ordered,
-non-overlapping and at least one column wide. Together they cover the track
-unless the final window is open; that open window stops at today and leaves
-future columns blank. Pressing it therefore means only “log today,” never the
-future days that the old stretched control visually contained.
+**A live weekly row draws exactly N rep windows** (#476). A met row may draw
+more when it holds bonus completions (#543). The marks are ordered,
+non-overlapping and at least one column wide. Together they cover the track. A
+final open window may extend through future columns when no later rep needs
+them, but pressing it still means only “log today”; its shape does not make
+those future days controls.
 
 A rep with no day left to land on becomes a one-day ✕ on the earliest blank
 past day it could have used: never a warning and never a prediction. The next
-live mark absorbs the unused days after that cross. **In the week view a ✕ is
-correctable** (#116): logging its day recomputes the row from the record and can
-remove it. The widget remains today-only.
+live mark absorbs the unused days after that cross. A ✕ is browse-only on every
+cadence surface; logging its day in Edit History recomputes the row from the
+record and can remove it (#543).
 
 **A finished unmet week is a seven-day diary**, not N rep windows (#476). Every
 completed day is filled, every other day on which the habit existed is a
 one-day ✕, and a pre-creation blank day is inactive. Correcting one day changes
-that exact diary day. A finished met week keeps its N completed spans and has no
-crosses.
+that exact diary day. A finished met week keeps every completion, including
+bonus marks, and has no crosses.
 
 Rest-day behavior is not part of #476. The shipping app retired rest-day input
 (#390), and a stored legacy rest day retains the earlier span algorithm until
@@ -646,13 +655,12 @@ holds the rule; the widget's own completion carries it too, recorded at the tap
 and spent on a timeline of one still entry.
 
 **This Week creates and edits its habits through one editor.** Outside edit
-mode it carries one trailing control: an ellipsis menu holding **New Habit**,
-**Blank Row** and **Edit** (#320). The menu belongs to the current week only
-(#207): paged back, the trailing slot holds **Today** instead, because
-reordering, deleting and adding are properties of the list and mean nothing
-more three weeks ago than they mean now. The editor opened on the adding
-screen's *kind* while there were two of them (#209); there is one, so it opens
-on the count and nothing else.
+mode its ellipsis menu orders **New Habit**, **Blank Row**, a divider, **Edit
+History**, then **Edit** (#320, #543). Row management belongs to the current
+week; on a browsed week the menu contains Edit History beside the separate
+**Today** shortcut, so the history matrix can open on exactly the week being
+viewed. The editor opened on the adding screen's *kind* while there were two of
+them (#209); there is one, so it opens on the count and nothing else.
 
 **Editing has a toolbar of its own** (#399). While the list is fanned open the
 week pager and the week readout both leave — neither answers a question editing
@@ -660,12 +668,12 @@ asks, and the pager is the only control that could change the week, so hiding
 it is also what makes "edit mode ends when you leave this week" a rule nothing
 on screen can reach. What appears in their place is a **Done** checkmark,
 immediately left of the ellipsis, carrying the same `checkmark` symbol the menu
-item used to. The menu keeps New Habit and Blank Row and drops Edit for as long
-as editing lasts, so Done is said once rather than twice. **Entering is still
-two taps and leaving is now one**: #320 put both ends in the menu for symmetry
-and named the cost, and this is that cost being paid back on the end that
-needed it — a mode whose exit is behind a menu reads as a mode you are stuck
-in.
+item used to. The menu keeps New Habit, Blank Row and Edit History and drops
+Edit for as long as editing lasts, so Done is said once rather than twice.
+**Entering is still two taps and leaving is now one**: #320 put both ends in
+the menu for symmetry and named the cost, and this is that cost being paid back
+on the end that needed it — a mode whose exit is behind a menu reads as a mode
+you are stuck in.
 
 **A name that will not fit is shown not fitting in the field itself** (#405,
 #456). The field has no character limit and imposes none — what is stored is
@@ -711,13 +719,10 @@ that remains and always was the weekly one: a seven-times-a-week cadence, which
 is why "7x per week" is the wording for the everyday case rather than a
 separate mode.
 
-**Every slot in the week view is a plain button** (#116). No edit mode, no long
-press, no confirmation: a tap on Monday marks or un-marks Monday, exactly as a
-tap on today does for today. Today still glows and still reads as the live one;
-the other six are tap targets that happen not to be lit, which is §1 doing its
-job — light says what happened, and shape says what is still open. The cost is
-accepted: a stray tap changes a day, and nothing distinguishes a correction from
-an original. That is what editing the past means.
+**Only today responds inside the week view** (#543, superseding #116). The
+other six columns still show the cadence's record and judgement but carry no
+button. Corrections do not share the browsing surface any more; Edit History is
+the plain all-days matrix built for them.
 
 **The week view pages back through earlier weeks** (#117, #190, #207). Two
 toolbar buttons, and **the pair is asymmetric**: on the current week only `<`,
@@ -727,26 +732,23 @@ anything. Off the current week the trailing slot holds **Today**, which jumps
 straight home rather than stepping — a way out of a place you paged into is not
 one tap per week you came back through, and with no cap that walk is as long as
 the record. There is no gesture: #190's header swipe is out (#207), and the
-rows keep their own swipe actions for edit and delete. An earlier week is edited
-exactly as this one is: the surface has not changed, and all seven of its
-columns are past, so all seven are tap targets. Nothing is open in it, because
-nothing is open anywhere but today (R1).
+rows keep their own swipe actions for edit and delete. An earlier week is
+browse-only: nothing is open and none of its marks accepts a tap. Its trailing
+toolbar keeps Today and adds the same Edit History door, opening the matrix on
+that displayed week.
 
-**How far back: as far as the record reaches, and no further** (#186). The
-record starts at the first completion on record or the first habit's creation,
-whichever is earlier — the demo invents completions ten weeks before the habits
-that carry them, so neither alone is the answer. A week before anything existed
-holds nothing to correct, so a fresh install pages nowhere and the reach grows
-with the app's own history. **There is no cap.** There was one, of twelve
-weeks, and both of its reasons are gone: how much rope a person gets was
-decided the other way, and the value that made an uncapped reach unbounded is
+**How far back: the record, or twelve weeks, whichever is further** (#186,
+#259). The record starts at the first completion on record or the first habit's
+creation, whichever is earlier — the demo invents completions ten weeks before
+the habits that carry them, so neither alone is the answer. A fresh install can
+still browse a quarter of empty history; a longer record extends the reach with
+no cap. The value that once made an uncapped reach accidentally unbounded is
 refused where it is read rather than clipped where it is used —
 `Habit.createdAt` defaults to `.distantPast` for rows written before the column
 existed, which means *unknown*, and a habit whose only signal is that default
-starts no record at all. Forward stops at the current week. The pager is the
-only long view now: the Settings History screen — a year of days that did not
-respond to touch on purpose — went with #316, so the week view's reach is where
-the record is read.
+starts no record at all. This Week stops forward at the current week. Edit
+History shares that backward reach and alone continues forward, exactly twelve
+weeks.
 
 **The title names the week you are looking at: how long ago, then which days**
 (#190, #207). "This Week", "Last Week", "Two Weeks Ago" — and past the third
@@ -848,15 +850,17 @@ where the crossfade already was.
 
 - [x] A daily habit shows exactly 7 circles for the current week, in the
       calendar's own week order.
-- [x] A live or met N-times habit shows exactly N claimable-window marks on the
-      day lattice; a finished unmet one shows seven day-sized diary marks.
+- [x] A live N-times habit shows N claimable-window marks on the day lattice; a
+      met one keeps every completion as a mark, including bonuses, and a
+      finished unmet one shows seven day-sized diary marks.
 - [x] Tapping today's open slot marks it complete, persists a `Completion`, and
       runs the fill transition.
 - [x] Tapping today's filled slot un-marks it, reverting to open with the glow
       resumed.
-- [x] Tapping any other day of the week in the app marks or un-marks *that*
-      day; the widget offers today and nothing else.
-- [x] Days still to come are tappable only with demo history in.
+- [x] This Week, installed widgets and in-app widget previews offer today and
+      nothing else; every other correction is made in Edit History.
+- [x] Edit History offers every day through exactly twelve weeks ahead and
+      writes each selected/unselected circle immediately.
 - [x] At most one slot per habit is open at a time, and it ends on today rather
       than painting future days.
 - [x] Without EDR the glow renders as flat colour, no crash, no artifact.
@@ -910,11 +914,10 @@ again by this change, now drawing a month (#321 closes with it).
 **The week, at medium and large.** Today's slot is an `AppIntent`-backed toggle
 (`SlotToggle`, #292), so a habit can be logged from the home screen without
 launching the app and the mark flips at the tap rather than at the next
-provider run. Past days are not tappable here even though the app's own grid
-now edits them: a widget is a glance and a single confirmed action, and it has
-no touch location to resolve a span's column with. `SlotEditing.todayOnly` is
-how the surface says so, and `HabitStore` refuses a day ahead whatever the
-surface offers.
+provider run. Past days are not tappable here or in This Week: Edit History is
+the one correction surface. `SlotEditing.todayOnly` is how every cadence
+surface says so, and `HabitStore` refuses a day ahead unless that editor names
+the exception explicitly.
 Rows are as many as fit, then a hard cut — no "+N more" row, per
 docs/vision.md: a row spent saying how much is missing is a row not showing a
 habit. The app's own grid marks the boundary, where there is room to say it.

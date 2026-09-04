@@ -276,11 +276,12 @@ private struct WidgetRow: View {
     let burstDay: DayID?
 
     private var slots: [Slot] {
-        // The week widget edits every non-future day it draws (#508), matching
-        // the app's week while leaving the month on its today-only contract.
+        // Every cadence surface is today-only now (#543). Past and future
+        // corrections belong to Edit History in the app, while this remains a
+        // fully optimistic control for the one day it can edit.
         WeekGrid.slots(
             for: habit, in: week, today: today,
-            editing: .week(allowingFuture: false), restDay: restDay
+            editing: .todayOnly, restDay: restDay
         )
     }
 
@@ -290,7 +291,7 @@ private struct WidgetRow: View {
         guard case .timesPerWeek(let target) = habit.frequency else { return [] }
         return WeekSpans.spans(
             for: habit, in: week, today: today, target: target,
-            editing: .week(allowingFuture: false), restDay: restDay
+            editing: .todayOnly, restDay: restDay
         )
     }
 
@@ -396,9 +397,8 @@ private struct WidgetRow: View {
                 Color.clear
                     .frame(width: 0, height: 0)
                 // One element for the run, no button trait: the days are a
-                // record, separate from the controls that may now correct any
-                // non-future day. The app row does the same from the same
-                // string. See #104 and #508.
+                // record, separate from today's one live control. The app row
+                // does the same from the same string. See #104 and #543.
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(voice.map { "\(habit.name), \($0)" } ?? "")
                 .accessibilityHidden(voice == nil)
@@ -407,9 +407,9 @@ private struct WidgetRow: View {
         .frame(height: side)
     }
 
-    /// The face a filled daily slot returns to when it is corrected. A past
-    /// day normally becomes missed, but a back-filled day before the habit
-    /// existed was never missed and returns to upcoming (#265, #508).
+    /// The face today's filled daily slot returns to when it is corrected.
+    /// The past branches remain deterministic for an archived stale surface,
+    /// even though #543 no longer creates controls for them.
     private func undoneMark(for slot: Slot) -> SlotMark {
         guard slot.state == .filled else { return slot.mark }
         guard week.days.indices.contains(slot.index) else { return .upcoming }
@@ -498,7 +498,11 @@ private struct WidgetSpan: View {
             )
         )
         let label = SlotVoice.span(
-            habitName: habit.name, state: span.state, actionDay: span.actionDay
+            habitName: habit.name,
+            state: span.state,
+            actionDay: span.actionDay,
+            completionDay: span.completionDay,
+            isBonus: span.isBonus
         )
         if span.state == .open, !actions.isEmpty {
             openSpan(mark: mark, actions: actions)
@@ -518,7 +522,11 @@ private struct WidgetSpan: View {
                 day: actionDay,
                 renderedDay: renderedDay,
                 onLabel: SlotVoice.span(
-                    habitName: habit.name, state: .filled, actionDay: span.actionDay
+                    habitName: habit.name,
+                    state: .filled,
+                    actionDay: span.actionDay,
+                    completionDay: span.completionDay,
+                    isBonus: span.isBonus
                 ),
                 offLabel: SlotVoice.span(
                     habitName: habit.name, state: offState, actionDay: span.actionDay

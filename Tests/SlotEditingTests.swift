@@ -3,12 +3,7 @@ import Foundation
 import Testing
 @testable import Glow
 
-/// Which days a surface may write, and which day a touch lands on.
-///
-/// The two halves of #116: the policy, and the geometry that resolves a finger
-/// on a span into a weekday. They are tested together because a row that draws
-/// a tap target it will not honour is exactly the bug the pair exists to
-/// prevent.
+/// Which day every cadence-shaped surface may write after #543.
 @Suite("Slot editing")
 struct SlotEditingTests {
     private let calendar = TestCalendar.monday
@@ -16,143 +11,99 @@ struct SlotEditingTests {
     private let today = TestCalendar.date(2026, 8, 19)
     private var week: Week { WeekCalendar.week(containing: today, calendar: calendar) }
 
-    private func day(_ editing: SlotEditing, column: Int, restDay: Int? = nil) -> Date? {
-        editing.day(
-            atColumn: column, in: week, today: today, restDay: restDay, calendar: calendar
+    private func day(column: Int, restDay: Int? = nil) -> Date? {
+        SlotEditing.todayOnly.day(
+            atColumn: column,
+            in: week,
+            today: today,
+            restDay: restDay,
+            calendar: calendar
         )
     }
 
-    // MARK: - The policy
-
-    @Test("The widget's surface reaches today and nothing else")
+    @Test("Every cadence surface reaches today and nothing else")
     func todayOnlyReachesToday() {
-        #expect(day(.todayOnly, column: 0) == nil)
-        #expect(day(.todayOnly, column: 2) == today)
-        #expect(day(.todayOnly, column: 3) == nil)
+        #expect(day(column: 0) == nil)
+        #expect(day(column: 2) == today)
+        #expect(day(column: 3) == nil)
     }
 
-    @Test("The week view reaches back but not forward")
-    func weekReachesBack() {
-        let editing = SlotEditing.week(allowingFuture: false)
-        #expect(day(editing, column: 0) == TestCalendar.date(2026, 8, 17))
-        #expect(day(editing, column: 2) == today)
-        #expect(day(editing, column: 3) == nil)
-        #expect(day(editing, column: 6) == nil)
-    }
-
-    @Test("Demo history opens the days ahead")
-    func demoOpensTheFuture() {
-        let editing = SlotEditing.week(allowingFuture: true)
-        #expect(day(editing, column: 3) == TestCalendar.date(2026, 8, 20))
-        #expect(day(editing, column: 6) == TestCalendar.date(2026, 8, 23))
-    }
-
-    @Test("No surface reaches the rest day")
-    func restDayIsRefusedEverywhere() {
-        // Monday, a past day the week view otherwise reaches.
-        let monday = TestPreferences.weekday(ofColumn: 0, in: week, calendar: calendar)
-        let cases: [SlotEditing] = [
-            .todayOnly, .week(allowingFuture: false), .week(allowingFuture: true)
-        ]
-        for editing in cases {
-            #expect(day(editing, column: 0, restDay: monday) == nil, "\(editing)")
-        }
-
-        // And when today is the rest day, today goes with it.
-        let wednesday = TestPreferences.weekday(ofColumn: 2, in: week, calendar: calendar)
-        for editing in cases {
-            #expect(day(editing, column: 2, restDay: wednesday) == nil, "\(editing)")
-        }
-    }
-
-    // MARK: - A week that is not this one (#117)
-
-    /// The week beginning Monday 2026-08-03, two weeks before this one.
-    private var pastWeek: Week {
-        WeekCalendar.week(containing: TestCalendar.date(2026, 8, 3), calendar: calendar)
-    }
-
-    private func pastDay(_ editing: SlotEditing, column: Int, restDay: Int? = nil) -> Date? {
-        editing.day(
-            atColumn: column, in: pastWeek, today: today, restDay: restDay, calendar: calendar
+    @Test("A week entirely in the past is browse-only", arguments: 0..<7)
+    func pastWeekIsInert(column: Int) {
+        let past = WeekCalendar.week(
+            containing: TestCalendar.date(2026, 8, 3), calendar: calendar
         )
+        #expect(SlotEditing.todayOnly.day(
+            atColumn: column,
+            in: past,
+            today: today,
+            restDay: nil,
+            calendar: calendar
+        ) == nil)
     }
 
-    @Test("A week entirely in the past is editable end to end", arguments: 0..<7)
-    func pastWeekIsEditableEndToEnd(column: Int) {
-        // Stated rather than left to fall out of the comparison: every day of a
-        // week already over is a day that happened, so every column carries an
-        // action. This is the whole reason the pager exists.
-        #expect(pastDay(.week(allowingFuture: false), column: column) == pastWeek.days[column])
+    @Test("A week in the future is browse-only", arguments: 0..<7)
+    func futureWeekIsInert(column: Int) {
+        let future = WeekCalendar.week(
+            containing: TestCalendar.date(2026, 9, 7), calendar: calendar
+        )
+        #expect(SlotEditing.todayOnly.day(
+            atColumn: column,
+            in: future,
+            today: today,
+            restDay: nil,
+            calendar: calendar
+        ) == nil)
     }
 
-    @Test("Demo history decides nothing about a past week")
-    func allowingFutureIsANoOpInThePast() {
-        for column in 0..<7 {
-            #expect(
-                pastDay(.week(allowingFuture: true), column: column)
-                    == pastDay(.week(allowingFuture: false), column: column),
-                "column \(column)"
-            )
-        }
-    }
-
-    @Test("The widget's surface reaches nothing at all in an earlier week")
-    func todayOnlyCannotReachBack() {
-        // Reaching back is the app's, and only the app's. A widget snapshot
-        // built before the app paged anywhere still holds today and only today,
-        // and `HabitStore` refuses the rest anyway.
-        for column in 0..<7 {
-            #expect(pastDay(.todayOnly, column: column) == nil, "column \(column)")
-        }
-    }
-
-    @Test("The rest day is still refused in an earlier week")
-    func restDayHoldsInThePast() {
-        let thursday = TestPreferences.weekday(ofColumn: 3, in: pastWeek, calendar: calendar)
-        #expect(pastDay(.week(allowingFuture: false), column: 3, restDay: thursday) == nil)
-        #expect(pastDay(.week(allowingFuture: false), column: 2, restDay: thursday) != nil)
+    @Test("Even today is withheld when the legacy rest setting names it")
+    func restDayIsRefused() {
+        let wednesday = TestPreferences.weekday(
+            ofColumn: 2, in: week, calendar: calendar
+        )
+        #expect(day(column: 2, restDay: wednesday) == nil)
     }
 
     @Test("A column outside the week is not a day")
     func columnsOutsideTheWeek() {
-        #expect(day(.week(allowingFuture: true), column: -1) == nil)
-        #expect(day(.week(allowingFuture: true), column: 7) == nil)
+        #expect(day(column: -1) == nil)
+        #expect(day(column: 7) == nil)
     }
 
-    // MARK: - Resolving a touch on a span
-
-    @Test("A tap on a past column of a span writes that day, not today")
-    func spanTapResolvesToTheColumnTouched() throws {
-        // The row a 2×/week habit draws on this Wednesday with nothing logged:
-        // one open span covering Monday through Wednesday, one waiting for the
-        // weekend. Touching the open span over Monday has to write Monday —
-        // the span's own `actionDay` is today, and that is what a location-less
-        // activation falls back to.
-        let track: CGFloat = 220
-        let habit = HabitSnapshot.fixture(frequency: .timesPerWeek(2))
-        let spans = WeekSpans.spans(
-            for: habit, in: week, today: today, target: 2,
-            editing: .week(allowingFuture: false), restDay: nil, calendar: calendar
+    @Test("A span resolves today only, and a filled span must hold today's completion")
+    func spanResolution() {
+        let open = SlotSpan(
+            index: 0, firstDay: 0, lastDay: 4,
+            state: .open, actionDay: today
         )
-        let span = try #require(spans.first { $0.state == .open })
-        #expect(span.firstDay == 0)
+        let empty = HabitSnapshot.fixture(frequency: .timesPerWeek(2))
+        #expect(WeekSpans.day(
+            atColumn: 0, of: open, for: empty, in: week, today: today,
+            editing: .todayOnly, restDay: nil, calendar: calendar
+        ) == nil)
+        #expect(WeekSpans.day(
+            atColumn: 2, of: open, for: empty, in: week, today: today,
+            editing: .todayOnly, restDay: nil, calendar: calendar
+        ) == today)
 
-        // A touch over Monday's column, in the span's own coordinates.
-        let start = SlotLayout.columnStart(trackWidth: track, index: span.firstDay)
-        let touchX = SlotLayout.columnCentre(trackWidth: track, index: 0) - start
-        let column = try #require(SlotLayout.column(atX: start + touchX, trackWidth: track))
-
-        #expect(column == 0)
-        #expect(
-            day(.week(allowingFuture: false), column: column) == TestCalendar.date(2026, 8, 17)
+        let filled = SlotSpan(
+            index: 0, firstDay: 0, lastDay: 4,
+            state: .filled, actionDay: nil
         )
-        // The span itself still carries today, which is what a tap with no
-        // location writes.
-        #expect(span.actionDay == today)
+        #expect(WeekSpans.day(
+            atColumn: 2, of: filled, for: empty, in: week, today: today,
+            editing: .todayOnly, restDay: nil, calendar: calendar
+        ) == nil)
+        let done = HabitSnapshot.fixture(
+            frequency: .timesPerWeek(2), completedDays: [today]
+        )
+        #expect(WeekSpans.day(
+            atColumn: 2, of: filled, for: done, in: week, today: today,
+            editing: .todayOnly, restDay: nil, calendar: calendar
+        ) == today)
     }
 
-    @Test("Every column of a span resolves to its own weekday")
+    @Test("Span touch geometry remains the inverse of column placement")
     func everyColumnOfASpanResolves() {
         let track: CGFloat = 338
         for firstDay in 0..<7 {

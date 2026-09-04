@@ -117,7 +117,13 @@ struct SpanView: View {
     /// act on. What it does name is the day an activation without a location
     /// would touch. See `SlotVoice`.
     private var label: String {
-        SlotVoice.span(habitName: habitName, state: span.state, actionDay: span.actionDay)
+        SlotVoice.span(
+            habitName: habitName,
+            state: span.state,
+            actionDay: span.actionDay,
+            completionDay: span.completionDay,
+            isBonus: span.isBonus
+        )
     }
 
     private var hint: String {
