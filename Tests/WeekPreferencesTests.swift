@@ -230,7 +230,7 @@ struct WeekPreferencesTests {
         let habit = HabitSnapshot.fixture(frequency: .timesPerWeek(3))
         let spans = WeekSpans.spans(
             for: habit, in: week, today: today, target: 3,
-            editing: .todayOnly, restDay: restDay, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: restDay, calendar: calendar
         )
         // The geometry holds — still three spans dividing the week — but
         // nothing is open and nothing takes a tap.
@@ -244,7 +244,7 @@ struct WeekPreferencesTests {
         )
         let metSpans = WeekSpans.spans(
             for: met, in: week, today: today, target: 1,
-            editing: .todayOnly, restDay: restDay, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: restDay, calendar: calendar
         )
         #expect(metSpans.allSatisfy { !$0.isTappable })
     }

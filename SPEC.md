@@ -312,7 +312,12 @@ A build that violates one of these is broken regardless of what else works.
   mode, not a separate screen (#557): every real habit against every day as a
   plain selected/unselected circle, from the same backward floor through
   exactly twelve weeks ahead. Its future write is explicit at the store call.
-  A rest day is never editable on the cadence surfaces.
+  A rest day is never editable on the cadence surfaces. **A met row still
+  takes today on This Week** (#560): the filled mark covering an unlogged
+  today carries today as its action, and the completion it logs is an
+  ordinary bonus mark. The widget and its preview offer nothing on a met row
+  — WidgetKit cannot tell which column of a bar was touched — and
+  `BonusEditing` is how each surface says which it is.
 - **R3.** A day holds zero or one completion. Never two. The per-day kind was
   the exception — one row per repetition, up to the habit's target — and it is
   gone (#209).
@@ -474,6 +479,19 @@ reps happened. Every completion past the target gets its own bonus mark, so a
 3x row logged four times visibly has four completed marks. The latest
 chronological completion owns the remainder of the week even when it is a
 bonus. The one-completion-per-day invariant is the natural cap of seven.
+
+**Today's tap on a met row logs one more** (#560), on This Week only. The bar
+covering today is still the completion it was — its words stay "done", and it
+is not dated with a day nothing happened on — but while today is unlogged it
+carries today as its action, and `SpanView` resolves the column under the
+finger, so today's part of the bar means today. The tap splits the bar: the
+covering mark ends on its own day again (#339) and today's completion becomes
+the final mark, running to the end of the week (#342). It is a bonus mark like
+any other — same fill, same "bonus completion" sentence, no third tier. Tapping
+it takes today back and the row returns to the shape it had. Nothing animates
+in either direction: there is no ring to close, and the mark being born has no
+view that survives the split to animate — see `MotionPolicy`. The widget keeps
+the marks it draws and offers nothing there.
 
 A completion recorded before the habit was created remains visible on every
 history surface. In a week entirely before creation, weekly rows use seven
@@ -910,6 +928,9 @@ where the crossfade already was.
       resumed.
 - [x] This Week, installed widgets and in-app widget previews offer today and
       nothing else; every other correction is made in Correct History.
+- [x] On This Week, tapping today's part of a met row's bar logs a bonus that
+      becomes its own mark; tapping that mark takes it back. The widget's met
+      row is inert.
 - [x] Correct History is This Week in place — same list, same scroll position,
       no presentation — offers every day through exactly twelve weeks ahead,
       and writes each selected/unselected circle immediately (#557).

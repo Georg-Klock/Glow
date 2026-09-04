@@ -103,7 +103,7 @@ struct RestWindowTests {
         func spans(restDay: Int?) -> [SlotSpan] {
             WeekSpans.spans(
                 for: habit, in: week, today: today, target: 2,
-                editing: .todayOnly, restDay: restDay, calendar: calendar
+                editing: .todayOnly, bonus: .never, restDay: restDay, calendar: calendar
             )
         }
 

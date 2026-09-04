@@ -8514,3 +8514,61 @@ Habit" and "Blank Row" beside it. The row's swipe action keeps the bare "Edit"
 symbols (`EditHistoryReach`, `EditHistoryTrack`, `EditHistoryContractTests`)
 keep the old name: they are not copy, and `GlowOffPreviewNotice` set the
 precedent.
+## 2026-09-04 — Today's tap on a met row logs a bonus, and This Week alone offers it (#560)
+
+The issue described a completion beyond the target as drawn nowhere and cited
+`WeekSpans.divided()`'s `.prefix(done)`. Checked against `main` at the time of
+this change, that clamp was already gone: #543 gives every completion past the
+target a bonus mark, on every surface and on any day, and the widget draws them
+too. The issue's "Settled" section — past-day overachievement stays invisible,
+the widget keeps the marks it draws today — was written against the clamped
+code, so the parts of it that describe drawing are not reopened here. Nothing
+that #543 draws is hidden again.
+
+What was still missing was the tap. `WeekSpans.day(atColumn:)` let a filled
+span hand out only a day carrying a completion, and `withUndo` gave a filled
+span an action only when today's own completion was on it, so a row whose goal
+was met could not be logged on This Week at all: tapping the bar did nothing.
+
+**The rule.** On a met row, while today is unlogged, inside the week, not a
+rest day and a day the habit existed on, the filled mark covering today carries
+today as its action. The mark's words stay "done" — it is not dated with a day
+nothing happened on — and the hint says "Log a bonus completion for
+<today>". `SpanView` resolves the column under the finger, so today's part of
+the bar means today; every other column falls back to the span's one action,
+exactly as today's undo already does on a bar covering other days. The tap
+writes through `HabitStore.toggleCompletion`, which needed nothing new.
+Afterwards the covering mark ends on its own anchor again (#339) and today's
+completion is the final mark, running to the end of the week (#342); it is a
+bonus mark like any other (#543) — same fill, same sentence, no third tier.
+Tapping it takes today back, and the row returns, action included, to the
+shape it had. A sweep over every target, weekday, completion subset and
+creation day asserts that the offer is made exactly when the row is met, today
+is unlogged and the habit existed, that the completion replaces one span with
+two tiling the same range, and that every other mark keeps its division,
+state and completion day.
+
+**This Week only.** `WeekSpans.spans` takes a `BonusEditing` beside
+`SlotEditing`, with no default: `HabitRowView` passes `.today`;
+`WeekWidgetView` and `MonthGrid` pass `.never`. The widget's reason is
+WidgetKit's, not the arithmetic's: it reports no touch location inside a
+custom control, so a filled multi-day bar cannot tell today's column from
+Monday's, and one `Toggle` across it would offer Monday's pixels as today's
+rep. The division of the week is identical under both values; the widget's
+spans, and every history projection's, are the spans they were.
+
+**The reveal does not animate**, and the issue's recommendation to widen
+`MotionPolicy.closesCompletion` is declined. The closing animation is a ring
+becoming a bar; here the bar is already lit, and the tap splits it into two
+lit bars whose views did not exist before (`SlotSpan.id` is the range, #196,
+#498), so nothing survives the split to animate. The row arrives at its new
+shape in one frame — the same instant path Reduce Motion takes and the undo
+takes back — and there is no animation transaction, so no intermediate
+background frame is exposed. A grown-in reveal would also be the app
+applauding a rep the week did not ask for.
+
+**Undo strictly today's completion.** `withUndo` already hands the undo to the
+span whose `completionDay` is today, and `day(atColumn:)` still refuses every
+other completed column on this surface. A past bonus — Wednesday's, on a row
+browsed on Friday — is drawn and carries no action here; Edit History corrects
+it, as #543 decided.

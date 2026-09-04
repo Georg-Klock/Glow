@@ -136,7 +136,7 @@ struct SlotVoiceTests {
         )
         let spans = WeekSpans.spans(
             for: habit, in: week, today: today, target: 3,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
         let spoken = spans.map {
             SlotVoice.span(
@@ -160,7 +160,7 @@ struct SlotVoiceTests {
         )
         let spans = WeekSpans.spans(
             for: habit, in: week, today: today, target: 3,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
         let tappable = spans.filter(\.isTappable)
         #expect(tappable.count == 1)
@@ -181,7 +181,7 @@ struct SlotVoiceTests {
         )
         let spans = WeekSpans.spans(
             for: habit, in: week, today: today, target: 1,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
         let bonus = try #require(spans.first { $0.isBonus })
 
@@ -197,6 +197,53 @@ struct SlotVoiceTests {
         )
     }
 
+    @Test("A met mark offering today keeps its own words, and the hint names the day")
+    func metMarkOfferingTodayIsNotMisdated() throws {
+        // One a week, logged Monday, today Wednesday: the bar is Monday's
+        // completion and carries today as its action (#560). It must not say
+        // "Wednesday, done" — nothing was done on Wednesday — so the mark
+        // keeps the words a completed span has, and the hint says what a press
+        // will do and for which day.
+        let habit = HabitSnapshot.fixture(
+            name: "Workout", frequency: .timesPerWeek(1), completedDays: [day(0)]
+        )
+        let spans = WeekSpans.spans(
+            for: habit, in: week, today: today, target: 1,
+            editing: .todayOnly, bonus: .today, restDay: nil, calendar: calendar
+        )
+        let bar = try #require(spans.first)
+        #expect(bar.actionDay == today)
+        #expect(!bar.actionIsUndo)
+        #expect(
+            SlotVoice.span(
+                habitName: habit.name, state: bar.state, actionDay: bar.actionDay,
+                completionDay: bar.completionDay, isBonus: bar.isBonus, calendar: calendar
+            ) == "Workout, done"
+        )
+        #expect(
+            SlotVoice.bonusHint(for: today, calendar: calendar)
+                == "Log a bonus completion for Wednesday 19 August"
+        )
+
+        // Once logged, today's own mark is a dated bonus, and its press is the
+        // undo every completion of today already has.
+        let logged = WeekSpans.spans(
+            for: .fixture(
+                name: "Workout", frequency: .timesPerWeek(1), completedDays: [day(0), today]
+            ),
+            in: week, today: today, target: 1,
+            editing: .todayOnly, bonus: .today, restDay: nil, calendar: calendar
+        )
+        let bonus = try #require(logged.first { $0.isBonus })
+        #expect(bonus.actionIsUndo)
+        #expect(
+            SlotVoice.span(
+                habitName: habit.name, state: bonus.state, actionDay: bonus.actionDay,
+                completionDay: bonus.completionDay, isBonus: bonus.isBonus, calendar: calendar
+            ) == "Workout, Wednesday 19 August, bonus completion"
+        )
+    }
+
     @Test("A lost repetition is spoken as missed, not as a day")
     func lostSpans() {
         // #82's ✕: a rep with no day left to land on. It has no date of its
@@ -206,7 +253,7 @@ struct SlotVoiceTests {
         let habit = HabitSnapshot.fixture(name: "Workout", frequency: .timesPerWeek(3))
         let spans = WeekSpans.spans(
             for: habit, in: week, today: saturday, target: 3,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
         let missed = spans.filter { $0.state == .missed }
         #expect(!missed.isEmpty)

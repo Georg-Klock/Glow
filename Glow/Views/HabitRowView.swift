@@ -497,9 +497,13 @@ struct HabitRowView: View {
     /// shapes that stretch across the week rather than as seven columns.
     private var spans: [SlotSpan] {
         guard case .timesPerWeek(let target) = snapshot.frequency else { return [] }
+        // **This is the surface that logs a bonus** (#560). `SpanView` resolves
+        // the column under the finger, so today's part of a filled bar can mean
+        // today while the bar keeps saying when the goal was met; the widget
+        // cannot make that distinction and passes `.never`.
         return WeekSpans.spans(
             for: snapshot, in: week, today: today, target: target,
-            editing: editing, restDay: restDay
+            editing: editing, bonus: .today, restDay: restDay
         )
     }
 

@@ -126,9 +126,14 @@ struct SpanView: View {
         )
     }
 
+    /// What a press does — which on a filled span is not always an undo. A met
+    /// row's mark covering today offers today as a bonus while today is
+    /// unlogged (#560), and `span.actionIsUndo` is what tells the two apart.
     private var hint: String {
-        guard span.isTappable else { return "" }
-        return SlotVoice.hint(isDone: span.state == .filled)
+        guard let actionDay = span.actionDay else { return "" }
+        if span.actionIsUndo { return SlotVoice.hint(isDone: true) }
+        if span.state == .filled { return SlotVoice.bonusHint(for: actionDay) }
+        return SlotVoice.hint(isDone: false)
     }
 
     /// Writes the weekday actually touched.
@@ -148,6 +153,12 @@ struct SpanView: View {
     ///    the span's own day. That part of the capsule is drawn lit and
     ///    identical to today's column, and a lit shape that ignores a tap is
     ///    worse than one that does the obvious thing.
+    ///
+    /// A met row's filled bar goes through the same two steps (#560). Its one
+    /// action is today, so today's column resolves to today through
+    /// `WeekSpans.day` and every other column falls back to the same day: the
+    /// bar has one thing it can do, and it does it wherever it is pressed —
+    /// exactly as today's undo already does on a bar that covers other days.
     private func tap() {
         // Taken and cleared: an activation that came from VoiceOver or a
         // keyboard has no location, and must not inherit the last finger's.

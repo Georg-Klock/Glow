@@ -34,7 +34,7 @@ struct MidnightTimelineTests {
         func openMark(on column: Int) -> SlotSpan? {
             WeekSpans.spans(
                 for: habit, in: week, today: week.days[column], target: 3,
-                editing: .todayOnly, restDay: nil, calendar: calendar
+                editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
             ).first { $0.state == .open }
         }
 
@@ -57,7 +57,7 @@ struct MidnightTimelineTests {
         func crosses(on column: Int) -> Int {
             WeekSpans.spans(
                 for: habit, in: week, today: week.days[column], target: 5,
-                editing: .todayOnly, restDay: nil, calendar: calendar
+                editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
             ).count { $0.state == .missed }
         }
 

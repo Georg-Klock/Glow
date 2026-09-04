@@ -158,10 +158,10 @@ struct HistoryProjectionTests {
                 #expect(
                     WeekSpans.spans(
                         for: part, in: shown, today: today, target: 3,
-                        editing: .todayOnly, restDay: restDay, calendar: calendar
+                        editing: .todayOnly, bonus: .never, restDay: restDay, calendar: calendar
                     ) == WeekSpans.spans(
                         for: full, in: shown, today: today, target: 3,
-                        editing: .todayOnly, restDay: restDay, calendar: calendar
+                        editing: .todayOnly, bonus: .never, restDay: restDay, calendar: calendar
                     )
                 )
                 #expect(

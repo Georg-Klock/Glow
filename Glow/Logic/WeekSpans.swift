@@ -83,6 +83,19 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
     var dayCount: Int { lastDay - firstDay + 1 }
     var isTappable: Bool { actionDay != nil }
 
+    /// Whether the span's one action takes a completion back rather than
+    /// logging one.
+    ///
+    /// A filled span's tap is an undo when it lands on the completion the mark
+    /// stands for — `actionDay` and `completionDay` are the same day. On a met
+    /// row today's column of a filled bar can instead carry an action on a day
+    /// the mark is *not* about (#560): the mark says when the goal was met, and
+    /// the tap logs one more, today. `SpanView` reads this to say which of the
+    /// two a press will do; the arithmetic that decides it is `WeekSpans`'.
+    var actionIsUndo: Bool {
+        state == .filled && actionDay != nil && actionDay == completionDay
+    }
+
     /// **A mark is a mark, and a completed one is lit** (#344, reversing #47).
     ///
     /// #47 made an achieved span draw the same unlit line an upcoming one
@@ -155,6 +168,13 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
 ///    collapse to one span across the week, which forgot what it had just
 ///    recorded; the latest mark runs to the end instead, including when it is a
 ///    bonus completion past the target.
+///  - **A met row still takes today, where the surface says so** (#560). The
+///    filled mark covering today carries today as its action while today is
+///    unlogged; the completion that tap makes is a bonus mark like any other,
+///    so the covering mark ends on its own anchor again and today's mark takes
+///    the remainder. Tapping that mark takes it back, and the row returns to
+///    the shape it had. `BonusEditing` is the surface's answer; the widget's
+///    is `.never`.
 ///
 /// Two numbers carry the reps that have run out of days (#81):
 ///
@@ -180,6 +200,9 @@ enum WeekSpans {
     /// week does not divide differently because it is editable. Since #543
     /// there is one policy, `.todayOnly`; the required parameter keeps a new
     /// cadence caller from inheriting an unstated editing scope.
+    /// `bonus` is the surface's second answer (#560): whether today's column of
+    /// a met row still takes a rep. It changes which mark carries an action and
+    /// nothing about how the week divides — the division is the record's.
     /// `restDay` is the weekday nothing is expected on, or nil for none — a
     /// parameter for the same reason the calendar is one (#181).
     static func spans(
@@ -188,13 +211,14 @@ enum WeekSpans {
         today: Date,
         target: Int,
         editing: SlotEditing,
+        bonus: BonusEditing,
         restDay: Int?,
         calendar: Calendar = WeekCalendar.calendar
     ) -> [SlotSpan] {
         _ = editing
         return divided(
             for: habit, in: week, today: today, target: target,
-            restDay: restDay, calendar: calendar
+            bonus: bonus, restDay: restDay, calendar: calendar
         )
     }
 
@@ -212,6 +236,14 @@ enum WeekSpans {
     /// visually hidden by the target clamp; it now becomes a bonus mark. This
     /// guard remains the correct inverse contract: a cadence-surface undo may
     /// only remove the exact day it names.
+    ///
+    /// **Or on the one day the span itself offers** (#560). A met row's filled
+    /// mark can carry today as its action while today is unlogged — the tap
+    /// there logs a bonus rather than undoing anything — and that day passes
+    /// this guard because the span names it, not because a completion sits on
+    /// it. Which surfaces hand a filled span such a day is `BonusEditing`'s
+    /// call, made in `spans`; this only honours what that call decided, so a
+    /// row cannot draw a tap target it will not honour.
     ///
     /// An open span is untouched: it exists to *take* a completion, so the
     /// column under the finger is right whether or not anything is logged
@@ -233,7 +265,10 @@ enum WeekSpans {
         // habit existed stays tappable and back-filling it is allowed. What
         // #265 removes is the accusation, not the ability to log.
         guard habit.existed(on: week.days[column]) else { return nil }
-        guard span.state != .filled || habit.completedDays.contains(week.days[column]) else {
+        guard span.state != .filled
+            || habit.completedDays.contains(week.days[column])
+            || span.actionDay == week.days[column]
+        else {
             return nil
         }
         return editing.day(
@@ -247,6 +282,7 @@ enum WeekSpans {
         in week: Week,
         today: Date,
         target: Int,
+        bonus: BonusEditing,
         restDay: Int?,
         calendar: Calendar
     ) -> [SlotSpan] {
@@ -330,9 +366,20 @@ enum WeekSpans {
                 required: requiredCompletions,
                 in: week
             )
-            let spans = assignColumns(marks, lastColumn: lastColumn)
-            return withUndo(
-                spans, doneToday: doneToday, todayRests: todayRests, today: todayStart
+            let spans = withUndo(
+                assignColumns(marks, lastColumn: lastColumn),
+                doneToday: doneToday, todayRests: todayRests, today: todayStart
+            )
+            // **Today is still a day, even when the week no longer needs it**
+            // (#560). Only the met row reaches here with today unlogged and no
+            // open mark to receive it — in the live row an unlogged, unresting
+            // today is always actionable, so `live` is at least one and the
+            // open mark contains it. The surface decides whether that day is
+            // offered; nothing about the division above moves either way.
+            return withBonus(
+                spans, bonus: bonus, doneToday: doneToday, todayRests: todayRests,
+                todayIndex: week.days.firstIndex(of: todayStart), today: todayStart,
+                existed: habit.existed(on: todayStart)
             )
         }
 
@@ -942,6 +989,49 @@ enum WeekSpans {
         var spans = spans
         let s = spans[completion]
         spans[completion] = SlotSpan(
+            index: s.index, firstDay: s.firstDay, lastDay: s.lastDay,
+            state: s.state, actionDay: today,
+            completionDay: s.completionDay, isBonus: s.isBonus
+        )
+        return spans
+    }
+
+    /// Hands today to the filled mark covering it on a met row (#560).
+    ///
+    /// The mark keeps saying what it says — when the goal was met — and gains
+    /// an action on a day it is not about: today, unlogged, inside this week,
+    /// not resting, and a day the habit existed on. `day(atColumn:)` honours
+    /// that day because the span names it, and `SpanView` resolves the column
+    /// under the finger, so today's part of the bar means today.
+    ///
+    /// Only a `.filled` mark takes it. The other mark a met row can hold is
+    /// creation credit, and a met row with today unlogged never has any: credit
+    /// is at most `target − daysLeft − backfilled`, and meeting the goal with
+    /// today still blank needs `backfilled + daysLeft − 1` completions, which
+    /// is one short of what a positive credit would require. So the guard is a
+    /// statement of the model rather than a case that can arrive.
+    ///
+    /// `.never` leaves the row exactly as `withUndo` left it — the widget's
+    /// spans, and every history projection's, are the same spans as before.
+    private static func withBonus(
+        _ spans: [SlotSpan],
+        bonus: BonusEditing,
+        doneToday: Bool,
+        todayRests: Bool,
+        todayIndex: Int?,
+        today: Date,
+        existed: Bool
+    ) -> [SlotSpan] {
+        guard bonus == .today, !doneToday, !todayRests, existed,
+              let todayIndex,
+              let covering = spans.indices.first(where: {
+                  spans[$0].state == .filled
+                      && spans[$0].firstDay <= todayIndex && todayIndex <= spans[$0].lastDay
+              })
+        else { return spans }
+        var spans = spans
+        let s = spans[covering]
+        spans[covering] = SlotSpan(
             index: s.index, firstDay: s.firstDay, lastDay: s.lastDay,
             state: s.state, actionDay: today,
             completionDay: s.completionDay, isBonus: s.isBonus

@@ -224,7 +224,7 @@ struct MonthGridTests {
                 case .timesPerWeek(let target):
                     let spans = WeekSpans.spans(
                         for: habit, in: week, today: today, target: target,
-                        editing: editing, restDay: nil, calendar: calendar
+                        editing: editing, bonus: .never, restDay: nil, calendar: calendar
                     )
                     let span = spans.first {
                         ($0.firstDay...$0.lastDay).contains(cell.column)

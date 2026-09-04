@@ -243,7 +243,7 @@ struct SpacerTests {
         let spacer = HabitSnapshot.fixture(frequency: .timesPerWeek(3), isSpacer: true)
         let spans = WeekSpans.spans(
             for: spacer, in: week, today: today, target: 3,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
         #expect(spans.isEmpty)
     }
