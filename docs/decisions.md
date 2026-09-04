@@ -8367,3 +8367,40 @@ existing behaviour; switching tabs and back leaves them shown; the next launch
 hides them again. Injected simulator taps that reach SwiftUI here are the
 dwelling multi-point kind — plain `simctl`-style taps did not register, which
 is the known quirk and not the gesture.
+
+## 2026-09-04 — Settings' footers were tertiary by accident, not secondary by design (#562)
+
+The explainer under each Settings section read too dark. #562 framed it as two
+standing decisions colliding — "two greys, on purpose" (#7) keeping `.secondary`
+on the system screens, and the Form sitting on true black rather than the
+grouped background (#87) — with the hypothesis that a translucent system grey
+composited over black comes out dimmer than Apple tuned it for. Measured before
+anything moved, on the iPhone 17 simulator at 3×, text core against black:
+
+| | before | after |
+| --- | --- | --- |
+| Glow / Encouragement / Week footers | 71,71,74 — **2.27:1** | 141,141,147 — **6.36:1** |
+| Section headers (system-styled, same black) | 141,141,147 — 6.36:1 | unchanged |
+| Readout inside the platter (`Color.secondary` on 28,28,30) | 152,152,159 — 5.94:1 | unchanged |
+
+**The hypothesis does not hold, and neither decision was the cause.** In dark
+mode `systemGroupedBackground` is itself `#000000` — the grouped grey is the
+*cell* colour, `secondarySystemGroupedBackground` at `#1C1C1E`, which is what
+the platter measures. So `.secondary` over this app's black is `.secondary`
+over exactly the ground Apple tuned it for, and the section headers prove it:
+styled by the system alone, they read 141,141,147, which is `secondaryLabel`
+(235,235,245 at 60%) on black. The footers read half that.
+
+The cause is that `.secondary` is *hierarchical*. A `Form` footer already
+draws its text at the secondary level; `.foregroundStyle(.secondary)` applied
+inside it steps down from there, and the footers resolved to `tertiaryLabel` —
+235,235,245 at 30%, which is 70.5 on black and is what 71,71,74 is. Removing
+the redundant modifier from the three footers puts them at the level the system
+gives a footer, 6.36:1, the same value as the headers beside them. Nothing
+declares a new grey, nothing moves the Form off black, and #7's line between
+"designed here" and "designed by Apple" is exactly where it was: the footers now
+look like Apple's because they are drawn the way Apple draws them.
+
+Worth keeping in mind next time a system-styled text reads wrong here: the
+palette's own floor for text asking nothing is 4.0:1, and 2.27:1 was well under
+it — a number, not a taste, was what said the footers were broken.

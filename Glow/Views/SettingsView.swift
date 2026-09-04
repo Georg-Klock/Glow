@@ -230,9 +230,21 @@ struct SettingsView: View {
                     // Outside the platter again (#474). The compact wording
                     // from #395 stays: moving the explainer does not restore
                     // the repetition that was removed with it.
+                    //
+                    // **No `.foregroundStyle(.secondary)` on any footer here**
+                    // (#562). A `Form` footer already draws its text at the
+                    // secondary level, and `.secondary` is *hierarchical* — it
+                    // steps down from whatever level it is applied inside, so
+                    // on a footer it resolved to the tertiary label, not the
+                    // secondary one. Measured on the simulator: the footers
+                    // read 71,71,74 on black, 2.27:1 — below the 4.0:1 the
+                    // palette's own resting step treats as the floor — while
+                    // the section headers, styled by the system alone, read
+                    // 141,141,147 at 6.36:1. Removing the modifier puts the
+                    // footers at the headers' value; nothing about which grey
+                    // this screen uses (#7) or what it sits on (#87) moves.
                     Text(Self.glowNote)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
                 }
 
                 Section {
@@ -262,7 +274,6 @@ struct SettingsView: View {
                     // again; all three shortened variants remain (#474).
                     Text(popNote)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
                 }
 
                 // One row now. This section held the rest day too — a toggle
@@ -284,7 +295,6 @@ struct SettingsView: View {
                     // whose picker it explains (#474).
                     Text(Self.weekNote)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
                 }
 
                 // Data last: the export, beside the one control that writes
