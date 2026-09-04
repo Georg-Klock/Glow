@@ -75,6 +75,32 @@ final class EditModeGestureBoundsTests: XCTestCase {
         drop.lifetime = .keepAlways
         add(drop)
 
+        // What the rows did in the three seconds after the drop, and what the
+        // app's `onMove` received (#556): the runner's failure is not the
+        // gesture being lost, so the callbacks are the evidence.
+        func order() -> String {
+            app.editRows(containing: "Pitch Fixture").map { row in
+                let label = row.buttons.firstMatch.label
+                return String(label.suffix(1))
+            }.joined()
+        }
+        var timeline: [(Double, String)] = []
+        let start = Date()
+        let orderDeadline = start.addingTimeInterval(3)
+        let trace = app.descendants(matching: .any)["reorder-trace"]
+        var calls = "no trace element"
+        while Date() < orderDeadline {
+            let now = order() + (trace.exists ? " / " + trace.label : "")
+            if timeline.last?.1 != now {
+                timeline.append((Date().timeIntervalSince(start), now))
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        if trace.exists { calls = trace.label }
+        let evidence = "order timeline \(timeline.map { "\($0.1)@\(String(format: "%.1f", $0.0))s" }); "
+            + "onMove calls: \(calls)"
+        print("reorder: \(evidence)")
+
         // A List commits a reorder on an animation, so give the rows the same
         // moment everything else in this file waits for — and no more than
         // that: #554 showed that three seconds after the drop the order was
@@ -89,7 +115,7 @@ final class EditModeGestureBoundsTests: XCTestCase {
         XCTAssertEqual(
             moved.frame.minY,
             topOfRows(),
-            "rows after the drop were \(app.editRows(containing: "Pitch Fixture").map(\.frame))"
+            "rows after the drop were \(app.editRows(containing: "Pitch Fixture").map(\.frame)); \(evidence)"
         )
     }
 }
