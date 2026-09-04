@@ -86,8 +86,10 @@ carry the one-tier rule and are the contradiction to settle next.
 
 ## 3. Invariants
 
-1. A current or met row draws exactly `target` marks. A finished unmet row
-   draws exactly seven day marks.
+1. A live row draws exactly `target` marks. A met row keeps one mark per real
+   completion after any creation-credit marks, so bonuses may take it beyond
+   `target`; the one-completion-per-day rule caps the total at seven. A finished
+   unmet row draws exactly seven day marks.
 2. Marks are ordered, contiguous and non-overlapping. They cover the track.
 3. Every mark is at least one column wide.
 4. At most one mark is `open`. It contains today. It ends there while a rep
@@ -119,9 +121,9 @@ lost mark never spans: its ✕ owns one day.
 2. **If the week is finished and `owed > 0`, draw the diary.** Each completed
    day is filled. Each blank day on which the habit existed is a one-day ✕. A
    pre-creation day without a completion is inactive.
-3. **If `owed == 0`, draw the met row.** Credit marks pack left, completions
-   anchor in day order, and the final completed mark reaches the final column.
-   Completions past the target remain in the record but receive no extra mark.
+3. **If `owed == 0`, draw the met row.** Credit marks pack left, every real
+   completion anchors in day order, and the latest completed mark reaches the
+   final column. Completions past the target are bonus marks of their own.
 4. **Otherwise, draw the live row.** Compute how many owed reps no longer fit
    from today through the end of the week. Give each loss the earliest eligible
    blank past day, one day each. Sort those losses, completions and today's open
@@ -136,8 +138,9 @@ It starts wherever the previous mark ended — reaching back over blank days. If
 another rep follows, it ends **on today** and leaves that rep's future window
 alone. If it is the final rep owed, it reaches the final column instead. The
 ordinary week surface and the widget still write today; widening the shape does
-not widen their editing permission. Demo-seeded history explicitly permits
-future editing, so its future columns remain working demo controls (#495).
+not widen their editing permission. Demo-seeded history may contain future
+facts, but its rendered cadence rows are today-only too. Future corrections now
+belong exclusively to Edit History (#495, #543).
 
 ### 4.3 Worked states
 
@@ -562,6 +565,10 @@ order, is:
    earliest-day cross, and a finished unmet week becomes a seven-day diary.
 9. #495 lets a final open mark own the remainder of the week when no future rep
    needs those columns; production actions remain pinned to today.
+10. #543 moves arbitrary-date edits into a factual Edit History matrix. It
+    keeps every bonus completion as a mark, lets the latest bonus own the
+    remainder, and displays pre-creation completions without judging blank
+    pre-creation days.
 
 **`Frequency.daily` needs no change and must stay consistent.** A 7x row is
 day-pinned through `WeekGrid`, not `WeekSpans`. Check that the two agree: for
@@ -629,7 +636,8 @@ All of it is pure and belongs in `Glow/Logic/`, exercised through the real types
 Property tests for the invariants of §3 across every `target` × every weekday ×
 every completion pattern:
 
-- exactly `target` marks in live/met rows and seven in finished unmet rows;
+- exactly `target` marks in live rows, or one per real completion when bonuses
+  exceed it, and seven in finished unmet rows;
 - ordered, contiguous, non-overlapping marks that cover the track;
 - ✕ count equals `max(0, owed − days_left)` — the §5 monotonicity claim, checked
   rather than trusted;

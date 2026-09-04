@@ -419,11 +419,10 @@ struct HabitStore {
     /// completion per day: a duplicate cannot be created by tapping twice
     /// quickly, because the second tap finds the first one and removes it.
     ///
-    /// **Any day, and that is the point** (#116). This has always taken an
-    /// arbitrary date; what changed is that the week view now offers days other
-    /// than today. `allowingFuture` defaults to false, so the widget's intents
-    /// get the strict answer without having to name it, and only the week view
-    /// — with demo history in — opts out.
+    /// **Any date, behind an explicit future gate.** This has always taken an
+    /// arbitrary date. Since #543 ordinary cadence surfaces offer only today;
+    /// Edit History supplies past/future dates and says `allowingFuture` at its
+    /// call site. The default stays false for every stale or ordinary caller.
     ///
     /// **Every row on the day goes, not the first one found** (#130). A store
     /// written by a build before day identities can hold two rows for one civil
@@ -487,9 +486,10 @@ struct HabitStore {
         let day = dayID.date(in: calendar)
 
         // A completion logged ahead is a claim about something that has not
-        // happened, and the app's one signal is a record of what did. Demo
-        // history is the exception and says so at the call site: its whole job
-        // is an invented past, and painting days ahead is the same job.
+        // happened, and the app's one signal is a record of what did. Edit
+        // History is the exception and says so at its call site: its job is to
+        // correct arbitrary days explicitly (#543). Demo seeding writes its
+        // own transaction rather than passing this guard.
         //
         // Guarded here as well as in the grid, for the reason the rest day is:
         // a surface can outlive the setting it was built under, and this is the
@@ -553,8 +553,9 @@ struct HabitStore {
     /// The first completion on record or the first habit's creation, whichever
     /// is earlier — the demo invents completions ten weeks before the habits
     /// that carry them, so neither table alone is the answer. `WeekReach` turns
-    /// it into how far the week view may be paged (#117), and since #186 that
-    /// is the whole of the bound: there is no cap behind this any more.
+    /// it into how far the week view and Edit History may be paged (#117,
+    /// #543). The record has no cap; `WeekReach` also guarantees a twelve-week
+    /// floor.
     ///
     /// **A habit with no creation date on record does not start the record**
     /// (#186). `Habit.createdAt` defaults to `Habit.unknownCreation` for every

@@ -172,6 +172,31 @@ struct SlotVoiceTests {
         )
     }
 
+    @Test("A bonus completion has its own dated sentence")
+    func bonusCompletionIsExplicit() throws {
+        let habit = HabitSnapshot.fixture(
+            name: "Workout",
+            frequency: .timesPerWeek(1),
+            completedDays: [day(0), day(2)]
+        )
+        let spans = WeekSpans.spans(
+            for: habit, in: week, today: today, target: 1,
+            editing: .todayOnly, restDay: nil, calendar: calendar
+        )
+        let bonus = try #require(spans.first { $0.isBonus })
+
+        #expect(
+            SlotVoice.span(
+                habitName: habit.name,
+                state: bonus.state,
+                actionDay: bonus.actionDay,
+                completionDay: bonus.completionDay,
+                isBonus: bonus.isBonus,
+                calendar: calendar
+            ) == "Workout, Wednesday 19 August, bonus completion"
+        )
+    }
+
     @Test("A lost repetition is spoken as missed, not as a day")
     func lostSpans() {
         // #82's ✕: a rep with no day left to land on. It has no date of its

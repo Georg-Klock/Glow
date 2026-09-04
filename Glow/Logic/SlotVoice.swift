@@ -103,16 +103,22 @@ enum SlotVoice {
     /// The day is `actionDay` rather than the span's own columns. A span
     /// covers a run of days and an activation with no location touches exactly
     /// one of them, so that is the date the control is about; the columns it
-    /// happens to cover would be a date it does not act on. On a widget that is
-    /// today. In the week view, which edits any day it shows, it is the last
-    /// day of the span that surface may write (#116) — still one date, still
-    /// the one a tap here would land on.
+    /// happens to cover would be a date it does not act on. On every cadence
+    /// surface that date is today after #543; arbitrary-day edits use factual
+    /// circles with their own exact-date labels.
     static func span(
         habitName: String,
         state: SlotState,
         actionDay: Date?,
+        completionDay: Date? = nil,
+        isBonus: Bool = false,
         calendar: Calendar = WeekCalendar.calendar
     ) -> String {
+        if isBonus {
+            let fact = "bonus completion"
+            guard let completionDay else { return "\(habitName), \(fact)" }
+            return "\(habitName), \(day(completionDay, calendar: calendar)), \(fact)"
+        }
         guard let actionDay else { return "\(habitName), \(spanState(state))" }
         return "\(habitName), \(day(actionDay, calendar: calendar)), \(spanState(state))"
     }

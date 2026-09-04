@@ -29,7 +29,7 @@ enum WidgetSpanActions {
                 for: habit,
                 in: week,
                 today: today,
-                editing: .week(allowingFuture: false),
+                editing: .todayOnly,
                 restDay: restDay,
                 calendar: calendar
             ).map { Action(column: column, day: $0) }

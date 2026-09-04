@@ -11,8 +11,8 @@ struct MonthCell: Identifiable, Equatable, Sendable {
     let column: Int
     let mark: SlotMark
     /// The day a tap would toggle, or nil when the cell is not tappable. The
-    /// month uses the week surface's nonfuture editing rule, so this is always
-    /// this cell's own date — never a span's fallback date (#526).
+    /// month is today-only, so this is either today's own date or nil — never
+    /// a span's fallback date (#543, superseding #526).
     let actionDay: Date?
 
     var id: Date { date }
@@ -30,7 +30,7 @@ struct MonthCell: Identifiable, Equatable, Sendable {
 ///
 /// - **Daily habits** are day-pinned, so each week of the month is handed to
 ///   `WeekGrid.slots` and the columns read straight off it. Every settled rule
-///   — missed only in the past, only today open, every nonfuture day editable,
+///   — missed only in the past, only today open, only today editable,
 ///   a rest day never missed — arrives from the one place it is defined, and
 ///   any future change there is inherited here without a second edit.
 /// - **N×/week habits** are not day-pinned, so the week row has no opinion
@@ -38,7 +38,7 @@ struct MonthCell: Identifiable, Equatable, Sendable {
 ///   so a completion shows on the day it really happened. Whether *today* is
 ///   open is still the week row's own verdict: `WeekGrid.slots` decides, and
 ///   this asks. Which exact days accept a correction is `WeekSpans.day`'s
-///   verdict under the same nonfuture editing policy the week widget uses.
+///   verdict under the same today-only policy every cadence surface uses.
 ///
 ///   **A lost week Xs its past unlogged days** (#82). It used to decline this
 ///   verdict — "a week already lost is a judgement this grid does not invent" —
@@ -110,7 +110,7 @@ enum MonthGrid {
         let todayStart = WeekCalendar.day(today, calendar: calendar)
         guard let month = calendar.dateInterval(of: .month, for: todayStart) else { return [] }
 
-        let editing = SlotEditing.week(allowingFuture: false)
+        let editing = SlotEditing.todayOnly
 
         // The week row's verdict on today, asked once rather than re-derived.
         // Whatever it withholds (a rest day or a spent week), this inherits.
@@ -139,8 +139,8 @@ enum MonthGrid {
 
             // One span projection supplies both the lost-rep verdict and each
             // exact column's action. The latter is resolved with `day(...)`,
-            // not the span's location-less fallback, so Monday always edits
-            // Monday even when a pill continues through Wednesday (#526).
+            // not the span's location-less fallback, so today's control always
+            // carries today's date even when a pill continues across it.
             let spans = weeklyTarget.map { target in
                 WeekSpans.spans(
                     for: habit, in: week, today: todayStart, target: target,

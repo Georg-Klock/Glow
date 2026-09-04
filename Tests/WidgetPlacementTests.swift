@@ -479,11 +479,11 @@ struct WidgetPlacementTests {
         #expect(widgets.contains("MarkHabitOperation.perform("))
     }
 
-    /// Week and month share one bounded editing horizon now (#526). Source is
-    /// the boundary here: a still render cannot reveal which day an archived
-    /// AppIntent will write when its control is tapped.
-    @Test("Week and month controls carry their own nonfuture day")
-    func widgetDaysAreExplicitAndBounded() throws {
+    /// Every widget is today-only now that Edit History owns corrections
+    /// (#543, superseding #508/#526). Source is the boundary here: a still
+    /// render cannot reveal which day an archived AppIntent would write.
+    @Test("Week and month controls carry today and nothing else")
+    func widgetDaysAreExplicitAndTodayOnly() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -496,9 +496,10 @@ struct WidgetPlacementTests {
         let toggle = try source("GlowWidget/SlotToggle.swift")
         let intent = try source("Glow/Store/MarkHabitIntent.swift")
 
-        #expect(week.components(separatedBy: ".week(allowingFuture: false)").count >= 3)
-        #expect(monthGrid.contains("SlotEditing.week(allowingFuture: false)"))
-        #expect(!monthGrid.contains("editing: .todayOnly"))
+        #expect(week.components(separatedBy: "editing: .todayOnly").count >= 3)
+        #expect(monthGrid.contains("SlotEditing.todayOnly"))
+        #expect(!week.contains(".week(allowingFuture:"))
+        #expect(!monthGrid.contains(".week(allowingFuture:"))
         #expect(toggle.contains("day: day"))
         #expect(toggle.contains("renderedDay: renderedDay"))
         #expect(intent.contains("@Parameter(title: \"Day\")"))

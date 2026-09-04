@@ -16,6 +16,31 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
     let state: SlotState
     /// The day a tap would toggle, or nil when the span is not tappable.
     let actionDay: Date?
+    /// The exact day represented by a completion mark. Ordinary completed
+    /// spans keep using the row's one combined logged-days sentence, while a
+    /// bonus uses this date for its own VoiceOver fact. Keeping it on every
+    /// completion also lets today's cadence action find the exact mark to undo
+    /// when Edit History has already recorded a later day (#543).
+    let completionDay: Date?
+    let isBonus: Bool
+
+    init(
+        index: Int,
+        firstDay: Int,
+        lastDay: Int,
+        state: SlotState,
+        actionDay: Date?,
+        completionDay: Date? = nil,
+        isBonus: Bool = false
+    ) {
+        self.index = index
+        self.firstDay = firstDay
+        self.lastDay = lastDay
+        self.state = state
+        self.actionDay = actionDay
+        self.completionDay = completionDay
+        self.isBonus = isBonus
+    }
 
     /// **A span is identified by the division it is, not by where it sits**
     /// (#196).
@@ -110,10 +135,12 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
 /// completions, which put a mark's edge nowhere in particular; an anchored mark
 /// ends on the day its rep happened, so the mark's left edge carries when.
 ///
-///  - **A live or met row has exactly `target` marks.** Each is at least one
-///    column wide and their ranges are ordered and contiguous. A final mark
-///    owns the remainder of the week; a finished unmet row instead has seven
-///    day-sized diary marks (#476, #495).
+///  - **A live row has `target` marks; a met row keeps every completion.** A
+///    completion beyond the target is a bonus mark, capped naturally at seven
+///    because the store holds at most one per civil day. Each mark is at least
+///    one column wide and their ranges are ordered and contiguous. The latest
+///    completion owns the remainder of a met week; a finished unmet row instead
+///    has seven day-sized diary marks (#476, #495, #543).
 ///  - **A completion anchors on the day it was logged**, a lost rep is a
 ///    one-day cross on the earliest blank day it could have used. An open mark
 ///    ends on today while reps follow it; those reps divide the days after
@@ -124,10 +151,10 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
 ///  - **A completion logged today closes the row.** There is nothing open once
 ///    today is spent, so what follows the completions is arithmetic that
 ///    divides rather than a mark that ends on today.
-///  - **A met goal keeps every completion on its day** (#342). It used to
+///  - **A met goal keeps every completion on its day** (#342, widened by #543). It used to
 ///    collapse to one span across the week, which forgot what it had just
-///    recorded; the last mark runs to the end instead, and completions past the
-///    target fall inside it.
+///    recorded; the latest mark runs to the end instead, including when it is a
+///    bonus completion past the target.
 ///
 /// Two numbers carry the reps that have run out of days (#81):
 ///
@@ -144,14 +171,15 @@ struct SlotSpan: Identifiable, Equatable, Sendable {
 /// could have used. The retained legacy-rest-day path still uses #341's older
 /// break-day pinning until the separate rest-day design work returns.
 enum WeekSpans {
-    /// The spans to draw, with each one's action decided by the surface.
+    /// The spans to draw, with today's one action decided by the cadence
+    /// surface policy.
     ///
     /// **The arithmetic below does not know about `SlotEditing`** (#116). Which
     /// spans exist, how wide they are and which one is open are all decided by
-    /// today, on every surface, exactly as before — a span is a division of the
-    /// week, and the week does not divide differently because the app can edit
-    /// more of it. What the surface decides is only which spans carry an
-    /// action, and that is a pass over the finished row.
+    /// today, exactly as before — a span is a division of the week, and the
+    /// week does not divide differently because it is editable. Since #543
+    /// there is one policy, `.todayOnly`; the required parameter keeps a new
+    /// cadence caller from inheriting an unstated editing scope.
     /// `restDay` is the weekday nothing is expected on, or nil for none — a
     /// parameter for the same reason the calendar is one (#181).
     static func spans(
@@ -163,21 +191,11 @@ enum WeekSpans {
         restDay: Int?,
         calendar: Calendar = WeekCalendar.calendar
     ) -> [SlotSpan] {
-        let spans = divided(
+        _ = editing
+        return divided(
             for: habit, in: week, today: today, target: target,
             restDay: restDay, calendar: calendar
         )
-        switch editing {
-        case .todayOnly:
-            // The widget's row, untouched: the open span writes today, the last
-            // filled span undoes today, and nothing else is a button.
-            return spans
-        case .week:
-            return withColumnActions(
-                spans, for: habit, in: week, today: today, editing: editing,
-                restDay: restDay, calendar: calendar
-            )
-        }
     }
 
     /// The day a tap on one column of a span writes, or nil where that column
@@ -190,12 +208,10 @@ enum WeekSpans {
     /// `HabitStore.toggleCompletion` is a per-day toggle — on a day with
     /// nothing logged it *adds* a completion rather than removing one. A filled
     /// span covers columns that mostly have no dot on them, so without this a
-    /// tap between the dots logged a new day. On a row whose goal is already
-    /// met that is invisible: `done` is clamped to `target`, so the week stays
-    /// undivided and the only trace is a dot appearing. That is the whole of
-    /// the report in #256 — un-completing worked exactly when the finger landed
-    /// on one of the lit columns, and every miss added a completion the next
-    /// correct tap then had to get past.
+    /// tap between the dots logged a new day. Before #543 that write was also
+    /// visually hidden by the target clamp; it now becomes a bonus mark. This
+    /// guard remains the correct inverse contract: a cadence-surface undo may
+    /// only remove the exact day it names.
     ///
     /// An open span is untouched: it exists to *take* a completion, so the
     /// column under the finger is right whether or not anything is logged
@@ -226,46 +242,6 @@ enum WeekSpans {
         )
     }
 
-    /// A span carries the last day inside it that this surface may write.
-    ///
-    /// A span is not day-pinned — it covers several columns — so the day a tap
-    /// writes is the column under the finger, which only the view knows. What
-    /// the span carries is the day a tap with no location lands on: VoiceOver's
-    /// activation, and the fallback for a touch that resolves to a column this
-    /// surface will not take. The *last* writable column, because for the span
-    /// today sits in that is today — every column after it is the future.
-    ///
-    /// **For a filled span, the last writable column that carries a
-    /// completion** (#256), by the same rule and for the same reason as
-    /// `day(atColumn:of:for:in:today:editing:restDay:calendar:)` above: the
-    /// fallback is what a location-less activation gets, and handing VoiceOver
-    /// a day with nothing on it would make its "un-complete" log a day instead.
-    private static func withColumnActions(
-        _ spans: [SlotSpan],
-        for habit: HabitSnapshot,
-        in week: Week,
-        today: Date,
-        editing: SlotEditing,
-        restDay: Int?,
-        calendar: Calendar
-    ) -> [SlotSpan] {
-        spans.map { span in
-            let day = (span.firstDay...span.lastDay).reversed().lazy.compactMap {
-                Self.day(
-                    atColumn: $0, of: span, for: habit, in: week, today: today,
-                    editing: editing, restDay: restDay, calendar: calendar
-                )
-            }.first
-            return SlotSpan(
-                index: span.index,
-                firstDay: span.firstDay,
-                lastDay: span.lastDay,
-                state: span.state,
-                actionDay: day
-            )
-        }
-    }
-
     private static func divided(
         for habit: HabitSnapshot,
         in week: Week,
@@ -279,6 +255,12 @@ enum WeekSpans {
         let dayCount = week.days.count
         guard target > 0, dayCount == 7 else { return [] }
 
+        // The columns completions landed on, in order. **These are the
+        // anchors** (#339): a mark ends on the day its rep happened, and starts
+        // wherever the mark before it ended, so the blank days between two
+        // completions are swallowed rather than left as holes.
+        let doneColumns = week.days.indices.filter { habit.completedDays.contains(week.days[$0]) }
+
         // **A week the habit did not live in asks for nothing** (#265). Without
         // this the arithmetic below runs normally: nothing is done, no day is
         // actionable, so every rep is dead and the row draws a ✕ per mark —
@@ -290,27 +272,38 @@ enum WeekSpans {
         // week, and the days before it in *that* week are the daily rows'
         // question rather than this one's. See `HabitSnapshot.existed(on:)`.
         if let last = week.days.last, !habit.existed(on: last) {
-            return [SlotSpan(
-                index: 0, firstDay: 0, lastDay: dayCount - 1,
-                state: .inactive, actionDay: nil
-            )]
+            guard !doneColumns.isEmpty else {
+                return [SlotSpan(
+                    index: 0, firstDay: 0, lastDay: dayCount - 1,
+                    state: .inactive, actionDay: nil
+                )]
+            }
+            // Edit History may record something that really happened before the
+            // habit was added. Preserve every such fact while keeping #265's
+            // promise: unlogged pre-creation days are inactive, never missed.
+            // Day-sized marks are the only division that says both things
+            // without making a cadence claim about a week the habit did not
+            // yet owe (#543).
+            let completed = Set(doneColumns)
+            return week.days.indices.map { column in
+                let isDone = completed.contains(column)
+                return SlotSpan(
+                    index: column,
+                    firstDay: column,
+                    lastDay: column,
+                    state: isDone ? .filled : .inactive,
+                    actionDay: nil
+                )
+            }
         }
 
-        // The columns completions landed on, in order. **These are the
-        // anchors** (#339): a mark ends on the day its rep happened, and starts
-        // wherever the mark before it ended, so the blank days between two
-        // completions are swallowed rather than left as holes.
-        let doneColumns = week.days.indices.filter { habit.completedDays.contains(week.days[$0]) }
-        // A habit edited from 5x down to 2x can hold more completions than it
-        // has marks. Clamp rather than draw a row that overflows its own goal;
-        // the completions past the target keep no mark of their own and fall
-        // inside the last one, which runs to the end of the week (#342).
         // Reps forgiven for the days before the habit existed (#343). Zero for
         // a habit that lived the whole week, which is every habit made before
         // this one.
         let credit = credit(for: habit, in: week, target: target, calendar: calendar)
-        let done = min(doneColumns.count, target - credit)
-        let repsLeft = target - credit - done
+        let requiredCompletions = target - credit
+        let done = doneColumns.count
+        let repsLeft = max(0, requiredCompletions - done)
         let doneToday = habit.completedDays.contains(todayStart)
         // The rest day stops these rows like any other: nothing can be logged
         // on it and nothing un-logged, so no mark carries an action and the
@@ -332,7 +325,11 @@ enum WeekSpans {
             // forgiven still says so.
             let marks = Array(
                 repeating: Mark(state: .inactive, anchor: nil), count: credit
-            ) + doneColumns.prefix(done).map { Mark(state: .filled, anchor: $0) }
+            ) + completionMarks(
+                doneColumns,
+                required: requiredCompletions,
+                in: week
+            )
             let spans = assignColumns(marks, lastColumn: lastColumn)
             return withUndo(
                 spans, doneToday: doneToday, todayRests: todayRests, today: todayStart
@@ -361,10 +358,8 @@ enum WeekSpans {
                 in: week,
                 today: todayStart,
                 todayIndex: todayIndex,
-                target: target,
                 credit: credit,
                 doneColumns: doneColumns,
-                done: done,
                 repsLeft: repsLeft,
                 doneToday: doneToday,
                 lastColumn: lastColumn
@@ -481,12 +476,15 @@ enum WeekSpans {
         // a day it is not, and the completion's mark ended before the day it
         // was logged on. Both are things §4 says a mark never does, and neither
         // needs the anchor rule bent to fix — it needs applying to one more
-        // mark. Reachable through `SlotEditing.week(allowingFuture:)`.
+        // mark. Arbitrary-day editing moved to Edit History in #543; cadence
+        // surfaces only resolve today's action here now.
         //
         // A spent today has no anchor and cannot sort: it is not an event on a
         // day, it is the arithmetic that divides what the completions leave, so
         // it keeps its place after them.
-        var anchored = doneColumns.prefix(done).map { Mark(state: .filled, anchor: $0) }
+        var anchored = doneColumns.map {
+            Mark(state: .filled, anchor: $0, completionDay: week.days[$0])
+        }
             + dead.map { Mark(state: .missed, anchor: $0) }
         if let open, open.anchor != nil { anchored.append(open) }
         marks += anchored.sorted { ($0.anchor ?? 0) < ($1.anchor ?? 0) }
@@ -517,10 +515,8 @@ enum WeekSpans {
         in week: Week,
         today: Date,
         todayIndex: Int?,
-        target: Int,
         credit: Int,
         doneColumns: [Int],
-        done: Int,
         repsLeft: Int,
         doneToday: Bool,
         lastColumn: Int
@@ -577,8 +573,8 @@ enum WeekSpans {
         var marks = Array(
             repeating: Mark(state: .inactive, anchor: nil), count: credit
         )
-        var anchored = doneColumns.prefix(done).map {
-            Mark(state: .filled, anchor: $0)
+        var anchored = doneColumns.map {
+            Mark(state: .filled, anchor: $0, completionDay: week.days[$0])
         }
         anchored += lostColumns.map { Mark(state: .missed, anchor: $0) }
 
@@ -763,11 +759,41 @@ enum WeekSpans {
         let state: SlotState
         let anchor: Int?
         var actionDay: Date?
+        let completionDay: Date?
+        let isBonus: Bool
 
-        init(state: SlotState, anchor: Int?, actionDay: Date? = nil) {
+        init(
+            state: SlotState,
+            anchor: Int?,
+            actionDay: Date? = nil,
+            completionDay: Date? = nil,
+            isBonus: Bool = false
+        ) {
             self.state = state
             self.anchor = anchor
             self.actionDay = actionDay
+            self.completionDay = completionDay
+            self.isBonus = isBonus
+        }
+    }
+
+    /// Every real completion becomes a dated mark. Only the completions after
+    /// the cadence's required count are bonuses; creation credit is
+    /// forgiveness, not a completion, so it does not make a real logged day a
+    /// bonus.
+    private static func completionMarks(
+        _ columns: [Int],
+        required: Int,
+        in week: Week
+    ) -> [Mark] {
+        columns.enumerated().map { offset, column in
+            let bonus = offset >= required
+            return Mark(
+                state: .filled,
+                anchor: column,
+                completionDay: week.days[column],
+                isBonus: bonus
+            )
         }
     }
 
@@ -877,7 +903,8 @@ enum WeekSpans {
     private static func span(_ mark: Mark, at index: Int, from first: Int, to last: Int) -> SlotSpan {
         SlotSpan(
             index: index, firstDay: first, lastDay: last,
-            state: mark.state, actionDay: mark.actionDay
+            state: mark.state, actionDay: mark.actionDay,
+            completionDay: mark.completionDay, isBonus: mark.isBonus
         )
     }
 
@@ -895,11 +922,12 @@ enum WeekSpans {
         return (0..<count).map { base + ($0 >= count - extra ? 1 : 0) }
     }
 
-    /// Hands the undo to the most recent completion, which is today's.
+    /// Hands the undo to today's exact completion mark.
     ///
-    /// Spans are not day-pinned, so "today's completion" is the last filled
-    /// span rather than the one over today's column — they fill in completion
-    /// order and today is the most recent day.
+    /// Edit History can already contain a completion later than today, so the
+    /// last filled span is not necessarily today's. Completion marks retain
+    /// their factual date and make the cadence surface's one allowed undo
+    /// unambiguous (#543).
     private static func withUndo(
         _ spans: [SlotSpan],
         doneToday: Bool,
@@ -907,13 +935,16 @@ enum WeekSpans {
         today: Date
     ) -> [SlotSpan] {
         guard doneToday, !todayRests,
-              let last = spans.indices.last(where: { spans[$0].state == .filled })
+              let completion = spans.indices.first(where: {
+                  spans[$0].state == .filled && spans[$0].completionDay == today
+              })
         else { return spans }
         var spans = spans
-        let s = spans[last]
-        spans[last] = SlotSpan(
+        let s = spans[completion]
+        spans[completion] = SlotSpan(
             index: s.index, firstDay: s.firstDay, lastDay: s.lastDay,
-            state: s.state, actionDay: today
+            state: s.state, actionDay: today,
+            completionDay: s.completionDay, isBonus: s.isBonus
         )
         return spans
     }

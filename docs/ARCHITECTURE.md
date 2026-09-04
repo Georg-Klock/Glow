@@ -28,11 +28,12 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
   slots to draw. This is the entire interaction model of the app, and it is one
   function.
 - `WeekReach` is how far back the week view may be paged: two week starts,
-  derived from where the record begins and bounded by nothing else (#186 —
-  there was a twelve-week cap). Separate
-  from `SlotEditing` on purpose — one says which weeks there are to visit, the
-  other says what a tap may do on the week you are on, and neither needs to
-  know the other's answer. It trusts the date it is handed: the record's start
+  reaching to the record or twelve weeks, whichever is earlier (#186, #259).
+  `EditHistoryReach` reuses that past edge and adds the editor's flat
+  twelve-week future edge (#543). Both are separate from `SlotEditing` on
+  purpose — reach says which weeks there are to visit, while every cadence
+  surface now passes `.todayOnly`; the arbitrary-day editor reads exact days
+  without cadence projection. `WeekReach` trusts the date it is handed: the record's start
   comes from `HabitStore.earliestRecordedDay`, which is where a habit carrying
   the unknown-creation sentinel is refused, because an uncapped pager over the
   year 1 is a scroll with no end.
@@ -58,7 +59,8 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
 - `SlotVoice` and `HistoryVoice` are what the marks say out loud. A day-pinned
   column names its own date, because the header that carries the dates on
   screen is a table when it is read aloud and stays hidden; a month of columns
-  is counted into one sentence instead. Both are pure, so the app and the
+  is counted into one sentence instead. A bonus span is the exception that
+  carries its exact completion day and says “bonus completion.” Both are pure, so the app and the
   widget cannot disagree about a word and the strings are asserted without a
   renderer.
 - `ResetConfirmation` is the gate in front of Reset to Default Habits: the word
@@ -191,16 +193,14 @@ the claimable-window rules for frequency rows both end up duplicated in the
 view layer, where they cannot be tested. Instead, "is this tappable" and "what does
 it do" are decided in one place, and R1 and R2 hold by construction.
 
-**Which days a surface may write is a parameter, not a fork** (#116).
-`SlotEditing` is `.todayOnly` or `.week(allowingFuture:)`, and `WeekGrid.slots`
-and `WeekSpans.spans` both require one — no default, so a new call site has to
-say which surface it is rather than inherit the permissive answer. The week view
-passes `.week`, everything else passes `.todayOnly`, and `SlotEditing.day(atColumn:in:today:)`
-is the single function that answers "may this column be written", asked by the
-grid, by the span pass, and again by the view for the column under a finger.
-`WeekSpans` runs the surface's answer as a pass over the finished row, so the
-division of the week — which spans exist, how wide, which one is open — is
-identical on both surfaces and only the actions differ.
+**Which days a cadence surface may write is explicit** (#116, superseded in
+scope by #543). `WeekGrid.slots` and `WeekSpans.spans` require a
+`SlotEditing`; every production caller passes `.todayOnly`, with no default a
+new call site could accidentally widen. `SlotEditing.day(atColumn:in:today:)`
+is the single function that answers whether the cadence column may be written.
+Edit History is intentionally outside that projection: it draws exact factual
+days rather than cadence marks and is the one caller that explicitly permits a
+future store write.
 
 **`WeekSpans` owns claimable rep windows** (#476). In the current week a
 completion owns the window ending on its logged day, today's open rep reaches
@@ -211,34 +211,36 @@ rep instead owns the remainder of the week, just as a final completion does
 used. Completing today changes only the open window's state; tomorrow's date
 change is what redistributes any remaining future windows.
 
-Span geometry does not grant editing. An ordinary week surface still resolves a
-widened final open span to today, and the widget remains `.todayOnly`. The
-demo-seeded week explicitly uses `allowingFuture: true`; there, future columns
-inside that final span remain real demo controls and the fallback action is its
-last column. That is the existing demo-only permission applied to the new shape,
-not a permission leaked into production (#495).
+When completions meet the target, `WeekSpans` keeps every completion rather
+than clamping at the target. Each later completion is a bonus mark, up to the
+seven civil days the store can hold, and the chronologically latest completion
+owns the trailing remainder. A week entirely before creation remains free of
+cadence judgement, but if Edit History recorded real completions there it
+returns day-sized filled facts among inactive blanks instead of hiding them.
+
+Span geometry does not grant editing. A widened final open span still resolves
+to today on every cadence surface. Demo seeding may put future completions in
+the store, but it does not turn their rendered columns into controls; only Edit
+History exposes an arbitrary future date (#543, preserving #495's geometry).
 
 Once an unmet week is entirely past, `WeekSpans` stops forecasting reps and
 returns seven day-sized diary spans: completed, missed, or inactive before the
 habit existed. A met past week keeps its completed rep windows and no crosses.
-Both forms still pass through the same surface-action layer above, so the app
-can correct past days and an installed widget remains today-only. Stored legacy
-rest-day rows intentionally stay on the pre-#476 divider; rest-day redesign is
-separate feature scope.
+Both forms still pass through the same surface-action layer above, so they are
+browse-only outside today. Stored legacy rest-day rows intentionally stay on
+the pre-#476 divider; rest-day redesign is separate feature scope.
 
-**Widening from one week to several changed neither** (#117). `SlotEditing` is
-about the surface, not about which week is on screen, so a week entirely in the
-past asks the same question of each of its columns and gets seven yeses; the
-week view holds the visible week's start as state and `WeekReach` bounds it.
-Nothing was added to `HabitStore`: a day three weeks ago is behind *now* exactly
-as Monday is, so the pager reaches no write the store did not already accept.
-The store's refusals exist for a surface that outlives the setting it was drawn
-under, which is a second process's problem, and the pager runs in one.
+**Browsing and correcting split in #543, superseding #117's shared scope.** The
+week view still holds the visible week's start as state and `WeekReach` bounds
+it, but a past week supplies no actions. Edit History receives that displayed
+week as its initial value and owns the arbitrary-day write. Nothing was added
+to the store for past dates — they were already valid — while future dates use
+the existing explicit permission.
 
-A span covers several columns, so the week view resolves a touch to a weekday
-with `SlotLayout.column(atX:trackWidth:)`, the inverse of `columnCentre`. The
-arithmetic lives beside the forward direction and is tested against it; the view
-adds the span's own origin and asks `SlotEditing` what that column allows.
+A span covers several columns, so its view still resolves a touch to a weekday
+with `SlotLayout.column(atX:trackWidth:)`, the inverse of `columnCentre`, then
+asks `SlotEditing` whether that column is today. The location math remains next
+to its forward direction; it no longer broadens correction scope.
 
 ### Store
 
@@ -248,9 +250,9 @@ it: the grid uses `@Query`, so SwiftData drives updates.
 `toggleCompletion(for:on:allowingFuture:)` resolves the `DayID` itself, which is
 what makes R3 and R4 hold no matter who calls it. It refuses a rest day, a blank
 row, a habit of the wrong cadence, and — unless the caller asks otherwise — a day
-that has not happened yet. `allowingFuture` defaults to false, so the widget's
-intents get the strict answer without naming it and only the week view, with demo
-history in, opts out. Tapping twice quickly cannot create a duplicate, because
+that has not happened yet. `allowingFuture` defaults to false, so every
+ordinary caller gets the strict answer without naming it and Edit History alone
+opts out explicitly. Tapping twice quickly cannot create a duplicate, because
 the second call finds the first completion and removes it — and it finds it by
 *fetching* the habit's rows for that day rather than reading the cached
 relationship array, so a row the widget tap's own context wrote is not missed
@@ -399,6 +401,14 @@ with `DayRingView` and the geometry under it (#209); the slot was left empty
 rather than collapsed so that #210 could fill it in the same position, and the
 bar reflowed once rather than twice. #238 then moved Widgets to the front,
 an order argued on its own terms rather than inherited.
+
+`EditHistoryView` is a full-screen editor presented from This Week's existing
+More menu. It draws one bounded week at a time as real habit rows by exact day,
+using plain circles and `Habit.snapshots(...within:)` rather than `WeekGrid` or
+`WeekSpans`: cadence judgement is deliberately absent. Every tap writes
+immediately with the explicit future permission; the presentation has no back
+destination or interactive dismissal, so its toolbar checkmark is the sole
+exit.
 
 `WidgetsView` is that tab: every widget this bundle ships, previewed by the
 shipping view, as three named cards — "Large Week Widget", "Medium Week
@@ -614,9 +624,9 @@ changes. Three paths, and all are needed:
   week stay alive and unredrawn while it moves. The handler compares the
   override before it touches anything: the notification fires for every key
   the process writes, and a tap writes several.
-- `StoreChange.committed` covers what the *record* decides — whether demo
-  history is in, which opens the days ahead, and how far back the pager
-  reaches. Every save posts it, from `HabitStore` and `DemoHistory` alike.
+- `StoreChange.committed` covers what the *record* decides — how far back the
+  week pager and Edit History reach. Every save posts it, from `HabitStore` and
+  `DemoHistory` alike.
   These used to ride on the defaults notification too, which a save reached
   only through the trace line the widget reload writes; see decisions.md,
   2026-09-02.
@@ -625,7 +635,7 @@ changes. Three paths, and all are needed:
 
 `WeekCalendar.today()` is where "today" is established, and every surface that
 needs one calls it and hands the answer down as a parameter. Nothing
-downstream — `WeekGrid`, `WeekSpans`, `SlotEditing`'s future-write guard, the
+downstream — `WeekGrid`, `WeekSpans`, `HabitStore`'s future-write guard, the
 widgets' timeline providers — knows there is anything to know.
 
 `DebugToday` is what it consults first: a day of the current week, stored in the
@@ -683,10 +693,9 @@ re-implement app logic in a test file: a mirror copy passes forever while the
 app regresses.
 
 `WeekGridTests` includes an exhaustive pass: for each cadence, all 128 possible
-completion histories of a week, asserting R1 and R2 hold for every one — R2 under
-each `SlotEditing` case, since it is now a difference between surfaces rather
-than one answer, and the same sweep again over a week already over, which is the
-branch with no today in it. That is
+completion histories of a week, asserting R1 and R2 hold for every one under
+the shared `.todayOnly` policy, and the same sweep again over a week already
+over, which is the branch with no today in it. That is
 cheap here because the logic is pure, and it is the reason those invariants can
 be stated as facts rather than as intentions.
 
@@ -927,8 +936,8 @@ through the same `MonthWidgetView` the month kind used. `GlowMonthSmall` is
 removed rather than renamed, so a placed Month widget freezes; SPEC.md's
 widgets section records why that was accepted. The week halves read the same
 store through the App Group, with today's slot as an `AppIntent` button. Past
-days are not buttons: the widget passes `SlotEditing.todayOnly`, which is R2's
-asymmetry holding in a second process. (Small was the week's third family
+days are not buttons: the widget passes `SlotEditing.todayOnly`, the same R2
+policy enforced in a second process. (Small was the week's third family
 until PR #277 dropped it for drawing unlabeled rows; #322's small is the
 month's content, which names its habit.)
 

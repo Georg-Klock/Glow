@@ -48,14 +48,15 @@ struct MonthGridTests {
         }
 
         #expect(byDay(10)?.mark == .donePast)
-        #expect(byDay(10)?.actionDay == done)
-        // Yesterday, unlogged: a daily habit misses and can be corrected.
+        #expect(byDay(10)?.actionDay == nil)
+        // Yesterday, unlogged: a daily habit misses, but correction belongs to
+        // Edit History now (#543).
         #expect(byDay(18)?.mark == .missed)
-        #expect(byDay(18)?.actionDay == TestCalendar.date(2026, 8, 18))
+        #expect(byDay(18)?.actionDay == nil)
         // Today remains open and tappable.
         #expect(byDay(19)?.mark == .openToday)
         #expect(byDay(19)?.isTappable == true)
-        #expect(cells.count(where: \.isTappable) == 19)
+        #expect(cells.count(where: \.isTappable) == 1)
         // Still to come.
         #expect(byDay(25)?.mark == .upcoming)
         #expect(byDay(25)?.isTappable == false)
@@ -102,12 +103,12 @@ struct MonthGridTests {
 
         #expect(cells.count { $0.mark == .donePast } == 2)
         // This week holds nothing yet, so today is open by the week row's own
-        // verdict. Every nonfuture column its open span covers is correctable.
+        // verdict. Only today's column is correctable on this surface.
         let todayCell = cells.first { $0.date == today }
         #expect(todayCell?.mark == .openToday)
         let thisWeek = WeekCalendar.week(containing: today, calendar: calendar)
-        #expect(cells.first { $0.date == thisWeek.days[0] }?.isTappable == true)
-        #expect(cells.first { $0.date == thisWeek.days[1] }?.isTappable == true)
+        #expect(cells.first { $0.date == thisWeek.days[0] }?.isTappable == false)
+        #expect(cells.first { $0.date == thisWeek.days[1] }?.isTappable == false)
         #expect(todayCell?.isTappable == true)
 
         // Nothing in this week or later is crossed: today and the days after
@@ -132,7 +133,7 @@ struct MonthGridTests {
         // Two logged, five crossed — every unlogged day of it is in the past.
         #expect(inWeek.count { $0.mark == .donePast } == 2)
         #expect(inWeek.count { $0.mark == .missed } == 5)
-        #expect(inWeek.allSatisfy { $0.isTappable })
+        #expect(inWeek.allSatisfy { !$0.isTappable })
     }
 
     @Test("A lost week never crosses the rest day")
@@ -168,7 +169,7 @@ struct MonthGridTests {
     @Test("A met week closes today, and a completion today can be undone")
     func frequencyFollowsTheWeekVerdict() {
         // Goal met this week without today: nothing open. Its two actual
-        // completions remain individually undoable.
+        // completions are visible but correction belongs to Edit History.
         let monday = TestCalendar.date(2026, 8, 17)
         let tuesday = TestCalendar.date(2026, 8, 18)
         let met = HabitSnapshot.fixture(
@@ -178,7 +179,7 @@ struct MonthGridTests {
         #expect(!metCells.contains { $0.mark == .openToday })
         let thisWeek = WeekCalendar.week(containing: today, calendar: calendar)
         let tappableThisWeek = metCells.filter { thisWeek.contains($0.date) && $0.isTappable }
-        #expect(Set(tappableThisWeek.map(\.date)) == Set([monday, tuesday]))
+        #expect(tappableThisWeek.isEmpty)
 
         // Done today: the mark says so, and the tap is the undo — the same
         // rule the week row applies to its own pill.
@@ -205,7 +206,7 @@ struct MonthGridTests {
                 ]
             ),
         ]
-        let editing = SlotEditing.week(allowingFuture: false)
+        let editing = SlotEditing.todayOnly
 
         for habit in habits {
             let cells = MonthGrid.cells(

@@ -2,10 +2,10 @@ import Foundation
 
 /// How far back the week view may be paged, as two week starts.
 ///
-/// #116 made any day of the *visible* week editable and left the visible week
-/// as one week: the one containing today. This is the other half — which weeks
-/// there are to visit — and it is a separate question from `SlotEditing`, which
-/// stays a fact about the surface rather than about which week is on screen.
+/// #117 made weeks before the current one visible. #543 later moved their
+/// editing into `EditHistoryView`, but visibility remains a separate question
+/// from `SlotEditing`, which stays a fact about a cadence surface rather than
+/// about which week is on screen.
 ///
 /// **The reach is the record's, or twelve weeks, whichever is further back**
 /// (#186, widened by #259).
@@ -65,11 +65,9 @@ import Foundation
 /// reach back to the sentinel. The one guard is in `earliestRecordedDay`,
 /// which is where the tables are read — see `WeekReachTests.theSentinelIsNotThisTypesToRefuse`.
 ///
-/// **Forward stops at the current week.** There is nothing to correct in a week
-/// that has not happened; the days *ahead* are demo-history's, and only within
-/// the current week (#116). History — a year of days, and deliberately not
-/// touchable — is a different view of the same record rather than what happens
-/// past the end of this one.
+/// **Forward stops at the current week.** This is the browsing reach for This
+/// Week, not the correction reach: `EditHistoryReach` deliberately continues
+/// exactly twelve weeks beyond it (#543).
 ///
 /// Pure, per the `WeekGrid` pattern: dates in, bounds out, no store and no
 /// `Date()`.

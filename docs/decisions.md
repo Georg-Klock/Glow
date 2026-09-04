@@ -8206,3 +8206,41 @@ they continue to pin the design coordinate system. Nor does
 `WidgetMetrics.rowLayout` already adapts the slot to the actual frame so every
 measured Large frame keeps that promise. This separates design intent from
 environmental measurement instead of letting either masquerade as the other.
+
+## 2026-09-03 — Edit History is the sole arbitrary-day editor (#543)
+
+This decision explicitly supersedes #116 and #117's app-grid editing scope and
+#508 and #526's widget editing scope. This Week keeps its backward pager, but
+every cadence-shaped surface—This Week, an installed widget and the in-app
+widget preview—offers only today's action. Past pages are factual, browse-only
+history. A correction for any other date belongs to Edit History.
+
+Edit History is a full-screen destination in This Week's existing More menu,
+after the two row-adding actions and their divider, before Edit. It opens to the
+week This Week was displaying. The screen is a cadence-free matrix: every real
+habit is a row, each week contributes seven plain circles, and selected means a
+completion exists on that exact civil day. Spacers do not appear. Every tap
+writes immediately through `HabitStore`; there is no draft or save. The toolbar
+checkmark is the sole exit, so interactive dismissal and back navigation are
+disabled.
+
+Its past boundary reuses `WeekReach`: the record or twelve weeks, whichever is
+further. Its future boundary is exactly twelve weeks after the current week,
+with no record clause. Future writes are explicit through `allowingFuture` at
+this one call site. Every day is selectable, including a date before the habit
+was created. Creation continues to suppress missed/open judgement, but it no
+longer hides a completion that genuinely exists: an entirely pre-creation week
+draws factual completed day marks and inactive blanks on every history surface.
+
+The matrix also makes over-completion an ordinary reachable state, so the old
+target clamp is retired. Every real completion receives a mark; the binary-day
+store is the natural seven-mark cap. Completions after `target − credit` are
+bonus marks. The latest chronological completion—including a bonus—owns the
+remainder of a met week. Removing today removes only today's completion, as any
+other toggle does; older corrections stay in Edit History. This Week and the
+week widget announce a bonus as “bonus completion” with its exact date rather
+than inheriting the target-level “done” sentence.
+
+No rest-day behavior is designed or expanded here. The shipping app still has
+no rest-day input, and #346/#391/#392 remain the separate post-release feature
+work already recorded for that model.

@@ -30,11 +30,9 @@ struct WeeklyGridView: View {
     /// The earliest day anything is on record for, from `HabitStore`. Held
     /// rather than recomputed per redraw — see `earliestRecordedDay`.
     @State private var recordStart: Date?
-    /// Whether the invented past is in, mirrored from `DemoHistory` the way
-    /// Settings mirrors it. It is what opens the days ahead — see `editing`.
-    @State private var isDemoSeeded = false
     @State private var editingHabit: Habit?
     @State private var isAddingHabit = false
+    @State private var isEditingHistory = false
     /// Edit mode, owned rather than left to the `NavigationStack` (#207).
     ///
     /// The list's editing controls are offered on the current week and nowhere
@@ -106,25 +104,12 @@ struct WeeklyGridView: View {
 
     private var isOnCurrentWeek: Bool { weekStart >= reach.latest }
 
-    /// **This screen edits any day of the week it shows** (#116). Every slot is
-    /// a plain button — no edit mode, no long press, no confirmation — and the
-    /// cost is accepted: a stray tap on Monday changes Monday, and nothing
-    /// distinguishes a correction from an original. That is what editing the
-    /// past means.
-    ///
-    /// The days *ahead* open only with demo history in. Outside it a completion
-    /// logged forward would be a claim about something that has not happened,
-    /// and the app's one signal is a record of what did; with the demo in, the
-    /// whole screen is an invented past already, and painting days ahead is the
-    /// same job.
-    ///
-    /// **It does not change with the week on screen** (#117). An earlier week
-    /// is edited exactly as this one is, because the surface is the same
-    /// surface; all seven of its columns happen to be past, so all seven carry
-    /// an action and `allowingFuture` decides nothing. Widening the reach was a
-    /// change to which weeks exist — `WeekReach` — not to what a tap may do.
+    /// This Week is now a viewer for every day except today (#543). All
+    /// corrections—past or future—belong to Edit History, so the app grid uses
+    /// the same strict policy as the widget regardless of which week is shown.
+    /// This explicitly supersedes #116/#117's permissive pager behavior.
     private var editing: SlotEditing {
-        .week(allowingFuture: isDemoSeeded)
+        .todayOnly
     }
 
     /// Whether the grid has outgrown the widget.
@@ -244,8 +229,8 @@ struct WeeklyGridView: View {
                         //
                         // The icon is the one the menu's own item already used,
                         // which is what makes this a promotion of that item
-                        // rather than a second Done beside it — the menu drops
-                        // to New Habit and Blank Row while editing.
+                        // rather than a second Done beside it. The menu keeps
+                        // row additions and Edit History while editing.
                         if editMode.isEditing {
                             Button {
                                 withAnimation(editModeAnimation) { editMode = .inactive }
@@ -266,36 +251,14 @@ struct WeeklyGridView: View {
                         // this button swaps its own label from the state this
                         // view already owns. The menu rebuilds its content on
                         // every open, so the label is current by construction.
-                        Menu {
-                            Button("New Habit", systemImage: "plus") {
-                                isAddingHabit = true
-                            }
-                            Button("Blank Row", systemImage: "rectangle.dashed") {
-                                addSpacer()
-                            }
-                            // Entering only. Done left this menu for the
-                            // button above it (#399), so this item no longer
-                            // swaps its label — it is absent while editing
-                            // rather than reading Done in a second place.
-                            if !habits.isEmpty, !editMode.isEditing {
-                                Divider()
-                                Button("Edit", systemImage: "pencil") {
-                                    withAnimation(editModeAnimation) { editMode = .active }
-                                }
-                            }
-                        } label: {
-                            Label("More", systemImage: "ellipsis")
-                        }
+                        moreMenu
                     } else {
-                        // **Not new editing scope** (#207). Every day of the
-                        // week on screen is still a tap target — #116 and #117
-                        // are untouched. What is gone from a past week is the
-                        // *list*: reordering, deleting and adding are
-                        // properties of the list itself, and doing them while
-                        // looking at three weeks ago means nothing they do not
-                        // already mean today. In their place, the one action a
-                        // past week has: getting back.
+                        // Past weeks are browse-only now (#543, superseding
+                        // #116/#117). Today is the quick way home; Edit History
+                        // remains available beside it because that is where a
+                        // correction to the displayed week belongs.
                         todayButton
+                        moreMenu
                     }
                 }
             }
@@ -311,6 +274,10 @@ struct WeeklyGridView: View {
         }
         .sheet(isPresented: $isShowingLowPowerNotice) {
             LowPowerNoticeView(headroom: lowPower.currentHeadroom)
+        }
+        .fullScreenCover(isPresented: $isEditingHistory) {
+            EditHistoryView(initialWeek: weekStart, today: today)
+                .interactiveDismissDisabled(true)
         }
         // Announce it once per activation, then leave the banner to carry it.
         // Re-presenting on every launch would be nagging about a condition the
@@ -331,7 +298,6 @@ struct WeeklyGridView: View {
                 refreshToday()
                 // The power-state notification does not arrive while suspended.
                 lowPower.refresh()
-                refreshDemoHistory()
             }
         }
         // The debug override is a defaults key in the App Group (#204), and
@@ -360,15 +326,10 @@ struct WeeklyGridView: View {
         }
         // **Every successful save, from this screen or any other** — a mark,
         // a demo seeded or removed in Settings, a reset, a widget tap written
-        // through the app's own context. The two things this screen derives
-        // from the record move on exactly those events: whether the invented
-        // past is in, which decides the days ahead (`editing`), and how far
-        // back the pager reaches. Both used to be re-read on the defaults
-        // notification above, which a save reached only by way of the trace
-        // line the widget reload writes — the right signal, through the wrong
-        // door, three times.
+        // through the app's own context. The record's start is the one thing
+        // this screen derives from those events now that its editing policy is
+        // permanently today-only (#543).
         .onReceive(NotificationCenter.default.publisher(for: StoreChange.committed)) { _ in
-            refreshDemoHistory()
             refreshReach()
         }
         .onReceive(NotificationCenter.default.publisher(for: StoreChange.fromIntent)) { _ in
@@ -388,7 +349,6 @@ struct WeeklyGridView: View {
         // `refreshReach` is unconditional and has to stay that way: it is the
         // only thing that reads `recordStart`, and the sweep that used to
         // trigger a second call is now over before this view exists.
-        .task { refreshDemoHistory() }
         .task { refreshReach() }
     }
 
@@ -834,6 +794,39 @@ struct WeeklyGridView: View {
         Button("Today") { show(week: reach.latest) }
     }
 
+    /// The existing list menu, available from every browsed week now that it
+    /// is also the door to Edit History (#543). Row-management actions remain
+    /// current-week-only; the history action opens to the week being viewed.
+    private var moreMenu: some View {
+        Menu {
+            if isOnCurrentWeek {
+                Button("New Habit", systemImage: "plus") {
+                    isAddingHabit = true
+                }
+                Button("Blank Row", systemImage: "rectangle.dashed") {
+                    addSpacer()
+                }
+                Divider()
+            }
+
+            Button("Edit History", systemImage: "calendar.badge.clock") {
+                if editMode.isEditing { editMode = .inactive }
+                isEditingHistory = true
+            }
+
+            // Entering only. Done lives in the promoted toolbar button
+            // (#399), so this item is absent while editing rather than reading
+            // Done in a second place.
+            if isOnCurrentWeek, !habits.isEmpty, !editMode.isEditing {
+                Button("Edit", systemImage: "pencil") {
+                    withAnimation(editModeAnimation) { editMode = .active }
+                }
+            }
+        } label: {
+            Label("More", systemImage: "ellipsis")
+        }
+    }
+
     /// What the week on screen is called: how long ago it was, until that stops
     /// being an answer, and then the days it covers (#207).
     ///
@@ -1047,22 +1040,11 @@ struct WeeklyGridView: View {
         }
     }
 
-    /// Re-reads whether the invented past is in. Compared before assigning, so
-    /// an unrelated defaults change — the glow's headroom, the rest day — costs
-    /// nothing.
-    private func refreshDemoHistory() {
-        let seeded = DemoHistory(context: context).isSeeded
-        if seeded != isDemoSeeded { isDemoSeeded = seeded }
-    }
-
     private func toggle(_ habit: Habit, on day: Date) {
         do {
-            // The same permission the grid drew with. The store guards the
-            // future itself, so a row rendered before the demo went out cannot
-            // write a day it was offered a moment ago.
-            switch try store.toggleCompletion(
-                for: habit, on: day, allowingFuture: isDemoSeeded
-            ) {
+            // This surface offers today only. The store's ordinary strict
+            // guard is the second line of defense for any stale control.
+            switch try store.toggleCompletion(for: habit, on: day) {
             case .completed:
                 Haptics.completed()
                 // **#103 said no pop here and PR #275 reverses it.** The Island
