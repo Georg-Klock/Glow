@@ -403,7 +403,7 @@ bar reflowed once rather than twice. #238 then moved Widgets to the front,
 an order argued on its own terms rather than inherited.
 
 `EditHistoryView` is a full-screen editor presented from This Week's existing
-More menu. It draws one bounded week at a time as real habit rows by exact day,
+More menu, as its **Correct History** item (#559; the type keeps its name). It draws one bounded week at a time as real habit rows by exact day,
 using plain circles and `Habit.snapshots(...within:)` rather than `WeekGrid` or
 `WeekSpans`: cadence judgement is deliberately absent. Every tap writes
 immediately with the explicit future permission; the presentation has no back

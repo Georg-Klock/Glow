@@ -38,7 +38,7 @@ final class EditModeGestureBoundsTests: XCTestCase {
         let more = app.buttons["More"]
         XCTAssertTrue(more.waitForExistence(timeout: 3))
         more.tap()
-        let edit = app.buttons["Edit"]
+        let edit = app.buttons["Edit Habits"]
         XCTAssertTrue(edit.waitForExistence(timeout: 3))
         edit.tap()
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 3))

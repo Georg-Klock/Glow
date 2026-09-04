@@ -678,11 +678,12 @@ holds the rule; the widget's own completion carries it too, recorded at the tap
 and spent on a timeline of one still entry.
 
 **This Week creates and edits its habits through one editor.** Outside edit
-mode its ellipsis menu orders **New Habit**, **Blank Row**, a divider, **Edit
-History**, then **Edit** (#320, #543). Row management belongs to the current
-week; on a browsed week the menu contains Edit History beside the separate
-**Today** shortcut, so the history matrix can open on exactly the week being
-viewed. The editor opened on the adding screen's *kind* while there were two of
+mode its ellipsis menu orders **New Habit**, **Blank Row**, a divider,
+**Correct History**, then **Edit Habits** (#320, #543, #559). The two used to
+both begin "Edit"; each now names what it acts on. Row management belongs to
+the current week; on a browsed week the menu contains Correct History beside
+the separate **Today** shortcut, so the history matrix can open on exactly the
+week being viewed. The editor opened on the adding screen's *kind* while there were two of
 them (#209); there is one, so it opens on the count and nothing else.
 
 **Editing has a toolbar of its own** (#399). While the list is fanned open the
@@ -691,8 +692,9 @@ asks, and the pager is the only control that could change the week, so hiding
 it is also what makes "edit mode ends when you leave this week" a rule nothing
 on screen can reach. What appears in their place is a **Done** checkmark,
 immediately left of the ellipsis, carrying the same `checkmark` symbol the menu
-item used to. The menu keeps New Habit, Blank Row and Edit History and drops
-Edit for as long as editing lasts, so Done is said once rather than twice.
+item used to. The menu keeps New Habit, Blank Row and Correct History and
+drops Edit Habits for as long as editing lasts, so Done is said once rather
+than twice.
 **Entering is still two taps and leaving is now one**: #320 put both ends in
 the menu for symmetry and named the cost, and this is that cost being paid back
 on the end that needed it — a mode whose exit is behind a menu reads as a mode

@@ -11,11 +11,11 @@ final class EditHistoryTests: XCTestCase {
         XCTAssertTrue(more.waitForExistence(timeout: 3))
         more.tap()
 
-        let openHistory = app.buttons["Edit History"]
+        let openHistory = app.buttons["Correct History"]
         XCTAssertTrue(openHistory.waitForExistence(timeout: 3))
         openHistory.tap()
 
-        XCTAssertTrue(app.navigationBars["Edit History"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.navigationBars["Correct History"].waitForExistence(timeout: 3))
         let done = app.buttons["Done"]
         XCTAssertTrue(done.exists)
         XCTAssertFalse(app.buttons["Cancel"].exists)

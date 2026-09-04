@@ -13,8 +13,8 @@ final class EditModeRowPitchTests: XCTestCase {
             XCTAssertTrue(more.waitForExistence(timeout: 3), "More was absent at \(habitCount) rows")
             more.tap()
 
-            let edit = app.buttons["Edit"]
-            XCTAssertTrue(edit.waitForExistence(timeout: 3), "Edit was absent at \(habitCount) rows")
+            let edit = app.buttons["Edit Habits"]
+            XCTAssertTrue(edit.waitForExistence(timeout: 3), "Edit Habits was absent at \(habitCount) rows")
             edit.tap()
             XCTAssertTrue(
                 app.buttons["Done"].waitForExistence(timeout: 3),

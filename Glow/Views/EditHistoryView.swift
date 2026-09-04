@@ -95,7 +95,7 @@ struct EditHistoryView: View {
                     }
                 }
             }
-            .navigationTitle("Edit History")
+            .navigationTitle("Correct History")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .toolbar {

@@ -17,7 +17,15 @@ struct EditHistoryContractTests {
         try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
     }
 
-    @Test("The existing More menu presents Edit History at the displayed week")
+    /// The two menu items are named for what they act on (#559). They both
+    /// began "Edit", one above the other, for two unrelated jobs — managing
+    /// the habit list, and fixing a day that was logged wrong or missed. The
+    /// history item says *Correct* because that is the job the screen exists
+    /// for; the list item says *Habits* to match "New Habit" and "Blank Row"
+    /// beside it. The row's swipe action is a third "Edit" — one habit's own
+    /// editor — and is deliberately untouched, so the scan below is on the
+    /// menu's text alone.
+    @Test("The existing More menu presents Correct History at the displayed week")
     func menuAndPresentation() throws {
         let weekly = try source("Glow/Views/WeeklyGridView.swift")
         let menuStart = try #require(weekly.range(of: "private var moreMenu"))
@@ -28,8 +36,8 @@ struct EditHistoryContractTests {
         let menu = String(weekly[menuStart.lowerBound..<menuEnd.lowerBound])
         let newHabit = try #require(menu.range(of: "Button(\"New Habit\""))
         let blank = try #require(menu.range(of: "Button(\"Blank Row\""))
-        let history = try #require(menu.range(of: "Button(\"Edit History\""))
-        let edit = try #require(menu.range(of: "Button(\"Edit\""))
+        let history = try #require(menu.range(of: "Button(\"Correct History\""))
+        let edit = try #require(menu.range(of: "Button(\"Edit Habits\""))
 
         #expect(newHabit.lowerBound < blank.lowerBound)
         #expect(blank.lowerBound < history.lowerBound)
@@ -38,11 +46,16 @@ struct EditHistoryContractTests {
         #expect(weekly.contains("EditHistoryView(initialWeek: weekStart, today: today)"))
     }
 
+    /// The screen's title matches the menu item that opens it (#559): a menu
+    /// saying one thing and the screen it opens saying another is its own
+    /// confusion. The Swift symbols keep their names — `EditHistoryView` is
+    /// not copy — the way `GlowOffPreviewNotice` kept its name when the words
+    /// it draws moved on.
     @Test("The matrix is factual, immediate, future-capable, and checkmark-only")
     func screenContract() throws {
         let history = try source("Glow/Views/EditHistoryView.swift")
 
-        #expect(history.contains(".navigationTitle(\"Edit History\")"))
+        #expect(history.contains(".navigationTitle(\"Correct History\")"))
         #expect(history.contains(".navigationBarBackButtonHidden(true)"))
         #expect(history.contains(".interactiveDismissDisabled(true)"))
         #expect(history.contains("Label(\"Done\", systemImage: \"checkmark\")"))

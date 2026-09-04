@@ -833,7 +833,14 @@ struct WeeklyGridView: View {
                 Divider()
             }
 
-            Button("Edit History", systemImage: "calendar.badge.clock") {
+            // **Two items that both began "Edit", side by side, for two
+            // unrelated jobs** (#559). Each now says what it acts on: the
+            // history item *corrects* a day that was logged wrong or missed
+            // — the word the code already reached for — and the list item
+            // manages the habits, matching "New Habit" and "Blank Row" beside
+            // it. The row's swipe action keeps the bare "Edit": it opens one
+            // habit's own editor, a third meaning, and nothing reported it.
+            Button("Correct History", systemImage: "calendar.badge.clock") {
                 if editMode.isEditing { editMode = .inactive }
                 isEditingHistory = true
             }
@@ -842,7 +849,7 @@ struct WeeklyGridView: View {
             // (#399), so this item is absent while editing rather than reading
             // Done in a second place.
             if isOnCurrentWeek, !habits.isEmpty, !editMode.isEditing {
-                Button("Edit", systemImage: "pencil") {
+                Button("Edit Habits", systemImage: "pencil") {
                     withAnimation(editModeAnimation) { editMode = .active }
                 }
             }
