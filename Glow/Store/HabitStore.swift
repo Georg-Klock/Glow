@@ -273,24 +273,8 @@ struct HabitStore {
 
     /// Rewrites `sortOrder` across the whole list so the stored order matches
     /// what the user just dragged into place.
-    ///
-    /// **The offsets are applied to the order as stored, not to `habits` as
-    /// handed in** (#556). A `List` can report one drag as more than one
-    /// move — a row carried past two others arrived on the CI runner as two
-    /// `onMove` calls, each with offsets relative to the order after the
-    /// previous one — and the caller's array is a `@Query` result that is
-    /// republished asynchronously, so the second call can arrive holding the
-    /// order from before the first. Applied to that stale array, "offset 1 to
-    /// 0" moved the wrong row: the runner's recording shows row 3 landing at
-    /// the top and the list then re-rendering as 2, 1, 3, 4, 5, which is
-    /// exactly that arithmetic. The `Habit` objects themselves are live and
-    /// carry the `sortOrder` the first call wrote, so sorting by it first puts
-    /// the offsets back onto the order the `List` meant. Stable on ties by the
-    /// caller's own order, which is what a fresh array already is.
     func reorder(_ habits: [Habit], from source: IndexSet, to destination: Int) throws {
-        var reordered = habits.enumerated()
-            .sorted { ($0.element.sortOrder, $0.offset) < ($1.element.sortOrder, $1.offset) }
-            .map(\.element)
+        var reordered = habits
         reordered.move(fromOffsets: source, toOffset: destination)
         for (index, habit) in reordered.enumerated() {
             habit.sortOrder = index

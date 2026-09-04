@@ -57,19 +57,29 @@ final class EditModeGestureBoundsTests: XCTestCase {
         print("reorder: \(handles.count) handles at \(handles.map(\.frame)); "
             + "dragging \(source.frame) to \(target.frame)")
 
-        // **Slow, and held before lifting** (#556). The two-argument form
-        // drags at the default velocity and lifts the moment it arrives, and
-        // under load the list can discard that gesture whole: locally, at a
-        // load average around 240, the failing iterations' own screen
-        // recordings held not one frame with the row lifted, and the default
-        // form failed within two and five iterations on iOS 18.5 and 26.5
-        // where this form moved the row in 30 of 30 on each. That is one of
-        // the two ways this test has failed; the other was the app's, on the
-        // runner, where the drag landed and a second `onMove` was applied to
-        // a stale query array — see `HabitStore.reorder`.
-        source.press(
-            forDuration: 1, thenDragTo: target, withVelocity: .slow, thenHoldForDuration: 1
-        )
+        // **Dropped above the target's centre, slowly, and held before
+        // lifting** (#556). Two ways this drag has failed, both measured:
+        //
+        // Under load the two-argument form, which drags at the default
+        // velocity and lifts the moment it arrives, is discarded whole: at a
+        // load average around 240 the failing iterations' recordings held no
+        // frame with the row lifted, and the default form failed within two
+        // and five iterations on iOS 18.5 and 26.5 where the slow, held form
+        // moved the row in 30 of 30 on each.
+        //
+        // Dropped on the target handle's centre, the lifted cell's centre
+        // sits 0.6pt past the first row's, and whether the List has registered
+        // that crossing by touch-up is a coin flip. When it has not, the List
+        // reports the move as ending in the slot *between* rows 1 and 2 —
+        // the trace below read `[1]->3` on 1,2,3,4,5, which is that
+        // permutation written as row 2's displacement — while the cell
+        // visibly lands at the top, and the screen then re-renders to an
+        // order matching neither. Seen on the runner (iOS 18.5) and locally
+        // on both runtimes. Dropping a third of the way into the target row
+        // puts the centre 13pt clear of the boundary.
+        let lift = source.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let land = target.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1))
+        lift.press(forDuration: 1, thenDragTo: land, withVelocity: .slow, thenHoldForDuration: 1)
         let drop = XCTAttachment(screenshot: app.screenshot())
         drop.name = "after the drop"
         drop.lifetime = .keepAlways
@@ -80,7 +90,9 @@ final class EditModeGestureBoundsTests: XCTestCase {
         // gesture being lost, so the callbacks are the evidence.
         func order() -> String {
             app.editRows(containing: "Pitch Fixture").map { row in
-                let label = row.buttons.firstMatch.label
+                let label = row.buttons.matching(NSPredicate(
+                    format: "label CONTAINS %@", "Edit Pitch Fixture"
+                )).firstMatch.label
                 return String(label.suffix(1))
             }.joined()
         }
