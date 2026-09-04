@@ -9,8 +9,9 @@ import WidgetKit
 /// Glow leads because it is the product rather than a preference about it.
 /// Week holds both controls that decide what a week is — where it starts and
 /// which day the app stops asking about — which were two sections, one of them
-/// headerless. Data holds the export beside the one control that writes
-/// something invented into the same store.
+/// headerless. Data holds the export, the reset, and — behind seven taps on
+/// its version line (#566) — the two controls that write something invented
+/// into the same store.
 ///
 /// A tab now rather than a sheet, so there is no Done button and nothing to
 /// dismiss — the changes are live and the way out is the tab bar.
@@ -76,6 +77,11 @@ struct SettingsView: View {
     /// `@AppStorage` can bind to, so the control is driven from state and the
     /// store is written behind it. Nil is off.
     @State private var overrideDay: Date?
+
+    /// Whether the two debug rows are showing (#566). Process state shared
+    /// through `DebugReveal.shared`, so it survives leaving this tab and dies
+    /// with the session — see that type for why neither is negotiable.
+    @State private var reveal = DebugReveal.shared
 
     /// Whether the reset confirmation is up, and what has been typed into it.
     /// See `resetRow`.
@@ -291,21 +297,29 @@ struct SettingsView: View {
                     }
                     .disabled(habits.isEmpty)
 
-                    Toggle("Demo history", isOn: demoBinding)
-                        .tint(GlowPalette.controlTint)
+                    // Both debug rows are hidden until the version line below
+                    // has been tapped seven times (#566). Hidden, not compiled
+                    // out: they are in every build, TestFlight included, which
+                    // is #204's requirement and is untouched — see
+                    // `DebugReveal` for why this narrows that decision rather
+                    // than reversing it.
+                    if reveal.isRevealed {
+                        Toggle("Demo history", isOn: demoBinding)
+                            .tint(GlowPalette.controlTint)
 
-                    // The same tier as demo history, and in the same section:
-                    // both write real rows into the real store, and this one
-                    // decides what day they are dated to. Not `#if DEBUG` —
-                    // see `DebugToday` for why a build that compiles it out is
-                    // a build where it is missing from the only place it is
-                    // needed.
-                    Toggle("Debug: Override Today", isOn: overrideBinding)
-                        .tint(GlowPalette.controlTint)
-                    if overrideDay != nil {
-                        Picker("Day", selection: dayBinding) {
-                            ForEach(DebugToday.choices(), id: \.self) { day in
-                                Text(DebugToday.dayName(day)).tag(day)
+                        // The same tier as demo history, and in the same
+                        // section: both write real rows into the real store,
+                        // and this one decides what day they are dated to. Not
+                        // `#if DEBUG` — see `DebugToday` for why a build that
+                        // compiles it out is a build where it is missing from
+                        // the only place it is needed.
+                        Toggle("Debug: Override Today", isOn: overrideBinding)
+                            .tint(GlowPalette.controlTint)
+                        if overrideDay != nil {
+                            Picker("Day", selection: dayBinding) {
+                                ForEach(DebugToday.choices(), id: \.self) { day in
+                                    Text(DebugToday.dayName(day)).tag(day)
+                                }
                             }
                         }
                     }
@@ -313,10 +327,21 @@ struct SettingsView: View {
                     resetRow
                 } header: {
                     Text("Data")
+                } footer: {
+                    // One line, not the footer #317 removed. That was six
+                    // paragraphs of explanation under Reset, and the decision
+                    // was that the section explains itself through its rows;
+                    // the same entry noted that a version line somewhere would
+                    // be a new decision, and this is it (#566). An ordinary
+                    // piece of Settings UI on its own merits — and the seventh
+                    // tap on it reveals the two debug rows above for the rest
+                    // of the session. A `Text` with a tap gesture rather than
+                    // a `Button`, so VoiceOver reads a version number and not
+                    // a control; the gesture is found by trying, the way
+                    // Apple's own is.
+                    Text(Self.version.label)
+                        .onTapGesture { reveal.registerTap() }
                 }
-                // No footer, decided on purpose (#317): the section grew a
-                // six-paragraph wall of explanation under its last row, and
-                // the answer was to remove it rather than trim it.
             }
             .scrollContentBackground(.hidden)
             // A choice of two, rather than a format setting nobody would ever
@@ -681,6 +706,10 @@ struct SettingsView: View {
             }
         }
     }
+
+    /// The installed build, read once. `project.yml` is the source of both
+    /// numbers; see `AppVersion`.
+    private static let version = AppVersion()
 
     /// Why the week's first day is more than a column order.
     ///

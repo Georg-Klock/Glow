@@ -8323,3 +8323,47 @@ than inheriting the target-level “done” sentence.
 No rest-day behavior is designed or expanded here. The shipping app still has
 no rest-day input, and #346/#391/#392 remain the separate post-release feature
 work already recorded for that model.
+
+## 2026-09-04 — The debug rows hide behind seven taps on a version line (#566)
+
+Demo history and Debug: Override Today come off the visible Data section.
+Settings gains a version line as the section's footer — `Version 0.1 (1)`,
+`MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` read from the bundle through
+`AppVersion` — and seven taps on it reveal both rows in place for the rest of
+the app session. Seven is Apple's count for Developer Mode under Settings →
+General → About, so the gesture is one anyone who has found a hidden iOS menu
+already knows.
+
+**This narrows #204, it does not reverse it.** #204 argued against `#if DEBUG`
+because a build that compiles the override out is missing it from the one
+place it is needed — the phone, through TestFlight. That reasoning is about the
+binary and it stands: nothing is compiled out, the rows ship in every build and
+are reachable on every install. What changes is who finds them without knowing
+to look. Before, anyone who opened Settings did; after, only someone who knows
+the gesture does. `DebugToday`'s three fences — current-week scope,
+clear-on-launch, the banner — are untouched, as is every test over them.
+
+**The reveal is process state, deliberately.** `DebugReveal` is one in-memory
+instance for the process: no `UserDefaults`, no App Group key, and
+`SettingsSupportTests` scans the file for both. A reveal that outlived the
+session it was tapped in would be the same risk #204's clear-on-launch fence
+exists to bound — the entry point, rather than the override, left on by
+accident. One instance rather than a `@State` on the screen because the reveal
+is a session, not a screen: leaving Settings for another tab and coming back
+must not re-hide it, and it does not.
+
+**The version line is the new decision #317 said it would be.** #317 removed
+the Data footer whole — six paragraphs under Reset, one of them the version —
+and noted that the installed version string then appeared nowhere in the app,
+so putting one somewhere would be a new decision rather than a revival of that
+footer. This is that decision: one line, secondary and footnote by the Form's
+own footer style, and no explanation. It is a `Text` with a tap gesture rather
+than a `Button`, so VoiceOver reads a version number and not a control; the
+gesture is found by trying, the way Apple's own is.
+
+Checked on the iPhone 17 simulator (iOS 26.5): a fresh launch shows only the
+version line; seven taps on it show both toggles and the Day picker with their
+existing behaviour; switching tabs and back leaves them shown; the next launch
+hides them again. Injected simulator taps that reach SwiftUI here are the
+dwelling multi-point kind — plain `simctl`-style taps did not register, which
+is the known quirk and not the gesture.

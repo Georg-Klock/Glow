@@ -557,6 +557,17 @@ announced by a persistent banner on every screen that reads it, with one tap on
 the banner to turn it off. It ships in every build, TestFlight included, for the
 reason demo history does: the phone is where this app is tested.
 
+**Neither it nor Demo history is offered to someone who does not know to look**
+(#566). The Data section shows Export History, Reset to Default Habits and a
+version line — `Version 0.1 (1)`, marketing version and build, read from the
+bundle. Tapping the version line seven times, Apple's own count for Developer
+Mode, reveals both debug rows in place for the rest of the app session; a
+relaunch hides them again. The reveal is in-memory state, never persisted,
+matching the override's own clear-on-launch: an entry point left on by accident
+would be the same risk one level up. This narrows who reaches the rows, not
+what they do or which builds carry them — `DebugToday`'s three fences and its
+every-build shipping are unchanged.
+
 **"The whole app" includes the Widgets tab's previews** (#439). It did not: that
 page established today from the clock directly, so with an override set the
 placed widget honoured the chosen day and the preview of that same widget drew
