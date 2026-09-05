@@ -19,14 +19,22 @@ final class EditModeGestureBoundsTests: XCTestCase {
         XCTAssertTrue(delete.waitForExistence(timeout: 3))
 
         // The app grid has a fixed 20pt panel margin, then scales the widget's
-        // 14pt trailing inset from its 338pt design width. A native swipe
-        // action used to end at the panel instead of at the track, one scaled
-        // trailing inset too far right (#548). The same expectation on every
-        // runtime: iOS 26 floats the action 10pt inside the List's bound and
-        // iOS 18 runs it out to the bound, and the List's bound is placed so
-        // the action lands on the track either way (#555).
-        let scale = (app.frame.width - 40) / 338
-        let expectedTrackEnd = app.frame.width - 20 - 14 * scale
+        // 14pt trailing inset from its 338pt design width — by a factor capped
+        // at 1 (#588): on a phone wider than 378pt the panel is the widget's
+        // own 338pt, centred, and the surplus is margin on each side before
+        // the 20. A native swipe action used to end at the panel instead of at
+        // the track, one scaled trailing inset too far right (#548). The same
+        // expectation on every runtime: iOS 26 floats the action 10pt inside
+        // the List's bound and iOS 18 runs it out to the bound, and the List's
+        // bound is placed so the action lands on the track either way (#555).
+        //
+        // Written out rather than imported: a UI test cannot see `RowGeometry`,
+        // so this is the rule as `RowGeometryTests` pins it, in three lines.
+        let offered = app.frame.width - 40
+        let panel = min(offered, 338)
+        let scale = panel / 338
+        let sideMargin = (offered - panel) / 2
+        let expectedTrackEnd = app.frame.width - sideMargin - 20 - 14 * scale
         XCTAssertEqual(delete.frame.maxX, expectedTrackEnd, accuracy: 1)
     }
 

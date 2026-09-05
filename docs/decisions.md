@@ -8977,7 +8977,9 @@ Under 338pt nothing changes — a narrow panel is still a smaller widget, and th
 floor #370 removed stays removed. Past 338pt the grid stops growing: the track is
 the widget's own 216pt, the type is the widget's 12pt, and what the phone has
 over is margin, half on each side. On an iPhone 17e (390pt) that is 6pt a side
-on top of the ordinary 20; on a 17 Pro Max (440pt) it is 51.
+on top of the ordinary 20, for 26pt from the screen's edge; on a 17 Pro Max
+(440pt) it is 31, for 51. Both measured off the simulator's screenshot to the
+pixel, equal on both sides.
 
 **Why the reversal.** The Widgets tab has drawn every family at
 `min(1, width / designWidth)` since it existed and never past its true size,

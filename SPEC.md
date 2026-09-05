@@ -376,7 +376,7 @@ the right.
 the widget's times one factor, `min(1, width / 338)`: on a panel narrower than
 the widget the screen is a smaller widget, and on a wider one it is the widget
 at its true size, centred, with equal margins on both sides — 6pt over the
-ordinary 20 on an iPhone 17e, 51pt on a 17 Pro Max. The Widgets tab has always
+ordinary 20 on an iPhone 17e, 31pt over it on a 17 Pro Max. The Widgets tab has always
 drawn its previews by that rule; the two screens now share it. The row's 6/14
 inset pair is the widget's and is not symmetrised (#331, #591).
 
