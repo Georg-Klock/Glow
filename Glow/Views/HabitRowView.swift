@@ -29,9 +29,21 @@ struct RowGeometry: Equatable {
     let scale: CGFloat
     let labelWidth: CGFloat
     let trackWidth: CGFloat
-    /// The widget's 12pt, scaled to the screen and then by the user's type
-    /// size.
+    /// The widget's 12pt, scaled to the screen. The weekday letters and the
+    /// icon are always this size; the name is `nameTextSize`.
     let textSize: CGFloat
+    /// What the label column draws (#567): whether the icon is there, and the
+    /// name's size in the design's points. `.standard` — icon, 12pt — unless
+    /// the reader has raised the type size *and* asked, in Settings, for the
+    /// name to take the icon's room. Decided by `LargeTextPolicy` at the
+    /// grid's boundary and handed in, so this type reads no setting.
+    let label: LargeTextPolicy.Layout
+    /// The name's size on screen: the label's design points times the one
+    /// factor everything else here is multiplied by. Equal to `textSize`
+    /// whenever the icon is drawn; at most `WidgetMetrics.textSizeCap` × scale.
+    var nameTextSize: CGFloat { label.textSize * scale }
+    /// Whether the row draws its icon. False only when the name has grown.
+    var showsIcon: Bool { label.showsIcon }
 
     /// The widget's own insets, and they are **not** the same on both sides.
     /// 6 and 14 is an optical adjustment for a row that starts with a label
@@ -119,7 +131,13 @@ struct RowGeometry: Equatable {
     /// it is −13.5pt, which SwiftUI reports as
     /// `Invalid frame dimension (negative or non-finite)` — a line the suite
     /// has been logging at test-host startup.
-    var nameMaxWidth: CGFloat { max(0, labelWidth - iconWidth - iconGap) }
+    ///
+    /// The whole label column when the icon is not drawn (#567): the name
+    /// starts where the icon started and takes `iconWidth + iconGap` as well.
+    /// One rule for both surfaces, so it is `LargeTextPolicy.Layout`'s.
+    var nameMaxWidth: CGFloat {
+        label.nameMaxWidth(labelWidth: labelWidth, iconWidth: iconWidth, iconGap: iconGap)
+    }
 
     /// Everything between the resting row's own edges: the label column, the
     /// gap after it and the track.
@@ -185,11 +203,10 @@ struct RowGeometry: Equatable {
     /// exact decomposition is pinned in `RowGeometryTests` rather than copied
     /// here as another set of coordinates.
     var editingNameMaxWidth: CGFloat {
-        max(
-            0,
-            editingContentWidth
-                - 2 * (editControlOverhang + labelGap)
-                - iconWidth - iconGap
+        label.nameMaxWidth(
+            labelWidth: editingContentWidth - 2 * (editControlOverhang + labelGap),
+            iconWidth: iconWidth,
+            iconGap: iconGap
         )
     }
 
@@ -205,8 +222,13 @@ struct RowGeometry: Equatable {
         width.isFinite ? max(0, width) : 0
     }
 
-    init(totalWidth: CGFloat) {
+    /// `label` defaults to the design's row. The grid passes what
+    /// `LargeTextPolicy` decided from the setting and the environment's type
+    /// size; the tests and the editor's preview take the default unless they
+    /// are asking about the grown row.
+    init(totalWidth: CGFloat, label: LargeTextPolicy.Layout = .standard) {
         let width = Self.usable(totalWidth)
+        self.label = label
         // **One factor, and nothing exempt from it.** The screen is the large
         // widget scaled, so the scale is the ratio — not a ratio floored at 1,
         // which drew a panel narrower than 338pt as a widget with oversized
@@ -229,7 +251,9 @@ struct RowGeometry: Equatable {
         // a scale factor, and a label column that grows on its own is the one
         // thing that cannot be. The cost is real and named in
         // docs/decisions.md — text on this screen no longer grows with the
-        // reader's setting.
+        // reader's setting. What #567 added is narrower than what went: the
+        // *name* may grow, inside the same column, by giving up the icon —
+        // see `label` — and only when the person asked for that trade.
         //
         // The clamp is not replaced by a smaller one. `labelWidth` is
         // `98/338` of the width by construction now, so it cannot outgrow the
@@ -751,10 +775,11 @@ struct HabitRowView: View {
         let text = HabitLabelView(
             icon: snapshot.icon,
             name: snapshot.name,
+            showsIcon: geometry.showsIcon,
             iconSize: geometry.iconSize,
             iconWidth: geometry.iconWidth,
             iconGap: geometry.iconGap,
-            textSize: geometry.textSize,
+            textSize: geometry.nameTextSize,
             nameMaxWidth: isEditing
                 ? geometry.editingNameMaxWidth : geometry.nameMaxWidth,
             baseTier: isHandled ? .lit : .resting,

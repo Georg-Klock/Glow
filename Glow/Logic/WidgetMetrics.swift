@@ -305,6 +305,13 @@ enum WidgetMetrics {
 
     /// SF Pro Regular, one size for the habit name and every weekday letter.
     static let textSize: CGFloat = 12
+    /// The largest a habit name may grow when the reader has asked for larger
+    /// text and given up the icon column to get it (#567, `LargeTextPolicy`).
+    /// A name at 20pt in a 98pt column reads about six characters; past that
+    /// the row would be an ellipsis beside a track. Nothing else reads it —
+    /// at the default type size, or with the setting off, the name is
+    /// `textSize` exactly.
+    static let textSizeCap: CGFloat = 20
     /// The habit icon is the same size as the name it sits beside (#455), and
     /// derived from it rather than written down so the two cannot drift.
     ///

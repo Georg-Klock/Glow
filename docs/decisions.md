@@ -8572,3 +8572,51 @@ span whose `completionDay` is today, and `day(atColumn:)` still refuses every
 other completed column on this surface. A past bonus — Wednesday's, on a row
 browsed on Friday — is drawn and carries no action here; Edit History corrects
 it, as #543 decided.
+
+## 2026-09-04 — Larger text is a trade the person makes: the icon for the name (#567)
+
+**Narrows the 2026-08-24 entry "Dynamic Type scaling is gone", which stands.**
+That entry took an accessibility regression deliberately — text on This Week is
+12pt × scale whatever the reader has asked for, because the screen is the large
+widget at one factor and a label column that grows on its own is the one thing
+a scaled copy cannot have — and it named the middle position if the question
+was ever reopened: exact fidelity at the default type size, growth only once
+the reader has actually asked for larger text. This is that position, with one
+departure from how the entry imagined it.
+
+**The growth is behind a switch, not automatic.** Settings → Text → *Remove
+icons for larger text*, off by default. It is opt-in because what it changes is
+what the row *shows*, not only how large: the name can only grow by taking the
+icon's column, and whether a bigger name is worth losing the glyph is the
+person's call rather than a consequence of a system setting they changed for
+other reasons. `LargeTextPolicy` is the rule, pure and in `Glow/Logic`; the
+switch and the environment's `DynamicTypeSize` arrive as parameters, read once
+at the grid, the editor and the widget.
+
+**Both conditions, and the row is the design's without either.** With the
+switch on and the type size above the default, the icon is not drawn, the name
+starts where the icon started — reclaiming `iconWidth + iconGap`, 26.25pt of a
+98pt column — and it grows from 12pt at the rate iOS grows body text: 13.4pt at
+xLarge, 14.8 at xxLarge, 16.2 at xxxLarge, 19.8 at accessibility1. The label
+column, the track and the row height do not move, so the columns still line up
+and the screen is still the widget scaled. With the switch off, or at the
+default size or below, nothing changes — which is what lets both committed
+render baselines, measured at the default, stay where they are.
+
+**Two open questions, both answered on the narrow side.** The threshold is any
+step above the default (`.large`), not the accessibility range: a reader at
+xLarge asked for larger text too, and answering only from accessibility1 would
+leave three of the five larger steps doing nothing. The cap is a hard 20pt
+(`WidgetMetrics.textSizeCap`), reached at accessibility2 and held from there,
+rather than climbing further at the largest sizes: a 20pt name in a 98pt column
+already shows about half the characters a 12pt one did, and past that the row
+would be an ellipsis beside a track. Both are tested in `LargeTextPolicyTests`
+and were checked on the simulator at xxLarge and accessibility-extra-large,
+where "Watch Sunset" fits whole at 14.8pt and cuts to "Watch Su…" at the cap.
+Neither was measured on a phone; the numbers are geometry, not glow.
+
+**What did not move.** The weekday letters stay at 12pt × scale — they have no
+icon to trade. The month widget's title, which never had an icon and has its own
+line box, is unchanged. The setting is stored, not the habit: `SymbolPickerView`
+still assigns a glyph, and the switch only decides whether it is drawn.
+

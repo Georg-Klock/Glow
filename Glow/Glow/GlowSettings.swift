@@ -159,4 +159,22 @@ enum GlowSettings {
     static func clamp(_ value: Double) -> Double {
         min(max(value, range.lowerBound), range.upperBound)
     }
+
+    /// Whether a habit row gives its icon column to the name once the reader
+    /// has raised the system text size (#567). Off by default: at the default
+    /// type size the row is the design's, and the toggle decides whether a
+    /// larger setting is answered with a larger name or with the glyph kept.
+    ///
+    /// In the App Group for the reason the glow level is: the widget draws the
+    /// same row, and a widget that kept the icon while the app dropped it
+    /// would be the two surfaces disagreeing about what a row is. Read at a
+    /// boundary and handed to `LargeTextPolicy` as a parameter, the way the
+    /// rest day is — a view through `@AppStorage` on `largeTextKey`, the
+    /// widget once per render through this property.
+    static let largeTextKey = "largeTextDropsIcon"
+
+    static var largeTextDropsIcon: Bool {
+        get { store.bool(forKey: largeTextKey) }
+        set { store.set(newValue, forKey: largeTextKey) }
+    }
 }

@@ -72,6 +72,16 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
   ways — a ring closing, a bar closing, a label dimming — and Reduce Motion has
   to reach all three; a predicate left in a view is one no test can reach. It
   was four while the Today ring's sweep shipped (#209).
+- `LargeTextPolicy` decides whether a habit row gives its icon column to the
+  name, and how large the name is then (#567): the design's 12pt scaled at the
+  rate iOS scales body text, capped at `WidgetMetrics.textSizeCap`, and only
+  when the Settings switch is on *and* the type size is above the default. The
+  switch is `GlowSettings.largeTextDropsIcon`, in the App Group, read once at
+  each boundary — `WeeklyGridView` and `HabitEditorView` through `@AppStorage`,
+  `WeekWidgetView` once per render — and handed in with the environment's
+  `DynamicTypeSize`; `RowGeometry` and the widget row carry the answer, so no
+  row asks the store. Settings invalidates the widget timelines when it
+  changes, as it does for the glow level.
 
 Every function takes its `Calendar` and its `today` as parameters. Nothing here
 reads the clock, which is what lets the tests assert against a fixed Tuesday in

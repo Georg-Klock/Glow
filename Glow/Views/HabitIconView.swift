@@ -46,6 +46,10 @@ struct HabitIconView: View {
 struct HabitLabelView: View {
     let icon: String
     let name: String
+    /// False when the name has taken the icon's column (#567,
+    /// `LargeTextPolicy`): nothing is drawn before the name, not an empty
+    /// frame, so the name starts at the column's leading edge.
+    var showsIcon = true
     let iconSize: CGFloat?
     let iconWidth: CGFloat
     let iconGap: CGFloat
@@ -66,7 +70,7 @@ struct HabitLabelView: View {
             } else {
                 if let baseTier {
                     base(content(iconOpacity: 1, nameOpacity: 1), tier: baseTier)
-                } else if !isSymbol {
+                } else if !isSymbol, showsIcon {
                     // The widget's emitting state has no ordinary label under
                     // it. Emoji are the exception because their colour cannot
                     // live in the mask: draw only the icon underneath and let
@@ -104,10 +108,12 @@ struct HabitLabelView: View {
         // HStack also inserts the same gap before the trailing Spacer, which
         // spends width on nothing and cuts the name early (#475).
         HStack(spacing: 0) {
-            HabitIconView(icon: icon, size: iconSize)
-                .frame(width: iconWidth)
-                .padding(.trailing, iconGap)
-                .opacity(iconOpacity)
+            if showsIcon {
+                HabitIconView(icon: icon, size: iconSize)
+                    .frame(width: iconWidth)
+                    .padding(.trailing, iconGap)
+                    .opacity(iconOpacity)
+            }
 
             Text(name)
                 .lineLimit(1)
