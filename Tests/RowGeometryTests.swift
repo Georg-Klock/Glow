@@ -367,12 +367,16 @@ struct RowGeometryTests {
     func trailingSwipeEdgeStopsAtTheTrack() {
         for width in [200, 320, 338, 350, 353, 393, 402, 430, 1024] as [CGFloat] {
             let geometry = RowGeometry(totalWidth: width)
-            let trackEnd = GridMetrics.horizontalPadding + geometry.padTrailing
+            // The track ends one centring margin further in on a wide phone
+            // (#588); every sum below carries it on both sides.
+            let margin = geometry.sideMargin
+            let trackEnd = margin + GridMetrics.horizontalPadding + geometry.padTrailing
             for systemInset in [0, 10] as [CGFloat] {
                 let resting = GridHorizontalInsets(
                     isEditing: false,
                     padLeading: geometry.padLeading,
                     padTrailing: geometry.padTrailing,
+                    sideMargin: margin,
                     swipeActionInset: systemInset
                 )
                 let short = trackEnd - resting.listTrailing - systemInset
@@ -382,23 +386,25 @@ struct RowGeometryTests {
                 )
                 #expect(
                     resting.listTrailing + resting.rowTrailing
-                        == GridMetrics.rowOuterInset(isEditing: false) + geometry.padTrailing
+                        == margin + GridMetrics.rowOuterInset(isEditing: false) + geometry.padTrailing
                 )
                 #expect(
                     resting.listTrailing + resting.panelTrailing
-                        == GridMetrics.horizontalPadding
+                        == margin + GridMetrics.horizontalPadding
                 )
             }
 
             let resting = GridHorizontalInsets(
                 isEditing: false,
                 padLeading: geometry.padLeading,
-                padTrailing: geometry.padTrailing
+                padTrailing: geometry.padTrailing,
+                sideMargin: margin
             )
             let editing = GridHorizontalInsets(
                 isEditing: true,
                 padLeading: geometry.padLeading,
-                padTrailing: geometry.padTrailing
+                padTrailing: geometry.padTrailing,
+                sideMargin: margin
             )
 
             #expect(
@@ -408,29 +414,105 @@ struct RowGeometryTests {
             )
             #expect(
                 resting.listLeading + resting.rowLeading
-                    == GridMetrics.rowOuterInset(isEditing: false) + geometry.padLeading
+                    == margin + GridMetrics.rowOuterInset(isEditing: false) + geometry.padLeading
             )
             #expect(
                 resting.listTrailing + resting.rowTrailing
-                    == GridMetrics.rowOuterInset(isEditing: false) + geometry.padTrailing
+                    == margin + GridMetrics.rowOuterInset(isEditing: false) + geometry.padTrailing
             )
             #expect(
                 resting.listLeading + resting.panelLeading
-                    == GridMetrics.horizontalPadding
+                    == margin + GridMetrics.horizontalPadding
             )
             #expect(
                 resting.listTrailing + resting.panelTrailing
-                    == GridMetrics.horizontalPadding
+                    == margin + GridMetrics.horizontalPadding
             )
 
             #expect(editing.listLeading == editing.listTrailing)
             #expect(
                 editing.listLeading + editing.panelLeading
-                    == GridMetrics.horizontalPadding
+                    == margin + GridMetrics.horizontalPadding
             )
             #expect(
                 editing.listTrailing + editing.panelTrailing
-                    == GridMetrics.horizontalPadding
+                    == margin + GridMetrics.horizontalPadding
+            )
+        }
+    }
+
+    /// #588, superseding #370: the factor is the plain ratio up to the
+    /// widget's own width and 1 past it. Above 338pt every measurement is the
+    /// widget's own — the same numbers `atTheWidgetsOwnWidth` pins — and what
+    /// the proposal had over is reported as margin, half on each side.
+    @Test("Past 338 the screen is the widget at its true size, not a larger one")
+    func scaleIsCappedAtTheWidgetsSize() {
+        let widget = RowGeometry(totalWidth: WidgetMetrics.largeWidth)
+        for width in [339, 350, 353, 362, 393, 402, 430, 440, 1024] as [CGFloat] {
+            let g = RowGeometry(totalWidth: width)
+            #expect(g.scale == 1, "scale is \(g.scale) at \(width)")
+            #expect(g.panelWidth == WidgetMetrics.largeWidth)
+            #expect(g.sideMargin == (width - WidgetMetrics.largeWidth) / 2)
+            // The widget's track exactly: 338 − 6 − 14 − 98 − 4.
+            #expect(g.trackWidth == 216)
+            #expect(g.labelWidth == WidgetMetrics.labelWidth)
+            #expect(g.textSize == WidgetMetrics.textSize)
+            #expect(g.padLeading == WidgetMetrics.padLeading)
+            #expect(g.padTrailing == WidgetMetrics.padTrailing)
+            #expect(g.slotHeight == widget.slotHeight)
+            #expect(g.panelHeight(rows: 10) == widget.panelHeight(rows: 10))
+            // And the margin plus the panel is the whole proposal: nothing is
+            // lost or invented on the way to the screen.
+            #expect(abs(g.sideMargin * 2 + g.panelWidth - width) < 1e-9)
+        }
+    }
+
+    /// The floor #370 removed stays removed: under 338pt the ratio is plain, the
+    /// grid is the whole proposal and there is no margin to centre.
+    @Test("Under 338 the screen is a smaller widget, with no margin")
+    func narrowPanelsStillScaleDown() {
+        for width in [1, 100, 200, 320, 337] as [CGFloat] {
+            let g = RowGeometry(totalWidth: width)
+            #expect(abs(g.scale - width / WidgetMetrics.largeWidth) < 1e-12)
+            #expect(g.scale < 1)
+            #expect(g.panelWidth == width)
+            #expect(g.sideMargin == 0)
+            #expect(g.trackWidth < 216)
+        }
+    }
+
+    /// The margin lands on the `List`'s bounds, symmetrically, and nowhere else:
+    /// the row and panel insets are relative to the List and are the same
+    /// numbers with or without it, which is what keeps #400, #520 and #548's
+    /// measured relations true on a wide phone.
+    @Test("The centring margin moves both List bounds and nothing inside them")
+    func sideMarginIsSymmetricAndOnlyOnTheList() {
+        let g = RowGeometry(totalWidth: 440)
+        #expect(g.sideMargin == 51)
+        for isEditing in [false, true] {
+            let plain = GridHorizontalInsets(
+                isEditing: isEditing, padLeading: g.padLeading, padTrailing: g.padTrailing
+            )
+            let centred = GridHorizontalInsets(
+                isEditing: isEditing,
+                padLeading: g.padLeading,
+                padTrailing: g.padTrailing,
+                sideMargin: g.sideMargin
+            )
+            #expect(centred.listLeading == plain.listLeading + g.sideMargin)
+            #expect(centred.listTrailing == plain.listTrailing + g.sideMargin)
+            #expect(centred.rowLeading == plain.rowLeading)
+            #expect(centred.rowTrailing == plain.rowTrailing)
+            #expect(centred.panelLeading == plain.panelLeading)
+            #expect(centred.panelTrailing == plain.panelTrailing)
+            // The panel's outer edges, from the screen's: equal on both sides.
+            #expect(
+                centred.listLeading + centred.panelLeading
+                    == centred.listTrailing + centred.panelTrailing
+            )
+            #expect(
+                centred.listLeading + centred.panelLeading
+                    == g.sideMargin + GridMetrics.horizontalPadding
             )
         }
     }

@@ -371,6 +371,15 @@ than trusting it.
 Each habit is one row: icon and name on the left, a fixed-width status track on
 the right.
 
+**This Week is the large widget at the widget's size or smaller, never larger**
+(#588, superseding #370's uncapped ratio). Every measurement on the screen is
+the widget's times one factor, `min(1, width / 338)`: on a panel narrower than
+the widget the screen is a smaller widget, and on a wider one it is the widget
+at its true size, centred, with equal margins on both sides — 6pt over the
+ordinary 20 on an iPhone 17e, 51pt on a 17 Pro Max. The Widgets tab has always
+drawn its previews by that rule; the two screens now share it. The row's 6/14
+inset pair is the widget's and is not symmetrised (#331, #591).
+
 **The name is 12pt at the widget's scale whatever the phone's text size** —
 a deliberate trade recorded in `docs/decisions.md` (2026-08-24) — **unless the
 person has asked for the middle position** (#567). Settings → Text has one
@@ -776,8 +785,9 @@ it reads *Short titles work better. Long titles will be cut.* The line reserves
 its height while empty, so the field and frequency control do not move when it
 appears. **One field is honest about both surfaces**, because they are one row
 at two sizes: `RowGeometry` is the large widget's geometry times a single
-factor, applied to the text size as well as to the label column, so a name
-breaks at the same character on This Week as it does in the widget.
+factor — never above 1 (#588) — applied to the text size as well as to the
+label column, so a name breaks at the same character on This Week as it does in
+the widget.
 
 **A blank row is grouping somebody put there** (#143, narrowed by #257).
 Blank rows exist so habits can be clustered, and they are made deliberately —
@@ -1123,7 +1133,12 @@ own habits.
 
 **The page is three named cards and the widgets themselves** (#237,
 restructured by #312): **"Large Week Widget"**, **"Medium Week Widget"**,
-**"Monthly View per Habit"**, in that order, largest first. No card carries an
+**"Monthly View per Habit"**, in that order, largest first. Each card is
+centred in the page's column with its heading (#591): a preview is the
+family's real frame scaled by at most 1, so it can be narrower than the column,
+and the slack splits evenly rather than collecting on the right. A row of
+Smalls centres as a row and keeps its cards at its leading edge, so a trailing
+odd card sits where the next one would go. No card carries an
 explaining sentence under its heading — the gallery does, because there a
 widget is an unfamiliar tile in a list, but here the widget itself is drawn
 directly below over the person's own habits and says the same thing without

@@ -1,12 +1,16 @@
 import SwiftUI
 
-/// How the screen is divided and sized: the large widget, scaled to the screen.
+/// How the screen is divided and sized: the large widget, scaled to the screen
+/// and never past its own size.
 ///
-/// Tapping the widget is meant to land on a bigger version of the same thing,
-/// so every measurement here is a `WidgetMetrics` number times one factor —
-/// the screen's width over the widget's 338pt. The widget's spec is measured
-/// from the design file; the screen has no frame of its own, so it borrows
-/// that truth rather than keeping a second set of guesses beside it.
+/// Tapping the widget is meant to land on the same thing, so every measurement
+/// here is a `WidgetMetrics` number times one factor — the width offered over
+/// the widget's 338pt, **capped at 1** (#588). On a panel narrower than the
+/// widget the screen is a smaller widget; on a wider one it is the widget at
+/// its true size, centred, with the surplus as margin on both sides. The
+/// widget's spec is measured from the design file; the screen has no frame of
+/// its own, so it borrows that truth rather than keeping a second set of
+/// guesses beside it.
 ///
 /// Computed once per layout and passed to the header and every row, so they
 /// cannot disagree. If they did, the columns would stop lining up, which is
@@ -25,8 +29,18 @@ import SwiftUI
 /// widget scaled up, and `WeekdayHeader` has drawn the letter alone since. The
 /// sentence outlived it, which is how a stale line goes on being cited.
 struct RowGeometry: Equatable {
-    /// The screen's width over the large widget's own.
+    /// The width offered over the large widget's own, never above 1 (#588).
     let scale: CGFloat
+    /// The width the grid actually occupies: the width offered, up to the
+    /// widget's 338pt, and exactly 338pt past it. Every horizontal measurement
+    /// on this type is taken from this rather than from the proposal, so a
+    /// wide phone gets the widget's track and not a wider one.
+    let panelWidth: CGFloat
+    /// What the cap leaves over, halved: the margin on *each* side that
+    /// centres `panelWidth` in the width offered. Zero up to 338pt. Nothing in
+    /// the cap centres anything by itself; `WeeklyGridView` hands this to
+    /// `GridHorizontalInsets`, which moves the `List`'s bounds in by it.
+    let sideMargin: CGFloat
     let labelWidth: CGFloat
     let trackWidth: CGFloat
     /// The widget's 12pt, scaled to the screen. The weekday letters and the
@@ -229,10 +243,19 @@ struct RowGeometry: Equatable {
     init(totalWidth: CGFloat, label: LargeTextPolicy.Layout = .standard) {
         let width = Self.usable(totalWidth)
         self.label = label
-        // **One factor, and nothing exempt from it.** The screen is the large
-        // widget scaled, so the scale is the ratio — not a ratio floored at 1,
-        // which drew a panel narrower than 338pt as a widget with oversized
-        // marks in it rather than as a smaller widget.
+        // **One factor, and nothing exempt from it — capped at the widget's
+        // own size** (#588, superseding #370). The screen is the large widget
+        // scaled, so the scale is the ratio of the width offered to the
+        // widget's 338pt; past 338pt it is 1, and the surplus is margin on
+        // both sides rather than a bigger widget. #370 had the ratio uncapped
+        // at both ends and called that the whole point; the Widgets tab's own
+        // preview never drew a family past its true size, and This Week now
+        // shares that rule exactly — `min(1, width / designWidth)` on both
+        // screens.
+        //
+        // **Still not floored at 1.** That was tried before #370 and drew a
+        // panel narrower than 338pt as a widget with oversized marks in it
+        // rather than as a smaller widget. A narrow panel still scales down.
         //
         // **Not floored at the bottom either**, and #136 is why. A zero
         // proposal is the first pass of every `GeometryReader`, and a floor
@@ -242,8 +265,13 @@ struct RowGeometry: Equatable {
         // as well. Scaling all the way down does the job honestly: at zero
         // width every measurement below is zero, which is what `zeroWidth`
         // asserts.
-        let scale = width / WidgetMetrics.largeWidth
+        let scale = min(1, width / WidgetMetrics.largeWidth)
         self.scale = scale
+        // `min` rather than `largeWidth * scale`, which is the same number up
+        // to a rounding error this type would then hand to a frame.
+        let panelWidth = min(width, WidgetMetrics.largeWidth)
+        self.panelWidth = panelWidth
+        sideMargin = max(0, (width - panelWidth) / 2)
 
         // **Dynamic Type is deliberately not applied here.** It used to be, and
         // the label column was clamped to 42% of the width to stop a large type
@@ -261,7 +289,10 @@ struct RowGeometry: Equatable {
         labelWidth = max(0, WidgetMetrics.labelWidth * scale)
         textSize = WidgetMetrics.textSize * scale
 
-        let available = width
+        // From the panel's width, not the proposal's: past 338pt the two
+        // differ by twice `sideMargin`, and that difference is margin, not
+        // track.
+        let available = panelWidth
             - WidgetMetrics.padLeading * scale
             - WidgetMetrics.padTrailing * scale
             - labelWidth
@@ -401,6 +432,14 @@ enum GridMetrics {
 /// Edit mode does not offer the swipe actions (its native remove control owns
 /// that gesture). It therefore keeps the symmetric List bounds #400/#520 use
 /// to position the remove and reorder controls.
+///
+/// **The centring margin is the List's** (#588). Past 338pt `RowGeometry` caps
+/// its scale and reports the surplus as `sideMargin`; adding it to *both* List
+/// bounds moves the List, and everything laid out against its bounds — the
+/// rows and panel inside it, the system's edit controls and swipe actions at
+/// its edges — inward together, so the panel is centred and every relation
+/// #400, #520 and #548 measured against the List's edge holds unchanged. The
+/// row and panel insets are relative to the List and do not carry it twice.
 struct GridHorizontalInsets: Equatable {
     let listLeading: CGFloat
     let listTrailing: CGFloat
@@ -413,22 +452,23 @@ struct GridHorizontalInsets: Equatable {
         isEditing: Bool,
         padLeading: CGFloat,
         padTrailing: CGFloat,
+        sideMargin: CGFloat = 0,
         swipeActionInset: CGFloat = GridMetrics.swipeActionInset
     ) {
         let list = GridMetrics.listInset(isEditing: isEditing)
         let row = GridMetrics.contentInset(isEditing: isEditing)
         let panel = GridMetrics.panelInset(isEditing: isEditing)
-        // The track ends `horizontalPadding + padTrailing` in from the screen's
-        // trailing edge. At rest the List's bound sits `swipeActionInset`
-        // outside that, so the system's own inset lands the action on the
-        // track; whatever that needs beyond `list` is what the row and the
-        // panel give back below.
+        // The track ends `sideMargin + horizontalPadding + padTrailing` in
+        // from the screen's trailing edge. At rest the List's bound sits
+        // `swipeActionInset` outside that, so the system's own inset lands the
+        // action on the track; whatever that needs beyond `list` is what the
+        // row and the panel give back below.
         let swipe = isEditing
             ? 0
             : GridMetrics.horizontalPadding + padTrailing - swipeActionInset - list
 
-        listLeading = list
-        listTrailing = list + swipe
+        listLeading = sideMargin + list
+        listTrailing = sideMargin + list + swipe
         rowLeading = row + padLeading
         rowTrailing = row + padTrailing - swipe
         panelLeading = panel

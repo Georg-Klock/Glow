@@ -5800,6 +5800,11 @@ against 18.21, the first habit row lands at 43.00 against 42.84, and the row
 pitch is 34.33 against 32 x scale. Every landmark is inside a third of a point,
 which is edge detection rather than offset.
 
+*Note, 2026-09-05:* that ratio is no longer what the app draws. The 2026-09-05
+entry for #588 caps the factor at 1, so a 362pt panel now renders at scale 1.0 —
+the widget's own 338pt, centred — and 1.0710 is a measurement of a rule the app
+used to follow. The paragraph stands as the record of what was true then.
+
 Four things had to move, and two of them cost something real.
 
 **The header went onto the panel and lost its dates.** A widget's
@@ -8958,3 +8963,75 @@ deferred to the background transition. Until that is measured, the Widgets
 tab's hosted preview keeps `presentsIsland: false` (#465) — its silence is
 now an asymmetry with This Week rather than a shared rule, and the same
 measurement decides both.
+## 2026-09-05 — This Week caps at the widget's true size, and is centred (#588, #591)
+
+**This supersedes the 2026-08-28 entry for #370** where it says the screen is the
+large widget scaled by one factor with nothing exempt, "the plain ratio at both
+ends". The ratio is now capped at 1:
+
+```swift
+let scale = min(1, width / WidgetMetrics.largeWidth)
+```
+
+Under 338pt nothing changes — a narrow panel is still a smaller widget, and the
+floor #370 removed stays removed. Past 338pt the grid stops growing: the track is
+the widget's own 216pt, the type is the widget's 12pt, and what the phone has
+over is margin, half on each side. On an iPhone 17e (390pt) that is 6pt a side
+on top of the ordinary 20; on a 17 Pro Max (440pt) it is 51.
+
+**Why the reversal.** The Widgets tab has drawn every family at
+`min(1, width / designWidth)` since it existed and never past its true size,
+so on most phones This Week ran visibly bigger than the preview of the widget it
+claims to be — about 4% on a 15 Pro, closer to 18% on a 17 Pro Max. #587
+proposed closing the gap the other way, by letting the preview grow to This
+Week's scale; it was closed in favour of this, because since #544 the preview's
+size is the *real* WidgetKit frame for this device, and a preview drawn larger
+than the frame WidgetKit will give it is a picture of a widget that does not
+exist. The screen and the preview now share one rule, and it is the preview's.
+What #370 gained — one factor, no exemptions — is kept in the only direction it
+was ever measured in, downward; what it loses is the claim that the screen fills
+the width, which on most phones it no longer does. That trade was confirmed
+before the change was made.
+
+**What #370 rejected is not what this does.** The cap #370 removed was a floor,
+`max(1, …)`, which drew a panel narrower than 338pt as a widget with oversized
+marks in it. This is a ceiling. `RowGeometryTests` pins both ends: the plain
+ratio below 338 and exactly the widget's numbers above it.
+
+**Centring is the `List`'s job, and it is symmetric by construction.** Nothing
+in the cap centres anything. `RowGeometry` reports the surplus as `sideMargin`,
+and `GridHorizontalInsets` adds it to *both* bounds of the `List`, so the rows
+and panel inside it and the system's edit controls and swipe actions at its
+edges all move inward together. Every relation #400, #520 and #548 measured
+against the List's edge holds unchanged; the row and panel insets are relative to
+the List and do not carry the margin twice. The cost, stated: on a wide phone a
+vertical drag that starts on the black margin outside the List does not scroll
+the grid, where it used to on a List that ran nearly edge to edge.
+
+**The 6/14 row inset stays** (#591). What reads as off-centre inside the panel is
+the track of marks, and that is `WidgetMetrics.padLeading`/`padTrailing` — 6 and
+14 — scaled straight from the widget on purpose (#331): an optical adjustment
+for a row that begins with a label column and ends with a mark, and the reason
+the screen and the widget do not disagree. Symmetrising it on the screen alone
+would put the two surfaces back in the state #331 moved them out of, with the
+imbalance on the other side. #591's This Week half is answered by the centred
+panel; the split is untouched on both surfaces.
+
+**The Widgets tab now centres what it draws** (#591). Each card's width is the
+family's real frame times a scale capped at 1, and nothing makes that equal the
+column the page offers; `.leading` on the page and card stacks collected every
+point of the difference on the right. The stacks centre now, the heading with
+them — where the system's own gallery puts a widget's name — and each row of
+Smalls takes its full two-card width and keeps its cards at its leading edge, so
+a trailing odd card still sits in the place the next one would go
+(`WidgetCardGroup.rows`) while the row centres like any other card. No card
+changed size. The Widgets tab needed nothing for #588 itself; its rule was
+already the one This Week adopted.
+
+**What moved in the render baselines.** The `grid rows` fixture offers
+`RowGeometry` 353pt (a 393pt phone less the 20pt margins) and used to render at
+scale 1.044; it now renders at 1, so the frame is 338pt wide and every row in it
+is the widget's own. The hosted `weekly grid screen` frame gains the 7.5pt
+centring margin on each side, and `widgets screen` moves by the half of the
+slack its cards were leaving on the right. Both runtimes were approved together
+with `Tools/approve-baseline.sh`.
