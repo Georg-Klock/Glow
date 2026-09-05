@@ -8231,7 +8231,10 @@ drop, which is the system reconciling an interactive move with a data update
 that disagrees with it. The test now drops a third of the way into the
 target row, 13pt clear of the boundary, still slowly and held. A person's
 finger can land on that boundary too; what the list does then is the
-system's, and it is noted rather than worked around.
+system's, and it is noted rather than worked around. Observed once since, at
+a load average around 400 with three agents building: the trace read `[1]->3`
+with the 13pt-clear drop in place, so the hold before lifting is now 2.5
+seconds rather than one — a single observation, not a proof.
 
 ## 2026-09-03 — Swipe ends at the track; the native drag proxy stays native (#548)
 
