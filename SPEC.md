@@ -1098,7 +1098,10 @@ frame still close to 1.2pt. What the same design node offered and this did
 **not** take: a 24pt corner (the preview's stays 30), a gradient surface (it
 stays flat `GlowPalette.widgetSurface`), and any mark shading — the marks are
 `SlotMarkView`'s and the three-step palette (#335) holds. None of this reaches
-the week widgets or This Week.
+the week widgets or This Week. The small
+widget's vertical geometry is the design's, top-anchored (nodes `357:9212`
+and `357:9301`, 2026-09-05): the title's box at 10pt, the first row at 31pt
+whatever the row count, six rows on the natural 20pt pitch, 11pt below them.
 
 **The Widgets tab is where they are found from inside the app** (#210). It
 shows every widget this app ships — the one kind at all three families —

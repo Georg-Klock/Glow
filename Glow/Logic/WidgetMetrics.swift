@@ -362,19 +362,36 @@ enum WidgetMetrics {
     /// and a slot does not.
     static let headerHeight: CGFloat = 14
 
-    /// The month habit name's line box. It occupies the header position but is
-    /// not the week widget's compact row of weekday letters: the authored
-    /// 158pt month frame places its grid at y=32, four points below the shared
-    /// weekday-header geometry. Keep that distinction explicit so correcting
-    /// the month never moves either week surface (#493).
-    static let monthTitleHeight: CGFloat = headerHeight + 4
+    /// The month habit name's line box: 14.5pt, the text box the design
+    /// authors at y=10 in the 158pt frame (nodes `357:9212` and `357:9301`,
+    /// 36 of 392 at 2.48x). It occupies the header position but is not the
+    /// week widget's row of weekday letters, so correcting the month never
+    /// moves either week surface (#493). It was 18 until 2026-09-05.
+    static let monthTitleHeight: CGFloat = 14.5
 
-    /// Extra space above only the small month widget's title (#527).
-    ///
-    /// The shared `padTop` belongs to all three families. Keeping this delta
-    /// beside the month's own title metric moves the title and grid together
-    /// without moving either week widget.
-    static let monthTopInset: CGFloat = padTop
+    /// The air between the month's title box and its first row: 6.5pt, so the
+    /// grid starts at `padTop + monthTitleHeight + monthHeaderGap = 31`, where
+    /// the design puts it for five rows and six alike (2026-09-05). The
+    /// week's `headerGap` is a different number for a different header.
+    static let monthHeaderGap: CGFloat = 6.5
+
+    /// Extra space above only the small month widget's title (#527): none,
+    /// since 2026-09-05. The title's top is the shared `padTop`, 10pt, where
+    /// the design draws it; the 10pt this used to add put the title at 20 and
+    /// the grid at 42, and centred the rows in what was left. Kept as a named
+    /// zero rather than removed so the month's vertical arithmetic still
+    /// reads as three terms in one place.
+    static let monthTopInset: CGFloat = 0
+
+    /// The small month's bottom inset: 11pt, the room the design leaves under
+    /// six rows (392 − 76.9 − 287.9 at 2.48x). The week families keep the
+    /// shared `padBottom`; a month that inherited 14 would either lose its
+    /// 20pt pitch at six rows or overflow, and the design does neither.
+    static let smallPadBottom: CGFloat = 11
+
+    static func padBottom(for family: WidgetFamily) -> CGFloat {
+        family == .systemSmall ? smallPadBottom : padBottom
+    }
 
     /// How far the row block sits below whatever precedes it, so that it is
     /// centred in the height the header leaves (#368).

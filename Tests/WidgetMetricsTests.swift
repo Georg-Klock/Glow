@@ -21,18 +21,25 @@ struct WidgetMetricsTests {
         return SlotLayout.slotHeight(trackWidth: track)
     }
 
-    @Test("The month title starts at twice the shared top inset")
+    @Test("The month title sits at the shared top inset and its grid starts at 31")
     func monthTitleOwnsItsLineBox() {
+        // Nodes `357:9212` (six rows) and `357:9301` (five): the title's text
+        // box at y=10, 14.5 tall; the grid at y=31 in both. Top-anchored — the
+        // row count changes what is below the grid, never where it starts.
         #expect(WidgetMetrics.headerHeight == 14)
-        #expect(WidgetMetrics.monthTitleHeight == 18)
-        #expect(WidgetMetrics.monthTopInset == WidgetMetrics.padTop)
-        #expect(WidgetMetrics.padTop + WidgetMetrics.monthTopInset == 20)
+        #expect(WidgetMetrics.monthTitleHeight == 14.5)
+        #expect(WidgetMetrics.monthTopInset == 0)
+        #expect(WidgetMetrics.padTop + WidgetMetrics.monthTopInset == 10)
         #expect(
             WidgetMetrics.padTop
                 + WidgetMetrics.monthTopInset
                 + WidgetMetrics.monthTitleHeight
-                + WidgetMetrics.headerGap == 42
+                + WidgetMetrics.monthHeaderGap == 31
         )
+        // The week families keep the shared bottom; the small month has its own.
+        #expect(WidgetMetrics.padBottom(for: .systemLarge) == WidgetMetrics.padBottom)
+        #expect(WidgetMetrics.padBottom(for: .systemMedium) == WidgetMetrics.padBottom)
+        #expect(WidgetMetrics.padBottom(for: .systemSmall) == 11)
     }
 
     @Test("The small month grid is 136 wide: 16pt cells on a 20pt pitch (#553)")
@@ -55,47 +62,34 @@ struct WidgetMetricsTests {
     }
 
     @Test(
-        "Four-, five-, and six-row months split the space below the title",
-        arguments: [(4, 13.0), (5, 3.0), (6, 0.0)]
+        "A month is top-anchored: the grid starts at 31 and the row count decides what is below",
+        arguments: [(4, 51.0), (5, 31.0), (6, 11.0)]
     )
-    func shortMonthsCentreTheirRowBlock(rows: Int, expectedOffset: CGFloat) {
-        // The small widget's 158pt frame leaves a 134pt content box inside its
-        // 10/14 shared vertical insets and a second month-only 10pt top inset.
-        // A month cell is 16pt on a 20pt pitch, and the title plus its gap
-        // occupies 22pt. These are the 4/5/6-row placements from #527 at the
-        // 4pt natural gap #553 adopted: a five-row block grew 4pt and a
-        // four-row one 3pt, so each sits that much less above and below. Six
-        // rows still tighten to 1.2pt and do not move.
-        let contentHeight: CGFloat = 158
-            - WidgetMetrics.padTop - WidgetMetrics.padBottom - WidgetMetrics.monthTopInset
+    func shortMonthsAreTopAnchored(rows: Int, expectedBottom: CGFloat) {
+        // The 158pt small frame: 10 above the title, a 14.5 title box, 6.5 to
+        // the first row, six 16pt rows on a 20pt pitch, 11 below — nodes
+        // `357:9212` and `357:9301`, and every number lands exactly:
+        // 10 + 14.5 + 6.5 + 116 + 11 = 158. Fewer rows leave more below; the
+        // grid does not move down to meet them (this replaces #368/#527's
+        // centring for the month, 2026-09-05).
+        let frame: CGFloat = WidgetMetrics.smallSide
+        let contentHeight = frame
+            - WidgetMetrics.padTop - WidgetMetrics.padBottom(for: .systemSmall)
+            - WidgetMetrics.monthTopInset
         let slot: CGFloat = 16
         let naturalGap: CGFloat = SlotLayout.monthGap(trackWidth: 136)
-        let header = WidgetMetrics.monthTitleHeight + WidgetMetrics.headerGap
+        let header = WidgetMetrics.monthTitleHeight + WidgetMetrics.monthHeaderGap
         let available = contentHeight - header
         let gap = rows > 1
-            ? max(1, min(
-                naturalGap,
-                (available - CGFloat(rows) * slot) / CGFloat(rows - 1)
-            ))
+            ? max(1, min(naturalGap, (available - CGFloat(rows) * slot) / CGFloat(rows - 1)))
             : 0
-        let offset = WidgetMetrics.rowsOffset(
-            contentHeight: contentHeight,
-            slot: slot,
-            gap: gap,
-            rows: rows,
-            headerFootprint: header
-        )
+        // Six rows fit at the natural 4pt gap: the pitch is never tightened.
+        #expect(abs(gap - 4) < 0.001)
+        let gridTop = WidgetMetrics.padTop + WidgetMetrics.monthTopInset + header
+        #expect(abs(gridTop - 31) < 0.001)
         let block = CGFloat(rows) * slot + CGFloat(rows - 1) * gap
-        let bottom = contentHeight - header - offset - block
-
-        #expect(abs(offset - expectedOffset) < 0.001)
-        #expect(abs(offset - bottom) < 0.001)
-        if rows == 6 {
-            #expect(abs(gap - 1.2) < 0.001)
-            #expect(abs(
-                WidgetMetrics.padTop + WidgetMetrics.monthTopInset + header + offset - 42
-            ) < 0.001)
-        }
+        let bottom = frame - gridTop - block
+        #expect(abs(bottom - expectedBottom) < 0.001)
     }
 
     @Test("A short large widget centres its header and rows as one group")

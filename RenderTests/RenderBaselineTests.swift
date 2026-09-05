@@ -427,6 +427,15 @@ struct RenderBaselineTests {
             top: WidgetMetrics.padTop, leading: WidgetMetrics.padLeading,
             bottom: WidgetMetrics.padBottom, trailing: WidgetMetrics.padTrailing
         )
+
+        /// The small family's own insets — the month's 11pt bottom and
+        /// `smallPad` either side — so the harness frames the month the way
+        /// `WidgetContentInset` does (2026-09-05).
+        static let smallInsets = EdgeInsets(
+            top: WidgetMetrics.padTop, leading: WidgetMetrics.padLeading(for: .systemSmall),
+            bottom: WidgetMetrics.padBottom(for: .systemSmall),
+            trailing: WidgetMetrics.padTrailing(for: .systemSmall)
+        )
     }
 
     static var frames: [Frame] {
@@ -492,7 +501,8 @@ struct RenderBaselineTests {
                       entry: Fixture.deviceWeek(), familyOverride: .systemLarge
                   ))),
             Frame(name: "month small", size: WidgetMetrics.size(of: .systemSmall),
-                  view: AnyView(MonthWidgetView(entry: month))),
+                  view: AnyView(MonthWidgetView(entry: month)),
+                  insets: Frame.smallInsets),
             // **The app, not the widget** (#386). See `GridRows`.
             Frame(name: "grid rows", size: GridRows.size,
                   view: AnyView(GridRows(entry: week)),
