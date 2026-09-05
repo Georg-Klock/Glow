@@ -8,7 +8,7 @@ import Testing
 /// true there and in the widget's burst, which records the setting at the tap
 /// (`WidgetBurst`, #107). The week grid — the screen the app *is* — read the
 /// setting nowhere: a completion closed on a spring, the row's label dimmed on
-/// the same spring, and a press grew 32% and sprang back, whatever the person
+/// the same spring, and a press grew and sprang back, whatever the person
 /// had asked for.
 ///
 /// The ring is gone with the per-day kind (#209) and `sweepsRing` with it, so

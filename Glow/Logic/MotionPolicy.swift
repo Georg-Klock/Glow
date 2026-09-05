@@ -85,9 +85,8 @@ enum MotionPolicy {
 
     /// How far a press pushes a mark past its resting size.
     ///
-    /// A press growing 32% and springing back is the same overshoot the
-    /// completion is built on, and it is motion under a fingertip: 1 is the
-    /// scale that does not move. The `ButtonStyle` keeps its `.animation` —
+    /// A press growing and springing back — 5% since #589, 32% before it —
+    /// is motion under a fingertip: 1 is the scale that does not move. The `ButtonStyle` keeps its `.animation` —
     /// animating a value that never changes costs nothing and keeps one code
     /// path rather than two.
     static func pressScale(_ scale: CGFloat, reduceMotion: Bool) -> CGFloat {

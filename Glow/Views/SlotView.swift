@@ -33,7 +33,13 @@ struct SlotView: View {
 
     /// How far past its resting size a press pushes the ring. Shared with the
     /// spanning rows, which do the same thing at a different shape.
-    static let pressScale: CGFloat = 1.32
+    ///
+    /// About 5%. It was 32% — the completion spring's own overshoot, applied
+    /// to the fingertip — and on a filled pill that read as the mark leaping
+    /// under the thumb rather than acknowledging it (#589). A press is
+    /// confirmation that the touch landed, not the completion's motion
+    /// rehearsed early; 1.05 is enough to see and too little to notice.
+    static let pressScale: CGFloat = 1.05
 
     /// How a mark changes state: a quick cross-fade between the old drawing and
     /// the new one, both ways (2026-09-05). It was a 0.34s spring that shrank
