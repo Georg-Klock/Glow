@@ -660,6 +660,14 @@ It ships in every build, TestFlight included, and deliberately not behind
 this app is tested on, and compiling the tool out of it would remove it from
 the only place it is wanted.
 
+**Its Settings row is hidden, not gone** (#566). Demo history and Debug:
+Override Today no longer appear in the Data section until the version line
+under it has been tapped seven times; `DebugReveal` holds that as one
+in-memory instance for the process, so the reveal survives leaving the tab and
+dies with the session, deliberately mirroring clear-on-launch one level up.
+This narrows who reaches the entry point without touching what it does or
+which builds carry it — see docs/decisions.md.
+
 ## Testing
 
 `Tools/test.sh` is the test command. Use it rather than a hand-typed
