@@ -59,7 +59,7 @@ enum DefaultHabits {
         Template(isSpacer: true, name: "", icon: "", frequency: .daily),
 
         // Evening:
-        Template(name: "Watch Sunset", icon: "sunset", frequency: .timesPerWeek(3)),
+        Template(name: "Sunset", icon: "sunset", frequency: .timesPerWeek(3)),
         Template(name: "Early night", icon: "bed.double", frequency: .daily)
     ]
 }
