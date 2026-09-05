@@ -257,6 +257,10 @@ targets:
       - path: Glow/Views/WeekdayHeader.swift
       - path: Glow/Views/SlotView.swift
       - path: Glow/Views/SpanView.swift
+      # The row's third track (#557): what it draws while This Week corrects
+      # history. Compiled here because `HabitRowView` names it, not because any
+      # isolated frame renders it — the hosted screen frames render browsing.
+      - path: Glow/Views/EditHistoryTrack.swift
     # Hosted by the app, same as GlowTests — hostless, Bundle.main is the
     # xctest runner and HabitSymbol finds no SymbolCatalog.json, so "sunrise"
     # quietly renders as the text "s…" instead of a symbol. Measured, not

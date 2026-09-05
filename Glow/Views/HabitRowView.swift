@@ -427,6 +427,12 @@ struct HabitRowView: View {
     /// the screen does, and hands the same answer to the grid, to the spans and
     /// to the touch resolution below, so all three agree.
     let editing: SlotEditing
+    /// Whether the track draws facts instead of judgement (#557): while This
+    /// Week is correcting history, the seven cadence marks give way to
+    /// `EditHistoryTrack`'s plain circles and `onToggle` receives whichever
+    /// day was tapped, today or not. The label, the height and the rest-day
+    /// cut are unchanged — the row is the same row with a different track.
+    var isCorrectingHistory = false
     let onToggle: (Date) -> Void
     let onEdit: () -> Void
 
@@ -530,6 +536,11 @@ struct HabitRowView: View {
                 label
                 if isEditing {
                     Spacer(minLength: 0)
+                } else if isCorrectingHistory {
+                    EditHistoryTrack(
+                        snapshot: snapshot, week: week, geometry: geometry, onToggle: onToggle
+                    )
+                    .frame(width: geometry.trackWidth, alignment: .leading)
                 } else {
                     track
                         .frame(width: geometry.trackWidth, alignment: .leading)

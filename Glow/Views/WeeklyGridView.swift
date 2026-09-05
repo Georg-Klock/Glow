@@ -32,7 +32,20 @@ struct WeeklyGridView: View {
     @State private var recordStart: Date?
     @State private var editingHabit: Habit?
     @State private var isAddingHabit = false
-    @State private var isEditingHistory = false
+    /// Correcting history — the third of this screen's three modes (#557).
+    ///
+    /// **One view, genuinely mode-switched.** Correct History used to be a
+    /// `fullScreenCover` holding `EditHistoryView`: its own `List`, toolbar and
+    /// pager sliding up over this screen. It is now a flag on this one: the
+    /// same `List`, the same panel, the same scroll position, and every row
+    /// swaps its track for `EditHistoryTrack`'s seven plain circles. Nothing
+    /// is pushed or presented, so there is no transition to speak of and
+    /// leaving lands exactly where entering began. See `WeekGridMode`.
+    ///
+    /// Owned here beside `editMode` rather than folded into it: `EditMode` is
+    /// the system's type and the `List` reads it for its own controls, which
+    /// correcting must not fan open.
+    @State private var isCorrectingHistory = false
     /// Edit mode, owned rather than left to the `NavigationStack` (#207).
     ///
     /// The list's editing controls are offered on the current week and nowhere
@@ -66,6 +79,7 @@ struct WeeklyGridView: View {
     /// Advances when `MarkHabitIntent` settles a write from the Widgets tab or
     /// a Home Screen widget while this app process is alive. The view's model
     /// container is a peer of the intent's, so a redraw is the bridge (#465).
+    /// A correction advances it too (#557): see `correct(_:on:)`.
     @State private var intentRevision = 0
     /// The pop currently on screen, or nil. See `InAppPop` and PR #275.
     @State private var pop: InAppPop.PopContent?
@@ -108,19 +122,41 @@ struct WeeklyGridView: View {
     }
     private var store: HabitStore { HabitStore(context: context) }
 
-    /// Which weeks there are to visit. Derived from the record, so a fresh
-    /// install has only this one: back is disabled against it, forward is not
-    /// drawn at all, and the toolbar never leaves its current-week shape.
-    private var reach: WeekReach {
-        WeekReach.from(recordStart: recordStart, today: today)
+    /// Which of the three modes is on screen, derived from the two flags that
+    /// hold them. Correcting wins because entering it ends list editing (see
+    /// `moreMenu`), so the two are never both set.
+    private var mode: WeekGridMode {
+        if isCorrectingHistory { return .correctingHistory }
+        return editMode.isEditing ? .editingList : .browsing
     }
 
-    private var isOnCurrentWeek: Bool { weekStart >= reach.latest }
+    /// Which weeks there are to visit — **in this mode** (#557). Browsing
+    /// derives it from the record, so a fresh install has only this one and
+    /// the twelve behind it: back is disabled against the floor, forward is
+    /// not drawn at all, and the toolbar never leaves its current-week shape.
+    /// Correcting reaches twelve weeks ahead as well (#543), and the same
+    /// pager consults that reach instead. `WeekGridMode.reach` is the rule.
+    private var reach: any WeekBounds {
+        mode.reach(recordStart: recordStart, today: today)
+    }
 
-    /// This Week is now a viewer for every day except today (#543). All
-    /// corrections—past or future—belong to Edit History, so the app grid uses
-    /// the same strict policy as the widget regardless of which week is shown.
-    /// This explicitly supersedes #116/#117's permissive pager behavior.
+    /// The week today falls in. Not `reach.latest` any more: while correcting,
+    /// the reach's latest week is twelve weeks from now, and "current" still
+    /// means this one.
+    private var currentWeek: Date { WeekCalendar.startOfWeek(containing: today) }
+
+    /// Exactly the current week. `>=` said the same thing while nothing ahead
+    /// of it could be shown; correcting pages ahead (#557), and there a week
+    /// ahead is not the current one — it wants the Today button and not the
+    /// current week's menu items.
+    private var isOnCurrentWeek: Bool { weekStart == currentWeek }
+
+    /// This Week is a viewer for every day except today while it browses
+    /// (#543). All corrections — past or future — belong to the correcting
+    /// mode, whose track bypasses the cadence projection altogether, so the
+    /// cadence surface uses the same strict policy as the widget regardless
+    /// of which week is shown. This explicitly supersedes #116/#117's
+    /// permissive pager behavior.
     private var editing: SlotEditing {
         .todayOnly
     }
@@ -229,7 +265,19 @@ struct WeeklyGridView: View {
                 // independently: on the current week the only way out is back,
                 // and in the past the way home is on both sides.
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    if isOnCurrentWeek {
+                    if isCorrectingHistory {
+                        // **Done replaces the menu** (#557). Correcting asks one
+                        // question per day and nothing about the list, so New
+                        // Habit, Blank Row and Edit Habits have nothing to do
+                        // here — and a mode whose exit is behind a menu reads
+                        // as a mode you are stuck in (#399). Today stays off
+                        // the current week: paging home is as useful twelve
+                        // weeks ahead as it is twelve behind.
+                        if !isOnCurrentWeek {
+                            todayButton
+                        }
+                        doneCorrecting
+                    } else if isOnCurrentWeek {
                         // **Leaving edit mode is one tap; entering it is still
                         // two** (#399, superseding half of #320). #320 put both
                         // ends in the menu so there was one control at all
@@ -243,7 +291,7 @@ struct WeeklyGridView: View {
                         // The icon is the one the menu's own item already used,
                         // which is what makes this a promotion of that item
                         // rather than a second Done beside it. The menu keeps
-                        // row additions and Edit History while editing.
+                        // row additions and Correct History while editing.
                         if editMode.isEditing {
                             Button {
                                 withAnimation(editModeAnimation) { editMode = .inactive }
@@ -267,9 +315,9 @@ struct WeeklyGridView: View {
                         moreMenu
                     } else {
                         // Past weeks are browse-only now (#543, superseding
-                        // #116/#117). Today is the quick way home; Edit History
-                        // remains available beside it because that is where a
-                        // correction to the displayed week belongs.
+                        // #116/#117). Today is the quick way home; Correct
+                        // History remains available beside it because that is
+                        // where a correction to the displayed week belongs.
                         todayButton
                         moreMenu
                     }
@@ -287,10 +335,6 @@ struct WeeklyGridView: View {
         }
         .sheet(isPresented: $isShowingLowPowerNotice) {
             LowPowerNoticeView(headroom: lowPower.currentHeadroom)
-        }
-        .fullScreenCover(isPresented: $isEditingHistory) {
-            EditHistoryView(initialWeek: weekStart, today: today)
-                .interactiveDismissDisabled(true)
         }
         // Announce it once per activation, then leave the banner to carry it.
         // Re-presenting on every launch would be nagging about a condition the
@@ -479,16 +523,34 @@ struct WeeklyGridView: View {
                         geometry: geometry,
                         index: index,
                         cut: cut,
-                        editing: editing
+                        editing: editing,
+                        // The same row, drawing facts instead of judgement
+                        // while correcting (#557). A blank row draws nothing
+                        // in either mode — it holds a position, and there is
+                        // nothing on it to correct — so it keeps its gap
+                        // rather than vanishing and moving every row below.
+                        isCorrectingHistory: isCorrectingHistory
                     ) { day in
-                        toggle(habit, on: day)
+                        if isCorrectingHistory {
+                            correct(habit, on: day)
+                        } else {
+                            toggle(habit, on: day)
+                        }
                     } onEdit: {
                         // A blank row has nothing to edit. Opening the sheet
                         // on one would offer a name, an icon and a cadence
-                        // for something that is only a position.
-                        guard !habit.isSpacer else { return }
+                        // for something that is only a position. Correcting
+                        // manages no habits either (#557).
+                        guard !habit.isSpacer, mode.offersHabitManagement else { return }
                         editingHabit = habit
                     }
+                    // **Nothing about the list while correcting** (#557):
+                    // no swipe-to-delete, no reorder. Both are what the
+                    // separate screen already excluded; disabling the
+                    // `ForEach`'s own gestures per row is how the same `List`
+                    // excludes them.
+                    .deleteDisabled(!mode.offersHabitManagement)
+                    .moveDisabled(!mode.offersHabitManagement)
                     .listRowInsets(EdgeInsets(
                         top: geometry.rowInset,
                         leading: horizontal.rowLeading,
@@ -535,23 +597,25 @@ struct WeeklyGridView: View {
                     // Swipe actions rather than a long-press menu: this is
                     // where iOS users already reach for edit and delete.
                     .swipeActions(edge: .trailing) {
-                        // Explicitly red: the app's white tint at the root
-                        // beats `role: .destructive`, and a swipe action
-                        // tinted white is a blank pill — white glyph on a
-                        // white background, invisible where it most needs
-                        // to look dangerous. The editor's delete button
-                        // says red out loud for the same reason; the
-                        // confirmation dialog alone keeps its role colour,
-                        // because alert contexts ignore the app tint.
-                        Button("Delete", systemImage: "trash", role: .destructive) {
-                            delete(habit)
-                        }
-                        .tint(.red)
-                        if !habit.isSpacer {
-                            Button("Edit", systemImage: "pencil") {
-                                editingHabit = habit
+                        if mode.offersHabitManagement {
+                            // Explicitly red: the app's white tint at the root
+                            // beats `role: .destructive`, and a swipe action
+                            // tinted white is a blank pill — white glyph on a
+                            // white background, invisible where it most needs
+                            // to look dangerous. The editor's delete button
+                            // says red out loud for the same reason; the
+                            // confirmation dialog alone keeps its role colour,
+                            // because alert contexts ignore the app tint.
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                delete(habit)
                             }
-                            .tint(.indigo)
+                            .tint(.red)
+                            if !habit.isSpacer {
+                                Button("Edit", systemImage: "pencil") {
+                                    editingHabit = habit
+                                }
+                                .tint(.indigo)
+                            }
                         }
                     }
                 }
@@ -722,12 +786,7 @@ struct WeeklyGridView: View {
             // label in it at all. Same treatment as `StoreUnavailableView`.
             // See #162.
             Button { isAddingHabit = true } label: {
-                Text("Add Your First Habit")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(Capsule().fill(GlowPalette.color))
+                FilledCapsuleLabel(title: "Add Your First Habit")
             }
             .buttonStyle(.plain)
 
@@ -815,12 +874,40 @@ struct WeeklyGridView: View {
     /// in white (#162). A toolbar button needs no fill to be found — it is the
     /// only thing on that side of the bar.
     private var todayButton: some View {
-        Button("Today") { show(week: reach.latest) }
+        Button("Today") { show(week: currentWeek) }
+    }
+
+    /// The way out of correcting history (#557): a solid white capsule with
+    /// a dark label, where the list's edit mode has an icon-only checkmark.
+    ///
+    /// **Built the way the empty state's button is, and for the same
+    /// reason.** The app's root tint is pure white, and anything that fills
+    /// with the tint and draws its label in "the contrasting colour" renders
+    /// white on white — measured three times over (#124, #162; CLAUDE.md).
+    /// `FilledCapsuleLabel` states both colours outright. Tighter padding than
+    /// the empty state's: this sits in a 44pt toolbar.
+    ///
+    /// Labelled "Done", the same word the edit mode's exit carries, so the
+    /// two ways out of the two modes read as one control in two shapes.
+    private var doneCorrecting: some View {
+        Button {
+            isCorrectingHistory = false
+            // Back inside browsing's reach. A week paged into ahead of today
+            // has nowhere to be shown outside this mode, so it clamps to the
+            // current week; every other week stays exactly where it was.
+            show(week: reach.clamped(weekStart))
+        } label: {
+            FilledCapsuleLabel(title: "Done", horizontalPadding: 14, verticalPadding: 7)
+        }
+        .buttonStyle(.plain)
     }
 
     /// The existing list menu, available from every browsed week now that it
-    /// is also the door to Edit History (#543). Row-management actions remain
-    /// current-week-only; the history action opens to the week being viewed.
+    /// is also the door to correcting history (#543). Row-management actions
+    /// remain current-week-only; the history action keeps the week being
+    /// viewed, since it is this same screen changing what its rows draw
+    /// (#557). Absent altogether while correcting — `doneCorrecting` takes
+    /// its place in the bar.
     private var moreMenu: some View {
         Menu {
             if isOnCurrentWeek {
@@ -841,8 +928,12 @@ struct WeeklyGridView: View {
             // it. The row's swipe action keeps the bare "Edit": it opens one
             // habit's own editor, a third meaning, and nothing reported it.
             Button("Correct History", systemImage: "calendar.badge.clock") {
+                // Plainly, with no animation (#557): the rows swap what they
+                // draw and nothing moves, so there is nothing to ease. List
+                // editing ends first — the two modes are exclusive, and the
+                // fanned-open rows have no track to swap.
                 if editMode.isEditing { editMode = .inactive }
-                isEditingHistory = true
+                isCorrectingHistory = true
             }
 
             // Entering only. Done lives in the promoted toolbar button
@@ -866,13 +957,14 @@ struct WeeklyGridView: View {
     /// nobody does in their head from a date, and a date is what identifies the
     /// week — so the ladder hands over to `weekRangeTitle`, which #190 built,
     /// and the distance moves to the line underneath.
+    ///
+    /// **The ladder runs both ways since #557.** Correcting history pages
+    /// ahead as well as back, so `WeekDistanceTitle` mirrors the three rungs
+    /// forward — "Next Week", "Two Weeks Ahead", then the dates over "N weeks
+    /// ahead". Browsing never reaches a week ahead, so its titles are exactly
+    /// what #207 built.
     private var weekTitle: String {
-        switch weeksBack {
-        case 0: return "This Week"
-        case 1: return "Last Week"
-        case 2: return "Two Weeks Ago"
-        default: return weekRangeTitle
-        }
+        WeekDistanceTitle.title(weeks: weekDistance, range: weekRangeTitle)
     }
 
     /// The half `weekTitle` leaves out: the dates when the title is a phrase,
@@ -889,15 +981,12 @@ struct WeeklyGridView: View {
     /// distance to years would lose the only precise thing this line says, and
     /// it is the line nobody has to read.
     private var weekSubtitle: String? {
-        switch weeksBack {
-        case 0: return nil
-        case 1, 2: return weekRangeTitle
-        default: return WeekCalendar.weeksBackTitle(for: weekStart, latest: reach.latest)
-        }
+        WeekDistanceTitle.subtitle(weeks: weekDistance, range: weekRangeTitle)
     }
 
-    private var weeksBack: Int {
-        WeekCalendar.weeksBack(from: weekStart, latest: reach.latest)
+    /// Signed: behind is negative, ahead is positive.
+    private var weekDistance: Int {
+        WeekDistanceTitle.weeks(from: currentWeek, to: weekStart)
     }
 
     private var weekRangeTitle: String {
@@ -982,7 +1071,7 @@ struct WeeklyGridView: View {
     private func refreshReach() {
         let start = store.earliestRecordedDay()
         if start != recordStart { recordStart = start }
-        show(week: WeekReach.from(recordStart: start, today: today).clamped(weekStart))
+        show(week: mode.reach(recordStart: start, today: today).clamped(weekStart))
     }
 
     /// **Asymmetric** (#207): back is always there, forward only exists once
@@ -1023,7 +1112,10 @@ struct WeeklyGridView: View {
             .disabled(weekStart <= reach.earliest)
         }
 
-        if !isOnCurrentWeek {
+        // Forward exists exactly when the reach has somewhere forward to go.
+        // While browsing that is every past week and never the current one;
+        // while correcting it is every week short of the twelfth ahead (#557).
+        if weekStart < reach.latest {
             // **What actually separates the platters** (#258). iOS 26 gathers
             // adjacent toolbar items at the same placement into one glass
             // container, so two `ToolbarItem`s are drawn exactly as the single
@@ -1066,8 +1158,36 @@ struct WeeklyGridView: View {
     private func show(week newStart: Date) {
         guard newStart != weekStart else { return }
         weekStart = newStart
-        if newStart < reach.latest, editMode.isEditing {
+        if newStart < currentWeek, editMode.isEditing {
             editMode = .inactive
+        }
+    }
+
+    /// A correction: the one write in the app that names a day other than
+    /// today (#543), made from the correcting mode's circles (#557).
+    ///
+    /// `allowingFuture` is said out loud here and nowhere else — `HabitStore`
+    /// refuses a day ahead to every caller that does not — and
+    /// `EditHistoryContractTests` scans for exactly one such call site. No
+    /// pop: the pop is for what was just done, and a correction is about
+    /// another day.
+    private func correct(_ habit: Habit, on day: Date) {
+        do {
+            switch try store.toggleCompletion(for: habit, on: day, allowingFuture: true) {
+            case .completed:
+                Haptics.completed()
+            case .uncompleted:
+                Haptics.uncompleted()
+            case .refused, .unchanged:
+                return
+            }
+            // A completion is a relationship row, not a property on `Habit`,
+            // so `@Query` may not notice the habit changed; the snapshots
+            // read this revision and re-fetch on the same frame.
+            intentRevision &+= 1
+        } catch {
+            HabitStore.report(error, operation: "correctHistory")
+            OperationNotices.shared.report(.mark) { correct(habit, on: day) }
         }
     }
 
@@ -1236,6 +1356,31 @@ struct WeeklyGridView: View {
             // and going again means the same swipe (#282).
             OperationNotices.shared.report(.delete)
         }
+    }
+}
+
+/// A prominent control drawn outright: dark type on a white capsule.
+///
+/// **Drawn rather than styled** (#162). The app's root tint is pure white, and
+/// `.borderedProminent` fills with the tint and draws the label in the
+/// contrasting colour — white on white. Measured: the capsule's interior was
+/// 8077 pixels of a single colour, 255,255,255, with no label in it at all.
+/// Both colours are stated here, and the two places that need a filled
+/// control — the empty state's first button and the exit from correcting
+/// history (#557) — share this one construction rather than each re-deriving
+/// the trap. `StoreUnavailableView` draws the same shape for the same reason.
+struct FilledCapsuleLabel: View {
+    let title: String
+    var horizontalPadding: CGFloat = 24
+    var verticalPadding: CGFloat = 12
+
+    var body: some View {
+        Text(title)
+            .font(.body.weight(.semibold))
+            .foregroundStyle(.black)
+            .padding(.horizontal, horizontalPadding)
+            .padding(.vertical, verticalPadding)
+            .background(Capsule().fill(GlowPalette.color))
     }
 }
 

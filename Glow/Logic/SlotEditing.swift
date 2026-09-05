@@ -5,8 +5,8 @@ import Foundation
 /// The app and the widget share `WeekGrid` and `WeekSpans` deliberately, so
 /// that what a slot draws and what it does are decided in one place. Since #543
 /// every cadence-shaped surface has the same answer: today only. Past and
-/// future corrections live in `EditHistoryView`, whose plain factual circles
-/// intentionally do not use either cadence grid.
+/// future corrections live in This Week's correcting mode (#557), whose plain
+/// factual circles intentionally do not use either cadence grid.
 ///
 /// **No default value anywhere this is passed.** A new call site has to say
 /// which surface it is; a default would let one inherit the permissive answer by
