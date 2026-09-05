@@ -8323,3 +8323,121 @@ than inheriting the target-level “done” sentence.
 No rest-day behavior is designed or expanded here. The shipping app still has
 no rest-day input, and #346/#391/#392 remain the separate post-release feature
 work already recorded for that model.
+
+## 2026-09-04 — The debug rows hide behind seven taps on a version line (#566)
+
+Demo history and Debug: Override Today come off the visible Data section.
+Settings gains a version line as the section's footer — `Version 0.1 (1)`,
+`MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` read from the bundle through
+`AppVersion` — and seven taps on it reveal both rows in place for the rest of
+the app session. Seven is Apple's count for Developer Mode under Settings →
+General → About, so the gesture is one anyone who has found a hidden iOS menu
+already knows.
+
+**This narrows #204, it does not reverse it.** #204 argued against `#if DEBUG`
+because a build that compiles the override out is missing it from the one
+place it is needed — the phone, through TestFlight. That reasoning is about the
+binary and it stands: nothing is compiled out, the rows ship in every build and
+are reachable on every install. What changes is who finds them without knowing
+to look. Before, anyone who opened Settings did; after, only someone who knows
+the gesture does. `DebugToday`'s three fences — current-week scope,
+clear-on-launch, the banner — are untouched, as is every test over them.
+
+**The reveal is process state, deliberately.** `DebugReveal` is one in-memory
+instance for the process: no `UserDefaults`, no App Group key, and
+`SettingsSupportTests` scans the file for both. A reveal that outlived the
+session it was tapped in would be the same risk #204's clear-on-launch fence
+exists to bound — the entry point, rather than the override, left on by
+accident. One instance rather than a `@State` on the screen because the reveal
+is a session, not a screen: leaving Settings for another tab and coming back
+must not re-hide it, and it does not.
+
+**The version line is the new decision #317 said it would be.** #317 removed
+the Data footer whole — six paragraphs under Reset, one of them the version —
+and noted that the installed version string then appeared nowhere in the app,
+so putting one somewhere would be a new decision rather than a revival of that
+footer. This is that decision: one line, secondary and footnote by the Form's
+own footer style, and no explanation. It is a `Text` with a tap gesture rather
+than a `Button`, so VoiceOver reads a version number and not a control; the
+gesture is found by trying, the way Apple's own is.
+
+Checked on the iPhone 17 simulator (iOS 26.5): a fresh launch shows only the
+version line; seven taps on it show both toggles and the Day picker with their
+existing behaviour; switching tabs and back leaves them shown; the next launch
+hides them again. Injected simulator taps that reach SwiftUI here are the
+dwelling multi-point kind — plain `simctl`-style taps did not register, which
+is the known quirk and not the gesture.
+
+## 2026-09-04 — Settings' footers were tertiary by accident, not secondary by design (#562)
+
+The explainer under each Settings section read too dark. #562 framed it as two
+standing decisions colliding — "two greys, on purpose" (#7) keeping `.secondary`
+on the system screens, and the Form sitting on true black rather than the
+grouped background (#87) — with the hypothesis that a translucent system grey
+composited over black comes out dimmer than Apple tuned it for. Measured before
+anything moved, on the iPhone 17 simulator at 3×, text core against black:
+
+| | before | after |
+| --- | --- | --- |
+| Glow / Encouragement / Week footers | 71,71,74 — **2.27:1** | 141,141,147 — **6.36:1** |
+| Section headers (system-styled, same black) | 141,141,147 — 6.36:1 | unchanged |
+| Readout inside the platter (`Color.secondary` on 28,28,30) | 152,152,159 — 5.94:1 | unchanged |
+
+**The hypothesis does not hold, and neither decision was the cause.** In dark
+mode `systemGroupedBackground` is itself `#000000` — the grouped grey is the
+*cell* colour, `secondarySystemGroupedBackground` at `#1C1C1E`, which is what
+the platter measures. So `.secondary` over this app's black is `.secondary`
+over exactly the ground Apple tuned it for, and the section headers prove it:
+styled by the system alone, they read 141,141,147, which is `secondaryLabel`
+(235,235,245 at 60%) on black. The footers read half that.
+
+The cause is that `.secondary` is *hierarchical*. A `Form` footer already
+draws its text at the secondary level; `.foregroundStyle(.secondary)` applied
+inside it steps down from there, and the footers resolved to `tertiaryLabel` —
+235,235,245 at 30%, which is 70.5 on black and is what 71,71,74 is. Removing
+the redundant modifier from the three footers puts them at the level the system
+gives a footer, 6.36:1, the same value as the headers beside them. Nothing
+declares a new grey, nothing moves the Form off black, and #7's line between
+"designed here" and "designed by Apple" is exactly where it was: the footers now
+look like Apple's because they are drawn the way Apple draws them.
+
+Worth keeping in mind next time a system-styled text reads wrong here: the
+palette's own floor for text asking nothing is 4.0:1, and 2.27:1 was well under
+it — a number, not a taste, was what said the footers were broken.
+
+## 2026-09-04 — Send Feedback is a message to the developer, not Email My History returning (#564)
+
+Settings ends with one header-less row, **Send Feedback**, addressed to
+`glowup@georgklock.com` with the subject `Glow Up feedback` and a body whose
+last line is the installed marketing version and build — the two numbers a bug
+report always wants, placed so writing happens above them. Its own section
+rather than a fifth row in Data: Export already leaves the device through a
+share sheet, but a message to Georg is a different kind of thing from an
+operation on the store, and the row's label says all a footer would.
+
+**#317 is not reopened.** Email My History was a second route for the *export*
+to the person's own address, removed as a duplicate of the share sheet. This
+carries no file and no history and is the only way in the app to reach the
+developer. The shape #289 built — a `UIViewControllerRepresentable` around
+`MFMailComposeViewController`, the same shape `ShareSheet` is — comes back
+because it is the right shape, not because the feature does; #289's rule that
+MessageUI's error object is neither surfaced nor logged is kept, since it can
+carry account details.
+
+**Both arms are code, because `canSendMail()` is false on every simulator.**
+A device with a Mail account gets the in-app composer. Everywhere else the row
+hands a `mailto:` URL to whatever client registers the scheme — Gmail, Outlook,
+anything — encoded by hand to RFC 3986's unreserved set, because
+`URLComponents` leaves `+` alone and some clients read it as a space;
+`FeedbackMailTests` round-trips every field. If no app takes the URL either,
+`OperationNotices` says so and gives the address (#282: a tap that does nothing
+is the one outcome a failure may not have). Checked on the iPhone 17 simulator,
+which has no Mail account and no mail client: the row takes the `mailto:` arm
+and lands on the notice. **The composer arm is untested on a device** as of
+this entry — a signed-in phone should confirm the sheet opens addressed,
+Cancel discards, and Send genuinely leaves.
+
+The local-only invariant is untouched: a compose sheet a person reviews and
+can cancel, nothing attached beyond the version line, nothing sent by the app.
+`LocalOnlyContractTests`' forbidden spellings do not name MessageUI and its
+allowlist did not need an entry.

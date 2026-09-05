@@ -4,13 +4,15 @@ import UIKit
 import UniformTypeIdentifiers
 import WidgetKit
 
-/// Settings, in three clusters: **Glow**, **Week**, **Data**.
+/// Settings, in three clusters — **Glow**, **Week**, **Data** — and one row
+/// after them, **Send Feedback** (#564).
 ///
 /// Glow leads because it is the product rather than a preference about it.
 /// Week holds both controls that decide what a week is — where it starts and
 /// which day the app stops asking about — which were two sections, one of them
-/// headerless. Data holds the export beside the one control that writes
-/// something invented into the same store.
+/// headerless. Data holds the export, the reset, and — behind seven taps on
+/// its version line (#566) — the two controls that write something invented
+/// into the same store.
 ///
 /// A tab now rather than a sheet, so there is no Done button and nothing to
 /// dismiss — the changes are live and the way out is the tab bar.
@@ -77,10 +79,23 @@ struct SettingsView: View {
     /// store is written behind it. Nil is off.
     @State private var overrideDay: Date?
 
+    /// Whether the two debug rows are showing (#566). Process state shared
+    /// through `DebugReveal.shared`, so it survives leaving this tab and dies
+    /// with the session — see that type for why neither is negotiable.
+    @State private var reveal = DebugReveal.shared
+
     /// Whether the reset confirmation is up, and what has been typed into it.
     /// See `resetRow`.
     @State private var isConfirmingReset = false
     @State private var typedConfirmation = ""
+
+    /// Whether the feedback composer is up (#564). Only ever true on a device
+    /// with a Mail account; everywhere else the row opens a `mailto:` URL.
+    @State private var isComposingFeedback = false
+
+    /// For the `mailto:` fallback: the environment's action, the SwiftUI
+    /// spelling for handing a URL to the system.
+    @Environment(\.openURL) private var openURL
 
     @AppStorage(WeekPreferences.firstWeekdayKey, store: GlowSettings.store)
     private var firstWeekday: Int = WeekPreferences.defaultFirstWeekday
@@ -224,9 +239,21 @@ struct SettingsView: View {
                     // Outside the platter again (#474). The compact wording
                     // from #395 stays: moving the explainer does not restore
                     // the repetition that was removed with it.
+                    //
+                    // **No `.foregroundStyle(.secondary)` on any footer here**
+                    // (#562). A `Form` footer already draws its text at the
+                    // secondary level, and `.secondary` is *hierarchical* — it
+                    // steps down from whatever level it is applied inside, so
+                    // on a footer it resolved to the tertiary label, not the
+                    // secondary one. Measured on the simulator: the footers
+                    // read 71,71,74 on black, 2.27:1 — below the 4.0:1 the
+                    // palette's own resting step treats as the floor — while
+                    // the section headers, styled by the system alone, read
+                    // 141,141,147 at 6.36:1. Removing the modifier puts the
+                    // footers at the headers' value; nothing about which grey
+                    // this screen uses (#7) or what it sits on (#87) moves.
                     Text(Self.glowNote)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
                 }
 
                 Section {
@@ -235,7 +262,7 @@ struct SettingsView: View {
                     // are a scale — quiet, the rare thing, everything — and a
                     // scale reads better laid out than hidden behind its own
                     // current value.
-                    Picker("Say well done", selection: popBinding) {
+                    Picker("Encouragement", selection: popBinding) {
                         ForEach(Self.popChoices, id: \.0) { level, title in
                             Text(title).tag(level)
                         }
@@ -246,13 +273,16 @@ struct SettingsView: View {
                     // where a row used to say what it was for.
                     .labelsHidden()
                 } header: {
-                    Text("Say well done")
+                    // "Encouragement", not "Say well done" (#561): the header
+                    // matches the one other place a person reads this concept
+                    // named, `MarkHabitIntent`'s "Present Island Encouragement"
+                    // parameter. The picker's three positions are unchanged.
+                    Text("Encouragement")
                 } footer: {
                     // The explainer belongs outside the control's platter
                     // again; all three shortened variants remain (#474).
                     Text(popNote)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
                 }
 
                 // One row now. This section held the rest day too — a toggle
@@ -274,7 +304,6 @@ struct SettingsView: View {
                     // whose picker it explains (#474).
                     Text(Self.weekNote)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
                 }
 
                 // Data last: the export, beside the one control that writes
@@ -283,25 +312,37 @@ struct SettingsView: View {
                     Button {
                         isChoosingFormat = true
                     } label: {
-                        Label("Export History", systemImage: "square.and.arrow.up")
+                        Label {
+                            Text("Export History")
+                        } icon: {
+                            DataIconBadge(systemName: "square.and.arrow.up")
+                        }
                     }
                     .disabled(habits.isEmpty)
 
-                    Toggle("Demo history", isOn: demoBinding)
-                        .tint(GlowPalette.controlTint)
+                    // Both debug rows are hidden until the version line below
+                    // has been tapped seven times (#566). Hidden, not compiled
+                    // out: they are in every build, TestFlight included, which
+                    // is #204's requirement and is untouched — see
+                    // `DebugReveal` for why this narrows that decision rather
+                    // than reversing it.
+                    if reveal.isRevealed {
+                        Toggle("Demo history", isOn: demoBinding)
+                            .tint(GlowPalette.controlTint)
 
-                    // The same tier as demo history, and in the same section:
-                    // both write real rows into the real store, and this one
-                    // decides what day they are dated to. Not `#if DEBUG` —
-                    // see `DebugToday` for why a build that compiles it out is
-                    // a build where it is missing from the only place it is
-                    // needed.
-                    Toggle("Debug: Override Today", isOn: overrideBinding)
-                        .tint(GlowPalette.controlTint)
-                    if overrideDay != nil {
-                        Picker("Day", selection: dayBinding) {
-                            ForEach(DebugToday.choices(), id: \.self) { day in
-                                Text(DebugToday.dayName(day)).tag(day)
+                        // The same tier as demo history, and in the same
+                        // section: both write real rows into the real store,
+                        // and this one decides what day they are dated to. Not
+                        // `#if DEBUG` — see `DebugToday` for why a build that
+                        // compiles it out is a build where it is missing from
+                        // the only place it is needed.
+                        Toggle("Debug: Override Today", isOn: overrideBinding)
+                            .tint(GlowPalette.controlTint)
+                        if overrideDay != nil {
+                            Picker("Day", selection: dayBinding) {
+                                ForEach(DebugToday.choices(), id: \.self) { day in
+                                    Text(DebugToday.dayName(day)).tag(day)
+                                }
                             }
                         }
                     }
@@ -309,10 +350,39 @@ struct SettingsView: View {
                     resetRow
                 } header: {
                     Text("Data")
+                } footer: {
+                    // One line, not the footer #317 removed. That was six
+                    // paragraphs of explanation under Reset, and the decision
+                    // was that the section explains itself through its rows;
+                    // the same entry noted that a version line somewhere would
+                    // be a new decision, and this is it (#566). An ordinary
+                    // piece of Settings UI on its own merits — and the seventh
+                    // tap on it reveals the two debug rows above for the rest
+                    // of the session. A `Text` with a tap gesture rather than
+                    // a `Button`, so VoiceOver reads a version number and not
+                    // a control; the gesture is found by trying, the way
+                    // Apple's own is.
+                    Text(Self.version.label)
+                        .onTapGesture { reveal.registerTap() }
                 }
-                // No footer, decided on purpose (#317): the section grew a
-                // six-paragraph wall of explanation under its last row, and
-                // the answer was to remove it rather than trim it.
+
+                // Last, on its own, header-less (#564). Not a fifth row in
+                // Data: Export leaves the device through a share sheet, but a
+                // message to the developer is a different kind of thing from
+                // an operation on the store, and the row's own label says
+                // everything a footer would — #317 took the last one off this
+                // screen for less.
+                Section {
+                    Button {
+                        sendFeedback()
+                    } label: {
+                        Label {
+                            Text("Send Feedback")
+                        } icon: {
+                            DataIconBadge(systemName: "envelope")
+                        }
+                    }
+                }
             }
             .scrollContentBackground(.hidden)
             // A choice of two, rather than a format setting nobody would ever
@@ -333,6 +403,13 @@ struct SettingsView: View {
             // them as two is how one of them gets missed.
             .sheet(item: $exportFile, onDismiss: { discardExport() }) { file in
                 ShareSheet(url: file.url)
+            }
+            // The composer is the system's, prefilled and then left alone: its
+            // own Cancel discards, and only a person's Send sends (#564).
+            .sheet(isPresented: $isComposingFeedback) {
+                FeedbackComposeView(version: Self.version) {
+                    isComposingFeedback = false
+                }
             }
             // The same sheet the grid's strip opens, reached from the same
             // condition — one explanation of why the glow is off, not two.
@@ -577,6 +654,34 @@ struct SettingsView: View {
         )
     }
 
+    // MARK: - Feedback
+
+    /// Opens a way to write to the developer (#564).
+    ///
+    /// The in-app composer where Mail has an account; otherwise a `mailto:`
+    /// URL, which hands the same recipient, subject and version line to
+    /// whatever client registers the scheme — Gmail, Outlook, anything —
+    /// rather than assuming Apple Mail. `canSendMail()` is false on every
+    /// simulator, so the fallback is the arm a simulator exercises and the
+    /// composer is the arm that needs a signed-in phone.
+    ///
+    /// If no app takes the URL either, the person is told so and given the
+    /// address, through the same notice every other failed action uses (#282)
+    /// — a tap that does nothing is the one outcome this must not have.
+    private func sendFeedback() {
+        if FeedbackComposeView.canSendMail() {
+            isComposingFeedback = true
+            return
+        }
+        guard let url = FeedbackMail.mailtoURL(version: Self.version) else {
+            OperationNotices.shared.report(.feedback)
+            return
+        }
+        openURL(url) { accepted in
+            if !accepted { OperationNotices.shared.report(.feedback) }
+        }
+    }
+
     // MARK: - Reset
 
     /// The row that opens the confirmation.
@@ -600,7 +705,15 @@ struct SettingsView: View {
             typedConfirmation = ""
             isConfirmingReset = true
         } label: {
-            Label("Reset to Default Habits", systemImage: "arrow.counterclockwise")
+            Label {
+                Text("Reset to Default Habits")
+            } icon: {
+                // The red lands on the glyph, not the badge (#563): a
+                // red-filled square would read as a destructive indicator at
+                // a glance, past what a button already gated behind a typed
+                // confirmation needs to say.
+                DataIconBadge(systemName: "arrow.counterclockwise")
+            }
         }
         .foregroundStyle(.red)
     }
@@ -678,6 +791,10 @@ struct SettingsView: View {
         }
     }
 
+    /// The installed build, read once. `project.yml` is the source of both
+    /// numbers; see `AppVersion`.
+    private static let version = AppVersion()
+
     /// Why the week's first day is more than a column order.
     ///
     /// One control, one line. The paragraph that described the rest day went
@@ -703,9 +820,13 @@ struct SettingsView: View {
     /// actionable — `SlotMarkView` routes `.openToday` through `GlowImageView`,
     /// while `.doneToday` and `.donePast` take a flat fill and no tile at all.
     /// A completion genuinely does not brighten with this slider.
+    ///
+    /// **The trade-off is named outright** (#561): "your eye adapts" alone left
+    /// it implied, and the sentence is the one place this screen says what the
+    /// slider costs.
     private static let glowNote =
-        "A brighter glow makes the open habits stand out. Your eye adapts to "
-            + "it, so everything else reads duller in exchange."
+        "A brighter glow makes the open habits stand out — but it's a trade-off: "
+            + "your eye adapts, so everything else reads duller in exchange."
 
 }
 
@@ -726,6 +847,53 @@ struct EDRHeadroomSnapshot: Equatable, Sendable {
     var summary: String {
         String(format: "%.1f× right now · %.1f× maximum", current, maximum)
     }
+}
+
+/// A Data-section icon in a contained badge (#563).
+///
+/// Apple's Settings puts every row icon in a filled 29pt rounded square, and
+/// the badge is what does the work — not its size. Measured on a device: the
+/// bare glyph left ~12.3pt to the separator and a 29pt badge centred in the
+/// same 52pt row leaves 11.5pt, so sizing alone buys nothing. What a bare glyph
+/// lacks is an edge to stop at; a filled square has a flat, predictable bottom
+/// the eye measures the row's clearance from, where a glyph's silhouette does
+/// not. The glyph itself keeps `Label`'s default size, which is the "large
+/// icon" being kept.
+///
+/// **The fill is the palette's ground, not one of its greys.** The issue asked
+/// for `GlowPalette.grey` or `controlTint`, and the arithmetic against the two
+/// glyphs rules both out: Reset's glyph is red (255,59,48; luminance 0.213),
+/// and on the resting grey composited over the row's platter (~122, luminance
+/// 0.195) it would sit at 1.04:1 — hue with no luminance edge at all — and on
+/// `controlTint` (~153) at 1.4:1. Even Export's white glyph reaches only 2.8:1
+/// on `controlTint`. On the black the Form already sits on, white is 21:1 and
+/// red 5.3:1, and the badge reads as a socket pressed into the platter — the
+/// app's own container idiom (#332) — bounded by the same 28-level edge the
+/// platter has against the screen. `GlowPalette.widgetBackground` is declared
+/// true black rather than `Color.black`, which is a system colour free to be
+/// something else; that is the property wanted here too.
+///
+/// Not `.secondary` and not a system material: colour lives in the code that
+/// draws it, and a material would drift from the app's own tones the next time
+/// either changed independently.
+private struct DataIconBadge: View {
+    let systemName: String
+
+    var body: some View {
+        Image(systemName: systemName)
+            .frame(width: Self.size, height: Self.size)
+            .background(
+                RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+                    .fill(GlowPalette.widgetBackground)
+            )
+    }
+
+    /// Apple's own badge, measured off Settings → General on a device. An
+    /// externally anchored number rather than one more guess.
+    static let size: CGFloat = 29
+
+    /// The continuous corner Apple's 29pt badges carry, by eye against one.
+    static let cornerRadius: CGFloat = 7
 }
 
 /// The written file, identified so `sheet(item:)` can present it.

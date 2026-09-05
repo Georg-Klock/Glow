@@ -113,6 +113,18 @@ landed on; that was weighed and taken. See docs/decisions.md.
   destinations, so the row was a second flow to the same place. The file
   remains an export, not a backup — no recovery promise attaches to it (see
   the 2026-08-25 entries in docs/decisions.md).
+
+  **Send Feedback is not that row coming back** (#564). The last section of
+  Settings is one header-less row that opens a message *to the developer* —
+  `glowup@georgklock.com`, subject `Glow Up feedback`, and a body whose last
+  line names the installed marketing version and build. It carries no file and
+  no history. On a phone with a Mail account it is Apple's compose sheet, whose
+  own Cancel discards; anywhere else — every simulator, a phone whose mail
+  lives in another client — it is a hand-percent-encoded `mailto:` URL handed
+  to whatever app registers the scheme, and if nothing does, the person is
+  told so and given the address. Nothing is sent by the app: the composer has
+  no send call for the hosting app, and a URL only opens a client. `FeedbackMail`
+  is pure and its encoding is asserted.
 - **No undo — and one action that therefore has to ask twice.** Settings → Data
   → **Reset to Default Habits** deletes every habit and every completion and
   installs `DefaultHabits.all` fresh, which is the way back to the shipped list
@@ -556,6 +568,17 @@ scoped to the real current week, cleared whenever the app relaunches, and
 announced by a persistent banner on every screen that reads it, with one tap on
 the banner to turn it off. It ships in every build, TestFlight included, for the
 reason demo history does: the phone is where this app is tested.
+
+**Neither it nor Demo history is offered to someone who does not know to look**
+(#566). The Data section shows Export History, Reset to Default Habits and a
+version line — `Version 0.1 (1)`, marketing version and build, read from the
+bundle. Tapping the version line seven times, Apple's own count for Developer
+Mode, reveals both debug rows in place for the rest of the app session; a
+relaunch hides them again. The reveal is in-memory state, never persisted,
+matching the override's own clear-on-launch: an entry point left on by accident
+would be the same risk one level up. This narrows who reaches the rows, not
+what they do or which builds carry them — `DebugToday`'s three fences and its
+every-build shipping are unchanged.
 
 **"The whole app" includes the Widgets tab's previews** (#439). It did not: that
 page established today from the clock directly, so with an override set the

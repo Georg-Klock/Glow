@@ -124,6 +124,8 @@ things that are neither a widget nor this week:
 - **History.** The long view. The year grid lives in here rather than being a
   tab of its own. (Landed, then removed outright — #316; see below.)
 - **Export.** Send yourself your history as a CSV or JSON file.
+- **Feedback.** A way to write to the developer, through the phone's own mail
+  (#564, shipped).
 
 ## The widget is the main product
 

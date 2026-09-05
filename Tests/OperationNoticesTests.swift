@@ -61,7 +61,7 @@ struct OperationNoticesTests {
     func messagesAreClosed() {
         let all: [OperationNotices.Failure] = [
             .save, .delete, .mark, .reorder, .addSpacer,
-            .installDefaults, .reset, .demo, .export,
+            .installDefaults, .reset, .demo, .export, .feedback,
         ]
         for failure in all {
             let message = failure.message
