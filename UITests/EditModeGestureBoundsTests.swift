@@ -93,15 +93,45 @@ final class EditModeGestureBoundsTests: XCTestCase {
         // now, so a loaded list has longer to register where the finger is.
         let lift = source.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         let land = target.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1))
-        lift.press(forDuration: 1, thenDragTo: land, withVelocity: .slow, thenHoldForDuration: 2.5)
+        let trace = app.descendants(matching: .any)["reorder-trace"]
+        func drag() {
+            lift.press(forDuration: 1.5, thenDragTo: land, withVelocity: .slow, thenHoldForDuration: 2.5)
+        }
+        // The List's own account of what it received. `calls: none` means the
+        // synthesized touch never reached it as a drag at all.
+        func listHeardNothing() -> Bool {
+            trace.exists && trace.label.contains("calls: none")
+        }
+        drag()
+
+        // **A discarded drag is repeated; a wrong answer is not** (#600). Four
+        // of seven `push: main` runs on 2026-09-05 failed here with
+        // `calls: none` — the whole gesture discarded, the rows exactly where
+        // they started, no `onMove` — where #556's misreport was a drag the
+        // List *did* receive and applied to the wrong slot. Only the first is
+        // an input that did not happen; repeating it is repeating the test's
+        // own action, not the app's answer. A drag the List received and got
+        // wrong still fails below, on whichever attempt it arrived, and the
+        // evidence line says how many times the drag had to be sent. Three
+        // attempts, because one repeat against a coin-flip discard still
+        // fails one run in four.
+        var attempts = 1
+        while attempts < 3, listHeardNothing() {
+            RunLoop.current.run(until: Date().addingTimeInterval(1))
+            guard listHeardNothing() else { break }
+            attempts += 1
+            print("reorder: the List received no drag; sending it again (attempt \(attempts))")
+            drag()
+        }
         let drop = XCTAttachment(screenshot: app.screenshot())
         drop.name = "after the drop"
         drop.lifetime = .keepAlways
         add(drop)
 
         // What the rows did in the three seconds after the drop, and what the
-        // app's `onMove` received (#556): the runner's failure is not the
-        // gesture being lost, so the callbacks are the evidence.
+        // app's `onMove` received (#556): when the drag arrived, the callbacks
+        // are the evidence for where it went; when it did not, that is
+        // recorded above and here.
         func order() -> String {
             app.editRows(containing: "Pitch Fixture").map { row in
                 let label = row.buttons.matching(NSPredicate(
@@ -113,7 +143,6 @@ final class EditModeGestureBoundsTests: XCTestCase {
         var timeline: [(Double, String)] = []
         let start = Date()
         let orderDeadline = start.addingTimeInterval(3)
-        let trace = app.descendants(matching: .any)["reorder-trace"]
         var calls = "no trace element"
         while Date() < orderDeadline {
             let now = order() + (trace.exists ? " / " + trace.label : "")
@@ -124,7 +153,7 @@ final class EditModeGestureBoundsTests: XCTestCase {
         }
         if trace.exists { calls = trace.label }
         let evidence = "order timeline \(timeline.map { "\($0.1)@\(String(format: "%.1f", $0.0))s" }); "
-            + "onMove calls: \(calls)"
+            + "onMove calls: \(calls)" + (attempts > 1 ? "; the drag was sent \(attempts) times" : "")
         print("reorder: \(evidence)")
 
         // A List commits a reorder on an animation, so give the rows the same
