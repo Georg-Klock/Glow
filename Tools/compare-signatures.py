@@ -71,6 +71,12 @@ TONE_NOISE = 2
 #: cells.
 EXACT_KEYS = ("width", "height", "exactBlackPercent", "rows")
 
+#: Beside `frames`, a baseline names the simulator it was measured on — a
+#: top-level `device`, "iPhone 17e" — because a picture of one phone's render
+#: fails on another by fractions of a point (#576). It is a record, not a
+#: signature: `compare` never reads it, and `settled` carries it through.
+DEVICE_KEY = "device"
+
 
 def compare(actual: dict, committed: dict) -> tuple[str, list[str]]:
     """Classify the difference. Returns (`same` | `noise` | `moved`, reasons)."""
@@ -128,6 +134,13 @@ def settled(actual: dict, committed: dict) -> dict:
     """
     result = json.loads(json.dumps(actual))
     baseline = committed.get("frames", {})
+
+    # The device is this run's when the run recorded one, and otherwise stays
+    # what the file already said — never dropped, so a baseline that has once
+    # named its phone keeps naming one (#576).
+    device = actual.get(DEVICE_KEY) or committed.get(DEVICE_KEY)
+    if device:
+        result[DEVICE_KEY] = device
 
     for name, frame in result.get("frames", {}).items():
         theirs = baseline.get(name)
@@ -196,6 +209,12 @@ def self_test() -> int:
             "a cell mean is compared exactly, however small the move",
             _baseline({"a": _signature({"124": 231, "255": 4097}, row="  1")}),
             "moved", "rows moved",
+        ),
+        (
+            "the device a baseline names is a record, not a signature",
+            dict(_baseline({"a": _signature({"124": 231, "255": 4097})}),
+                 device="iPhone Air"),
+            "same", "",
         ),
         (
             "so is the ground share",
@@ -275,6 +294,15 @@ def self_test() -> int:
     settled(source, _baseline({"a": _signature({"124": 231})}))
     check("settled() does not mutate what it was handed",
           source["frames"]["a"]["tones"]["124"] == 230)
+
+    named = dict(_baseline({"a": _signature({"124": 231})}), device="iPhone 17e")
+    check("a run that names its device writes it",
+          settled(dict(named, device="iPhone Air"), named).get("device") == "iPhone Air")
+    check("a run that names no device keeps the committed one",
+          settled(_baseline({"a": _signature({"124": 231})}), named).get("device")
+          == "iPhone 17e")
+    check("no device anywhere writes none",
+          "device" not in settled(_baseline({}), _baseline({})))
 
     total = len(cases) + 1 + written
     print(f"compare-signatures: {total - failures}/{total} self-tests passed")
