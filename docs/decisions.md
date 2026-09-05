@@ -8685,6 +8685,21 @@ which moves CI's measured feedback latency (see "Pull-request latency") and
 loses the incremental build a developer machine relies on, to buy a
 serialisation a lock buys for nothing.
 
+## 2026-09-05 — Feedback is an address with a Copy button, not a composer (#564)
+
+#564 shipped as Apple's compose sheet where a Mail account exists and a
+hand-encoded `mailto:` URL everywhere else, with a notice when nothing took
+the URL. Georg saw it on the first TestFlight build that carried it and
+redrew it: the row shows `glowup@georgklock.com` and a Copy button, and that
+is all. The reasoning is the local-only rule read one step further — an app
+with no send call of any kind has nothing to route, so choosing a client for
+the person, or guessing whether one exists, was machinery around a decision
+that is theirs. `FeedbackComposeView`, `FeedbackMail` and the `.feedback`
+notice are gone with their tests; the pasteboard write has no failure mode to
+report. #573's iOS 18 finding about `URL.query(percentEncoded:)` is moot for
+the app, and stays in the record as a Foundation difference between the two
+runtimes.
+
 ## 2026-09-05 — The small month takes the new file's geometry, not its palette (#553)
 
 Node `341:3695` redrew the small widget, and the issue measured every

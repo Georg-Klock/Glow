@@ -114,17 +114,13 @@ landed on; that was weighed and taken. See docs/decisions.md.
   remains an export, not a backup — no recovery promise attaches to it (see
   the 2026-08-25 entries in docs/decisions.md).
 
-  **Send Feedback is not that row coming back** (#564). The last section of
-  Settings is one header-less row that opens a message *to the developer* —
-  `glowup@georgklock.com`, subject `Glow Up feedback`, and a body whose last
-  line names the installed marketing version and build. It carries no file and
-  no history. On a phone with a Mail account it is Apple's compose sheet, whose
-  own Cancel discards; anywhere else — every simulator, a phone whose mail
-  lives in another client — it is a hand-percent-encoded `mailto:` URL handed
-  to whatever app registers the scheme, and if nothing does, the person is
-  told so and given the address. Nothing is sent by the app: the composer has
-  no send call for the hosting app, and a URL only opens a client. `FeedbackMail`
-  is pure and its encoding is asserted.
+  **Feedback is not that row coming back** (#564, redrawn 2026-09-05). The
+  last section of Settings is one header-less row that shows the developer's
+  address, `glowup@georgklock.com`, with a Copy button that puts it on the
+  pasteboard and reads "Copied" for a moment. That is the whole mechanism:
+  nothing is composed, opened or sent by the app, no client is assumed, and
+  the row carries no file and no history. It replaced a compose-sheet-or-
+  `mailto:` design that shipped for one build.
 - **No undo — and one action that therefore has to ask twice.** Settings → Data
   → **Reset to Default Habits** deletes every habit and every completion and
   installs `DefaultHabits.all` fresh, which is the way back to the shipped list
