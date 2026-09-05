@@ -38,14 +38,17 @@ enum SlotLayout {
     /// A week row and a month cell are different grids that happen to share a
     /// column count, and the design file gives them different rhythms: the week
     /// is seven 24pt slots on a 32pt pitch (8 on 24), the month is seven 16pt
-    /// cells on a 19pt pitch (3 on 16). Node `234:11216`, `Frame 14` at
-    /// 130 × 111 — `7 * 16 + 6 * 3 = 130`, exactly.
+    /// cells on a 20pt pitch (4 on 16). Node `341:3695`, grid frame 136 × 116
+    /// — `7 * 16 + 6 * 4 = 136`, exactly, in the 136pt track
+    /// `WidgetMetrics.smallPad` leaves (#553). It was 3 on 16 — 130 × 111 off
+    /// node `234:11216` — until 2026-09-05; the cell did not move, only the
+    /// air between cells, and the inset gave up the 6pt the six gaps took.
     ///
-    /// It reads much tighter than the week's, and that is the point: a month is
-    /// thirty-odd marks in a small widget's frame, so the air between them has
-    /// to give before the marks do. Deriving it from `gapRatio` spread the
-    /// cells 70% further apart than the file and shrank them by 4%.
-    static let monthGapRatio: CGFloat = 3.0 / 16.0
+    /// It still reads much tighter than the week's, and that is the point: a
+    /// month is thirty-odd marks in a small widget's frame, so the air between
+    /// them has to give before the marks do. Deriving it from `gapRatio`
+    /// spread the cells 70% further apart than the file and shrank them by 4%.
+    static let monthGapRatio: CGFloat = 4.0 / 16.0
 
     /// The gap for a given track, shared by every row so the columns line up.
     static func gap(trackWidth: CGFloat) -> CGFloat {

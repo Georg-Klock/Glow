@@ -8684,3 +8684,42 @@ under `Artifacts/<run>/` — was not taken: it makes every run a clean build,
 which moves CI's measured feedback latency (see "Pull-request latency") and
 loses the incremental build a developer machine relies on, to buy a
 serialisation a lock buys for nothing.
+
+## 2026-09-05 — The small month takes the new file's geometry, not its palette (#553)
+
+Node `341:3695` redrew the small widget, and the issue measured every
+parameter against the app before anything was written. Decided in two steps.
+**First, the three-step palette holds** (2026-09-04): the file's lit mark at
+70% with an embossed highlight, and its resting socket as a near-invisible
+fill behind an inset shadow, are the fourth appearance of an intermediate
+grey #335 exists to refuse, so the mark shading is not adopted and #335 is not
+reopened. **Second, of what was left open** (2026-09-05): the centred title and
+the grid geometry are adopted — `WidgetMetrics.smallPad` 14 → 11 and
+`SlotLayout.monthGapRatio` 3/16 → 4/16, so seven 16pt cells fill a 136pt track
+on a 20pt pitch and a six-row grid at its natural gap is 136 × 116. The cell
+did not move; the inset paid for the wider gaps. The row block keeps #505's
+centring below the title and #527's tightening vertical gap, so a six-row
+month in the authored frame still closes to 1.2pt, and five- and four-row
+months sit 3.0 and 13.0 below the title where they sat 5.0 and 14.5.
+
+**Not adopted**, and recorded so the same file is not re-read as a request:
+the 24pt corner (the in-app preview keeps 30; a placed widget is masked by iOS
+regardless), the gradient surface (`GlowPalette.widgetSurface` stays flat, for
+the reason `WidgetMetrics` still carries from the first gradient), and any
+mark shading. **Scope is the small/month widget only.** Nothing here touches
+`SlotMarkView`, `GlowShape`, the week widget's insets or This Week; the render
+baselines for the small family move on both runtimes and were approved
+together with `Tools/approve-baseline.sh`, and every other frame's signature
+stayed where it was.
+
+## 2026-09-05 — The rest day ships as it is; its three open rules stay open (#346)
+
+The rest day remains a setting that subtracts a column (#72, #73, #100), and
+`docs/week-marks.md` keeps naming the three rules the mark model never settled
+— whether a ✕ can pin to the rest column, how a span reaching back across it
+should read, and whether the rep division excludes it — as deliberately
+unresolved rather than answering any of them for the MVP. That is a decision,
+not an oversight left standing: inferring answers now would fix in code a
+behaviour nobody designed, and the questions belong to #391, where the rest
+day is redesigned rather than patched. Until then the document's "out of scope"
+is the current truth, and a reader who finds the gap has found what was meant.

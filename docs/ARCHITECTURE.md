@@ -470,7 +470,13 @@ The small month uses the same top inset and type size, but its habit name owns
 `WidgetMetrics.monthTitleHeight` rather than borrowing the week widget's
 `headerHeight`. The latter is the compact weekday-letter row. The former is an
 18pt text line box, which puts the month grid at y=32 in the authored 158pt
-frame while leaving every week grid untouched (#493).
+frame while leaving every week grid untouched (#493). Its horizontal geometry
+is its own too (#553): the title is centred in the frame with
+`.frame(maxWidth: .infinity)`, and the grid's symmetric inset
+`WidgetMetrics.smallPad` (11) and `SlotLayout.monthGapRatio` (4 on 16) give
+seven 16pt cells a 136pt track, where the week families keep their 6/14 pair
+and 8-on-24 rhythm. `WidgetMetricsTests` pins both sets so one cannot move the
+other by accident.
 
 **The previews use the production optimistic state with an app-host adapter.**
 WidgetKit owns touch delivery for its archived `Toggle(intent:)`, but the same

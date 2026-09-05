@@ -1090,6 +1090,20 @@ never crosses — the week grid's own rule, not a per-week verdict — and rest
 days get no month-specific treatment beyond what `WeekGrid` already says
 about them.
 
+**The small frame's own geometry** (#553, superseding the 14/14 and 3pt
+figures of #493/#505): the habit's name is centred in the frame, not flush
+with the grid's leading edge, and the grid sits 11pt in from either side —
+seven 16pt cells 4pt apart, 136pt wide, 116pt tall for a six-row month at its
+natural gap (`WidgetMetrics.smallPad`, `SlotLayout.monthGapRatio`). The cell
+did not change size; the inset gave up the six points the six wider gaps took.
+The row block keeps #505's centring below the title and #527's rule that the
+vertical gap tightens before a cell shrinks, so six rows in the authored 158pt
+frame still close to 1.2pt. What the same design node offered and this did
+**not** take: a 24pt corner (the preview's stays 30), a gradient surface (it
+stays flat `GlowPalette.widgetSurface`), and any mark shading — the marks are
+`SlotMarkView`'s and the three-step palette (#335) holds. None of this reaches
+the week widgets or This Week.
+
 **The Widgets tab is where they are found from inside the app** (#210). It
 shows every widget this app ships — the one kind at all three families —
 drawn by `WeekWidgetView` and `MonthWidgetView` themselves rather

@@ -70,9 +70,9 @@ struct MonthWidgetView: View {
 
         return GeometryReader { proxy in
             // The month's own ratio, not the week's (`SlotLayout.monthGapRatio`).
-            // Seven 16pt cells on a 19pt pitch fill 130 of track exactly; the
-            // week's 8-on-24 gave 15.33pt cells 5.11pt apart in the same frame
-            // — 4% small and 70% too far apart. Node `234:11216`.
+            // Seven 16pt cells on a 20pt pitch fill 136 of track exactly (#553;
+            // 19pt and 130 before it). The week's 8-on-24 gave 15.33pt cells
+            // 5.11pt apart in the same frame — 4% small and 70% too far apart.
             let side = SlotLayout.monthCell(trackWidth: proxy.size.width)
             let gap = SlotLayout.monthGap(trackWidth: proxy.size.width)
             // Vertical spacing gives way before the cells do: a six-row month
@@ -102,6 +102,11 @@ struct MonthWidgetView: View {
                         name.foregroundStyle(GlowPalette.grey)
                     }
                 }
+                // Centred in the frame, not flush with the grid's leading edge
+                // (#553). The grid below fills the track exactly, so the title
+                // is the one thing in this stack with somewhere to go; the
+                // week widgets' headers are untouched by this.
+                .frame(maxWidth: .infinity, alignment: .center)
                 .frame(height: WidgetMetrics.monthTitleHeight)
                 .padding(.bottom, WidgetMetrics.headerGap)
 

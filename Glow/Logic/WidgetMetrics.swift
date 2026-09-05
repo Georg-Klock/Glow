@@ -244,22 +244,25 @@ enum WidgetMetrics {
     /// The week widget's 6/14 is an optical adjustment for a row that starts
     /// with a label column and ends with a mark — it is left-heavy because its
     /// content is. The month has no label column: it is a centred block of
-    /// cells, so it is inset evenly. Node `234:11216` puts `Frame 14` at x=14
-    /// in a 158pt frame, 14 either side.
+    /// cells, so it is inset evenly. Node `341:3695` puts the grid at x=11 in
+    /// a 158pt frame, 11 either side, for a 136pt track (#553). It was 14/14
+    /// off node `234:11216`, a 130pt track, until 2026-09-05.
     ///
     /// Applying the week's 6/14 here shifted the whole grid 8pt left and gave
-    /// it 138pt of track where the file draws 130.
-    static let smallPad: CGFloat = 14
+    /// it 138pt of track where the file drew 130 — a width the file has since
+    /// moved toward, but symmetric, which the week's pair is not.
+    static let smallPad: CGFloat = 11
 
     /// The leading inset for a family. Small is symmetric; the rest are not.
     static func padLeading(for family: WidgetFamily) -> CGFloat {
         family == .systemSmall ? smallPad : padLeading
     }
 
-    /// The trailing inset for a family. Both answers are 14 today, and it is
-    /// still asked rather than assumed: the week's 14 is the optical pair to
-    /// its 6, and the month's is half a symmetric inset. They agree by
-    /// coincidence, not by derivation.
+    /// The trailing inset for a family. The two answers agreed at 14 until
+    /// #553 and were still asked rather than assumed: the week's 14 is the
+    /// optical pair to its 6, and the month's is half a symmetric inset. That
+    /// they agreed was coincidence, not derivation, which is why one could
+    /// move without the other.
     static func padTrailing(for family: WidgetFamily) -> CGFloat {
         family == .systemSmall ? smallPad : padTrailing
     }
