@@ -25,14 +25,17 @@
 #   Tools/approve-baseline.sh --check    render both, write nothing, exit 1
 #                                        if either baseline is out of date
 #
-# "Out of date" is `Tools/compare-signatures.py`'s answer, not `cmp`'s. Every
-# number in a signature is compared exactly except the tone counts, where a
-# single pixel of the iOS 18.5 renderer's own noise moves the count by one in
-# either direction — measured, over 60 renders on two devices, against 48
-# bit-identical ones on iOS 26.5. No cell mean and no ground share moved in any
-# of them. A difference that small is reported and not written: whichever of
-# the two values were committed, half the later runs on that lane would render
-# the other. See #431 and the tool's own header.
+# "Out of date" is `Tools/compare-signatures.py`'s answer, not `cmp`'s. Size
+# and ground share are compared exactly. The tone counts are not: a single
+# pixel of the iOS 18.5 renderer's own noise moves a count by one in either
+# direction — measured, over 60 renders on two devices, against 48
+# bit-identical ones on iOS 26.5. Nor, since #584, are the cell means: a mean
+# that sits near the half rounds the other way on one dithered pixel, and full
+# runs came back with 2, 3, 5 and 16 of 256 cells off by exactly one level, so
+# up to 16 cells by one level is the renderer too. A difference that small is
+# reported and not written: whichever of the two values were committed, half
+# the later runs on that lane would render the other. See #431, #584 and the
+# tool's own header.
 #
 # Each file also names the simulator it was measured on, in a top-level
 # `device` (#576). The run's own manifest carries the phone it ran on, so an

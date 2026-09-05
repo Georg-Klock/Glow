@@ -191,9 +191,12 @@ contradiction left standing reads as an instruction to whoever finds it next.
   check, because the lane that would otherwise catch it now reports after merge.
 
   **"Out of date" is `Tools/compare-signatures.py`'s answer, not `cmp`'s**
-  (#431). Size, ground share and all 256 cell means are compared exactly, on
-  both lanes. Tone counts are not: iOS 18.5 does not render the same picture
-  twice — 60 renders of one unchanged commit on two devices differ by up to 601
+  (#431). Size and ground share are compared exactly, on both lanes; the 256
+  cell means allow up to 16 cells off by one level (#584 — measured 2, 3, 5
+  and 16 cells, never more than one level, on both runtimes, and the gate's
+  own cell tolerance is 3). Tone counts are not exact either: iOS 18.5 does
+  not render the same picture twice — 60 renders of one unchanged commit on
+  two devices differ by up to 601
   pixels, every one of them by a single level, against 48 bit-identical renders
   on iOS 26.5 — and a tone count is a count of pixels at one exact level, so
   one pixel of that noise moves it by one. A tone that moves that far is
