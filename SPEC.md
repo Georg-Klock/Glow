@@ -370,6 +370,20 @@ than trusting it.
 Each habit is one row: icon and name on the left, a fixed-width status track on
 the right.
 
+**The name is 12pt at the widget's scale whatever the phone's text size** —
+a deliberate trade recorded in `docs/decisions.md` (2026-08-24) — **unless the
+person has asked for the middle position** (#567). Settings → Text has one
+switch, *Remove icons for larger text*, off by default. With it on *and* the
+system text size above iOS's default, the row draws no icon: the name starts
+where the icon started, reclaims the icon column and its gap, and grows from
+12pt at the rate body text grows, capped at 20pt (`LargeTextPolicy`,
+`WidgetMetrics.textSizeCap`). Any step above the default counts, not only the
+accessibility sizes. With either condition missing the row is exactly the
+design's. The label column, the track and the row height do not move in either
+state — only the name's size and room do — and the same rule draws the week
+widget's rows and the editor's truncation preview. The month widget's title,
+which has no icon and its own line box, is unchanged.
+
 - **Daily:** 7 equal slots, one per weekday in the calendar's own week order,
   day-pinned.
 - **N per week:** spans align to the same seven-day lattice. A span's width is
