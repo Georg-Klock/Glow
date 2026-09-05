@@ -121,6 +121,13 @@ import UIKit
 /// that carries its own (see `committedBaseline()`) — and saying in the pull
 /// request what moved. `Tools/test.sh` prints that command with the run's own
 /// path and the right destination in it.
+///
+/// Each file also names the simulator it was measured on, in a top-level
+/// `device` (#576). The hosted frames differ between phones by more than the
+/// black-percent tolerance on an unchanged tree — an iPhone Air reads the
+/// `widgets screen` frame 0.05pt past it against the 17e's baseline — so
+/// `Tools/test.sh` puts a run on that phone when the machine has it, and a
+/// failure here says when it is not.
 @MainActor
 @Suite("Render baseline")
 struct RenderBaselineTests {
@@ -136,11 +143,25 @@ struct RenderBaselineTests {
         // be used to approve a change, and a run that cannot read the committed
         // file at all is exactly when the rendered manifest is worth having.
         Attachment.record(
-            try JSONEncoder.baseline.encode(RenderBaseline(frames: actual)),
+            try JSONEncoder.baseline.encode(
+                RenderBaseline(device: Self.runningDevice, frames: actual)
+            ),
             named: "render-signatures-actual.json"
         )
 
         let baseline = try Self.committedBaseline()
+
+        // A baseline is a picture of one phone's render, and on another phone
+        // the hosted frames differ by fractions of a point on an unchanged tree
+        // (#576). When this run is not on the phone the file names, every
+        // failure says so, so the first reading is "wrong phone" rather than
+        // "the change moved pixels".
+        let deviceNote: String
+        if let measured = baseline.device, let running = Self.runningDevice, measured != running {
+            deviceNote = " The baseline was measured on \(measured); this run is on \(running)."
+        } else {
+            deviceNote = ""
+        }
 
         for (name, signature) in actual.sorted(by: { $0.key < $1.key }) {
             guard let expected = baseline.frames[name] else {
@@ -186,7 +207,8 @@ struct RenderBaselineTests {
                 Issue.record("""
                     \(name) moved: cell (\(worst.column),\(worst.row)) is \(worst.actual), the \
                     baseline says \(worst.expected) — a delta of \(worst.delta), tolerance \
-                    \(Self.cellTolerance). Expected, actual and diff images are attached.
+                    \(Self.cellTolerance). Expected, actual and diff images are attached.\
+                    \(deviceNote)
                     """)
             }
 
@@ -195,11 +217,18 @@ struct RenderBaselineTests {
                 ? Self.hostedBlackTolerance
                 : Self.blackTolerance
             if blackDelta > blackTolerance {
+                // Attached like every other disagreement. This one used to
+                // record its Issue alone, so a run that failed here left no
+                // image to look at and the validator added "attached no frame
+                // image at all" on top — two findings, the second only saying
+                // the first was silent (#576).
+                attachFailureOnce()
                 Issue.record("""
                     \(name) is \(String(format: "%.1f", signature.exactBlackPercent))% pure black; \
                     the baseline says \(String(format: "%.1f", expected.exactBlackPercent))%. \
                     A gradient, a tint or a material lifts this number off the floor. The \
-                    tolerance for this frame is \(blackTolerance) percentage points.
+                    tolerance for this frame is \(blackTolerance) percentage points. Expected, \
+                    actual and diff images are attached.\(deviceNote)
                     """)
             }
 
@@ -991,6 +1020,13 @@ struct RenderBaselineTests {
     /// unsuffixed file is the current runtime's. Approving a change on the
     /// minimum lane means copying that lane's `render-signatures-actual.json`
     /// over the suffixed file; `Tools/test.sh` names the right destination.
+    /// The simulator this process is running on, as CoreSimulator names it to
+    /// every process it launches — "iPhone 17e" — and nothing on a device,
+    /// where no baseline is measured.
+    static var runningDevice: String? {
+        ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"]
+    }
+
     static func committedBaseline() throws -> RenderBaseline {
         let bundle = Bundle(for: BaselineBundleToken.self)
         let major = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
@@ -1304,8 +1340,13 @@ struct RenderSignature: Codable, Equatable {
     }
 }
 
-/// The committed file's shape.
+/// The committed file's shape: the signatures, and the simulator they were
+/// measured on (#576). `device` is a record beside the evidence, not part of
+/// it — `Tools/compare-signatures.py` ignores it and carries it through, and
+/// `Tools/test.sh` reads it to put a run on the same phone. Optional so that a
+/// file without one still decodes; the encoder omits it when nothing is known.
 struct RenderBaseline: Codable {
+    var device: String?
     var frames: [String: RenderSignature]
 }
 

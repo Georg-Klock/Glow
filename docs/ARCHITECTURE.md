@@ -706,7 +706,10 @@ which builds carry it — see docs/decisions.md.
 
 `Tools/test.sh` is the test command. Use it rather than a hand-typed
 `xcodebuild test`. It picks whichever iPhone simulator the machine actually
-has, so it behaves the same locally and on a runner with a different Xcode; it
+has — on the newest runtime, the phone the committed render baseline names as
+its own where there is one (#576) — so it behaves the same locally and on a
+runner with a different Xcode; it holds that phone and its DerivedData location
+for the run, so concurrent runs queue rather than collide (#221, #577); it
 runs the suite once into a result bundle under `Artifacts/<run>/`, unique per
 run and gitignored; and it then asks `Tools/validate-test-result.py` whether the
 run was really a pass.
@@ -779,9 +782,14 @@ models; after the safe-area pin, hosted-screen cells differed by at most one
 level across three current-runtime models. The cell tolerance remains 3. The
 hosted compositor's exact-black share spans 0.6 percentage points across those
 models, so only those two frames use a measured 0.75-point black tolerance;
-direct frames retain 0.5. A change that is deliberate is approved by copying
-the manifest the run attached over the committed file; `Tools/test.sh` prints
-that command with the run's own path in it.
+direct frames retain 0.5. Between phones on one runtime the hosted black share
+spans more than that tolerance on an unchanged tree — an iPhone Air against the
+17e's baseline, by 0.05pt (#576) — so each baseline file names the simulator
+it was measured on in a top-level `device`, which the comparison ignores, the
+approval carries through, and `Tools/test.sh` reads to put a run on that phone.
+A change that is deliberate is approved by copying the manifest the run
+attached over the committed file; `Tools/test.sh` prints that command with the
+run's own path in it.
 
 `GlowUITests` is the process-level interaction exception. Its single fixture
 launches Glow with a Debug-only, in-memory store containing one deterministic

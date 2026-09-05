@@ -136,13 +136,20 @@ contradiction left standing reads as an instruction to whoever finds it next.
   device, so that suite passed wherever a session had once turned VoiceOver on
   and failed on every CI run, which erases its phone. See #245.
 
-  It holds a lock on the simulator it chose, so two checkouts testing at once
-  queue instead of installing competing bundles onto one device. That collision
-  does not read as a device conflict — it reads as a dead host, a bundle under
-  its floor, or a failure naming a file that is clean in your checkout, and it
-  can produce a green run that is partly someone else's. Set
-  `GLOW_SIMULATOR_UDID` to give a run its own phone instead of waiting. See
-  #221.
+  It holds two locks, and queues on either rather than failing. One is on the
+  simulator it chose, so two checkouts testing at once wait instead of
+  installing competing bundles onto one device. That collision does not read
+  as a device conflict — it reads as a dead host, a bundle under its floor, or
+  a failure naming a file that is clean in your checkout, and it can produce a
+  green run that is partly someone else's. Set `GLOW_SIMULATOR_UDID` to give a
+  run its own phone instead of waiting. See #221. The other is on the
+  DerivedData location xcodebuild reports, because two runs on *different*
+  phones from one checkout pass the first lock and then share the build
+  database — one dies before any test runs with "unable to attach DB …
+  database is locked", which the validator reports correctly and the first
+  reading still gets wrong. The script says which lock it is waiting on. Not
+  a per-run `-derivedDataPath`: that is a clean build every run, and it moves
+  CI's timing. See #577.
 
   When the render baseline moves, the script prints the one command that
   approves it — for the runtime it just ran on. There are two committed
@@ -156,6 +163,20 @@ contradiction left standing reads as an instruction to whoever finds it next.
   fails loudly instead of falling forward to a newer runtime (#286). What ran
   is recorded either way: runtime and device on the console, in
   `<run>/simulator.txt`, and at the end of `summary.md`.
+
+  On that runtime it prefers **the phone the render baseline was measured
+  on** (#576). Each committed baseline names its simulator in a top-level
+  `device` — iPhone 17e for the current runtime, iPhone 16e for iOS 18 — and
+  a picture of one phone's render fails on another by fractions of a point on
+  an unchanged tree: an iPhone Air reads the hosted `widgets screen` frame
+  0.05pt past the tolerance against the 17e's baseline, on clean `main`. When
+  the machine has no such phone the old rule applies and the script warns,
+  naming both; when `GLOW_SIMULATOR_UDID` is another kind of phone it warns
+  the same way, and the render test's own failure message names both phones.
+  `Tools/test.sh --print-device` shows the choice without running anything.
+  A render gate failure of a fraction of a point on a phone the warning
+  named is the phone, not the change — re-run on the baseline's phone before
+  reading anything into it.
 
 - **Approve both render baselines:** `Tools/approve-baseline.sh` (and `--check`)
 

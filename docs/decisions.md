@@ -8620,3 +8620,67 @@ icon to trade. The month widget's title, which never had an icon and has its own
 line box, is unchanged. The setting is stored, not the habit: `SymbolPickerView`
 still assigns a glyph, and the switch only decides whether it is drawn.
 
+
+## 2026-09-04 — A render baseline is a measurement of one phone, and the runner should say which (#576, #577)
+
+**Question.** Several checkouts testing at once on 2026-09-04 produced two
+kinds of failure that had nothing to do with the change under test. Clean
+`main` failed the render gate on an iPhone Air: the hosted `widgets screen`
+frame read 48.7% pure black against the baseline's 49.5%, 0.05pt past the
+0.75-point tolerance, on every branch and on `main` itself, while the same
+tree on an iPhone 17e passed with signatures byte-identical to the committed
+file. And a current-runtime run and a `GLOW_EXPECTED_RUNTIME_MAJOR=18` run
+started together from one checkout both passed the per-simulator lock (#221)
+and one died before any test ran with `unable to attach DB … database is
+locked`. One agent spent an hour of control renders establishing the first
+was the phone. What should the tooling say, and hold?
+
+**The baseline names its phone.** `render-signatures.json` was measured on an
+iPhone 17e on iOS 26.5, `render-signatures-ios18.json` on an iPhone 16e on
+iOS 18.5 — the run records in #534 say so, and the #431 noise measurement was
+taken on the same two phones. Each file now carries that as a top-level
+`device`, beside `frames`. It is a record and not a signature:
+`Tools/compare-signatures.py` never reads it and its self-test says a
+baseline naming another phone still compares `same`; `settled()` carries it
+through, writing this run's phone when the run recorded one and keeping the
+committed name otherwise, so a file that has once named its phone keeps
+naming one. The test's own manifest records `SIMULATOR_DEVICE_NAME`, so an
+approval writes the phone in without anyone typing it. The two files were not
+re-measured for this; the name was written in from the evidence above.
+
+**The runner prefers that phone, and warns when it cannot.** Within the
+chosen runtime `Tools/test.sh` now picks the device whose name matches the
+baseline's, falling back to "highest model number" with a warning that names
+both phones when the machine has no such device, and warning the same way
+when `GLOW_SIMULATOR_UDID` points at another kind. Preferring rather than
+requiring, because a pinned phone is the caller's decision (#221's escape
+hatch) and a CI runner image may simply not have a 17e; what changes is that
+the run says so before the gate does. The render test's failure messages name
+both phones too, so the first reading of a 0.05pt miss on an Air is "wrong
+phone". `--print-device` shows the choice without a run. On this machine the
+old rule already landed on the 17e and the 16e by a tie-break on the name
+string — `"iPhone 17e" > "iPhone 17 Pro Max"` — which is why the failures
+only appeared under pinned devices, and why that accident is now a rule.
+
+**The black-percent check attaches its frames.** It recorded an Issue without
+`attachFailureOnce()`, alone among the checks, so a failure there left no
+image and `Tools/validate-test-result.py` added "attached no frame image at
+all" on top — two findings where the second only said the first was silent.
+It attaches expected, actual and diff like the rest.
+
+**A second lock, on DerivedData, not a per-run path.** The build database
+lives under xcodebuild's DerivedData location, which every run from one
+checkout shares whatever phone it is on. `Tools/test.sh` now takes a second
+`flock`, on fd 8 the way the simulator lock is on fd 9, keyed on the location
+`xcodebuild -showBuildSettings` reports rather than on a guess at Xcode's path
+hash — a custom DerivedData setting or a moved checkout would have a guessed
+key lock the wrong thing while both runs build in the same place. It is taken
+after the simulator lock, always in that order, so two runs cannot each hold
+one and wait for the other, and it prints that it is waiting. Proven with an
+iPhone 17 run and an iPhone 15 Pro run started three seconds apart: the second
+printed `DerivedData … is busy with another run's build; waiting for it` and
+both finished green. The alternative the issue named — `-derivedDataPath`
+under `Artifacts/<run>/` — was not taken: it makes every run a clean build,
+which moves CI's measured feedback latency (see "Pull-request latency") and
+loses the incremental build a developer machine relies on, to buy a
+serialisation a lock buys for nothing.

@@ -34,6 +34,11 @@
 # the two values were committed, half the later runs on that lane would render
 # the other. See #431 and the tool's own header.
 #
+# Each file also names the simulator it was measured on, in a top-level
+# `device` (#576). The run's own manifest carries the phone it ran on, so an
+# approval writes that phone in; `Tools/test.sh` puts the run on the committed
+# one to begin with, and the note below says when it did not.
+#
 # GLOW_MIN_IOS_MAJOR overrides the minimum major (default 18); it has to match
 # the major the CI lane pins, or this approves a file that lane never reads.
 
@@ -178,6 +183,15 @@ GATE
 
   if [ -n "$reasons" ]; then
     printf '%s\n' "$reasons" | sed 's/^/        /'
+  fi
+
+  # A baseline measured on another phone than the one committed is a change
+  # of instrument as well as of picture, and the diff should say so (#576).
+  local was_on now_on
+  was_on="$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("device",""))' "$baseline" 2>/dev/null || true)"
+  now_on="$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("device",""))' "$settled" 2>/dev/null || true)"
+  if [ -n "$was_on" ] && [ -n "$now_on" ] && [ "$was_on" != "$now_on" ]; then
+    echo "        note: this run was on an $now_on; the committed file was measured on an $was_on."
   fi
 
   if [ "$CHECK_ONLY" = "1" ]; then
