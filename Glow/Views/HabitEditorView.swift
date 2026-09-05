@@ -79,6 +79,14 @@ struct HabitEditorView: View {
     @ScaledMetric(relativeTo: .body)
     private var nameFieldTextSize = HabitEditorGeometry.nameFieldBaseTextSize
 
+    /// The preview below is the row the person is one tap from looking at, so
+    /// it takes the same answer the grid does (#567): with the setting on and
+    /// the type size raised, the icon column goes to the name and the
+    /// truncation warning measures the grown row rather than the design's.
+    @AppStorage(GlowSettings.largeTextKey, store: GlowSettings.store)
+    private var largeTextDropsIcon = false
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     @State private var name = ""
     @State private var icon = HabitSymbol.default
     /// Counted, never a mode. Seven means every day — `Frequency` normalizes it
@@ -261,7 +269,10 @@ struct HabitEditorView: View {
     /// "Watch Su…" here. Rendered at the grid's scale rather than the widget's
     /// because that is the row the person is one tap away from looking at.
     private var rowPreview: RowGeometry {
-        RowGeometry(totalWidth: max(0, sheetWidth - GridMetrics.horizontalPadding * 2))
+        RowGeometry(
+            totalWidth: max(0, sheetWidth - GridMetrics.horizontalPadding * 2),
+            label: LargeTextPolicy.layout(dropsIcon: largeTextDropsIcon, size: typeSize)
+        )
     }
 
     /// The compact row's available width enlarged by exactly the same factor
@@ -269,7 +280,7 @@ struct HabitEditorView: View {
     private var nameFieldWidth: CGFloat {
         HabitEditorGeometry.nameFieldWidth(
             rowNameWidth: rowPreview.nameMaxWidth,
-            rowTextSize: rowPreview.textSize,
+            rowTextSize: rowPreview.nameTextSize,
             fieldTextSize: nameFieldTextSize
         )
     }
@@ -295,7 +306,7 @@ struct HabitEditorView: View {
     /// the same nothing and is measured every pass.
     private var idealNameProbe: some View {
         Text(trimmedName)
-            .font(.system(size: rowPreview.textSize))
+            .font(.system(size: rowPreview.nameTextSize))
             .fixedSize()
             .onGeometryChange(for: CGFloat.self) { proxy in
                 proxy.size.width
@@ -321,9 +332,11 @@ struct HabitEditorView: View {
     /// a preview should show the narrower of the two.
     private var rowLabelProbe: some View {
         HStack(spacing: 0) {
-            HabitIconView(icon: icon, size: rowPreview.iconSize)
-                .frame(width: rowPreview.iconWidth)
-                .padding(.trailing, rowPreview.iconGap)
+            if rowPreview.showsIcon {
+                HabitIconView(icon: icon, size: rowPreview.iconSize)
+                    .frame(width: rowPreview.iconWidth)
+                    .padding(.trailing, rowPreview.iconGap)
+            }
             Text(trimmedName)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -335,7 +348,7 @@ struct HabitEditorView: View {
                 }
             Spacer(minLength: 0)
         }
-        .font(.system(size: rowPreview.textSize))
+        .font(.system(size: rowPreview.nameTextSize))
         .frame(width: rowPreview.labelWidth, alignment: .leading)
     }
 

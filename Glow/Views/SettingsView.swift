@@ -100,6 +100,12 @@ struct SettingsView: View {
     @AppStorage(WeekPreferences.firstWeekdayKey, store: GlowSettings.store)
     private var firstWeekday: Int = WeekPreferences.defaultFirstWeekday
 
+    /// Whether a raised text size is answered with a larger habit name in
+    /// place of the icon (#567). In the App Group, so the widget's row agrees
+    /// with the app's; `LargeTextPolicy` is the rule it feeds.
+    @AppStorage(GlowSettings.largeTextKey, store: GlowSettings.store)
+    private var largeTextDropsIcon = false
+
     var body: some View {
         NavigationStack {
             form
@@ -171,6 +177,7 @@ struct SettingsView: View {
             // the others; it is gone from this screen entirely (#390).
             .onChange(of: firstWeekday) { _, _ in WidgetRefresh.invalidate() }
             .onChange(of: peak) { _, _ in WidgetRefresh.invalidate() }
+            .onChange(of: largeTextDropsIcon) { _, _ in WidgetRefresh.invalidate() }
         }
     }
 
@@ -303,6 +310,25 @@ struct SettingsView: View {
                     // The shortened sentence stays, outside the platter
                     // whose picker it explains (#474).
                     Text(Self.weekNote)
+                        .font(.footnote)
+                }
+
+                // One row (#567). Off, the row is the design's: icon in its
+                // column, name at 12pt, whatever the phone's text size. On,
+                // and only once the text size is above iOS's default, the
+                // icon is not drawn and the name grows into its room, up to
+                // 20pt. Explicit rather than automatic, because it changes
+                // what the row shows and not only how large — that is the
+                // person's call. `LargeTextPolicy` is the rule; this is the
+                // one place the setting is written.
+                Section {
+                    Toggle("Remove icons for larger text", isOn: $largeTextDropsIcon)
+                        // #124: a root white tint fills a toggle white on white.
+                        .tint(GlowPalette.controlTint)
+                } header: {
+                    Text("Text")
+                } footer: {
+                    Text(Self.largeTextNote)
                         .font(.footnote)
                 }
 
@@ -802,6 +828,13 @@ struct SettingsView: View {
     /// sets which seven days a weekly goal counts over" — spends half its
     /// words restating the row it now sits directly under (#395).
     private static let weekNote = "Weekly goals count from this day."
+
+    /// Both conditions in one sentence, because the toggle alone does nothing
+    /// at the default text size and a person who flips it and sees no change
+    /// should be told where the other half lives (#567).
+    private static let largeTextNote =
+        "With a larger text size set in iOS Settings, habit names grow up to 20pt "
+        + "and their symbols and emojis are not drawn. At the default size nothing changes."
 
     /// What the slider trades, which is the one thing it never said (#424).
     ///

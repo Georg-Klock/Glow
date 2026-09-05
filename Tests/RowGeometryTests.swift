@@ -505,4 +505,41 @@ struct RowGeometryTests {
         #expect(infinite.scale == zero.scale)
         #expect(infinite.trackWidth == zero.trackWidth)
     }
+
+    /// #567: the grown row moves the name and nothing else. The columns are
+    /// the whole screen's point, so the label column, the track and every
+    /// inset have to be the same numbers with the icon gone.
+    @Test("A grown row moves the name's size and room, and nothing else")
+    func grownRowMovesOnlyTheName() {
+        let width: CGFloat = 362
+        let standard = RowGeometry(totalWidth: width)
+        let grown = RowGeometry(
+            totalWidth: width,
+            label: LargeTextPolicy.layout(dropsIcon: true, size: .accessibility1)
+        )
+
+        #expect(standard.showsIcon)
+        #expect(standard.nameTextSize == standard.textSize)
+        #expect(!grown.showsIcon)
+        #expect(grown.textSize == standard.textSize)
+        #expect(grown.nameTextSize > standard.nameTextSize)
+        #expect(grown.nameTextSize <= WidgetMetrics.textSizeCap * grown.scale)
+
+        #expect(grown.scale == standard.scale)
+        #expect(grown.labelWidth == standard.labelWidth)
+        #expect(grown.trackWidth == standard.trackWidth)
+        #expect(grown.padLeading == standard.padLeading)
+        #expect(grown.padTrailing == standard.padTrailing)
+        #expect(grown.slotHeight == standard.slotHeight)
+
+        // The name reclaims exactly the icon column and its one gap, on the
+        // resting row and on the editing one.
+        #expect(grown.nameMaxWidth == grown.labelWidth)
+        let reclaimed = standard.iconWidth + standard.iconGap
+        #expect(abs((grown.nameMaxWidth - standard.nameMaxWidth) - reclaimed) < 0.001)
+        #expect(abs((grown.editingNameMaxWidth - standard.editingNameMaxWidth) - reclaimed) < 0.001)
+        for (name, value) in values(grown) {
+            #expect(value.isFinite && value >= 0, "\(name) = \(value)")
+        }
+    }
 }

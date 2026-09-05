@@ -22,6 +22,9 @@ struct WeekWidgetView: View {
 
     @Environment(\.widgetFamily) private var environmentFamily
     private var family: WidgetFamily { familyOverride ?? environmentFamily }
+    /// The reader's type size, as WidgetKit renders it. Paired with the
+    /// large-text setting in `grid` below (#567).
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     /// **Always, since PR #277 dropped Week-Small.** The labels came off at the
     /// small family and nowhere else; with that family gone there is no size
@@ -123,6 +126,14 @@ struct WeekWidgetView: View {
             // the value is read once per render and handed to every row,
             // which is the same shape the app's row uses.
             let restDay = WeekPreferences.restDay
+            // **And its one read of the large-text setting** (#567), decided
+            // here for the same reason: once per render, then handed down.
+            // `.standard` unless the setting is on and the type size raised,
+            // so the render baselines — default store, default size — see
+            // the row they always did.
+            let largeText = LargeTextPolicy.layout(
+                dropsIcon: GlowSettings.largeTextDropsIcon, size: typeSize
+            )
             // The rest day's line, decided once for the whole widget: which
             // column it falls in, and which of the rows it actually shows
             // run through it. Both ends land on a habit — see RestCut.
@@ -168,6 +179,7 @@ struct WeekWidgetView: View {
                             cut: cut,
                             restIndex: restIndex,
                             restDay: restDay,
+                            largeText: largeText,
                             burst: entry.burstHabit == habit.id ? entry.progress : nil,
                             burstDay: entry.burstDay
                         )
@@ -270,6 +282,9 @@ private struct WidgetRow: View {
     /// The weekday nothing is expected on, read once by the widget and handed
     /// down with the rest (#181).
     let restDay: Int?
+    /// What the label column draws — icon and 12pt name, or the name alone
+    /// grown into the icon's room — decided once by the widget (#567).
+    let largeText: LargeTextPolicy.Layout
     /// Non-nil while this habit's completion is animating.
     let burst: Double?
     /// The one day the pending completion animation belongs to (#508).
@@ -430,11 +445,18 @@ private struct WidgetRow: View {
         HabitLabelView(
             icon: habit.icon,
             name: habit.name,
+            showsIcon: largeText.showsIcon,
             iconSize: WidgetMetrics.iconSize,
             iconWidth: WidgetMetrics.iconWidth,
             iconGap: WidgetMetrics.iconGap,
-            textSize: WidgetMetrics.textSize,
-            nameMaxWidth: WidgetMetrics.nameMaxWidth,
+            textSize: largeText.textSize,
+            // `WidgetMetrics.nameMaxWidth` when the icon is drawn; the whole
+            // column when it is not (#567).
+            nameMaxWidth: largeText.nameMaxWidth(
+                labelWidth: labelWidth,
+                iconWidth: WidgetMetrics.iconWidth,
+                iconGap: WidgetMetrics.iconGap
+            ),
             // An emitting widget label has no crossfade underneath it. The
             // shared view still supplies an icon-only base for an emoji, which
             // is how its colour survives the name's glow mask (#457).

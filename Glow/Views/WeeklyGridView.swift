@@ -106,6 +106,14 @@ struct WeeklyGridView: View {
     @AppStorage(WeekPreferences.firstWeekdayKey, store: GlowSettings.store)
     private var firstWeekday: Int = WeekPreferences.defaultFirstWeekday
 
+    /// **The grid's one read of the large-text setting** (#567), and of the
+    /// type size it is answered against. Both go into `LargeTextPolicy` once
+    /// per layout and the answer rides in `RowGeometry` to every row, the way
+    /// the rest day does — no row asks the store or the environment itself.
+    @AppStorage(GlowSettings.largeTextKey, store: GlowSettings.store)
+    private var largeTextDropsIcon = false
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     init(today: Date? = nil) {
         let initialToday = WeekCalendar.day(today ?? WeekCalendar.today())
         pinnedToday = today == nil ? nil : initialToday
@@ -441,7 +449,10 @@ struct WeeklyGridView: View {
             // same rule the widget follows, where the slot falls out of the
             // frame it was actually given.
             let inset = GridMetrics.horizontalPadding
-            let geometry = RowGeometry(totalWidth: max(0, proxy.size.width - inset * 2))
+            let geometry = RowGeometry(
+                totalWidth: max(0, proxy.size.width - inset * 2),
+                label: LargeTextPolicy.layout(dropsIcon: largeTextDropsIcon, size: typeSize)
+            )
             let snapshots = self.snapshots
             let isEditing = editMode.isEditing
             let horizontal = GridHorizontalInsets(
