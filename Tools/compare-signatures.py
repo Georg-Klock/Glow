@@ -32,7 +32,18 @@ the count at 255 itself is 4106 in every single render, and what oscillates is
 the neighbour the excess subtracts — one pixel crossing 253/254.
 
 So this compares exactly everywhere the render was measured to be exact, and
-allows the measured noise, and no more, in the one place it was not.
+allows the measured noise, and no more, in the two places it was not.
+
+**The second place is the cell grid, and it took longer to show** (#584). A
+cell mean over a few hundred pixels rounds to a whole level, and a mean that
+sits near the half is one dithered pixel from rounding the other way. Three
+times on 2026-09-05 a full run came back with `rows` differing by exactly one
+level in a handful of cells — 2, 3, 5 and 16 of 256 — with the ground, the
+black share and every other family unchanged, on both runtimes. Each cost an
+approval that re-measured noise. So `rows` allows up to 16 cells off by one
+level; a seventeenth cell, or any cell off by two, is a change. A real
+geometry move — a mark one column over — moves whole bands by tens of levels
+and is nowhere near either limit.
 
 **What that stops catching**, said plainly: a deliberate visual change whose
 entire effect on every frame is one or two pixels of one flat tone, with no
@@ -45,7 +56,10 @@ anyone can draw.
 it compares cells against a tolerance of 3 and tones against a retention ratio,
 and it always has. This is the file-equality check that stands in front of it,
 which was stricter than the gate by accident rather than by decision — and
-which was therefore the only thing that ever failed on #431's oscillation.
+which was therefore the only thing that ever failed on #431's oscillation, and
+the only thing that failed on #584's. The gate's own cell tolerance is wider
+than the noise allowed here, so nothing this lets through is something the
+gate would have stopped.
 
     compare-signatures.py --actual A.json --committed B.json
     compare-signatures.py --self-test
@@ -66,16 +80,48 @@ import sys
 #: re-measured first.
 TONE_NOISE = 2
 
-#: Everything else in a signature, compared exactly. The grid arrives as `rows`
-#: — sixteen strings of sixteen numbers — so comparing that compares all 256
-#: cells.
-EXACT_KEYS = ("width", "height", "exactBlackPercent", "rows")
+#: The frame's size and its ground share, compared exactly: neither moved once
+#: in the measured renders.
+EXACT_KEYS = ("width", "height", "exactBlackPercent")
+
+#: The cell grid arrives as `rows` — sixteen strings of sixteen numbers, one
+#: mean brightness level per cell. How far one cell may move, and in how many
+#: cells, before it is a change rather than the renderer rounding a mean that
+#: sits near the half (#584). Measured: 2, 3, 5 and 16 cells, never by more
+#: than one level. `RenderBaselineTests.cellTolerance` is 3, so this is
+#: stricter than the gate behind it, as it must be.
+ROWS_KEY = "rows"
+ROWS_NOISE_LEVELS = 1
+ROWS_NOISE_CELLS = 16
 
 #: Beside `frames`, a baseline names the simulator it was measured on — a
 #: top-level `device`, "iPhone 17e" — because a picture of one phone's render
 #: fails on another by fractions of a point (#576). It is a record, not a
 #: signature: `compare` never reads it, and `settled` carries it through.
 DEVICE_KEY = "device"
+
+
+def _cells(rows) -> list[int] | None:
+    """The 256 cell levels behind `rows`, or None when the value is not a grid."""
+    try:
+        return [int(value) for line in rows for value in line.split()]
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def rows_verdict(mine, theirs) -> tuple[str, str]:
+    """Classify one frame's grid: (`same` | `noise` | `moved`, reason)."""
+    if mine == theirs:
+        return "same", ""
+    here, there = _cells(mine), _cells(theirs)
+    if here is None or there is None or len(here) != len(there):
+        return "moved", "rows moved"
+    deltas = [abs(a - b) for a, b in zip(here, there) if a != b]
+    worst = max(deltas)
+    if worst <= ROWS_NOISE_LEVELS and len(deltas) <= ROWS_NOISE_CELLS:
+        cells = "cell" if len(deltas) == 1 else "cells"
+        return "noise", f"rows: {len(deltas)} {cells} off by one level"
+    return "moved", f"rows moved: {len(deltas)} cells, by up to {worst} levels"
 
 
 def compare(actual: dict, committed: dict) -> tuple[str, list[str]]:
@@ -98,6 +144,12 @@ def compare(actual: dict, committed: dict) -> tuple[str, list[str]]:
         for key in EXACT_KEYS:
             if mine.get(key) != theirs.get(key):
                 moved.append(f"{name}: {key} moved")
+
+        verdict, reason = rows_verdict(mine.get(ROWS_KEY), theirs.get(ROWS_KEY))
+        if verdict == "moved":
+            moved.append(f"{name}: {reason}")
+        elif verdict == "noise":
+            noise.append(f"{name}: {reason}")
 
         mine_tones = mine.get("tones", {})
         their_tones = theirs.get("tones", {})
@@ -146,6 +198,11 @@ def settled(actual: dict, committed: dict) -> dict:
         theirs = baseline.get(name)
         if theirs is None:
             continue
+        # A grid that moved only by the renderer's rounding keeps the committed
+        # cells for the same reason a tone does: otherwise every approval that
+        # touches the file re-rolls them (#584).
+        if rows_verdict(frame.get(ROWS_KEY), theirs.get(ROWS_KEY))[0] == "noise":
+            frame[ROWS_KEY] = theirs.get(ROWS_KEY)
         their_tones = theirs.get("tones", {})
         tones = frame.get("tones", {})
         for level, here in list(tones.items()):
@@ -170,6 +227,12 @@ def _signature(tones: dict[str, int], black: float = 0.0, row: str = "  0") -> d
         "rows": [" ".join([row] * 16)] * 16,
         "tones": tones,
     }
+
+
+def _rows(cells: int, by: int = 1) -> list[str]:
+    """A grid of zeros with the first `cells` cells lifted by `by` levels."""
+    values = [by if i < cells else 0 for i in range(256)]
+    return [" ".join(f"{v:3d}" for v in values[r * 16:(r + 1) * 16]) for r in range(16)]
 
 
 def _baseline(frames: dict) -> dict:
@@ -206,9 +269,39 @@ def self_test() -> int:
             "moved", "level 255 4097 -> 0",
         ),
         (
-            "a cell mean is compared exactly, however small the move",
+            "every cell one level up is a change, not the renderer",
             _baseline({"a": _signature({"124": 231, "255": 4097}, row="  1")}),
+            "moved", "rows moved: 256 cells, by up to 1 levels",
+        ),
+        (
+            "one cell one level off is the renderer",
+            _baseline({"a": dict(_signature({"124": 231, "255": 4097}), rows=_rows(1))}),
+            "noise", "rows: 1 cell off by one level",
+        ),
+        (
+            "sixteen cells one level off is still the renderer",
+            _baseline({"a": dict(_signature({"124": 231, "255": 4097}), rows=_rows(16))}),
+            "noise", "rows: 16 cells off by one level",
+        ),
+        (
+            "a seventeenth cell is a change",
+            _baseline({"a": dict(_signature({"124": 231, "255": 4097}), rows=_rows(17))}),
+            "moved", "rows moved: 17 cells, by up to 1 levels",
+        ),
+        (
+            "one cell two levels off is a change",
+            _baseline({"a": dict(_signature({"124": 231, "255": 4097}), rows=_rows(1, by=2))}),
+            "moved", "rows moved: 1 cells, by up to 2 levels",
+        ),
+        (
+            "a grid that is not a grid is a change",
+            _baseline({"a": dict(_signature({"124": 231, "255": 4097}), rows=["x"] * 16)}),
             "moved", "rows moved",
+        ),
+        (
+            "noisy cells beside a real move do not soften it",
+            _baseline({"a": dict(_signature({"124": 231, "255": 3000}), rows=_rows(2))}),
+            "moved", "level 255 4097 -> 3000",
         ),
         (
             "the device a baseline names is a record, not a signature",
@@ -282,6 +375,17 @@ def self_test() -> int:
     )["frames"]["a"]["tones"]
     check("a noisy tone keeps its committed value", kept.get("124") == 231)
     check("a tone past the noise takes this run's", kept.get("255") == 9999)
+
+    rows_kept = settled(
+        _baseline({"a": dict(_signature({"124": 231}), rows=_rows(3))}),
+        _baseline({"a": _signature({"124": 231})}),
+    )["frames"]["a"]["rows"]
+    check("noisy cells keep their committed values", rows_kept == _rows(0))
+    rows_taken = settled(
+        _baseline({"a": dict(_signature({"124": 231}), rows=_rows(40))}),
+        _baseline({"a": _signature({"124": 231})}),
+    )["frames"]["a"]["rows"]
+    check("cells past the noise take this run's", rows_taken == _rows(40))
 
     fresh = settled(
         _baseline({"b": _signature({"124": 5})}),

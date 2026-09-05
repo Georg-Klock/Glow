@@ -8831,4 +8831,43 @@ entry above, which cites "a press grew 32% and sprang back" as the gap it
 closed, stays as written: that is what it measured then. No render baseline
 sees a press — it is a live gesture state, not a resting frame — and
 `ReduceMotionTests` reads the constant symbolically, so neither moves.
+## 2026-09-05 — The cell grid allows the renderer's rounding too (#584)
+
+`Tools/compare-signatures.py` now classifies a `rows` difference of up to 16
+cells, each off by exactly one level, as `noise` — reported, and not written —
+the same standing a one-pixel tone count has had since #431. A seventeenth
+cell, or any cell off by two, is `moved`.
+
+**What was measured.** Three times on 2026-09-05 a full run failed the
+pre-pull-request check with nothing moved: `grid rows` on both runtimes, then
+`weekly grid screen` and `widgets screen` on iOS 18.5. The difference was one
+brightness level in 2, 3, 5 and 16 of the 256 cells, with the ground, the
+black share and every other family unchanged. Each cost an approval pull
+request that re-measured noise (#579's follow-ups, #583).
+
+**Why a cell mean is exposed at all.** #431 argued that a 16 × 16 cell averages
+about 1,800 pixels, so a few hundred single-level flips move it by a thousandth
+of a level — true, and beside the point once the mean is *rounded to a whole
+level*: a mean that sits near the half is one dithered pixel from rounding the
+other way, whatever the frame's size. The tone counts were the first statistic
+to show this and the grid was the second; the mechanism is the same.
+
+**Why 16 and 1.** 16 is the largest count observed and 1 the only delta ever
+observed; a real geometry change — a mark one column over — moves whole bands
+by tens of levels. `RenderBaselineTests.cellTolerance` is 3 on the gate
+behind this check, so nothing this lets through is something the gate would
+have stopped; the check stays stricter than the gate, which is the relation
+#431 established.
+
+**What was not changed, and what the one Swift failure that day actually
+was.** #584 proposed loosening the Swift comparison as well; it already
+tolerates 3 levels per cell, so it is untouched. The iOS 18.5 run behind #583
+did fail "Every family matches its committed signature", but on a different
+statistic: `week large device` painted 193 pixels flat at level 124 against a
+committed 408, under the 50% retention floor. Level 124 is the resting grey
+composited on the glass material, which dithers across 124/125, so a small
+count at that level on iOS 18.5 is on a rounding boundary of its own. #583
+approved the 193; if that count proves to oscillate across the floor it is a
+separate decision about `toneRetention` or about which levels the iOS 18
+baseline pins, and this entry is where the number was first written down.
 
