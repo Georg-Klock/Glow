@@ -8809,3 +8809,26 @@ not an oversight left standing: inferring answers now would fix in code a
 behaviour nobody designed, and the questions belong to #391, where the rest
 day is redesigned rather than patched. Until then the document's "out of scope"
 is the current truth, and a reader who finds the gap has found what was meant.
+
+## 2026-09-05 — A press grows 5%, not 32% (#589)
+
+`SlotView.pressScale` is 1.05. It was 1.32, and every pressable mark reads it
+— the daily rings through `SlotView`, every span through `SpanView` — via
+`MotionPolicy.pressScale(_:reduceMotion:)`, so the change is uniform by
+construction; the constant does not distinguish a filled pill from an open
+ring and splitting it would have been a second, unasked-for decision.
+
+**Why 32% was there.** It was the completion spring's overshoot, applied to the
+press so that touch-down and the closing animation shared one motion. On a
+filled pill under a thumb that read as the mark leaping rather than
+acknowledging: the completion's motion rehearsed at every touch, including the
+ones that un-complete. A press is confirmation that the touch landed. 5% is
+enough to see and too little to notice.
+
+**What this does not touch.** Reduce Motion still collapses the press to a flat
+1 whatever the resting value (`MotionPolicy.pressScale`), so the 2026-08-27
+entry above, which cites "a press grew 32% and sprang back" as the gap it
+closed, stays as written: that is what it measured then. No render baseline
+sees a press — it is a live gesture state, not a resting frame — and
+`ReduceMotionTests` reads the constant symbolically, so neither moves.
+
