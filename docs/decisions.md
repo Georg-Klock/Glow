@@ -8685,6 +8685,16 @@ which moves CI's measured feedback latency (see "Pull-request latency") and
 loses the incremental build a developer machine relies on, to buy a
 serialisation a lock buys for nothing.
 
+## 2026-09-05 — The Data icons keep #563's frame and lose its fill
+
+#563 put Export, Reset and then Feedback's glyphs in a filled 29pt square so
+the row had a flat edge to measure its clearance from. Georg saw it on the
+first TestFlight build that carried it and took the fill off. The frame
+stays: it is what fixed the crowding #563 measured, and it is invisible. The
+glyphs are bare again at `Label`'s size, and the palette reasoning in the
+old `DataIconBadge` comment — why the fill was the ground and not a grey —
+no longer applies to anything drawn.
+
 ## 2026-09-05 — Feedback is an address with a Copy button, not a composer (#564)
 
 #564 shipped as Apple's compose sheet where a Mail account exists and a

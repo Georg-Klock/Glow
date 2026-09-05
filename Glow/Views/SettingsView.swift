@@ -879,51 +879,28 @@ struct EDRHeadroomSnapshot: Equatable, Sendable {
     }
 }
 
-/// A Data-section icon in a contained badge (#563).
+/// The Data-section glyph, on the 29pt square Apple's own Settings badges
+/// occupy — and nothing drawn behind it (#563, redrawn 2026-09-05).
 ///
-/// Apple's Settings puts every row icon in a filled 29pt rounded square, and
-/// the badge is what does the work — not its size. Measured on a device: the
-/// bare glyph left ~12.3pt to the separator and a 29pt badge centred in the
-/// same 52pt row leaves 11.5pt, so sizing alone buys nothing. What a bare glyph
-/// lacks is an edge to stop at; a filled square has a flat, predictable bottom
-/// the eye measures the row's clearance from, where a glyph's silhouette does
-/// not. The glyph itself keeps `Label`'s default size, which is the "large
-/// icon" being kept.
-///
-/// **The fill is the palette's ground, not one of its greys.** The issue asked
-/// for `GlowPalette.grey` or `controlTint`, and the arithmetic against the two
-/// glyphs rules both out: Reset's glyph is red (255,59,48; luminance 0.213),
-/// and on the resting grey composited over the row's platter (~122, luminance
-/// 0.195) it would sit at 1.04:1 — hue with no luminance edge at all — and on
-/// `controlTint` (~153) at 1.4:1. Even Export's white glyph reaches only 2.8:1
-/// on `controlTint`. On the black the Form already sits on, white is 21:1 and
-/// red 5.3:1, and the badge reads as a socket pressed into the platter — the
-/// app's own container idiom (#332) — bounded by the same 28-level edge the
-/// platter has against the screen. `GlowPalette.widgetBackground` is declared
-/// true black rather than `Color.black`, which is a system colour free to be
-/// something else; that is the property wanted here too.
-///
-/// Not `.secondary` and not a system material: colour lives in the code that
-/// draws it, and a material would drift from the app's own tones the next time
-/// either changed independently.
+/// #563 measured the crowding against the separator and found it was not a
+/// size problem: a 29pt frame around the glyph gives the row a fixed, flat
+/// edge to measure its clearance from, where the glyph's own silhouette does
+/// not, and that frame is what stays. The filled square that first landed in
+/// that frame is gone — Georg saw it on a device and took it off — so the
+/// glyph reads as a glyph again, at `Label`'s default size, which is the
+/// "large icon" being kept. The frame is invisible and does the work.
 private struct DataIconBadge: View {
     let systemName: String
 
     var body: some View {
         Image(systemName: systemName)
             .frame(width: Self.size, height: Self.size)
-            .background(
-                RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
-                    .fill(GlowPalette.widgetBackground)
-            )
     }
 
     /// Apple's own badge, measured off Settings → General on a device. An
-    /// externally anchored number rather than one more guess.
+    /// externally anchored number rather than one more guess; kept as the
+    /// glyph's frame after the fill went (#563).
     static let size: CGFloat = 29
-
-    /// The continuous corner Apple's 29pt badges carry, by eye against one.
-    static let cornerRadius: CGFloat = 7
 }
 
 /// The written file, identified so `sheet(item:)` can present it.
