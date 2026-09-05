@@ -429,7 +429,7 @@ private struct WidgetContentInset<Content: View>: View {
             .padding(.leading, WidgetMetrics.padLeading(for: family))
             .padding(.trailing, WidgetMetrics.padTrailing(for: family))
             .padding(.top, WidgetMetrics.padTop)
-            .padding(.bottom, WidgetMetrics.padBottom)
+            .padding(.bottom, WidgetMetrics.padBottom(for: family))
             .containerBackground(for: .widget) {
                 GlowPalette.widgetContainer(reduceTransparency: reduceTransparency)
             }

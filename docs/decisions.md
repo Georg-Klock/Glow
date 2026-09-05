@@ -8685,6 +8685,24 @@ which moves CI's measured feedback latency (see "Pull-request latency") and
 loses the incremental build a developer machine relies on, to buy a
 serialisation a lock buys for nothing.
 
+## 2026-09-05 — The small month is top-anchored to the design's frame, not centred
+
+Georg compared the shipped small widget on an iPhone 14 Pro with two Figma
+fixtures — `357:9212` at six rows and `357:9301` at five — and asked for the
+title's position and the margins around it and around the rows to follow the
+file. Measured at 2.48x (392 for 158): the title's text box sits at y=10 and
+is 14.5 tall; the grid starts at y=31 in both fixtures; six rows run on the
+20pt pitch to y=147 and leave 11 below. The shipped widget put the title at
+20 (a second, month-only 10pt inset from #527), the grid at 42, and centred
+the row block in what remained (#368), which at six rows also squeezed the
+pitch to 17.2. So the numbers are now the file's: `monthTopInset` is a named
+zero, `monthTitleHeight` 14.5, a month-only `monthHeaderGap` of 6.5 puts the
+first row at 31, `smallPadBottom` is 11 for the small family alone, and the
+rows are top-anchored — fewer rows leave more room below, the grid does not
+move. `rowsOffset` and the shared `padBottom` remain the week widgets' rule.
+Not changed: the "7x" count prefix the fixtures show in the title, which is
+content rather than geometry and was not asked for.
+
 ## 2026-09-05 — The Data icons keep #563's frame and lose its fill
 
 #563 put Export, Reset and then Feedback's glyphs in a filled 29pt square so

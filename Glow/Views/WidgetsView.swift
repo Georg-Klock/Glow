@@ -369,7 +369,7 @@ struct WidgetsView: View {
             .padding(.leading, WidgetMetrics.padLeading(for: card.placement.family))
             .padding(.trailing, WidgetMetrics.padTrailing(for: card.placement.family))
             .padding(.top, WidgetMetrics.padTop)
-            .padding(.bottom, WidgetMetrics.padBottom)
+            .padding(.bottom, WidgetMetrics.padBottom(for: card.placement.family))
             .frame(width: size.width, height: size.height)
             // **The widget's own surface, not an imitation of one** (#369).
             //

@@ -79,17 +79,14 @@ struct MonthWidgetView: View {
             // tightens rather than overflowing the frame, and a four-row one
             // does not spread to fill it.
             let available = proxy.size.height
-                - WidgetMetrics.monthTitleHeight - WidgetMetrics.headerGap
+                - WidgetMetrics.monthTitleHeight - WidgetMetrics.monthHeaderGap
             let rowGap = rows > 1
                 ? max(1, min(gap, (available - CGFloat(rows) * side) / CGFloat(rows - 1)))
                 : 0
-            let rowsOffset = WidgetMetrics.rowsOffset(
-                contentHeight: proxy.size.height,
-                slot: side,
-                gap: rowGap,
-                rows: rows,
-                headerFootprint: WidgetMetrics.monthTitleHeight + WidgetMetrics.headerGap
-            )
+            // Top-anchored, not centred (2026-09-05): the design puts the first
+            // row at 31pt for five rows and six alike and leaves the rest of the
+            // frame below, so a short month does not float. #368's centring
+            // stays the week widgets' rule through `WidgetMetrics.rowsOffset`.
 
             VStack(alignment: .leading, spacing: 0) {
                 Group {
@@ -108,7 +105,7 @@ struct MonthWidgetView: View {
                 // week widgets' headers are untouched by this.
                 .frame(maxWidth: .infinity, alignment: .center)
                 .frame(height: WidgetMetrics.monthTitleHeight)
-                .padding(.bottom, WidgetMetrics.headerGap)
+                .padding(.bottom, WidgetMetrics.monthHeaderGap)
 
                 VStack(alignment: .leading, spacing: rowGap) {
                     ForEach(0..<rows, id: \.self) { row in
@@ -139,7 +136,6 @@ struct MonthWidgetView: View {
                 // layout unit without making the cut itself rowsOffset taller
                 // (#505). Six rows move only half a point; short months split
                 // their otherwise-dead space above and below the block.
-                .padding(.top, rowsOffset)
                 Spacer(minLength: 0)
             }
         }

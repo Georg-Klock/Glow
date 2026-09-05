@@ -714,8 +714,13 @@ struct WidgetRenderDiffTests {
     /// exactly as the configurations do.
     private func renderFamily(
         _ view: some View, size: CGSize,
-        top: CGFloat = WidgetMetrics.padTop, bottom: CGFloat = WidgetMetrics.padBottom
+        top: CGFloat = WidgetMetrics.padTop, bottom: CGFloat? = nil
     ) throws -> CGImage {
+        // The small family's month has its own bottom inset (2026-09-05); the
+        // week families keep the shared one. Decided by the frame's size, which
+        // is what the configurations decide it by too.
+        let isSmall = size == WidgetMetrics.size(of: .systemSmall)
+        let bottom = bottom ?? WidgetMetrics.padBottom(for: isSmall ? .systemSmall : .systemLarge)
         let framed = view
             .padding(.leading, WidgetMetrics.padLeading)
             .padding(.trailing, WidgetMetrics.padTrailing)
