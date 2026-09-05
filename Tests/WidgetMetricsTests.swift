@@ -35,19 +35,41 @@ struct WidgetMetricsTests {
         )
     }
 
+    @Test("The small month grid is 136 wide: 16pt cells on a 20pt pitch (#553)")
+    func smallMonthGridFillsItsTrack() {
+        // Node `341:3695`: 11pt either side of a 158pt frame, seven cells and
+        // six gaps filling the 136pt that leaves. The cell is the same 16pt it
+        // was at 14/14 and 3-on-16; the inset paid for the wider gaps.
+        #expect(WidgetMetrics.smallPad == 11)
+        #expect(WidgetMetrics.padLeading(for: .systemSmall) == 11)
+        #expect(WidgetMetrics.padTrailing(for: .systemSmall) == 11)
+        let track = WidgetMetrics.smallSide - 2 * WidgetMetrics.smallPad
+        #expect(track == 136)
+        #expect(abs(SlotLayout.monthCell(trackWidth: track) - 16) < 0.001)
+        #expect(abs(SlotLayout.monthGap(trackWidth: track) - 4) < 0.001)
+        // Six rows at the natural gap are the file's 116pt grid height.
+        #expect(abs(6 * 16 + 5 * SlotLayout.monthGap(trackWidth: track) - 116) < 0.001)
+        // The week's asymmetric pair did not move with it.
+        #expect(WidgetMetrics.padLeading(for: .systemLarge) == WidgetMetrics.padLeading)
+        #expect(WidgetMetrics.padTrailing(for: .systemLarge) == WidgetMetrics.padTrailing)
+    }
+
     @Test(
         "Four-, five-, and six-row months split the space below the title",
-        arguments: [(4, 14.5), (5, 5.0), (6, 0.0)]
+        arguments: [(4, 13.0), (5, 3.0), (6, 0.0)]
     )
     func shortMonthsCentreTheirRowBlock(rows: Int, expectedOffset: CGFloat) {
         // The small widget's 158pt frame leaves a 134pt content box inside its
         // 10/14 shared vertical insets and a second month-only 10pt top inset.
-        // A month cell is 16pt on a 19pt pitch, and the title plus its gap
-        // occupies 22pt. These are the actual 4/5/6-row placements from #527.
+        // A month cell is 16pt on a 20pt pitch, and the title plus its gap
+        // occupies 22pt. These are the 4/5/6-row placements from #527 at the
+        // 4pt natural gap #553 adopted: a five-row block grew 4pt and a
+        // four-row one 3pt, so each sits that much less above and below. Six
+        // rows still tighten to 1.2pt and do not move.
         let contentHeight: CGFloat = 158
             - WidgetMetrics.padTop - WidgetMetrics.padBottom - WidgetMetrics.monthTopInset
         let slot: CGFloat = 16
-        let naturalGap: CGFloat = 3
+        let naturalGap: CGFloat = SlotLayout.monthGap(trackWidth: 136)
         let header = WidgetMetrics.monthTitleHeight + WidgetMetrics.headerGap
         let available = contentHeight - header
         let gap = rows > 1
