@@ -69,7 +69,8 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
   one action that deletes everything at once, and a rule living inside a
   `.disabled(…)` is a rule nothing can assert.
 - `MotionPolicy` decides whether a change moves. One completion is drawn three
-  ways — a ring closing, a bar closing, a label dimming — and Reduce Motion has
+  ways — a slot's mark cross-fading, a span's mark cross-fading, a label
+  dimming — and Reduce Motion has
   to reach all three; a predicate left in a view is one no test can reach. It
   was four while the Today ring's sweep shipped (#209).
 - `LargeTextPolicy` decides whether a habit row gives its icon column to the

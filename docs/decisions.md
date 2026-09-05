@@ -8685,6 +8685,24 @@ which moves CI's measured feedback latency (see "Pull-request latency") and
 loses the incremental build a developer machine relies on, to buy a
 serialisation a lock buys for nothing.
 
+## 2026-09-05 — Marks cross-fade; the ring no longer shrinks into the pill
+
+A completion used to be a ring shrinking into its dot, or into its bar across
+a span, over a 0.34s spring (`SlotView.close`), held for 600ms and then
+replaced by the resting drawing; the undo landed in one frame. Georg asked for
+the morph to go and for a very quick cross-fade instead, in both directions.
+
+`SlotView` and `SpanView` now key the mark on its state and let SwiftUI's
+opacity transition carry the change: the old drawing fades out as the new one
+fades in, over `SlotView.close`'s 0.12s `easeOut`. `MotionPolicy.crossfadesMark`
+replaces `closesCompletion` and answers yes to any change of state, so a pill
+turning back into a ring is the same event as a ring turning into a pill —
+the old asymmetry (animate the achievement, cut the correction) is gone with
+the animation that expressed it. The habit label's dimming keeps borrowing the
+same timing so the row still reads as one movement. Reduce Motion still takes
+the instant path, and the bonus split on a met row still arrives in one frame
+for the reason recorded above: nothing survives the split to fade.
+
 ## 2026-09-05 — The small month is top-anchored to the design's frame, not centred
 
 Georg compared the shipped small widget on an iPhone 14 Pro with two Figma

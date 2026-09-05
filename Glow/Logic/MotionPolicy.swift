@@ -30,29 +30,34 @@ import CoreGraphics
 /// state change, so the reduced path is the app's own instant path rather than
 /// a second one written for accessibility.
 enum MotionPolicy {
-    /// Whether a slot or a span closes over time.
+    /// Whether a mark's change of state cross-fades, or lands in one frame.
     ///
-    /// Only a completion just made animates, which was already the rule:
-    /// un-completing is a correction, and animating a correction dresses a
-    /// mistake up as an achievement. Reduce Motion adds the second clause.
+    /// **A cross-fade, not a closing** (2026-09-05). Until then a ring became a
+    /// dot or a bar by shrinking — `SlotView.close`, a 0.34s spring — and the
+    /// undo landed instantly. Georg asked for the morph to go: the old mark
+    /// and the new one now cross-fade in `SlotView.close`'s 0.12s, in both
+    /// directions, so a ring turning into a pill and a pill turning back are
+    /// the same quick event rather than one animation and one cut.
     ///
-    /// **A bonus arriving on a met row does not close** (#560), and that is a
-    /// decision rather than an omission. The closing animation is a ring
-    /// becoming a bar, and there is no ring here: the bar covering today is
-    /// already lit, and the tap splits it into two lit bars — the covering
-    /// mark ending on its own day and today's taking the remainder. Neither
-    /// of those views existed before the tap (`SlotSpan.id` is the range), so
-    /// nothing survives the split to animate; the row arrives at its new
-    /// shape in one frame, which is the same instant path Reduce Motion takes
-    /// and the same one the undo takes back. A grown-in reveal would also be
-    /// the app applauding a rep the week did not ask for, which SPEC §1's
-    /// "brightness must not mean well done" reaches as well.
-    static func closesCompletion(
-        from previous: SlotState,
-        to next: SlotState,
+    /// **Reduce Motion takes the instant path**, as everywhere else here: the
+    /// final state with nothing scheduled in between (SPEC).
+    ///
+    /// **Today's bonus tap on a met row is not this case, and that is a
+    /// decision rather than an omission.** The bar covering today is already
+    /// lit, and the tap splits it into two lit bars — the covering mark ending
+    /// on its own day and today's taking the remainder. Neither of those views
+    /// existed before the tap (`SlotSpan.id` is the range), so nothing survives
+    /// the split to fade; the row arrives at its new shape in one frame, which
+    /// is the same instant path Reduce Motion takes and the same one the undo
+    /// takes back. A grown-in reveal would also be the app applauding a rep the
+    /// week did not ask for, which SPEC §1's "brightness must not mean well
+    /// done" reaches as well.
+    static func crossfadesMark(
+        from previous: SlotMark,
+        to next: SlotMark,
         reduceMotion: Bool
     ) -> Bool {
-        previous == .open && next == .filled && !reduceMotion
+        previous != next && !reduceMotion
     }
 
     /// Whether a deleted row collapses over time, or is simply gone.

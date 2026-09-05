@@ -15,22 +15,25 @@ import Testing
 /// the surfaces are three and every one of them is asserted here.
 @Suite("Reduce Motion")
 struct MotionPolicyTests {
-    @Test("A completion closes only when it was just made")
-    func completionAnimatesOnce() {
-        // The rule that was already there: un-completing is a correction, and
-        // animating a correction dresses a mistake up as an achievement.
-        #expect(MotionPolicy.closesCompletion(from: .open, to: .filled, reduceMotion: false))
-        #expect(!MotionPolicy.closesCompletion(from: .filled, to: .open, reduceMotion: false))
-        #expect(!MotionPolicy.closesCompletion(from: .missed, to: .filled, reduceMotion: false))
-        #expect(!MotionPolicy.closesCompletion(from: .inactive, to: .filled, reduceMotion: false))
-        #expect(!MotionPolicy.closesCompletion(from: .open, to: .rest, reduceMotion: false))
+    @Test("A mark cross-fades on every change of state, both ways")
+    func markCrossfadesBothWays() {
+        // Both directions cross-fade (2026-09-05): a ring becoming a pill and a
+        // pill becoming a ring are the same quick event. Only "no change" is
+        // not one.
+        #expect(MotionPolicy.crossfadesMark(from: .openToday, to: .doneToday, reduceMotion: false))
+        #expect(MotionPolicy.crossfadesMark(from: .doneToday, to: .openToday, reduceMotion: false))
+        #expect(MotionPolicy.crossfadesMark(from: .missed, to: .donePast, reduceMotion: false))
+        #expect(MotionPolicy.crossfadesMark(from: .upcoming, to: .doneToday, reduceMotion: false))
+        #expect(MotionPolicy.crossfadesMark(from: .openToday, to: .rest, reduceMotion: false))
+        #expect(!MotionPolicy.crossfadesMark(from: .doneToday, to: .doneToday, reduceMotion: false))
     }
 
     @Test("Reduce Motion snaps every completion, on every surface")
     func nothingClosesWhenReduced() {
-        for from in [SlotState.open, .filled, .missed, .inactive, .rest] {
-            for to in [SlotState.open, .filled, .missed, .inactive, .rest] {
-                #expect(!MotionPolicy.closesCompletion(from: from, to: to, reduceMotion: true))
+        let marks: [SlotMark] = [.openToday, .doneToday, .donePast, .missed, .upcoming, .rest]
+        for from in marks {
+            for to in marks {
+                #expect(!MotionPolicy.crossfadesMark(from: from, to: to, reduceMotion: true))
             }
         }
     }
