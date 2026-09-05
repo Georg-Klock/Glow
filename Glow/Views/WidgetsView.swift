@@ -328,7 +328,7 @@ struct WidgetsView: View {
     /// Everything outside the view itself is what the system does on a Default
     /// Home Screen: the same asymmetric padding, because
     /// `contentMarginsDisabled()` means the widget applies its own, and the
-    /// same `GlowPalette.widgetSurface` the widget declares as its container
+    /// same glass the widget declares as its container (`GlowPalette.widgetSurface`, over black here)
     /// background. The rounded corner is drawn here because the system is not
     /// here to mask it.
     ///

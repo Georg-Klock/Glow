@@ -8694,6 +8694,31 @@ stays: it is what fixed the crowding #563 measured, and it is invisible. The
 glyphs are bare again at `Label`'s size, and the palette reasoning in the
 old `DataIconBadge` comment — why the fill was the ground and not a grey —
 no longer applies to anything drawn.
+## 2026-09-05 — The widget's container is glass alone; black stays behind it only offscreen
+
+#333 made the widget's surface dark glass over black: `.ultraThinMaterial` on
+`GlowPalette.widgetBackground`, declared as one view for the widget and the
+render harness alike. On a Home Screen that black under the material made the
+panel flat — Georg saw it beside a system widget whose glass carried the
+wallpaper's warmth, in Default and Dark, and asked for the darkest glass the
+system offers with a little of the wallpaper still reading through.
+
+The container the widget declares is now `GlowPalette.widgetContainer`: the
+material alone, `.ultraThickMaterial` held to the dark scheme, and the system
+composites it over the wallpaper. `widgetSurface` keeps drawing that same
+material over black for the Widgets tab and the render harness, because an
+offscreen material has no wallpaper behind it; the material is one declaration
+so the two cannot drift. Under Reduce Transparency both are the opaque black.
+
+Two facts measured on the way. `ImageRenderer` draws the ultra-thick material
+at the same level as the thin one over black — the render baselines and the
+diff tests' ground of 31 did not move — so the harness cannot tell the two
+materials apart and only a Home Screen shows the change. And the choice of
+material is a one-word decision waiting on a device: `.thickMaterial` is the
+next step lighter if this reads too close to a panel.
+
+This does not reopen #53. Tinted and Clear still substitute the system's own
+glass and strip the background; what changed is what Default and Dark show.
 
 ## 2026-09-05 — Feedback is an address with a Copy button, not a composer (#564)
 

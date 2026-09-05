@@ -1176,8 +1176,11 @@ thrown away and only alpha survives. The previews show exactly that pairing:
 the rendering mode is injected, so the marks take the same alpha-stored grey
 by the same line of code they take on a Home Screen — the content is the real
 thing, not a drawing of it. The panel behind is not: the wallpaper and the
-system's compositing are unreachable from app code, so the page draws SwiftUI's
-own glass over black — the Home Screen the app's aesthetic assumes. #273 put
+system's compositing are unreachable from app code, so the page draws the
+widget's own glass — `GlowPalette.widgetGlass`, the darkest system material,
+which on a Home Screen is composited over the wallpaper and lets a little of
+it through (2026-09-05) — over black, the Home Screen the app's aesthetic
+assumes. #273 put
 an appearance picker over these previews and #312 removed it; the measurements
 that shaped it are kept in decisions.md, because no API reports the device's
 Home Screen appearance and the two glass appearances render identically here.

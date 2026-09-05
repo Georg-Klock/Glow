@@ -221,7 +221,8 @@ enum GlowPalette {
     /// the system drops it and substitutes its own glass.
     static let widgetBackground = Color(.sRGB, red: 0, green: 0, blue: 0, opacity: 1)
 
-    /// **The widget's surface: dark glass over black** (#333).
+    /// **The widget's surface: dark glass** (#333, and on the Home Screen
+    /// glass alone since 2026-09-05).
     ///
     /// `WidgetMetrics` used to end with a note explaining why there were no
     /// background constants — the design drew a gradient container, the widget
@@ -232,23 +233,47 @@ enum GlowPalette {
     /// into a surface (#332) need a surface to be pressed into, and a panel is
     /// the point rather than the problem.
     ///
-    /// `.ultraThinMaterial` is the spelling available at the 18.0 deployment
-    /// target — Liquid Glass is iOS 26 and out of reach. The design draws the
-    /// fill as `#FFFFFF 10% → 7%`, which is Figma's stand-in for a material
-    /// rather than the value to type in.
+    /// **Two spellings of one surface, because a material needs something
+    /// behind it.** On the Home Screen the system composites the container
+    /// background over the wallpaper, so `widgetContainer` is the material
+    /// alone and a little of the wallpaper reads through it — the darkest
+    /// glass the system offers, `.ultraThickMaterial`, held to the dark scheme
+    /// so a light Home Screen does not turn the panel pale. Georg asked for
+    /// exactly that on 2026-09-05 after seeing the flat panel beside a system
+    /// widget's glass. Offscreen — the Widgets tab's previews and the render
+    /// harness — there is no wallpaper, so `widgetSurface` draws the same
+    /// material over `widgetBackground`'s black, which is the Home Screen the
+    /// app's aesthetic assumes and the ground every baseline is measured on.
+    /// The material is one declaration used by both, so the two cannot drift.
     ///
-    /// Declared here as one view so the widget and the render harness cannot
-    /// disagree about what the surface is: a baseline rendered over a different
-    /// ground than the widget ships is a baseline of nothing.
+    /// Under Reduce Transparency both are the opaque black, as every other
+    /// surface here is (`TransparencyPolicy`).
     @ViewBuilder
     static func widgetSurface(reduceTransparency: Bool) -> some View {
         ZStack {
             widgetBackground
-            if TransparencyPolicy.drawsMaterial(reduceTransparency: reduceTransparency) {
-                Rectangle().fill(.ultraThinMaterial)
-            }
+            widgetContainer(reduceTransparency: reduceTransparency)
         }
     }
+
+    /// The container background the widget declares: the glass with nothing
+    /// of the app's behind it. See `widgetSurface`.
+    @ViewBuilder
+    static func widgetContainer(reduceTransparency: Bool) -> some View {
+        if TransparencyPolicy.drawsMaterial(reduceTransparency: reduceTransparency) {
+            Rectangle()
+                .fill(widgetGlass)
+                .environment(\.colorScheme, .dark)
+        } else {
+            widgetBackground
+        }
+    }
+
+    /// The one material the widget is made of. `.ultraThickMaterial` is the
+    /// darkest of the system's glasses with any wallpaper still reading
+    /// through it; `.thickMaterial` is the next step lighter if this proves too
+    /// close to a panel on a device.
+    static let widgetGlass: Material = .ultraThickMaterial
 
     /// The symbol section's system bar, with the same opaque fallback as every
     /// other surface carrying text when Reduce Transparency is enabled.

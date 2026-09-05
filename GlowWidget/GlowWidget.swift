@@ -43,12 +43,13 @@ struct GlowWidget: Widget {
                 // Tinted or Clear the system renders in `accented` mode, drops
                 // this background and substitutes glass.
                 //
-                // Black is what it is under Default, where the background is
-                // composited into the snapshot opaquely and every alpha resolves
-                // against black. `.clear` measures as black there — which it
-                // does, and which was wrongly written up in this file as proof
-                // that a home screen widget cannot be transparent. It is not a
-                // platform limit; it is one appearance out of three.
+                // Under Default the system composites this background itself,
+                // and a *material* here is blurred from the wallpaper the way a
+                // system widget's is — `.clear` measures as black there, a
+                // colour is flat, a material is glass. Since 2026-09-05 the
+                // container is `GlowPalette.widgetContainer`: the app's dark
+                // glass with nothing of the app's behind it, so a little of the
+                // wallpaper reads through (`widgetSurface` explains the pair).
                 //
                 // `containerBackgroundRemovable` is deliberately untouched, and
                 // not for the reason this comment used to give. It claimed that
@@ -430,7 +431,7 @@ private struct WidgetContentInset<Content: View>: View {
             .padding(.top, WidgetMetrics.padTop)
             .padding(.bottom, WidgetMetrics.padBottom)
             .containerBackground(for: .widget) {
-                GlowPalette.widgetSurface(reduceTransparency: reduceTransparency)
+                GlowPalette.widgetContainer(reduceTransparency: reduceTransparency)
             }
     }
 }
