@@ -5,7 +5,7 @@ import Foundation
 /// `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` are declared once in
 /// `project.yml` and arrive here as `CFBundleShortVersionString` and
 /// `CFBundleVersion`. Settings prints them as its version line (#566) and the
-/// feedback mail carries them in its body (#564), so they are read in one
+/// Settings shows them on its version line (#566), so they are read in one
 /// place. #317 removed the Data footer that used to carry a version paragraph
 /// and noted that putting a version line somewhere would be a new decision;
 /// this is that decision, recorded in docs/decisions.md under #566.

@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 import WidgetKit
 
 /// Settings, in three clusters — **Glow**, **Week**, **Data** — and one row
-/// after them, **Send Feedback** (#564).
+/// after them, **Feedback** — the address, with a Copy button (#564).
 ///
 /// Glow leads because it is the product rather than a preference about it.
 /// Week holds both controls that decide what a week is — where it starts and
@@ -89,13 +89,14 @@ struct SettingsView: View {
     @State private var isConfirmingReset = false
     @State private var typedConfirmation = ""
 
-    /// Whether the feedback composer is up (#564). Only ever true on a device
-    /// with a Mail account; everywhere else the row opens a `mailto:` URL.
-    @State private var isComposingFeedback = false
+    /// Where feedback goes (#564, as Georg redrew it on 2026-09-05): the
+    /// address is shown, and copied on a tap. No composer, no `mailto:` —
+    /// which client a person writes from is theirs to choose, and the app has
+    /// no send call of any kind.
+    static let feedbackAddress = "glowup@georgklock.com"
 
-    /// For the `mailto:` fallback: the environment's action, the SwiftUI
-    /// spelling for handing a URL to the system.
-    @Environment(\.openURL) private var openURL
+    /// Whether the address was just copied; the button says so for a moment.
+    @State private var copiedFeedbackAddress = false
 
     @AppStorage(WeekPreferences.firstWeekdayKey, store: GlowSettings.store)
     private var firstWeekday: Int = WeekPreferences.defaultFirstWeekday
@@ -399,14 +400,28 @@ struct SettingsView: View {
                 // everything a footer would — #317 took the last one off this
                 // screen for less.
                 Section {
-                    Button {
-                        sendFeedback()
-                    } label: {
+                    HStack(spacing: 12) {
                         Label {
-                            Text("Send Feedback")
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Feedback")
+                                Text(Self.feedbackAddress)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                            }
                         } icon: {
                             DataIconBadge(systemName: "envelope")
                         }
+                        Spacer(minLength: 8)
+                        // Plain text in the root tint, not a filled style: a
+                        // filled control here would draw white on white
+                        // (CLAUDE.md, "A root .tint() beats…").
+                        Button(copiedFeedbackAddress ? "Copied" : "Copy") {
+                            copyFeedbackAddress()
+                        }
+                        .buttonStyle(.borderless)
+                        .font(.body.weight(.medium))
+                        .accessibilityLabel(copiedFeedbackAddress ? "Copied" : "Copy address")
                     }
                 }
             }
@@ -429,13 +444,6 @@ struct SettingsView: View {
             // them as two is how one of them gets missed.
             .sheet(item: $exportFile, onDismiss: { discardExport() }) { file in
                 ShareSheet(url: file.url)
-            }
-            // The composer is the system's, prefilled and then left alone: its
-            // own Cancel discards, and only a person's Send sends (#564).
-            .sheet(isPresented: $isComposingFeedback) {
-                FeedbackComposeView(version: Self.version) {
-                    isComposingFeedback = false
-                }
             }
             // The same sheet the grid's strip opens, reached from the same
             // condition — one explanation of why the glow is off, not two.
@@ -682,29 +690,18 @@ struct SettingsView: View {
 
     // MARK: - Feedback
 
-    /// Opens a way to write to the developer (#564).
+    /// Copies the address and says so for a moment (#564).
     ///
-    /// The in-app composer where Mail has an account; otherwise a `mailto:`
-    /// URL, which hands the same recipient, subject and version line to
-    /// whatever client registers the scheme — Gmail, Outlook, anything —
-    /// rather than assuming Apple Mail. `canSendMail()` is false on every
-    /// simulator, so the fallback is the arm a simulator exercises and the
-    /// composer is the arm that needs a signed-in phone.
-    ///
-    /// If no app takes the URL either, the person is told so and given the
-    /// address, through the same notice every other failed action uses (#282)
-    /// — a tap that does nothing is the one outcome this must not have.
-    private func sendFeedback() {
-        if FeedbackComposeView.canSendMail() {
-            isComposingFeedback = true
-            return
-        }
-        guard let url = FeedbackMail.mailtoURL(version: Self.version) else {
-            OperationNotices.shared.report(.feedback)
-            return
-        }
-        openURL(url) { accepted in
-            if !accepted { OperationNotices.shared.report(.feedback) }
+    /// The pasteboard is the whole mechanism: nothing is composed, opened or
+    /// sent by the app, so there is no failure to report and no client to
+    /// assume. "Copied" reverts on its own so the row reads the same way the
+    /// next time it is seen.
+    private func copyFeedbackAddress() {
+        UIPasteboard.general.string = Self.feedbackAddress
+        copiedFeedbackAddress = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.5))
+            copiedFeedbackAddress = false
         }
     }
 

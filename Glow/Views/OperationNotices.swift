@@ -52,7 +52,6 @@ final class OperationNotices {
         case reset
         case demo
         case export
-        case feedback
 
         var message: String {
             switch self {
@@ -65,9 +64,6 @@ final class OperationNotices {
             case .reset: "Nothing was reset. Your habits are unchanged."
             case .demo: "The demo history could not be changed."
             case .export: "The export could not be written, so nothing was shared."
-            // The fallback's own fallback (#564): no Mail account and no app
-            // that takes a mailto link. The address is fixed, not data.
-            case .feedback: "No mail app could be opened. Write to glowup@georgklock.com."
             }
         }
 
@@ -78,7 +74,7 @@ final class OperationNotices {
         var allowsRetry: Bool {
             switch self {
             case .delete, .reset: false
-            case .save, .mark, .reorder, .addSpacer, .installDefaults, .demo, .export, .feedback: true
+            case .save, .mark, .reorder, .addSpacer, .installDefaults, .demo, .export: true
             }
         }
     }
