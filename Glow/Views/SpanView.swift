@@ -35,8 +35,9 @@ struct SpanView: View {
     /// completion.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Non-nil only while a completion is closing.
-    @State private var closing: CGSize?
+    /// See `SlotView.previousMark`.
+    @State private var previousMark: SlotMark?
+    @State private var previousOpacity: Double = 1
 
     /// Where the current touch went down, in this span's own coordinates.
     ///
@@ -69,7 +70,7 @@ struct SpanView: View {
             }
         }
         .frame(width: size.width, height: size.height)
-        .onChange(of: span.state) { previous, next in
+        .onChange(of: span.mark) { previous, next in
             transition(from: previous, to: next)
         }
         .accessibilityElement()
@@ -78,34 +79,45 @@ struct SpanView: View {
         .accessibilityAddTraits(span.isTappable ? .isButton : [])
     }
 
-    @ViewBuilder
+    /// The current drawing, with the previous one fading out on top of it
+    /// when the state has just changed (`MotionPolicy.crossfadesMark`).
     private var mark: some View {
-        if let closing {
-            GlowImageView(
-                size: closing,
-                shape: .ring,
-                ringLineWidth: size.height * GlowShape.ringWeight,
-                // The window does not go away for the 600ms — a bar flashing
-                // across the cut and then being taken back is worse than never
-                // cutting it. It is re-expressed, though: the closing shape is
-                // centred in the span's frame and narrower than it, so the
-                // window has to be measured from *its* leading edge.
-                restWindow: restWindow.map { window in
-                    let shift = (size.width - closing.width) / 2
-                    return (window.lowerBound - shift)...(window.upperBound - shift)
-                }
+        ZStack {
+            currentMark(span.mark)
+            if let previousMark {
+                currentMark(previousMark)
+                    .opacity(previousOpacity)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private func currentMark(_ mark: SlotMark) -> some View {
+        SlotMarkView(
+            mark: mark,
+            size: size,
+            spansDays: span.dayCount > 1,
+            restWindow: restWindow,
+            flattensSocket: true,
+            anchorOffset: SlotLayout.anchorOffset(
+                trackWidth: trackWidth, dayCount: span.dayCount
             )
-        } else {
-            SlotMarkView(
-                mark: span.mark,
-                size: size,
-                spansDays: span.dayCount > 1,
-                restWindow: restWindow,
-                flattensSocket: true,
-                anchorOffset: SlotLayout.anchorOffset(
-                    trackWidth: trackWidth, dayCount: span.dayCount
-                )
-            )
+        )
+    }
+
+    private func transition(from previous: SlotMark, to next: SlotMark) {
+        guard MotionPolicy.crossfadesMark(
+            from: previous, to: next, reduceMotion: reduceMotion
+        ) else {
+            previousMark = nil
+            return
+        }
+        previousMark = previous
+        previousOpacity = 1
+        withAnimation(SlotView.close) { previousOpacity = 0 }
+        Task {
+            try? await Task.sleep(for: SlotView.closeDuration)
+            if previousMark == previous { previousMark = nil }
         }
     }
 
@@ -179,25 +191,4 @@ struct SpanView: View {
         onToggle(day)
     }
 
-    private func transition(from previous: SlotState, to next: SlotState) {
-        guard MotionPolicy.closesCompletion(
-            from: previous, to: next, reduceMotion: reduceMotion
-        ) else {
-            closing = nil
-            return
-        }
-
-        closing = size
-        withAnimation(SlotView.close) {
-            closing = CGSize(
-                width: max(0, size.width - inset * 2),
-                height: GlowShape.barThickness
-            )
-        }
-
-        Task {
-            try? await Task.sleep(for: SlotView.closeDuration)
-            if span.state == .filled { closing = nil }
-        }
-    }
 }

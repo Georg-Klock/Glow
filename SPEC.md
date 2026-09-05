@@ -698,8 +698,10 @@ docs/decisions.md: light marks the habit at every shape, and #75's reversal of
 the ring's grey is what closed the last surface where a completion went dark.
 
 **Reduce Motion snaps every drawing of a completion.** One completion is drawn
-three ways — the ring closing in a slot, the bar closing across a span, the
-row's label dimming beside them — and the setting switches off all three, along
+three ways — the mark cross-fading in a slot, the mark cross-fading across a
+span, the row's label dimming beside them (a 0.12s fade since 2026-09-05; a
+ring used to shrink into its dot or bar over a spring, and the undo was a cut)
+— and the setting switches off all three, along
 with the press that grows a mark under a fingertip. It was four while the Today
 ring's sweep shipped. What the setting produces is the final state with nothing
 scheduled in between: a shorter animation is still an animation. `MotionPolicy`

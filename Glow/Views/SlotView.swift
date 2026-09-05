@@ -35,17 +35,27 @@ struct SlotView: View {
     /// spanning rows, which do the same thing at a different shape.
     static let pressScale: CGFloat = 1.32
 
-    /// The closing spring, and how long to hold the animating layer afterwards.
+    /// How a mark changes state: a quick cross-fade between the old drawing and
+    /// the new one, both ways (2026-09-05). It was a 0.34s spring that shrank
+    /// the ring into the dot, and the undo was a cut; see
+    /// `MotionPolicy.crossfadesMark`.
     ///
     /// Not private: the habit's label dims over exactly this, so the row reads
-    /// as one movement rather than a mark that animates beside a label that
+    /// as one movement rather than a mark that fades beside a label that
     /// snaps. Two timings for one event is two events.
-    static let close = Animation.spring(response: 0.34, dampingFraction: 0.58)
-    static let closeDuration: Duration = .milliseconds(600)
+    static let close = Animation.easeOut(duration: 0.12)
 
-    /// Non-nil only while a completion is closing. When it is nil the slot draws
-    /// its resting truth and nothing else.
-    @State private var closing: CGFloat?
+    /// How long the previous drawing stays on top while it fades.
+    static let closeDuration: Duration = .milliseconds(120)
+
+    /// The drawing the mark had before its last change of state, kept only
+    /// while it fades out over the new one. Nil at rest, so the resting render
+    /// is exactly `SlotMarkView` and nothing composites it — an opacity
+    /// transition on the mark itself renders through a group and dims the
+    /// lit white (measured: 2698 → 2535 level-255 pixels on the grid rows
+    /// frame), which on a device would also flatten the HDR tile.
+    @State private var previousMark: SlotMark?
+    @State private var previousOpacity: Double = 1
 
     var body: some View {
         Group {
@@ -64,7 +74,7 @@ struct SlotView: View {
             }
         }
         .frame(width: size.width, height: size.height)
-        .onChange(of: slot.state) { previous, next in
+        .onChange(of: slot.mark) { previous, next in
             transition(from: previous, to: next)
         }
         .accessibilityElement()
@@ -73,18 +83,16 @@ struct SlotView: View {
         .accessibilityAddTraits(slot.isTappable ? .isButton : [])
     }
 
-    @ViewBuilder
+    /// The current drawing, with the previous one fading out on top of it
+    /// when the state has just changed (`MotionPolicy.crossfadesMark`).
     private var mark: some View {
-        if let closing {
-            // Mid-flight: the ring at whatever diameter it has reached, with its
-            // stroke pinned to the resting width so the hole can close.
-            GlowImageView(
-                size: CGSize(width: closing, height: closing),
-                shape: .ring,
-                ringLineWidth: GlowShape.ringWeight
-            )
-        } else {
+        ZStack {
             SlotMarkView(mark: slot.mark, size: size, flattensSocket: true)
+            if let previousMark {
+                SlotMarkView(mark: previousMark, size: size, flattensSocket: true)
+                    .opacity(previousOpacity)
+                    .allowsHitTesting(false)
+            }
         }
     }
 
@@ -94,6 +102,22 @@ struct SlotView: View {
     /// Tuesday a "missed" belongs to (#137). The weekday header carries it on
     /// screen and is hidden from VoiceOver, because seven letters over seven
     /// numbers is a table read aloud.
+    private func transition(from previous: SlotMark, to next: SlotMark) {
+        guard MotionPolicy.crossfadesMark(
+            from: previous, to: next, reduceMotion: reduceMotion
+        ) else {
+            previousMark = nil
+            return
+        }
+        previousMark = previous
+        previousOpacity = 1
+        withAnimation(Self.close) { previousOpacity = 0 }
+        Task {
+            try? await Task.sleep(for: Self.closeDuration)
+            if previousMark == previous { previousMark = nil }
+        }
+    }
+
     private var accessibilityLabel: String {
         guard let day else { return "\(habitName), \(SlotVoice.state(slot.mark))" }
         return SlotVoice.label(habitName: habitName, mark: slot.mark, day: day)
@@ -112,25 +136,6 @@ struct SlotView: View {
     /// Reduce Motion takes the same branch every other state change takes: the
     /// resting mark, immediately, with nothing scheduled behind it. A shorter
     /// spring would still be a spring.
-    private func transition(from previous: SlotState, to next: SlotState) {
-        guard MotionPolicy.closesCompletion(
-            from: previous, to: next, reduceMotion: reduceMotion
-        ) else {
-            closing = nil
-            return
-        }
-
-        closing = size.height
-        withAnimation(Self.close) { closing = GlowShape.dotDiameter }
-
-        // Hand back to the resting mark once it has settled. That mark is the
-        // same glowing dot the animation ends on, so nothing moves at the
-        // handover, and no animating layer is left alive behind a still one.
-        Task {
-            try? await Task.sleep(for: Self.closeDuration)
-            if slot.state == .filled { closing = nil }
-        }
-    }
 }
 
 /// Grows on touch-down and springs back on release.
