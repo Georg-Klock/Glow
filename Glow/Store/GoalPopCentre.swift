@@ -6,23 +6,26 @@ import Foundation
 /// One place, so no two callers can disagree about when it fires or how long it
 /// lasts.
 ///
-/// **Called from the intents only, never from the app's own taps** (#103). The
-/// Island does not render a Live Activity while its own app is in the
-/// foreground — measured: `Activity.request` succeeds, `chronod` subscribes an
-/// Island renderer with the right metrics, and the Island stays a plain pill
-/// until the app is backgrounded. So a goal met on Today or This Week used to
-/// request an activity nobody could see and end it two seconds later, having
-/// drawn its Lock Screen presentation for the bin.
+/// **Called from the widget intent and from This Week's own tap** (#590,
+/// superseding #103's "the intents only"). The Island does not render a Live
+/// Activity while its own app is in the foreground — measured: `Activity.request`
+/// succeeds, `chronod` subscribes an Island renderer with the right metrics, and
+/// the Island stays a plain pill until the app is backgrounded. #103 read that
+/// as a reason not to fire from the app at all; PR #275 then drew `InAppPop`
+/// in the grid instead. #590 removes that capsule and lets This Week make the
+/// same request the widget makes, so a completion logged in the app has an
+/// update waiting for the moment the app leaves the screen. While the app is
+/// in front, the row's own acknowledgement — the ring closes, the label dims —
+/// is the whole of what is said.
 ///
-/// Not harmful, but a feature whose entire content is two seconds on screen
-/// should not have a path that spends them on nothing. The app has its own
-/// acknowledgement and it is the right one: the ring closes, the label dims,
-/// the row goes quiet. Putting something *else* on that screen would be a new
-/// question, and one §3 was amended once already to allow this much.
+/// **One thing is not yet measured**: whether an update requested while the
+/// app is foregrounded still expands the Island once the app is backgrounded,
+/// or whether ActivityKit needs the request to arrive after backgrounding. The
+/// simulator cannot answer it; see docs/decisions.md (2026-09-05, #590).
 ///
-/// The intents run in the app's process but not in its foreground — a widget
-/// tap happens on the home screen, which is exactly where the pop is visible.
-/// That is why the rule reads as "the intents" rather than as "the widget".
+/// The Widgets tab's hosted preview still passes `presentsIsland: false`
+/// (#465): it is the widget's own control drawn inside the app, and its
+/// silence is a separate decision from This Week's.
 ///
 /// Every path in here fails quietly. A pop is the least important thing the app
 /// does — a habit is logged whether or not the Island says so — and an error
@@ -36,8 +39,9 @@ enum GoalPopCentre {
     /// roll the mark back after the pop has appeared; that is the explicit cost
     /// of making both acknowledgements belong to the tap rather than the save.
     ///
-    /// The caller is the widget intent. See the note on the type before adding
-    /// one from a view.
+    /// Two callers: `MarkHabitOperation` for the widget, and
+    /// `WeeklyGridView.toggle` for This Week (#590). See the note on the type
+    /// before adding a third.
     static func popIfRequestedCompletion(
         requestedDone: Bool,
         habit: HabitSnapshot,

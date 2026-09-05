@@ -22,11 +22,15 @@ enum WeekGridMode: Equatable, Sendable {
     /// The weeks the pager may visit in this mode.
     ///
     /// Browsing stops at the current week: a forward chevron there would be a
-    /// control that can never do anything (#207). Correcting reaches exactly
-    /// twelve weeks past it (#543), because a day ahead can be corrected too.
-    /// The list is only editable on the current week, so its reach is
-    /// browsing's — `WeeklyGridView.show(week:)` ends that mode on the way to
-    /// any other week.
+    /// control that can never do anything (#207). Correcting reaches four
+    /// weeks past it, because a day ahead can be corrected too, and four
+    /// weeks behind it regardless of the record (#592, narrowing #543). The
+    /// list is only editable on the current week, so its reach is browsing's
+    /// — `WeeklyGridView.show(week:)` ends that mode on the way to any other
+    /// week.
+    ///
+    /// `recordStart` is browsing's concern alone: the correcting reach is two
+    /// flat numbers and reads no record.
     ///
     /// One pager, two reaches (#557): the same chevrons consult whichever of
     /// these the mode names, rather than always asking `WeekReach`.
@@ -39,7 +43,7 @@ enum WeekGridMode: Equatable, Sendable {
         case .browsing, .editingList:
             WeekReach.from(recordStart: recordStart, today: today, calendar: calendar)
         case .correctingHistory:
-            EditHistoryReach.from(recordStart: recordStart, today: today, calendar: calendar)
+            EditHistoryReach.from(today: today, calendar: calendar)
         }
     }
 

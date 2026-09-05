@@ -63,11 +63,11 @@ struct EditHistoryContractTests {
 
     /// The mode is the screen adapting in place (#557): the same `List`, whose
     /// rows swap their track for `EditHistoryTrack`, a pager that consults
-    /// the mode's own reach, and an exit that is a drawn white capsule rather
-    /// than a control left to resolve its own contrast against the root tint
-    /// (#162; CLAUDE.md, "A root `.tint()` beats anything that derives a
-    /// colour from it").
-    @Test("Correcting is the same List in another mode, with a drawn Done")
+    /// the mode's own reach, and one exit. #557 drew that exit as a white
+    /// `FilledCapsuleLabel` beside the list edit mode's bare checkmark — one
+    /// control in two shapes; #592 makes it one control in one shape, so both
+    /// modes leave through the same `doneButton`, and neither offers Today.
+    @Test("Correcting is the same List in another mode, leaving by the shared checkmark")
     func modeContract() throws {
         let weekly = try weeklyGrid()
 
@@ -77,16 +77,35 @@ struct EditHistoryContractTests {
         #expect(weekly.contains(".deleteDisabled(!mode.offersHabitManagement)"))
         #expect(weekly.contains(".moveDisabled(!mode.offersHabitManagement)"))
 
-        let done = try #require(weekly.range(of: "private var doneCorrecting"))
-        let doneBody = String(weekly[done.lowerBound...].prefix(1200))
-        #expect(doneBody.contains("FilledCapsuleLabel(title: \"Done\""))
-        #expect(doneBody.contains(".buttonStyle(.plain)"))
-        #expect(!doneBody.contains(".borderedProminent"))
+        // One construction, drawn by both modes (#592). The checkmark `Label`
+        // is built in exactly one place, that place is `doneButton`, and both
+        // `doneCorrecting` and the edit-mode branch reach it — so the two
+        // exits cannot differ in glyph, size or label style.
+        #expect(weekly.components(separatedBy: "Label(\"Done\", systemImage: \"checkmark\")").count == 2)
+        let shared = try #require(weekly.range(of: "private func doneButton(action: @escaping () -> Void)"))
+        let sharedBody = String(weekly[shared.lowerBound...].prefix(400))
+        #expect(sharedBody.contains("Label(\"Done\", systemImage: \"checkmark\")"))
+        #expect(sharedBody.contains(".labelStyle(.iconOnly)"))
+        #expect(!sharedBody.contains("FilledCapsuleLabel"))
+        #expect(!sharedBody.contains("Capsule()"))
 
-        let capsule = try #require(weekly.range(of: "struct FilledCapsuleLabel"))
-        let capsuleBody = String(weekly[capsule.lowerBound...].prefix(700))
-        #expect(capsuleBody.contains(".foregroundStyle(.black)"))
-        #expect(capsuleBody.contains("Capsule().fill(GlowPalette.color)"))
+        let done = try #require(weekly.range(of: "private var doneCorrecting"))
+        let doneBody = String(weekly[done.lowerBound...].prefix(600))
+        #expect(doneBody.contains("doneButton {"))
+        #expect(!doneBody.contains("FilledCapsuleLabel"))
+        #expect(weekly.components(separatedBy: "doneButton {").count == 3, "both exits use doneButton")
+
+        // Correcting's bar holds Done alone: no Today beside it, on any week
+        // (#592). The browsing branch keeps its Today button for past weeks,
+        // so the scan is bounded to the correcting branch.
+        let branch = try #require(weekly.range(of: "if isCorrectingHistory {\n"))
+        let branchEnd = try #require(weekly.range(
+            of: "} else if isOnCurrentWeek {", range: branch.upperBound..<weekly.endIndex
+        ))
+        let correctingBar = String(weekly[branch.lowerBound..<branchEnd.lowerBound])
+        #expect(correctingBar.contains("doneCorrecting"))
+        #expect(!correctingBar.contains("todayButton"))
+        #expect(!correctingBar.contains("isOnCurrentWeek"))
 
         let row = try source("Glow/Views/HabitRowView.swift")
         #expect(row.contains("} else if isCorrectingHistory {"))
@@ -113,7 +132,9 @@ struct EditHistoryContractTests {
         let correct = try #require(weekly.range(of: "private func correct(_ habit: Habit, on day: Date)"))
         let correctBody = String(weekly[correct.lowerBound...].prefix(600))
         #expect(correctBody.contains("allowingFuture: true"))
-        #expect(!correctBody.contains("showPop("))
+        // A correction is about another day; only today's tap asks the
+        // Island (#590).
+        #expect(!correctBody.contains("GoalPopCentre"))
     }
 
     @Test("Cadence surfaces edit only today")

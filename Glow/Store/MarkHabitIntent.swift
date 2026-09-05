@@ -63,7 +63,8 @@ struct MarkHabitIntent: LiveActivityIntent {
 
     /// Whether this archived control lives where the Island can be seen.
     /// Installed widgets pass true; the same control hosted inside Glow's
-    /// Widgets tab passes false (#465). The app keeps its own foreground pop.
+    /// Widgets tab passes false (#465). This Week's own tap asks
+    /// `GoalPopCentre` directly (#590).
     @Parameter(title: "Present Island Encouragement")
     var presentsIsland: Bool
 

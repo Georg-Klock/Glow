@@ -67,8 +67,9 @@ import Foundation
 /// which is where the tables are read — see `WeekReachTests.theSentinelIsNotThisTypesToRefuse`.
 ///
 /// **Forward stops at the current week.** This is the browsing reach for This
-/// Week, not the correction reach: `EditHistoryReach` deliberately continues
-/// exactly twelve weeks beyond it (#543).
+/// Week, not the correction reach: `EditHistoryReach` is a flat four weeks
+/// either side of the current week and, since #592, shares nothing with this
+/// type — not even the past edge.
 ///
 /// Pure, per the `WeekGrid` pattern: dates in, bounds out, no store and no
 /// `Date()`.

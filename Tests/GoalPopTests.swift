@@ -312,21 +312,32 @@ struct OnePopPerTapTests {
         #expect(GoalPop.lines.contains(GoalPop.line()))
     }
 
-    /// The two call sites are a `@MainActor` view and an ActivityKit wrapper,
-    /// so neither can be driven from here. What can be checked is that neither
-    /// still schedules a *second* thing to say: a handover needs a sleep, and
-    /// the only sleep either file is allowed is the one that ends the pop.
+    /// The pop is drawn by an ActivityKit wrapper that cannot be driven from
+    /// here. What can be checked is that it does not schedule a *second*
+    /// thing to say: a handover needs a sleep, and the only sleep the file is
+    /// allowed is the one that ends the pop. `WeeklyGridView` used to be the
+    /// second site, drawing `InAppPop` on its own timer; #590 removed the
+    /// capsule, so the grid sleeps for nothing and is scanned to say so.
     ///
     /// A source scan for the same reason `WidgetPlacementTests` uses them —
     /// the behaviour is in code no test in this process reaches.
-    @Test("Neither call site sleeps for anything but the pop's own end")
+    @Test("The Island is the one pop, and it sleeps only for its own end")
     func noCallSiteSchedulesASecondLine() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+        let grid = try String(
+            contentsOf: root.appendingPathComponent("Glow/Views/WeeklyGridView.swift"),
+            encoding: .utf8
+        )
+        #expect(!grid.contains("Task.sleep(for:"), "the grid draws no timed pop of its own (#590)")
+        #expect(!grid.contains("InAppPop("))
+        #expect(!FileManager.default.fileExists(
+            atPath: root.appendingPathComponent("Glow/Views/InAppPop.swift").path
+        ), "the in-app capsule is back")
+
         let sites = [
             root.appendingPathComponent("Glow/Store/GoalPopCentre.swift"),
-            root.appendingPathComponent("Glow/Views/WeeklyGridView.swift"),
         ]
 
         var sleeps = 0
@@ -350,9 +361,9 @@ struct OnePopPerTapTests {
                 )
             }
         }
-        // One end per call site. A scan that matched nothing would pass while
-        // saying nothing.
-        #expect(sleeps == 2, "the pop-sleep scan matched \(sleeps) calls, expected 2")
+        // One end. A scan that matched nothing would pass while saying
+        // nothing.
+        #expect(sleeps == 1, "the pop-sleep scan matched \(sleeps) calls, expected 1")
     }
 
     /// Preferences gate the pop rather than selecting words, which is the whole

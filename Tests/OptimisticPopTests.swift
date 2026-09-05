@@ -92,6 +92,40 @@ struct OptimisticPopTests {
         #expect(source.components(separatedBy: "GoalPopCentre.popIfRequestedCompletion(").count == 2)
     }
 
+    /// This Week never asked the Island for anything until #590: #103 kept
+    /// `GoalPopCentre` for the intents and PR #275 drew `InAppPop` in the grid
+    /// instead. Now the grid's tap makes the same request the widget makes,
+    /// with the same timing — decided from the pre-write snapshot, before the
+    /// store writes — and the correcting mode's write does not.
+    @Test("This Week asks the Island before it writes, and only from today's tap")
+    func gridTapIsOptimisticToo() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: root.appendingPathComponent("Glow/Views/WeeklyGridView.swift"),
+            encoding: .utf8
+        )
+        #expect(source.components(separatedBy: "GoalPopCentre.popIfRequestedCompletion(").count == 2)
+
+        let toggle = try #require(source.range(of: "private func toggle(_ habit: Habit, on day: Date)"))
+        let body = String(source[toggle.lowerBound...].prefix(2400))
+        let pop = try #require(body.range(of: "GoalPopCentre.popIfRequestedCompletion("))
+        let write = try #require(body.range(of: "store.toggleCompletion(for: habit, on: day)"))
+        #expect(pop.lowerBound < write.lowerBound)
+        // The tap toggles, so what it asks for is the opposite of what the
+        // day already holds; `OptimisticPop` keeps an undo silent from that.
+        #expect(body.contains("requestedDone: before.count(on: WeekCalendar.day(day)) == 0"))
+
+        // Nothing is drawn in the app for it any more (#590): no overlay state,
+        // no capsule, no timer. The comments may still name what went; a
+        // construction of it may not.
+        #expect(!source.contains("InAppPop("))
+        #expect(!source.contains("InAppPop.PopContent"))
+        #expect(!source.contains("showPop("))
+        #expect(!source.contains("@State private var pop"))
+    }
+
     @Test("Only a control outside the foreground app asks for the Island")
     func hostedPreviewDoesNotSpendAnInvisibleActivity() throws {
         let root = URL(fileURLWithPath: #filePath)
