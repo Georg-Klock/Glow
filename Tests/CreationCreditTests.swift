@@ -38,7 +38,7 @@ struct CreationCreditTests {
     private func spans(_ habit: HabitSnapshot, target: Int, today: Int) -> [SlotSpan] {
         WeekSpans.spans(
             for: habit, in: week, today: week.days[today], target: target,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
     }
 

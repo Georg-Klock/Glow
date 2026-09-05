@@ -427,7 +427,7 @@ struct BeforeCreationTests {
         )
         let spans = WeekSpans.spans(
             for: habit, in: week, today: later, target: 3,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
         #expect(spans.count == 1)
         #expect(spans[0].state == .inactive)
@@ -446,7 +446,7 @@ struct BeforeCreationTests {
         )
         let spans = WeekSpans.spans(
             for: habit, in: week, today: later, target: 3,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
 
         #expect(spans.count == 7)
@@ -467,7 +467,7 @@ struct BeforeCreationTests {
         )
         let spans = WeekSpans.spans(
             for: habit, in: week, today: later, target: 3,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
         #expect(spans.count == 7)
         #expect(spans.allSatisfy { $0.state == .missed && $0.dayCount == 1 })

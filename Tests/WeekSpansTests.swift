@@ -21,7 +21,7 @@ struct WeekSpansTests {
             in: week,
             today: today ?? friday,
             target: target,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
     }
 
@@ -226,7 +226,7 @@ struct ClaimableRepWindowTests {
             today: week.days[todayColumn],
             target: target,
             editing: editing,
-            restDay: nil,
+            bonus: .never, restDay: nil,
             calendar: calendar
         )
     }
@@ -241,7 +241,7 @@ struct ClaimableRepWindowTests {
             today: TestCalendar.date(2026, 8, 24),
             target: target,
             editing: .todayOnly,
-            restDay: nil,
+            bonus: .never, restDay: nil,
             calendar: calendar
         )
     }
@@ -395,7 +395,7 @@ struct LateWeekSpansTests {
             in: week,
             today: day(todayColumn),
             target: target,
-            editing: editing, restDay: restDay, calendar: calendar
+            editing: editing, bonus: .never, restDay: restDay, calendar: calendar
         )
     }
 
@@ -440,7 +440,7 @@ struct LateWeekSpansTests {
         let spans = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2), completedDays: [day(0)]),
             in: week, today: later, target: 2,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
         #expect(shape(spans)
             == "filled:0-0 missed:1-1 missed:2-2 missed:3-3 missed:4-4 missed:5-5 missed:6-6")
@@ -452,7 +452,7 @@ struct LateWeekSpansTests {
         let spans = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2)),
             in: week, today: earlier, target: 2,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
         // Remainder to the right (#340): three columns then four, not four
         // then three.
@@ -563,7 +563,7 @@ struct LateWeekSpansTests {
                     completedDays: Set((0..<done).map { day($0) })
                 ),
                 in: week, today: later, target: target,
-                editing: .todayOnly, restDay: nil, calendar: calendar
+                editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
             )
             #expect(spans.count { $0.state == .missed } == 7 - done,
                     "target \(target), done \(done): \(shape(spans))")
@@ -782,7 +782,7 @@ struct LateWeekSpansTests {
                 completedDays: Set(done.map { day($0) })
             ),
             in: week, today: today ?? day(4), target: target,
-            editing: .todayOnly, restDay: restDay, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: restDay, calendar: calendar
         )
     }
 
@@ -876,7 +876,7 @@ struct LateWeekSpansTests {
                 completedDays: Set(done.map { day($0) })
             ),
             in: week, today: later, target: target,
-            editing: editing, restDay: restDay, calendar: calendar
+            editing: editing, bonus: .never, restDay: restDay, calendar: calendar
         )
     }
 
@@ -1129,7 +1129,7 @@ struct WeekDotsTests {
         let met = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2), completedDays: [day(0), day(1)]),
             in: week, today: day(4), target: 2,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
         // `donePast`, not `doneToday`: a span covers a run of days rather than
         // one, and under the two tiers (#334) a completion is lit but does not
@@ -1141,7 +1141,7 @@ struct WeekDotsTests {
         let untouched = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2)),
             in: week, today: day(4), target: 2,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
         #expect(untouched.allSatisfy { $0.mark != .donePast })
 
@@ -1149,7 +1149,7 @@ struct WeekDotsTests {
         let partial = WeekSpans.spans(
             for: .fixture(frequency: .timesPerWeek(2)),
             in: week, today: day(6), target: 2,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
         #expect(partial.map(\.mark) == [.missed, .openToday])
     }
@@ -1188,7 +1188,7 @@ struct SpanIdentityTests {
                 completedDays: Set(done.map { day($0) })
             ),
             in: week, today: day(todayColumn), target: target,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         )
     }
 
@@ -1367,7 +1367,7 @@ struct MarkInvariantsTests {
                                 completedDays: Set(done.map { week.days[$0] })
                             ),
                             in: week, today: week.days[todayColumn], target: target,
-                            editing: .todayOnly, restDay: restDay, calendar: calendar
+                            editing: .todayOnly, bonus: .never, restDay: restDay, calendar: calendar
                         )
                         check(Row(
                             target: target, todayColumn: todayColumn, done: done,
@@ -1479,7 +1479,7 @@ struct MarkInvariantsTests {
                     ),
                     in: week, today: week.days[row.todayColumn], target: row.target,
                     editing: .todayOnly,
-                    restDay: row.restColumn.map { TestPreferences.weekday(ofColumn: $0, in: week) },
+                    bonus: .never, restDay: row.restColumn.map { TestPreferences.weekday(ofColumn: $0, in: week) },
                     calendar: calendar
                 ).count { $0.state == .missed }
                 #expect(after <= before, "logging day \(day) added a ✕ — \(row.what)")
@@ -1555,7 +1555,7 @@ struct LaterCompletionTests {
             today: week.days[todayColumn],
             target: target,
             editing: .todayOnly,
-            restDay: restColumn.map { TestPreferences.weekday(ofColumn: $0, in: week) },
+            bonus: .never, restDay: restColumn.map { TestPreferences.weekday(ofColumn: $0, in: week) },
             calendar: calendar
         )
     }
@@ -1618,5 +1618,301 @@ struct LaterCompletionTests {
                 }
             }
         }
+    }
+}
+
+/// #560: a met row still takes today, on the one surface that can tell which
+/// column of a bar was pressed.
+///
+/// The issue described a completion beyond the target as invisible. #543 had
+/// already given every such completion a bonus mark, on every surface; what
+/// was still missing was the tap. A filled span offered no day but the one
+/// carrying today's own completion, so a row whose goal was met could not be
+/// logged on This Week at all. These tests pin what the tap reaches, what it
+/// does to the row, and what it leaves alone.
+@Suite("Today's bonus on a met row")
+struct BonusTodayTests {
+    private let calendar = TestCalendar.monday
+    /// The week beginning Monday 2026-08-17.
+    private var week: Week {
+        WeekCalendar.week(containing: TestCalendar.date(2026, 8, 17), calendar: calendar)
+    }
+    private func day(_ column: Int) -> Date { week.days[column] }
+
+    /// A weekly habit, optionally made part-way into this week so that creation
+    /// credit is in the picture.
+    private func habit(target: Int, done: [Int], createdColumn: Int? = nil) -> HabitSnapshot {
+        HabitSnapshot(
+            id: UUID(), name: "Read", icon: "book",
+            frequency: .timesPerWeek(target),
+            completionCounts: done.reduce(into: [:]) { $0[day($1)] = 1 },
+            createdDay: createdColumn.map { day($0) },
+            targetAtCreation: createdColumn == nil ? nil : target
+        )
+    }
+
+    /// This Week's own call unless a test says otherwise.
+    private func row(
+        target: Int, done: [Int], todayColumn: Int, today: Date? = nil,
+        bonus: BonusEditing = .today, restColumn: Int? = nil, createdColumn: Int? = nil
+    ) -> [SlotSpan] {
+        WeekSpans.spans(
+            for: habit(target: target, done: done, createdColumn: createdColumn),
+            in: week, today: today ?? day(todayColumn), target: target,
+            editing: .todayOnly, bonus: bonus,
+            restDay: restColumn.map { TestPreferences.weekday(ofColumn: $0, in: week) },
+            calendar: calendar
+        )
+    }
+
+    private func shape(_ spans: [SlotSpan]) -> String {
+        spans.map { "\($0.state.rawValue):\($0.firstDay)-\($0.lastDay)" }.joined(separator: " ")
+    }
+
+    private func resolve(
+        column: Int, of span: SlotSpan, target: Int, done: [Int], todayColumn: Int
+    ) -> Date? {
+        WeekSpans.day(
+            atColumn: column, of: span, for: habit(target: target, done: done),
+            in: week, today: day(todayColumn), editing: .todayOnly, restDay: nil,
+            calendar: calendar
+        )
+    }
+
+    // MARK: - The issue's own row: one a week, done Monday, today Thursday
+
+    @Test("A met row hands today to the mark covering it")
+    func metRowOffersToday() {
+        let marks = row(target: 1, done: [0], todayColumn: 3)
+
+        // The drawing is #342's: one lit bar across the week, saying when the
+        // goal was met. What is new is the action on it.
+        #expect(shape(marks) == "filled:0-6")
+        #expect(marks[0].actionDay == day(3))
+        #expect(marks[0].completionDay == day(0))
+        #expect(!marks[0].actionIsUndo, "today is not logged, so the tap logs rather than undoes")
+        #expect(!marks[0].isBonus, "the mark is Monday's, and Monday met the goal")
+    }
+
+    @Test("Today's column resolves to today, and no other column resolves at all")
+    func todayColumnResolves() {
+        let bar = row(target: 1, done: [0], todayColumn: 3)[0]
+
+        #expect(resolve(column: 3, of: bar, target: 1, done: [0], todayColumn: 3) == day(3))
+        // Monday carries the completion, but this surface writes today only
+        // (#543); Tuesday and Saturday carry nothing and are not today.
+        for column in [0, 1, 2, 4, 5, 6] {
+            #expect(
+                resolve(column: column, of: bar, target: 1, done: [0], todayColumn: 3) == nil,
+                "column \(column) resolved on a met bar"
+            )
+        }
+    }
+
+    @Test("Logging today splits the bar: the covering mark ends on its anchor, today takes the rest")
+    func completionSplitsTheBar() {
+        let after = row(target: 1, done: [0, 3], todayColumn: 3)
+
+        // #339's rule, no longer hidden by the target clamp: Monday's mark
+        // ends on Monday, and today's — the new final mark — runs to the end
+        // of the week (#342). Both are lit, and only one is a bonus.
+        #expect(shape(after) == "filled:0-0 filled:1-6")
+        #expect(after[0].completionDay == day(0))
+        #expect(after[0].actionDay == nil, "Monday's mark is browse-only on this surface")
+        #expect(after[0].isBonus == false)
+        #expect(after[1].completionDay == day(3))
+        #expect(after[1].isBonus)
+        #expect(after[1].actionDay == day(3))
+        #expect(after[1].actionIsUndo, "the tap on today's mark takes today back")
+    }
+
+    @Test("Undoing the bonus returns the row to the shape it had, action included")
+    func undoRestoresTheRow() {
+        let before = row(target: 1, done: [0], todayColumn: 3)
+        let after = row(target: 1, done: [0, 3], todayColumn: 3)
+        let undone = row(target: 1, done: [0], todayColumn: 3)
+
+        #expect(after != before)
+        // Whole-value equality: range, state, completion day and the action
+        // that offers the bonus again.
+        #expect(undone == before)
+    }
+
+    // MARK: - What the tap does not reach
+
+    @Test("A bonus on a past day is drawn on every surface and tappable on none")
+    func pastBonusIsDrawnNotOffered() {
+        // One a week, Monday and Wednesday logged, today Friday. Wednesday's
+        // completion is a bonus mark (#543) whether or not this surface offers
+        // today; what it never offers is Wednesday.
+        for bonus in [BonusEditing.today, .never] {
+            let marks = row(target: 1, done: [0, 2], todayColumn: 4, bonus: bonus)
+            #expect(shape(marks) == "filled:0-0 filled:1-6", "\(bonus)")
+            #expect(marks[1].isBonus, "\(bonus)")
+            #expect(marks[1].completionDay == day(2), "\(bonus)")
+            #expect(
+                resolve(column: 2, of: marks[1], target: 1, done: [0, 2], todayColumn: 4) == nil,
+                "Wednesday resolved on this surface (\(bonus))"
+            )
+        }
+        // The mark covering Friday is Wednesday's; on This Week it carries
+        // Friday as its action, and a tap there is a third completion.
+        let here = row(target: 1, done: [0, 2], todayColumn: 4)
+        #expect(here[1].actionDay == day(4))
+        #expect(resolve(column: 4, of: here[1], target: 1, done: [0, 2], todayColumn: 4) == day(4))
+    }
+
+    @Test("The widget's rule leaves a met row exactly as it was")
+    func widgetRuleIsInert() {
+        let marks = row(target: 1, done: [0], todayColumn: 3, bonus: .never)
+        #expect(shape(marks) == "filled:0-6")
+        #expect(marks.allSatisfy { !$0.isTappable })
+    }
+
+    @Test("Today already logged is an undo, not a bonus")
+    func spentTodayIsAnUndo() {
+        let marks = row(target: 1, done: [3], todayColumn: 3)
+        #expect(shape(marks) == "filled:0-6")
+        #expect(marks[0].actionDay == day(3))
+        #expect(marks[0].actionIsUndo)
+        #expect(marks == row(target: 1, done: [3], todayColumn: 3, bonus: .never))
+    }
+
+    @Test("A resting today, a today outside the week, and a habit not yet made are not offered")
+    func notOfferedWhereTodayCannotBeWritten() {
+        // The rest day refuses every write (#72); the row asks for nothing.
+        let resting = row(target: 1, done: [0], todayColumn: 3, restColumn: 3)
+        #expect(resting.allSatisfy { !$0.isTappable })
+        #expect(resting == row(target: 1, done: [0], todayColumn: 3, bonus: .never, restColumn: 3))
+
+        // A met week browsed from a later one has no today in it to offer.
+        let later = TestCalendar.date(2026, 8, 26)
+        let browsed = row(target: 1, done: [0], todayColumn: 0, today: later)
+        #expect(browsed.allSatisfy { !$0.isTappable })
+
+        // Today before the habit existed — reachable through the debug today
+        // override (#204) — is #265's day: nothing is asked of it, and nothing
+        // is offered on it. Edit History wrote Friday; the goal is met.
+        let unborn = row(target: 1, done: [4], todayColumn: 2, createdColumn: 4)
+        #expect(unborn.allSatisfy { !$0.isTappable })
+    }
+
+    // MARK: - Swept
+
+    @Test("Nothing changes while the goal is unmet, on any row")
+    func unmetRowsAreUntouched() {
+        var unmet = 0
+        for target in 1...7 {
+            for todayColumn in 0...6 {
+                for mask in 0..<(1 << 7) {
+                    let done = (0...6).filter { mask & (1 << $0) != 0 }
+                    guard done.count < target else { continue }
+                    let here = row(target: target, done: done, todayColumn: todayColumn)
+                    let widget = row(target: target, done: done, todayColumn: todayColumn, bonus: .never)
+                    #expect(here == widget, "\(target)x, today \(todayColumn), done \(done)")
+                    unmet += 1
+                }
+            }
+        }
+        #expect(unmet > 0)
+    }
+
+    @Test("Every reveal splits exactly the covering mark and leaves every other mark alone")
+    func revealSplitsOnlyTheCoveringMark() {
+        var reveals = 0
+        var offeredWithCredit = 0
+
+        // Every target, weekday, completion subset and creation day. The offer
+        // is made exactly when the row is met — no mark open, none lost —
+        // today is unlogged and the habit existed on it. When it is made, the
+        // completion it invites replaces one span with two that tile the same
+        // range, and touches nothing else: that is the transition SpanView
+        // draws, and it is a birth rather than a state change (#498), so the
+        // shape of it is what this sweep pins.
+        for createdColumn in [nil, 2, 4] as [Int?] {
+            for target in 1...7 {
+                for todayColumn in 0...6 {
+                    for mask in 0..<(1 << 7) where mask & (1 << todayColumn) == 0 {
+                        let done = (0...6).filter { mask & (1 << $0) != 0 }
+                        let before = row(
+                            target: target, done: done, todayColumn: todayColumn,
+                            createdColumn: createdColumn
+                        )
+                        let what = "\(target)x, today \(todayColumn), done \(done), "
+                            + "created \(String(describing: createdColumn)): \(shape(before))"
+
+                        let met = !before.contains { $0.state == .open || $0.state == .missed }
+                        let existed = createdColumn.map { $0 <= todayColumn } ?? true
+                        // The open mark carries today too; the offer this
+                        // sweep is about is a *filled* mark carrying it.
+                        let offered = before.filter {
+                            $0.state == .filled && $0.actionDay == day(todayColumn)
+                        }
+                        #expect(offered.count == (met && existed ? 1 : 0), "offer — \(what)")
+                        guard let covering = offered.first else { continue }
+
+                        #expect(!covering.actionIsUndo, "an undo offered on a blank today — \(what)")
+                        if before.contains(where: { $0.state == .inactive }) { offeredWithCredit += 1 }
+
+                        let after = row(
+                            target: target, done: done + [todayColumn], todayColumn: todayColumn,
+                            createdColumn: createdColumn
+                        )
+                        let then = "\(what) -> \(shape(after))"
+                        #expect(after.count == before.count + 1, "mark count — \(then)")
+                        // One more completion past the target. Which mark
+                        // wears the bonus is #543's chronological rule, not
+                        // this one's: a day Edit History wrote after today
+                        // becomes the bonus once today sits in front of it.
+                        #expect(
+                            after.count(where: \.isBonus) == before.count(where: \.isBonus) + 1,
+                            "bonus count — \(then)"
+                        )
+
+                        // The rest of the row is the same row.
+                        let untouched = before.filter { $0.id != covering.id }
+                        for span in untouched {
+                            let same = after.first { $0.id == span.id }
+                            #expect(same?.state == span.state, "a bystander moved — \(then)")
+                            #expect(same?.completionDay == span.completionDay, "a bystander moved — \(then)")
+                            #expect(same?.actionDay == nil, "a bystander gained an action — \(then)")
+                        }
+
+                        // The covering mark's columns are now two marks: the
+                        // one it was, ending on its own day, and today's.
+                        let pieces = after.filter {
+                            covering.firstDay <= $0.firstDay && $0.lastDay <= covering.lastDay
+                        }
+                        #expect(pieces.count == 2, "the split is not two marks — \(then)")
+                        #expect(pieces.first?.firstDay == covering.firstDay, "range moved — \(then)")
+                        #expect(pieces.last?.lastDay == covering.lastDay, "range moved — \(then)")
+                        let todays = pieces.first { $0.completionDay == day(todayColumn) }
+                        let kept = pieces.first { $0.completionDay == covering.completionDay }
+                        #expect(todays?.state == .filled, "today's mark — \(then)")
+                        #expect(todays?.actionDay == day(todayColumn), "today's undo — \(then)")
+                        #expect(kept?.state == .filled, "the covering mark — \(then)")
+                        #expect(kept?.actionDay == nil, "the covering mark kept an action — \(then)")
+                        #expect(
+                            todays.map { $0.firstDay <= todayColumn && todayColumn <= $0.lastDay } == true,
+                            "today's mark does not contain today — \(then)"
+                        )
+
+                        // And the way back is the way there.
+                        #expect(
+                            row(target: target, done: done, todayColumn: todayColumn,
+                                createdColumn: createdColumn) == before,
+                            "undo did not restore the row — \(then)"
+                        )
+                        reveals += 1
+                    }
+                }
+            }
+        }
+
+        #expect(reveals > 0, "the sweep found no met row with today unlogged")
+        // `withBonus` looks for a `.filled` mark only, on the argument that a
+        // met row with today unlogged never carries creation credit. If this
+        // ever counts, the argument was wrong and the guard is a real case.
+        #expect(offeredWithCredit == 0, "a met row with today unlogged carried credit marks")
     }
 }

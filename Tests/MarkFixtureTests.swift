@@ -28,7 +28,7 @@ struct MarkFixtureTests {
                 completedDays: Set(done.map { week.days[$0] })
             ),
             in: week, today: week.days[today], target: target,
-            editing: .todayOnly, restDay: nil, calendar: calendar
+            editing: .todayOnly, bonus: .never, restDay: nil, calendar: calendar
         ).map { "\($0.state.rawValue):\($0.firstDay)-\($0.lastDay)" }.joined(separator: " ")
     }
 
@@ -155,7 +155,7 @@ struct DailyAgreementTests {
                     let marks = WeekSpans.spans(
                         for: .fixture(frequency: .timesPerWeek(7), completedDays: days),
                         in: week, today: week.days[todayColumn], target: 7,
-                        editing: .todayOnly, restDay: restDay, calendar: calendar
+                        editing: .todayOnly, bonus: .never, restDay: restDay, calendar: calendar
                     )
                     let what = "today \(todayColumn), done \(done), "
                         + "rest \(String(describing: restColumn))"

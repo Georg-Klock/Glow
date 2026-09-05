@@ -35,6 +35,18 @@ enum MotionPolicy {
     /// Only a completion just made animates, which was already the rule:
     /// un-completing is a correction, and animating a correction dresses a
     /// mistake up as an achievement. Reduce Motion adds the second clause.
+    ///
+    /// **A bonus arriving on a met row does not close** (#560), and that is a
+    /// decision rather than an omission. The closing animation is a ring
+    /// becoming a bar, and there is no ring here: the bar covering today is
+    /// already lit, and the tap splits it into two lit bars — the covering
+    /// mark ending on its own day and today's taking the remainder. Neither
+    /// of those views existed before the tap (`SlotSpan.id` is the range), so
+    /// nothing survives the split to animate; the row arrives at its new
+    /// shape in one frame, which is the same instant path Reduce Motion takes
+    /// and the same one the undo takes back. A grown-in reveal would also be
+    /// the app applauding a rep the week did not ask for, which SPEC §1's
+    /// "brightness must not mean well done" reaches as well.
     static func closesCompletion(
         from previous: SlotState,
         to next: SlotState,

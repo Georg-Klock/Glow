@@ -289,9 +289,13 @@ private struct WidgetRow: View {
     /// shapes stretching across the week rather than as seven columns.
     private var spans: [SlotSpan] {
         guard case .timesPerWeek(let target) = habit.frequency else { return [] }
+        // A met row offers nothing here (#560). WidgetKit reports no touch
+        // location inside a custom control, so a filled bar across several
+        // days cannot tell today's column from Monday's; the widget keeps the
+        // marks it draws and This Week is where a bonus is logged.
         return WeekSpans.spans(
             for: habit, in: week, today: today, target: target,
-            editing: .todayOnly, restDay: restDay
+            editing: .todayOnly, bonus: .never, restDay: restDay
         )
     }
 

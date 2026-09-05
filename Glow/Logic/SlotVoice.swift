@@ -120,7 +120,24 @@ enum SlotVoice {
             return "\(habitName), \(day(completionDay, calendar: calendar)), \(fact)"
         }
         guard let actionDay else { return "\(habitName), \(spanState(state))" }
+        // **A filled mark is not dated with a day it did not happen on** (#560).
+        // On a met row the mark covering today carries today as its action
+        // while today is unlogged; saying "Thursday, done" there would announce
+        // a completion that does not exist. The mark says what it is, and the
+        // hint — `bonusHint` — says what the day under the action is.
+        if state == .filled, let completionDay, completionDay != actionDay {
+            return "\(habitName), \(spanState(state))"
+        }
         return "\(habitName), \(day(actionDay, calendar: calendar)), \(spanState(state))"
+    }
+
+    /// What a tap on a met row's filled mark does when today is still unlogged
+    /// (#560): logs one more, today, as a bonus mark. Dated, because the label
+    /// above deliberately is not — the date belongs to the action here rather
+    /// than to the mark, and "Mark as done" alone would read as re-marking the
+    /// completion the mark already shows.
+    static func bonusHint(for day: Date, calendar: Calendar = WeekCalendar.calendar) -> String {
+        "Log a bonus completion for \(self.day(day, calendar: calendar))"
     }
 
     /// What a tap would do. The glow is the only thing marking a slot as

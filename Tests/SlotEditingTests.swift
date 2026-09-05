@@ -103,6 +103,32 @@ struct SlotEditingTests {
         ) == today)
     }
 
+    @Test("A filled span that names today resolves today without a completion on it")
+    func filledSpanOfferingTodayResolves() {
+        // A met row's bar carrying today as its action (#560). Today holds no
+        // completion, and the guard lets it through because the span names
+        // it — the surface decided that in `WeekSpans.spans`, and this only
+        // honours the decision. Every other column stays inert: Monday holds
+        // the completion but is not today, Tuesday is neither.
+        let offering = SlotSpan(
+            index: 0, firstDay: 0, lastDay: 6,
+            state: .filled, actionDay: today, completionDay: week.days[0]
+        )
+        let met = HabitSnapshot.fixture(
+            frequency: .timesPerWeek(1), completedDays: [week.days[0]]
+        )
+        #expect(WeekSpans.day(
+            atColumn: 2, of: offering, for: met, in: week, today: today,
+            editing: .todayOnly, restDay: nil, calendar: calendar
+        ) == today)
+        for column in [0, 1, 3, 6] {
+            #expect(WeekSpans.day(
+                atColumn: column, of: offering, for: met, in: week, today: today,
+                editing: .todayOnly, restDay: nil, calendar: calendar
+            ) == nil, "column \(column)")
+        }
+    }
+
     @Test("Span touch geometry remains the inverse of column placement")
     func everyColumnOfASpanResolves() {
         let track: CGFloat = 338

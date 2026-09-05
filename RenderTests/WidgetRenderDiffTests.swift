@@ -585,7 +585,7 @@ struct WidgetRenderDiffTests {
             let spans = WeekSpans.spans(
                 for: (entry.habits.value ?? [])[0], in: entry.week, today: entry.date, target: 2,
                 editing: .todayOnly,
-                restDay: WeekCalendar.calendar.component(
+                bonus: .never, restDay: WeekCalendar.calendar.component(
                     .weekday, from: entry.week.days[2]
                 )
             )

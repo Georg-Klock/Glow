@@ -123,7 +123,11 @@ lost mark never spans: its ✕ owns one day.
    pre-creation day without a completion is inactive.
 3. **If `owed == 0`, draw the met row.** Credit marks pack left, every real
    completion anchors in day order, and the latest completed mark reaches the
-   final column. Completions past the target are bonus marks of their own.
+   final column. Completions past the target are bonus marks of their own. On
+   This Week the completed mark covering an unlogged today carries today as its
+   action (#560, `BonusEditing.today`); the tap logs a bonus, which then
+   anchors like any other completion, and the mark that covered today ends on
+   its own day again. The widget passes `.never` and offers nothing here.
 4. **Otherwise, draw the live row.** Compute how many owed reps no longer fit
    from today through the end of the week. Give each loss the earliest eligible
    blank past day, one day each. Sort those losses, completions and today's open
@@ -571,6 +575,9 @@ order, is:
     keeps every bonus completion as a mark, lets the latest bonus own the
     remainder, and displays pre-creation completions without judging blank
     pre-creation days.
+11. #560 lets This Week log a bonus from a met row: the mark covering an
+    unlogged today carries today as its action, on that surface only. The
+    division does not change; which mark carries an action does.
 
 **`Frequency.daily` needs no change and must stay consistent.** A 7x row is
 day-pinned through `WeekGrid`, not `WeekSpans`. Check that the two agree: for

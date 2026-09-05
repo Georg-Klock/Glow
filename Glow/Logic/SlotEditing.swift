@@ -57,3 +57,30 @@ enum SlotEditing: Equatable, Sendable {
         return day
     }
 }
+
+/// Whether a surface still offers today once the week's goal is met (#560).
+///
+/// `SlotEditing` says which *days* a tap may touch, and every cadence surface
+/// answers "today". This is the second question a met row raises: today is not
+/// owed any more, so does the row still take a rep? The two surfaces answer
+/// differently, and for a reason that belongs to the surface rather than to
+/// the arithmetic — which is why it arrives as a parameter, with no default a
+/// new caller could inherit, exactly as `SlotEditing` does.
+///
+/// A completion logged this way is a bonus mark like any other (#543): same
+/// fill, same words, no third tier. What this decides is only whether the tap
+/// that makes one is offered.
+enum BonusEditing: Equatable, Sendable {
+    /// This Week: today's column of a filled row takes one more completion,
+    /// which becomes its own mark, and that mark's tap takes it back again.
+    /// `SpanView` resolves the column under the finger, so today's part of a
+    /// bar can mean today while the bar keeps saying when the goal was met.
+    case today
+
+    /// Home-Screen and in-app widgets, and every history projection: a met row
+    /// offers nothing. WidgetKit reports no touch location inside one custom
+    /// control, so a filled multi-day bar cannot tell today's column from
+    /// Monday's — one `Toggle` across the bar would offer Monday's pixels as
+    /// today's rep. The widget keeps the marks it draws and no more (#560).
+    case never
+}

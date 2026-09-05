@@ -203,6 +203,17 @@ outside that projection: `EditHistoryTrack` draws exact factual days rather
 than cadence marks, and `WeeklyGridView.correct(_:on:)` is the one caller that
 explicitly permits a future store write.
 
+**Whether a met row still takes today is the surface's second answer** (#560).
+`WeekSpans.spans` also requires a `BonusEditing`, again with no default:
+`HabitRowView` passes `.today`, so the filled mark covering an unlogged today
+carries today as its action and `SpanView` resolves the column under the
+finger; `WeekWidgetView` and `MonthGrid` pass `.never`, because WidgetKit
+reports no touch location inside a custom control and one `Toggle` across a
+multi-day bar would offer Monday's pixels as today's rep. `WeekSpans.day`
+honours the day a span names as well as a day carrying a completion, so the
+guard follows the decision rather than repeating it. The division of the week
+is the same under both values; only which mark carries an action differs.
+
 **`WeekSpans` owns claimable rep windows** (#476). In the current week a
 completion owns the window ending on its logged day, today's open rep reaches
 back over unused days and ends on today while another rep follows, and future

@@ -111,6 +111,10 @@ enum MonthGrid {
         guard let month = calendar.dateInterval(of: .month, for: todayStart) else { return [] }
 
         let editing = SlotEditing.todayOnly
+        // A month cell is a widget's, and a met week's today is not offered
+        // there (#560): WidgetKit cannot tell which column of a bar was
+        // touched, so the bar keeps the marks it draws and nothing more.
+        let bonus = BonusEditing.never
 
         // The week row's verdict on today, asked once rather than re-derived.
         // Whatever it withholds (a rest day or a spent week), this inherits.
@@ -144,7 +148,7 @@ enum MonthGrid {
             let spans = weeklyTarget.map { target in
                 WeekSpans.spans(
                     for: habit, in: week, today: todayStart, target: target,
-                    editing: editing, restDay: restDay, calendar: calendar
+                    editing: editing, bonus: bonus, restDay: restDay, calendar: calendar
                 )
             }
             let lostThisWeek = spans?.count { $0.state == .missed } ?? 0
