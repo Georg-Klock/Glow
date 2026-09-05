@@ -81,17 +81,6 @@ struct WeeklyGridView: View {
     /// container is a peer of the intent's, so a redraw is the bridge (#465).
     /// A correction advances it too (#557): see `correct(_:on:)`.
     @State private var intentRevision = 0
-    /// The pop currently on screen, or nil. See `InAppPop` and PR #275.
-    @State private var pop: InAppPop.PopContent?
-    /// Cancels a pop's own dismissal when a newer one replaces it, so the
-    /// first tap's timer cannot cut short the second tap's pill.
-    ///
-    /// A box rather than a `Task` in `@State`: the task is replaced on every
-    /// pop, and a `@State` assignment is a redraw. Nothing on screen depends
-    /// on which task is pending — `pop` is the state the screen draws — so
-    /// the handle is kept where changing it invalidates nothing. Measured as
-    /// one of the three grid body passes a tap used to cost.
-    @State private var popTask = TaskHolder()
     @Environment(\.accessibilityReduceMotion) private var gridReduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     /// Survives relaunches, so the notice appears once per time Low Power Mode
@@ -142,21 +131,22 @@ struct WeeklyGridView: View {
     /// derives it from the record, so a fresh install has only this one and
     /// the twelve behind it: back is disabled against the floor, forward is
     /// not drawn at all, and the toolbar never leaves its current-week shape.
-    /// Correcting reaches twelve weeks ahead as well (#543), and the same
-    /// pager consults that reach instead. `WeekGridMode.reach` is the rule.
+    /// Correcting reaches four weeks either way (#592, narrowing #543), and
+    /// the same pager consults that reach instead. `WeekGridMode.reach` is
+    /// the rule.
     private var reach: any WeekBounds {
         mode.reach(recordStart: recordStart, today: today)
     }
 
     /// The week today falls in. Not `reach.latest` any more: while correcting,
-    /// the reach's latest week is twelve weeks from now, and "current" still
+    /// the reach's latest week is four weeks from now, and "current" still
     /// means this one.
     private var currentWeek: Date { WeekCalendar.startOfWeek(containing: today) }
 
     /// Exactly the current week. `>=` said the same thing while nothing ahead
     /// of it could be shown; correcting pages ahead (#557), and there a week
-    /// ahead is not the current one — it wants the Today button and not the
-    /// current week's menu items.
+    /// ahead is not the current one — it must not offer the current week's
+    /// menu items.
     private var isOnCurrentWeek: Bool { weekStart == currentWeek }
 
     /// This Week is a viewer for every day except today while it browses
@@ -222,26 +212,16 @@ struct WeeklyGridView: View {
             // The panel now travels beneath the navigation bar with its rows
             // (#454). Use the same measured fade as the Widgets tab so that
             // moving material dissolves to black instead of lighting the status
-            // region. Applied before the pop overlay: a pop belongs above the
-            // screen treatment, not underneath it.
+            // region.
+            //
+            // **Nothing pops over this screen any more** (#590). PR #275 drew
+            // `InAppPop` here for two seconds after a completion, because the
+            // Island does not render a Live Activity while its own app is in
+            // front. The capsule is gone: while the app is open the row's own
+            // acknowledgement — the ring closes, the label dims — is all that
+            // is said, as #103 first decided, and the Island's real update is
+            // requested from `toggle` for the moment the app is out of view.
             .overlay(alignment: .top) { TopFade() }
-            // **An overlay, not a row in the stack** (PR #275). Put in the
-            // `VStack` it pushed the whole grid down for its two seconds, so
-            // the row that was just tapped moved out from under the finger —
-            // which is precisely the flurry #272 says has to stay fast. It
-            // floats in the gap the day header already leaves instead, and
-            // nothing else on the screen moves at all.
-            .overlay(alignment: .top) {
-                if let pop {
-                    InAppPop(content: pop)
-                        .padding(.horizontal, GridMetrics.horizontalPadding)
-                        .transition(
-                            gridReduceMotion
-                                ? .opacity
-                                : .move(edge: .top).combined(with: .opacity)
-                        )
-                }
-            }
             .navigationTitle(weekTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -274,16 +254,16 @@ struct WeeklyGridView: View {
                 // and in the past the way home is on both sides.
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if isCorrectingHistory {
-                        // **Done replaces the menu** (#557). Correcting asks one
-                        // question per day and nothing about the list, so New
-                        // Habit, Blank Row and Edit Habits have nothing to do
-                        // here — and a mode whose exit is behind a menu reads
-                        // as a mode you are stuck in (#399). Today stays off
-                        // the current week: paging home is as useful twelve
-                        // weeks ahead as it is twelve behind.
-                        if !isOnCurrentWeek {
-                            todayButton
-                        }
+                        // **Done replaces the menu, and nothing sits beside
+                        // it** (#557, #592). Correcting asks one question per
+                        // day and nothing about the list, so New Habit, Blank
+                        // Row and Edit Habits have nothing to do here — and a
+                        // mode whose exit is behind a menu reads as a mode you
+                        // are stuck in (#399). #557 also put Today here on
+                        // every week but the current one; #592 takes it away,
+                        // so the two modes' bars hold the same single exit.
+                        // The way back to the current week is the pager, four
+                        // weeks at most in either direction, or Done.
                         doneCorrecting
                     } else if isOnCurrentWeek {
                         // **Leaving edit mode is one tap; entering it is still
@@ -301,15 +281,9 @@ struct WeeklyGridView: View {
                         // rather than a second Done beside it. The menu keeps
                         // row additions and Correct History while editing.
                         if editMode.isEditing {
-                            Button {
+                            doneButton {
                                 withAnimation(editModeAnimation) { editMode = .inactive }
-                            } label: {
-                                Label("Done", systemImage: "checkmark")
                             }
-                            // Per-`Label`, not on an ancestor: a label style set
-                            // at a shared parent reaches every `Label` below it,
-                            // content included (#393). The pager does the same.
-                            .labelStyle(.iconOnly)
                         }
                         // One menu rather than a button and a menu (#320): the
                         // list actions share the one control, behind an ellipsis
@@ -888,29 +862,39 @@ struct WeeklyGridView: View {
         Button("Today") { show(week: currentWeek) }
     }
 
-    /// The way out of correcting history (#557): a solid white capsule with
-    /// a dark label, where the list's edit mode has an icon-only checkmark.
-    ///
-    /// **Built the way the empty state's button is, and for the same
-    /// reason.** The app's root tint is pure white, and anything that fills
-    /// with the tint and draws its label in "the contrasting colour" renders
-    /// white on white — measured three times over (#124, #162; CLAUDE.md).
-    /// `FilledCapsuleLabel` states both colours outright. Tighter padding than
-    /// the empty state's: this sits in a 44pt toolbar.
-    ///
-    /// Labelled "Done", the same word the edit mode's exit carries, so the
-    /// two ways out of the two modes read as one control in two shapes.
+    /// The way out of correcting history (#557, reshaped by #592). It was a
+    /// solid white `FilledCapsuleLabel` reading "Done", beside the list edit
+    /// mode's bare checkmark — "one control in two shapes". #592 makes it
+    /// one control in one shape: the same `doneButton` the edit mode draws,
+    /// so the two exits cannot differ in glyph, size or position.
     private var doneCorrecting: some View {
-        Button {
+        doneButton {
             isCorrectingHistory = false
             // Back inside browsing's reach. A week paged into ahead of today
             // has nowhere to be shown outside this mode, so it clamps to the
             // current week; every other week stays exactly where it was.
             show(week: reach.clamped(weekStart))
-        } label: {
-            FilledCapsuleLabel(title: "Done", horizontalPadding: 14, verticalPadding: 7)
         }
-        .buttonStyle(.plain)
+    }
+
+    /// The one exit both modes draw (#592): an icon-only checkmark in the
+    /// trailing group, no word and no fill.
+    ///
+    /// The icon is the one the menu's Edit item used, which is what makes the
+    /// edit mode's exit a promotion of that item rather than a second Done
+    /// beside it (#399). Nothing here is filled, so the white-on-white tint
+    /// trap (#124, #162; CLAUDE.md) that #557's capsule was built around does
+    /// not arise: a plain toolbar button draws its glyph in the tint over
+    /// the bar's own platter. "Done" stays as the label's title so VoiceOver
+    /// and the UI tests read the same word from either mode.
+    private func doneButton(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label("Done", systemImage: "checkmark")
+        }
+        // Per-`Label`, not on an ancestor: a label style set at a shared
+        // parent reaches every `Label` below it, content included (#393).
+        // The pager does the same.
+        .labelStyle(.iconOnly)
     }
 
     /// The existing list menu, available from every browsed week now that it
@@ -1203,18 +1187,36 @@ struct WeeklyGridView: View {
     }
 
     private func toggle(_ habit: Habit, on day: Date) {
+        // **This Week asks the Island for the real pop, before it writes**
+        // (#590). It never did: #103 kept `GoalPopCentre` for the intents
+        // because the Island does not render while its own app is in front,
+        // and PR #275 answered the silence by drawing `InAppPop` here instead
+        // — so the only call site of the real update was the widget's. Now
+        // this tap makes the same request `MarkHabitOperation` makes behind
+        // `presentsIsland: true`, decided from the pre-write snapshot with the
+        // same timing (#464), and `PopPreferences` stays the arbiter through
+        // `OptimisticPop`. The tap toggles, so what it asks for is the
+        // opposite of what the day holds; an undo is silent by that rule.
+        // Whether an update made while foregrounded still expands the Island
+        // once the app is backgrounded is a device question — see
+        // docs/decisions.md.
+        let week = WeekCalendar.week(containing: day)
+        let before = habit.snapshot(within: week.dayIDs())
+        GoalPopCentre.popIfRequestedCompletion(
+            requestedDone: before.count(on: WeekCalendar.day(day)) == 0,
+            habit: before,
+            in: week,
+            today: day
+        )
+
         do {
             // This surface offers today only. The store's ordinary strict
             // guard is the second line of defense for any stale control.
             switch try store.toggleCompletion(for: habit, on: day) {
             case .completed:
+                // The row is the whole in-app acknowledgement (#103, #590):
+                // the ring closes and the label dims. Nothing else is drawn.
                 Haptics.completed()
-                // **#103 said no pop here and PR #275 reverses it.** The Island
-                // still will not render a Live Activity while its own app is in
-                // front, which is why this draws its own rather than asking for
-                // one. Same words, same preferences — see `PopPreferences` and
-                // `InAppPop`.
-                showPop(for: habit, on: day)
             case .uncompleted:
                 Haptics.uncompleted()
             case .refused, .unchanged:
@@ -1238,46 +1240,6 @@ struct WeeklyGridView: View {
             // was making. The message names no habit and no day (#282).
             OperationNotices.shared.report(.mark) { toggle(habit, on: day) }
         }
-    }
-
-    /// Puts the completion's words on screen, and takes them off again.
-    ///
-    /// The same thing `GoalPopCentre` does for the Island: one line, gone after
-    /// `GoalPop.duration`. `PopPreferences.allows` decides whether it is wanted
-    /// at all, so the two surfaces cannot disagree.
-    ///
-    /// **One line per tap** (#420). This used to run the routine line and then
-    /// replace it with the goal's after `GoalPop.handover` when the tap met the
-    /// goal — two things said inside one two-second window, and the only
-    /// double-fire in the app. One pool, one line, no sequence to play.
-    ///
-    /// One task, cancelled and replaced. Checking off several habits quickly is
-    /// the flurry this has to survive (#272): without the cancel, the first
-    /// tap's dismissal would fire two seconds after *its* tap and take the
-    /// second tap's pill with it.
-    private func showPop(for habit: Habit, on day: Date) {
-        let week = WeekCalendar.week(containing: day)
-        let snapshot = habit.snapshot(within: week.dayIDs())
-        let met = GoalMet.justMet(habit: snapshot, in: week)
-        guard PopPreferences.allows(justMetGoal: met) else { return }
-
-        popTask.task?.cancel()
-        show(name: habit.name, habitID: habit.id, on: day)
-
-        popTask.task = Task { @MainActor in
-            try? await Task.sleep(for: GoalPop.duration)
-            guard !Task.isCancelled else { return }
-            withAnimation(gridReduceMotion ? nil : .easeOut(duration: 0.2)) { pop = nil }
-        }
-    }
-
-    private func show(name: String, habitID: UUID, on day: Date) {
-        let content = InAppPop.PopContent(
-            id: UUID(),
-            habitName: name,
-            line: GoalPop.line()
-        )
-        withAnimation(gridReduceMotion ? nil : .easeOut(duration: 0.2)) { pop = content }
     }
 
     #if DEBUG
@@ -1376,10 +1338,10 @@ struct WeeklyGridView: View {
 /// `.borderedProminent` fills with the tint and draws the label in the
 /// contrasting colour — white on white. Measured: the capsule's interior was
 /// 8077 pixels of a single colour, 255,255,255, with no label in it at all.
-/// Both colours are stated here, and the two places that need a filled
-/// control — the empty state's first button and the exit from correcting
-/// history (#557) — share this one construction rather than each re-deriving
-/// the trap. `StoreUnavailableView` draws the same shape for the same reason.
+/// Both colours are stated here. The empty state's first button is what needs
+/// a filled control; the exit from correcting history shared this construction
+/// under #557 and is a bare checkmark since #592. `StoreUnavailableView` draws
+/// the same shape for the same reason.
 struct FilledCapsuleLabel: View {
     let title: String
     var horizontalPadding: CGFloat = 24
@@ -1393,16 +1355,6 @@ struct FilledCapsuleLabel: View {
             .padding(.vertical, verticalPadding)
             .background(Capsule().fill(GlowPalette.color))
     }
-}
-
-/// A task handle a view can replace without redrawing.
-///
-/// `@State` holds the box; the box holds the task. Assigning the task changes
-/// nothing SwiftUI observes, which is the point: the view draws `pop`, not
-/// the timer that clears it.
-@MainActor
-private final class TaskHolder {
-    var task: Task<Void, Never>?
 }
 
 /// The grid's panel, moved by the `List`'s own scroll offset (#454) — with

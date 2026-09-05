@@ -8871,3 +8871,90 @@ approved the 193; if that count proves to oscillate across the floor it is a
 separate decision about `toneRetention` or about which levels the iOS 18
 baseline pins, and this entry is where the number was first written down.
 
+## 2026-09-05 — Correct History leaves through the same checkmark as Edit, without a Today button, and reaches four weeks either way (#592)
+
+This supersedes two parts of #557 and one of #543. #557 drew Correct History's
+exit as a solid white `FilledCapsuleLabel` reading "Done" beside the list edit
+mode's bare `checkmark` — "one control in two shapes" — and put a Today button
+next to it on every week but the current one, because a mode that pages twelve
+weeks ahead as well as back wanted a quick way home. #543 gave the mode its
+reach: browsing's record-or-twelve-week past edge, extended by the record
+without limit, and a flat twelve weeks ahead.
+
+**One control in one shape.** Both modes now leave through `doneButton`, one
+construction in `WeeklyGridView`: `Label("Done", systemImage: "checkmark")`
+with `.labelStyle(.iconOnly)`, in the trailing group, no word and no fill.
+`EditHistoryContractTests` pins that the checkmark `Label` is built exactly
+once and reached from both exits. The capsule's reason for existing — the root
+tint is pure white, so anything filled with it and labelled in "the
+contrasting colour" renders white on white (#124, #162) — does not apply to a
+plain toolbar button, which fills nothing. `FilledCapsuleLabel` stays for the
+empty state's first button, its one remaining use.
+
+**No Today in the mode, and the cost is accepted.** With Today gone the way
+back to the current week inside Correct History is the pager, or leaving via
+Done and re-entering. At twelve weeks that was too far to step, which is why
+the reach moved in the same change: **`EditHistoryReach` is a flat four weeks
+behind and four ahead**, reading no record, so the worst case is four taps.
+The real cost is the other edge: **a completion older than four weeks is no
+longer correctable through this screen**, where before it was reachable as far
+back as the record went. Older data that needs fixing will need a path other
+than Correct History. `EditHistoryReach.from(today:)` no longer delegates to
+`WeekReach`, whose past edge is unbounded upward by design — sharing it would
+have reintroduced the reach this bounds. Browsing's reach is untouched: This
+Week still pages back to the record or twelve weeks, and its past weeks keep
+their Today button.
+
+**Neither render baseline moved.** The hosted `weekly grid screen` frame does
+include a toolbar, but it is browsing's on the current week — the ••• menu —
+which this change does not touch; no frame renders the correcting or editing
+bar. Confirmed by the run rather than assumed.
+
+## 2026-09-05 — The app draws no pop of its own; This Week asks the Island for the real one (#590)
+
+This narrows PR #275 back toward #103 for what is *visible*, and goes past
+both for what is *requested*. #103 measured that the Island does not render a
+Live Activity while its own app is in the foreground and answered by keeping
+`GoalPopCentre` for the intents alone: the app's acknowledgement was the row —
+the ring closes, the label dims — and nothing else. PR #275 reversed the
+visible half: the pop was wanted every time, so the app drew `InAppPop`, the
+Lock Screen presentation as a capsule over the grid, for two seconds after a
+completion.
+
+**`InAppPop` is gone.** While the app is open, a completion is acknowledged by
+its row and by nothing drawn over the screen — #103's position, restored. The
+overlay, its state, its dismissal timer and the view file are removed;
+`GoalPopTests` now scans the grid for the absence of a timed pop rather than
+counting two sleep sites.
+
+**This Week had never requested a Live Activity.** `WeeklyGridView.toggle`
+called `store.toggleCompletion` and then drew the capsule; the only caller of
+`GoalPopCentre.popIfRequestedCompletion` was `MarkHabitOperation`, behind
+`presentsIsland: true` — the installed widget's path. So removing the capsule
+alone would have produced no encouragement from the app's main screen at all,
+foregrounded or not. `toggle` now makes the same request the widget makes,
+with the same timing (#464): decided from the bounded pre-write snapshot,
+asking for the completion the toggle would produce, before the store writes.
+`PopPreferences` stays the arbiter through `OptimisticPop`; an undo and a
+day already held are silent by the same rule. `MarkHabitOperation` itself was
+not reused for the grid's tap: it carries the widget's contract — absolute
+state, stale-day refusal, the burst note, the trace line — which the app's
+relative tap deliberately does not have. The shared unit is `GoalPopCentre`,
+which is what "one place, so no two callers can disagree" was for.
+
+**The default is already Always.** `PopPreferences.Level.unset` resolves to
+`.everything` (#185); confirmed against the code, nothing changed. `SPEC.md`
+still said Goals was the default and now says what the code does.
+
+**One question stays open, and it is a device question.** What was measured
+is that the Island does not render *while the app is foregrounded*. What is
+not measured is whether an update requested while foregrounded still expands
+the Island once the app is backgrounded afterwards, or whether ActivityKit
+needs the request to arrive after backgrounding. The simulator cannot show a
+Live Activity, so this change was verified there only for what it removes and
+for the request being made; if a phone answers "no", wiring `toggle` into
+`GoalPopCentre` is not enough on its own and the request would have to be
+deferred to the background transition. Until that is measured, the Widgets
+tab's hosted preview keeps `presentsIsland: false` (#465) — its silence is
+now an asymmetry with This Week rather than a shared rule, and the same
+measurement decides both.

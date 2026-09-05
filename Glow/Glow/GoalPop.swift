@@ -487,11 +487,11 @@ enum GoalPop {
     /// #420 argued the opposite and gave a reason: a Live Activity's content
     /// can be re-read, so a phrase that changed under the reader would look
     /// like a glitch. **That risk is handled by the architecture, not by the
-    /// seed.** Both surfaces choose once and store the result —
+    /// seed.** The surface chooses once and stores the result —
     /// `GoalPopAttributes.ContentState` holds the chosen `line` and the
-    /// Activity renders from it, and the in-app pop holds its own — so nothing
-    /// recomputes a phrase while it is on screen. Stability under re-read was
-    /// never what the arithmetic was buying.
+    /// Activity renders from it — so nothing recomputes a phrase while it is
+    /// on screen. Stability under re-read was never what the arithmetic was
+    /// buying.
     ///
     /// The unseen indices and an exact marker for this pool live in the App
     /// Group defaults, so app and widget spend the same cycle. A pool edit
@@ -582,21 +582,22 @@ enum GoalPop {
 
 /// How much the Island says.
 ///
-/// **Default on at `goals`, and that is the part with a trap in it.**
-/// `@AppStorage` hands back `false` — and `0` — for a key nobody has written,
-/// so a plain default of "on" reads as *off* for everybody until they change it
-/// twice. Stored the way `WeekPreferences.restDay` handles "unset": an explicit
-/// sentinel behind a computed property, and `unset` is `0` for exactly that
-/// reason.
+/// **Default on — at `everything` since #185 — and that is the part with a
+/// trap in it.** `@AppStorage` hands back `false` — and `0` — for a key nobody
+/// has written, so a plain default of "on" reads as *off* for everybody until
+/// they change it twice. Stored the way `WeekPreferences.restDay` handles
+/// "unset": an explicit sentinel behind a computed property, and `unset` is `0`
+/// for exactly that reason. Confirmed again for #590: `Level.unset.effective`
+/// is `.everything`, so a fresh install already speaks on every completion.
 ///
 /// In the App Group's defaults, because the intents that fire it may run in a
 /// different process from the app and would otherwise read a different store.
 ///
 /// **Three states rather than two** (#119). `goals` is what the switch used to
-/// mean by "on" and stays the default, so nobody's setting changes underneath
-/// them: the stored `1` that meant on still means goals. `everything` is the new
-/// one, and it is opt-in because being spoken to on every tap is a preference
-/// some people will want and most will not.
+/// mean by "on", so nobody's stored setting changes underneath them: the stored
+/// `1` that meant on still means goals. `everything` was the new one and was
+/// opt-in under #119; #185 made it what an unwritten key means, and the
+/// `Level.unset` case below carries that reasoning.
 enum PopPreferences {
     static let key = "islandPop"
 

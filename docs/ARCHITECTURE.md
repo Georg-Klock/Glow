@@ -29,8 +29,9 @@ Pure value types and free functions. No SwiftData, no SwiftUI, no `Date()`.
   function.
 - `WeekReach` is how far back the week view may be paged: two week starts,
   reaching to the record or twelve weeks, whichever is earlier (#186, #259).
-  `EditHistoryReach` reuses that past edge and adds the editor's flat
-  twelve-week future edge (#543). Both are separate from `SlotEditing` on
+  `EditHistoryReach` is Correct History's own reach — a flat four weeks either
+  side of the current week, reading no record (#592, narrowing #543, which had
+  reused browsing's past edge and added twelve ahead). Both are separate from `SlotEditing` on
   purpose — reach says which weeks there are to visit, while every cadence
   surface now passes `.todayOnly`; the arbitrary-day editor reads exact days
   without cadence projection. `WeekReach` trusts the date it is handed: the record's start
@@ -182,8 +183,14 @@ widget control rather than behind the save.
 `MarkHabitOperation`. Installed widgets reach it through `MarkHabitIntent` with
 the Island enabled. The in-app Widgets preview reaches it through a binding
 adapter over the app's live `ModelContext`, with the Island disabled. Both use
-the same absolute-state write and reconciliation path, but the foreground app
-does not request a Live Activity the system will not display.
+the same absolute-state write and reconciliation path.
+
+`WeeklyGridView.toggle` — This Week's own tap — is `GoalPopCentre`'s other
+caller (#590). It takes the bounded pre-write snapshot, asks for the completion
+the toggle would produce, and only then calls `HabitStore.toggleCompletion`, so
+the Island's decision has the same timing from the grid as from a widget. The
+grid draws nothing for it: `InAppPop`, PR #275's in-app capsule, is gone, and
+the row's own state change is the whole foreground acknowledgement.
 
 `LatestPopDelivery` owns replacement ordering for a running Live Activity. It
 does not serialise updates: every new operation begins immediately. When an
@@ -441,9 +448,10 @@ plain circles from `Habit.snapshots(...within:)`, never `WeekGrid` or
 `WeekSpans`, so cadence judgement is deliberately absent — while the label
 column, the row height, the `List`, the panel and the scroll position are
 untouched. Swipe actions, `onDelete` and `onMove` are disabled per row, the
-••• menu leaves the bar and a drawn white `FilledCapsuleLabel` Done takes its
-place; that button is the sole exit and clamps the week back into browsing's
-reach on the way out.
+••• menu leaves the bar and Done takes its place — the same icon-only
+checkmark the list's edit mode draws, from one `doneButton` (#592) — with no
+Today beside it; that button is the sole exit and clamps the week back into
+browsing's reach on the way out.
 
 `WidgetsView` is that tab: every widget this bundle ships, previewed by the
 shipping view, as three named cards — "Large Week Widget", "Medium Week

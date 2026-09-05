@@ -24,13 +24,15 @@ final class EditHistoryTests: XCTestCase {
         correct.tap()
 
         // The same screen: no new navigation bar, the week unchanged, the
-        // menu gone and Done in its place.
+        // menu gone and Done in its place — the icon-only checkmark whose
+        // accessible name is still "Done" (#592) — and no Today beside it.
         let done = app.buttons["Done"]
         XCTAssertTrue(done.waitForExistence(timeout: 3))
         XCTAssertTrue(app.navigationBars["Last Week"].exists)
         XCTAssertFalse(app.navigationBars["Correct History"].exists)
         XCTAssertFalse(app.buttons["More"].exists)
         XCTAssertFalse(app.buttons["Cancel"].exists)
+        XCTAssertFalse(app.buttons["Today"].exists, "Correct History offers no Today (#592)")
 
         let cells = app.buttons.matching(NSPredicate(
             format: "identifier BEGINSWITH %@", "edit-history-cell-"
@@ -63,9 +65,9 @@ final class EditHistoryTests: XCTestCase {
         next.tap()
         XCTAssertTrue(app.navigationBars["Next Week"].waitForExistence(timeout: 3))
         XCTAssertEqual(cells.count, 35, "a week ahead still offers every day")
-        XCTAssertTrue(
+        XCTAssertFalse(
             app.buttons["Today"].exists,
-            "the way home is offered ahead of the current week as it is behind it"
+            "no Today ahead of the current week either; the pager or Done is the way back (#592)"
         )
 
         // Done is the sole exit. Leaving from a week ahead clamps back into

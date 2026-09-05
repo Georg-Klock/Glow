@@ -150,9 +150,11 @@ landed on; that was weighed and taken. See docs/decisions.md.
   kept, and the grid is identical whether it fired or not.
 
   **How often it speaks is the person's choice** (#119), and Settings has three
-  positions rather than a switch: **Never**, **Goals**, **Everything**. Goals is
-  the default and is what "on" always meant, so a stored setting keeps exactly
-  what it had. This clause used to read "when a goal is met", and the reasoning
+  positions rather than a switch: **Never**, **Goals**, **Everything**. A fresh
+  install speaks at **Everything** (#185, confirmed for #590:
+  `PopPreferences.Level.unset` resolves to it); Goals is what "on" always
+  meant before there were three, so an install that stored that setting keeps
+  exactly what it had. This clause used to read "when a goal is met", and the reasoning
   for that restriction — that firing on every completion would put twenty of
   these a day on a screen whose whole argument is that it says one thing — is
   kept in `GoalMet`'s own comment, marked superseded. What it got wrong is the
@@ -210,8 +212,8 @@ landed on; that was weighed and taken. See docs/decisions.md.
   operation through an app binding adapter, with Island presentation disabled:
   the app is foreground, where the Live Activity is not visible. Installed
   widgets reach it through `MarkHabitIntent` with Island presentation enabled.
-  This keeps the Island a Home Screen acknowledgement and leaves the existing
-  in-app pop as the foreground presentation.
+  This Week's own tap asks `GoalPopCentre` directly, with the same pre-write
+  decision (#590) — see the next clause.
 
 **A mark from a widget sets a state; it does not flip one** (#272, #292).
 `MarkHabitIntent` carries the state the tapped mark was *asking for* — a ring
@@ -245,17 +247,20 @@ mark that is not tappable is not a `Toggle`, exactly as it was never a
 `Button`. VoiceOver's label, value and hint follow the same `isOn` the pixels
 do, so the announcement cannot lag the mark.
 
-  **The Island fires from the home screen only, and the app draws its own**
-  (#103, reversed in part by PR #275). The Island does not render a Live
-  Activity while its own app is in the foreground, so a completion logged in
-  the app would spend its two seconds on nobody. `GoalPopCentre` is therefore
-  called from `MarkHabitIntent` and from nowhere else — it was two intents
-  until #209 took the ring's away. #103's answer was that the app then says
-  nothing, and that read as the app saying *less* the moment a person is
-  looking at it: the app draws `InAppPop` instead, the Live Activity's own
-  Lock Screen presentation, from the same pool under the same setting. The two
-  surfaces cannot both fire for one tap — they are reached from different entry
-  points, and the widget's button is not a foreground tap.
+  **The app draws nothing of its own; the Island is the one pop** (#590,
+  narrowing PR #275 back toward #103 for what is visible). The Island does not
+  render a Live Activity while its own app is in the foreground, so #103 kept
+  `GoalPopCentre` for the widget intent alone and PR #275 then drew `InAppPop`
+  — the Lock Screen presentation as an in-app capsule — over the grid for two
+  seconds after a completion. That capsule is gone. While the app is open a
+  completion is acknowledged by its row alone: the ring closes, the label dims,
+  the row goes quiet. This Week's tap now makes the same `GoalPopCentre` request
+  the widget makes, decided from the pre-write snapshot under the same setting,
+  so the real update is waiting for the moment the app leaves the screen.
+  Whether an update requested while foregrounded still expands the Island once
+  the app is backgrounded is not yet measured on a device — the simulator
+  cannot show a Live Activity — and is recorded as open in docs/decisions.md.
+  The Widgets tab's hosted preview still asks for no Island (#465).
 
   The alternative was to rewrite §1 so that light may also mean *well done*.
   That was declined: it would put a second meaning on the one signal the app
@@ -306,8 +311,8 @@ A build that violates one of these is broken regardless of what else works.
   (#543, superseding #116/#117/#508/#526). Arbitrary past and future
   corrections belong to Correct History alone — This Week's own correcting
   mode, not a separate screen (#557): every real habit against every day as a
-  plain selected/unselected circle, from the same backward floor through
-  exactly twelve weeks ahead. Its future write is explicit at the store call.
+  plain selected/unselected circle, four weeks behind the current week through
+  four ahead (#592). Its future write is explicit at the store call.
   A rest day is never editable on the cadence surfaces. **A met row still
   takes today on This Week** (#560): the filled mark covering an unlogged
   today carries today as its action, and the completion it logs is an
@@ -729,16 +734,20 @@ draws no circles. Every tap writes immediately through `HabitStore`, with the
 future permission spoken at that one call site; there is no draft and no save.
 While the mode is on there is no habit management — no swipe actions, no
 reorder, no habit editor from the label, and no New Habit or Blank Row — and
-the ••• menu gives its place to **Done**: a solid white capsule with a dark
-label, drawn outright the way the empty state's first button is, because the
-root tint is white and a styled prominent button renders white on white
-(#162). The pager stays and reaches twelve weeks ahead as well as back
-(`EditHistoryReach`); the title ladder mirrors forward — "Next Week", "Two
-Weeks Ahead", then the dates over "N weeks ahead" — and the forward chevron is
-drawn whenever there is a week ahead to reach. **Today** sits beside Done on
-every week but the current one, ahead as well as behind. Done returns the
-screen to browsing on the week it is showing, clamped back to the current week
-if that week was ahead of today, because browsing has no forward reach.
+the ••• menu gives its place to **Done**: the same icon-only checkmark the
+list's edit mode leaves through, drawn by one construction so the two exits
+are one control in one shape (#592, superseding #557's white capsule). Nothing
+in the bar is filled, so the white-on-white tint trap (#162) does not arise.
+The pager stays and reaches a flat **four weeks either way** (`EditHistoryReach`;
+#592 narrowing #543's record-or-twelve back and twelve ahead); the title ladder
+mirrors forward — "Next Week", "Two Weeks Ahead", then the dates over "N weeks
+ahead" — and the forward chevron is drawn whenever there is a week ahead to
+reach. There is **no Today button** in this mode, on any week: the way back to
+the current week is the pager, four steps at most, or Done. A completion older
+than four weeks is outside this screen's reach and is not correctable in the
+app. Done returns the screen to browsing on the week it is showing, clamped
+back to the current week if that week was ahead of today, because browsing has
+no forward reach.
 
 **Editing has a toolbar of its own** (#399). While the list is fanned open the
 week pager and the week readout both leave — neither answers a question editing
@@ -748,8 +757,8 @@ on screen can reach. What appears in their place is a **Done** checkmark,
 immediately left of the ellipsis, carrying the same `checkmark` symbol the menu
 item used to. The menu keeps New Habit, Blank Row and Correct History and
 drops Edit Habits for as long as editing lasts, so Done is said once rather
-than twice. Correcting history has its own Done in the same slot (#557) — a
-filled capsule where the list's is a bare checkmark — and no menu at all.
+than twice. Correcting history has the same Done in the same slot (#557, #592)
+— the identical checkmark, from the same `doneButton` — and no menu at all.
 **Entering is still two taps and leaving is now one**: #320 put both ends in
 the menu for symmetry and named the cost, and this is that cost being paid back
 on the end that needed it — a mode whose exit is behind a menu reads as a mode
@@ -944,8 +953,9 @@ where the crossfade already was.
       becomes its own mark; tapping that mark takes it back. The widget's met
       row is inert.
 - [x] Correct History is This Week in place — same list, same scroll position,
-      no presentation — offers every day through exactly twelve weeks ahead,
-      and writes each selected/unselected circle immediately (#557).
+      no presentation — offers every day from four weeks behind the current
+      week through four ahead, and writes each selected/unselected circle
+      immediately (#557, #592).
 - [x] At most one slot per habit is open at a time, and it ends on today rather
       than painting future days.
 - [x] Without EDR the glow renders as flat colour, no crash, no artifact.

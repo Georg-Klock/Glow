@@ -13,7 +13,7 @@ struct WeekGridModeTests {
         return calendar
     }
 
-    @Test("Browsing and list editing stop at the current week; correcting reaches twelve ahead")
+    @Test("Browsing and list editing stop at the current week; correcting reaches four weeks either way")
     func reachFollowsTheMode() throws {
         let calendar = try calendar("Europe/Berlin")
         let today = try #require(calendar.date(from: DateComponents(
@@ -32,7 +32,12 @@ struct WeekGridModeTests {
         let correcting = WeekGridMode.correctingHistory.reach(
             recordStart: record, today: today, calendar: calendar
         )
-        #expect(correcting.earliest == record, "the past edge is the same record-or-twelve floor")
+        // The record reaches thirty weeks back; correcting reaches four (#592),
+        // and does not consult the record at all.
+        #expect(correcting.earliest == calendar.date(
+            byAdding: .day, value: -7 * EditHistoryReach.pastWeeks, to: current
+        ))
+        #expect(correcting.earliest > record)
         #expect(correcting.latest == calendar.date(
             byAdding: .day, value: 7 * EditHistoryReach.futureWeeks, to: current
         ))
