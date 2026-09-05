@@ -422,6 +422,13 @@ struct WeeklyGridView: View {
             // version of the widget, it is a different picture. This is the
             // same rule the widget follows, where the slot falls out of the
             // frame it was actually given.
+            //
+            // **And past 338pt it stops growing** (#588). The geometry caps
+            // its scale at the widget's own size and reports what is left
+            // over as `sideMargin`; `GridHorizontalInsets` puts that on both
+            // bounds of the `List`, so on a phone wider than 378pt the panel
+            // sits centred at the widget's true width with equal margins,
+            // rather than as a larger widget.
             let inset = GridMetrics.horizontalPadding
             let geometry = RowGeometry(
                 totalWidth: max(0, proxy.size.width - inset * 2),
@@ -432,7 +439,8 @@ struct WeeklyGridView: View {
             let horizontal = GridHorizontalInsets(
                 isEditing: isEditing,
                 padLeading: geometry.padLeading,
-                padTrailing: geometry.padTrailing
+                padTrailing: geometry.padTrailing,
+                sideMargin: geometry.sideMargin
             )
             // The rest day's line ends on a habit, and it ends where the widget
             // ends: the same `largeRowCapacity` that decides the boundary
@@ -715,7 +723,8 @@ struct WeeklyGridView: View {
     ///
     /// The panel insets are the remainders after the List's own insets, not the
     /// row's content insets (#400, #520, #548). Each side sums back to the
-    /// ordinary 20pt, so the panel does not follow the system controls inward.
+    /// ordinary 20pt — plus the centring margin the List carries on a wide
+    /// phone (#588) — so the panel does not follow the system controls inward.
     private func panel(
         geometry: RowGeometry,
         horizontal: GridHorizontalInsets

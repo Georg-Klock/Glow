@@ -609,16 +609,22 @@ circular. Passing one value down also guarantees the header and the rows divide
 the screen identically, which is the one thing the whole screen is for.
 
 `RowGeometry` is also where This Week becomes the widget: every measurement is
-a `WidgetMetrics` number times one factor, the screen's width over the
-widget's 338pt, so the screen is the large widget scaled up rather than a
-second layout kept in step with it by hand. The deliberate departures are on
-the type.
+a `WidgetMetrics` number times one factor, the width offered over the widget's
+338pt, **capped at 1** (#588). Under 338pt the screen is a smaller widget; past
+it the screen is the widget at its true size — the same `min(1, width /
+designWidth)` the Widgets tab draws every family at — and the surplus is
+reported as `sideMargin`. `GridHorizontalInsets` puts that margin on both
+bounds of the `List`, so on a wide phone the panel, its rows and the system's
+edit and swipe controls move inward together and the panel sits centred with
+equal margins. The deliberate departures are on the type.
 
-`RowGeometry` is where the label column's response to Dynamic Type lives. It
-scales with the user's text size and is then clamped to 42% of the screen, so a
-large accessibility size cannot shrink the track until a week stops looking like
-one. The weekday header's own numerals stay fixed, because they sit inside
-columns that are one slot wide and have nowhere to grow into.
+Dynamic Type does not scale the label column here (2026-08-24, superseding the
+42% clamp this paragraph used to describe). The one concession is #567's:
+with *Remove icons for larger text* on and the system size above the default,
+the name gives up the icon and grows inside the same column, capped at
+`WidgetMetrics.textSizeCap`. The weekday header's own letters stay fixed,
+because they sit inside columns that are one slot wide and have nowhere to grow
+into.
 
 ## What a launch does, in order
 

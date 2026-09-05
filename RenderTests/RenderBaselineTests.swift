@@ -670,13 +670,18 @@ struct RenderBaselineTests {
         /// frame.
         var mode: EditMode = .inactive
 
-        /// The panel the grid sits on: a 6.1" phone's width, less the margin
-        /// `WeeklyGridView` insets the panel by. The widget frames pin
+        /// The panel the grid sits on. `WeeklyGridView` offers `RowGeometry`
+        /// a 6.1" phone's width less its 20pt margin on each side — 353pt —
+        /// and since #588 the geometry caps at the widget's own 338pt and
+        /// reports that as `panelWidth`, so this frame is the widget's width
+        /// and the 15pt over is the screen's centring margin, which the
+        /// hosted `weekly grid screen` frame covers. The widget frames pin
         /// `WidgetMetrics.largeWidth` for the same reason — a signature is only
         /// comparable against a width that cannot move.
         static let screenWidth: CGFloat = 393
-        static var panelWidth: CGFloat { screenWidth - GridMetrics.horizontalPadding * 2 }
-        static var geometry: RowGeometry { RowGeometry(totalWidth: panelWidth) }
+        static var offeredWidth: CGFloat { screenWidth - GridMetrics.horizontalPadding * 2 }
+        static var geometry: RowGeometry { RowGeometry(totalWidth: offeredWidth) }
+        static var panelWidth: CGFloat { geometry.panelWidth }
 
         static var insets: EdgeInsets {
             let geometry = geometry

@@ -161,7 +161,16 @@ struct WidgetsView: View {
                     // launch. The banner's own note says the same about padding
                     // applied from outside: what it costs when it is not there
                     // is the whole question. The 10pt below it is its own.
-                    VStack(alignment: .leading, spacing: 0) {
+                    //
+                    // **Centred, not leading** (#591). A card's rendered width
+                    // is the family's real WidgetKit frame times a scale capped
+                    // at 1, and nothing makes that equal the column the page
+                    // has to offer; `.leading` collected every point of the
+                    // difference on the right. Each level of this stack
+                    // centres what it holds, so the slack splits evenly. The
+                    // instructions keep their own leading frame — prose reads
+                    // from the left.
+                    VStack(alignment: .center, spacing: 0) {
                         // Inside the scroll rather than fixed above it. This
                         // page is one scroll from the instructions to the last
                         // preview, and `TopFade` is what dissolves whatever
@@ -170,7 +179,7 @@ struct WidgetsView: View {
                         // drawn half-dimmed. Its horizontal margin is the
                         // stack's, so it is passed nothing of its own.
                         DebugTodayBanner(horizontalPadding: 0)
-                        LazyVStack(alignment: .leading, spacing: 32) {
+                        LazyVStack(alignment: .center, spacing: 32) {
                             instructions
                             ForEach(groups) { group in
                                 card(group, width: width, projection: projection)
@@ -179,7 +188,7 @@ struct WidgetsView: View {
                     }
                     .padding(.horizontal, Self.margin)
                     .padding(.vertical, 20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity)
                 }
             }
             .background(Color.black)
@@ -288,7 +297,9 @@ struct WidgetsView: View {
         width: CGFloat,
         projection: WidgetPreviewProjection
     ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        // The heading centres with the previews under it (#591), which is
+        // where the system's own widget gallery puts a widget's name.
+        VStack(alignment: .center, spacing: 12) {
             Text(group.placement.cardName)
                 .font(.headline)
             // Rows, not a flat stack (#274): a Small widget has a neighbour on
@@ -310,17 +321,40 @@ struct WidgetsView: View {
                 // one before the settled width arrives.
                 ? max(0, (width - gutter * CGFloat(perRow - 1)) / CGFloat(perRow))
                 : width
-            LazyVStack(alignment: .leading, spacing: 12) {
+            // What a full row of this family actually draws, from the same
+            // scale `preview` renders at. Every row takes this width and keeps
+            // its cards at its leading edge, so a trailing odd Small stays in
+            // the place the next one would go — `WidgetCardGroup.rows` says
+            // so — while the row as a whole is centred like any other card
+            // (#591).
+            let rendered = widgetDisplaySizes.referenceSize(of: group.placement.family).width
+                * Self.previewScale(fitting: cardWidth, into: widgetDisplaySizes, family: group.placement.family)
+            let rowWidth = rendered * CGFloat(perRow) + gutter * CGFloat(perRow - 1)
+            LazyVStack(alignment: .center, spacing: 12) {
                 ForEach(group.rows, id: \.self) { row in
                     HStack(alignment: .top, spacing: gutter) {
                         ForEach(row) { card in
                             preview(card, width: cardWidth, projection: projection)
                         }
                     }
+                    .frame(width: rowWidth, alignment: .leading)
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// The one factor a preview is drawn at: the column over the family's real
+    /// frame, capped at 1 so no family is ever drawn past its true size. Shared
+    /// by `preview` and by the row frame `card` centres, so the two cannot
+    /// disagree about how wide a card is.
+    private static func previewScale(
+        fitting width: CGFloat,
+        into sizes: WidgetDisplaySize.Snapshot,
+        family: WidgetFamily
+    ) -> CGFloat {
+        let size = sizes.referenceSize(of: family)
+        return size.width > 0 ? min(1, width / size.width) : 1
     }
 
     /// The production view, at the size the family really gets, scaled to fit.
@@ -342,7 +376,7 @@ struct WidgetsView: View {
         projection: WidgetPreviewProjection
     ) -> some View {
         let size = widgetDisplaySizes.referenceSize(of: card.placement.family)
-        let scale = size.width > 0 ? min(1, width / size.width) : 1
+        let scale = Self.previewScale(fitting: width, into: widgetDisplaySizes, family: card.placement.family)
         return content(for: card, projection: projection)
             // The production mark remains one `SlotToggle`, but an ordinary
             // app view needs a binding-backed delivery adapter where WidgetKit
