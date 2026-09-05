@@ -8231,7 +8231,10 @@ drop, which is the system reconciling an interactive move with a data update
 that disagrees with it. The test now drops a third of the way into the
 target row, 13pt clear of the boundary, still slowly and held. A person's
 finger can land on that boundary too; what the list does then is the
-system's, and it is noted rather than worked around.
+system's, and it is noted rather than worked around. Observed once since, at
+a load average around 400 with three agents building: the trace read `[1]->3`
+with the 13pt-clear drop in place, so the hold before lifting is now 2.5
+seconds rather than one — a single observation, not a proof.
 
 ## 2026-09-03 — Swipe ends at the track; the native drag proxy stays native (#548)
 
@@ -8441,3 +8444,73 @@ The local-only invariant is untouched: a compose sheet a person reviews and
 can cancel, nothing attached beyond the version line, nothing sent by the app.
 `LocalOnlyContractTests`' forbidden spellings do not name MessageUI and its
 allowlist did not need an entry.
+## 2026-09-04 — Correct History is This Week in another mode, not another screen (#557, #559)
+
+This supersedes the **presentation** half of #543 — "a full-screen destination
+in This Week's existing More menu", its own toolbar, its checkmark as the sole
+exit — and leaves the rest of that entry standing: the reach (the record or
+twelve weeks back, exactly twelve ahead), the factual matrix of one plain circle
+per civil day, the immediate write with the future permission spoken at one
+call site, and the retired target clamp. What moved is *where* the circles are
+drawn, not what they say or what they write.
+
+**One view, genuinely mode-switched.** `EditHistoryView` was a
+`fullScreenCover`: a second `NavigationStack`, a second `List`, a second pager
+and a second drawing of the label column, sliding up over This Week and
+returning to the top of it. Now `WeeklyGridView` has three modes — browsing,
+editing the list, correcting history — named by `WeekGridMode` in
+`Glow/Logic`, and correcting is a flag on the same view. The same `List`, the
+same panel, the same scroll position; every `HabitRowView` swaps its track for
+`EditHistoryTrack` and keeps everything else. Nothing is presented, so there is
+no transition, and leaving lands exactly where entering began. Verified on an
+iPhone 17e / iOS 26.5: the panel, the label column and the row pitch do not
+move between the two screenshots; a past day and a day ahead both wrote from
+the circles and both drew as lit marks when the mode ended.
+
+**One pager, two reaches.** The chevrons stay and consult whichever reach the
+mode names — `WeekReach` while browsing or editing the list, `EditHistoryReach`
+while correcting — through a `WeekBounds` protocol both already satisfied. The
+forward chevron is drawn whenever `weekStart < reach.latest`, which is #207's
+rule ("forward exists once there is something to come forward from") applied
+to a reach that now sometimes has a forward. The title ladder mirrors forward
+with `WeekDistanceTitle`: "Next Week", "Two Weeks Ahead", then the dates over
+"N weeks ahead". `WeekCalendar.weeksBack` floors at zero and stays as it is;
+browsing never reaches a week ahead, so its titles did not change.
+
+**Done is drawn, not styled.** A solid white capsule with a dark label in the
+slot the ••• menu vacates. The root tint is pure white and any control that
+fills with it and draws its label in "the contrasting colour" renders white on
+white — measured three times (#124, #162, and the empty state's 8077 pixels of
+one colour). `FilledCapsuleLabel` states both colours and is now shared by the
+empty state's first button and this exit, so the trap is avoided once rather
+than twice. It sits on iOS 26's glass platter like every other bar item; that
+platter is the system's and is left alone.
+
+**What the mode takes away, per row.** `deleteDisabled` and `moveDisabled`
+follow `WeekGridMode.offersHabitManagement`, the swipe actions are empty, the
+label's tap into the habit editor is ignored, and the menu is gone. This is what
+the separate screen already excluded, carried over unchanged. **A blank row
+keeps its gap and draws no circles** — the screen filtered spacers out, but in
+the same `List` that would move every row below and lose the position the
+person was looking at; a spacer holds a position and has nothing on it to
+correct, which "draws nothing" already says.
+
+**Leaving from a week ahead clamps to the current week.** Browsing has no
+forward reach, so a week paged into ahead of today has nowhere to be shown once
+the mode ends; every other week stays exactly where it was.
+
+**No new render frame.** The hosted `weekly grid screen` frame renders
+browsing, which this change leaves pixel-identical by construction — the row's
+browsing track and the toolbar are untouched. A frame for the correcting mode
+would need `WeeklyGridView` to accept an initial mode and both baselines to be
+approved on both runtimes; it is left as follow-up rather than approved from
+one runtime.
+
+**The names moved first (#559).** "Edit History" and "Edit" sat one above the
+other in the menu for two unrelated jobs. They are "Correct History" and "Edit
+Habits": the first names the job the mode exists for, the second matches "New
+Habit" and "Blank Row" beside it. The row's swipe action keeps the bare "Edit"
+— a third meaning, one habit's own editor, and nothing reported it. The Swift
+symbols (`EditHistoryReach`, `EditHistoryTrack`, `EditHistoryContractTests`)
+keep the old name: they are not copy, and `GlowOffPreviewNotice` set the
+precedent.

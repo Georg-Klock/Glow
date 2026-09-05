@@ -38,7 +38,7 @@ final class EditModeGestureBoundsTests: XCTestCase {
         let more = app.buttons["More"]
         XCTAssertTrue(more.waitForExistence(timeout: 3))
         more.tap()
-        let edit = app.buttons["Edit"]
+        let edit = app.buttons["Edit Habits"]
         XCTAssertTrue(edit.waitForExistence(timeout: 3))
         edit.tap()
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 3))
@@ -77,9 +77,15 @@ final class EditModeGestureBoundsTests: XCTestCase {
         // order matching neither. Seen on the runner (iOS 18.5) and locally
         // on both runtimes. Dropping a third of the way into the target row
         // puts the centre 13pt clear of the boundary.
+        //
+        // Observed once, not proven: at a load average around 400, with
+        // three agents building, the trace still read `[1]->3` with the
+        // 13pt-clear drop in place — the List's target index had not caught
+        // up with the finger by touch-up. The hold before lifting is 2.5s
+        // now, so a loaded list has longer to register where the finger is.
         let lift = source.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         let land = target.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1))
-        lift.press(forDuration: 1, thenDragTo: land, withVelocity: .slow, thenHoldForDuration: 1)
+        lift.press(forDuration: 1, thenDragTo: land, withVelocity: .slow, thenHoldForDuration: 2.5)
         let drop = XCTAttachment(screenshot: app.screenshot())
         drop.name = "after the drop"
         drop.lifetime = .keepAlways

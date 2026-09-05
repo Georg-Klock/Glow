@@ -3,7 +3,8 @@ import Foundation
 /// How far back the week view may be paged, as two week starts.
 ///
 /// #117 made weeks before the current one visible. #543 later moved their
-/// editing into `EditHistoryView`, but visibility remains a separate question
+/// editing into the correcting mode (`WeekGridMode.correctingHistory`, a
+/// separate screen until #557), but visibility remains a separate question
 /// from `SlotEditing`, which stays a fact about a cadence surface rather than
 /// about which week is on screen.
 ///

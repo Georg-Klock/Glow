@@ -308,8 +308,9 @@ A build that violates one of these is broken regardless of what else works.
   in-app preview — edits today and nothing else. This Week may page backward
   through the record-or-twelve-week reach, but those weeks are browse-only
   (#543, superseding #116/#117/#508/#526). Arbitrary past and future
-  corrections belong to Edit History alone: every real habit against every day
-  as a plain selected/unselected circle, from the same backward floor through
+  corrections belong to Correct History alone — This Week's own correcting
+  mode, not a separate screen (#557): every real habit against every day as a
+  plain selected/unselected circle, from the same backward floor through
   exactly twelve weeks ahead. Its future write is explicit at the store call.
   A rest day is never editable on the cadence surfaces.
 - **R3.** A day holds zero or one completion. Never two. The per-day kind was
@@ -409,7 +410,7 @@ distinctions live and where they are tested.
 
 **A state is what is true, not what can be tapped** (#116, superseded in scope
 by #543). A missed day remains missed while the cadence surface is browse-only;
-logging it through Edit History makes the day filled and draws `donePast` —
+logging it in Correct History makes the day filled and draws `donePast` —
 lit, because §1 says every completion is, and not `doneToday`, because it is
 not today. `Slot.isToday` remains a real comparison rather than an alias for
 "carries an action". Nothing about *open* moved: at most one slot is open, on
@@ -530,8 +531,8 @@ those future days controls.
 A rep with no day left to land on becomes a one-day ✕ on the earliest blank
 past day it could have used: never a warning and never a prediction. The next
 live mark absorbs the unused days after that cross. A ✕ is browse-only on every
-cadence surface; logging its day in Edit History recomputes the row from the
-record and can remove it (#543).
+cadence surface; logging its day in Correct History recomputes the row from
+the record and can remove it (#543).
 
 **A finished unmet week is a seven-day diary**, not N rep windows (#476). Every
 completed day is filled, every other day on which the habit existed is a
@@ -678,12 +679,36 @@ holds the rule; the widget's own completion carries it too, recorded at the tap
 and spent on a timeline of one still entry.
 
 **This Week creates and edits its habits through one editor.** Outside edit
-mode its ellipsis menu orders **New Habit**, **Blank Row**, a divider, **Edit
-History**, then **Edit** (#320, #543). Row management belongs to the current
-week; on a browsed week the menu contains Edit History beside the separate
-**Today** shortcut, so the history matrix can open on exactly the week being
-viewed. The editor opened on the adding screen's *kind* while there were two of
-them (#209); there is one, so it opens on the count and nothing else.
+mode its ellipsis menu orders **New Habit**, **Blank Row**, a divider,
+**Correct History**, then **Edit Habits** (#320, #543, #559). The two used to
+both begin "Edit"; each now names what it acts on. Row management belongs to
+the current week; on a browsed week the menu contains Correct History beside
+the separate **Today** shortcut, so the correcting mode begins on exactly the
+week being viewed. The editor opened on the adding screen's *kind* while there
+were two of them (#209); there is one, so it opens on the count and nothing
+else.
+
+**Correct History is This Week in another mode, not another screen** (#557,
+superseding the presentation half of #543). Choosing it changes what the rows
+draw and nothing else: the same `List`, the same panel, the same scroll
+position, no transition. Every habit row keeps its icon, its name and its
+place, and its track becomes seven plain circles — filled where a completion
+exists on that exact civil day, empty where none does, whatever the cadence
+and whether the day is past, today or ahead. A blank row keeps its gap and
+draws no circles. Every tap writes immediately through `HabitStore`, with the
+future permission spoken at that one call site; there is no draft and no save.
+While the mode is on there is no habit management — no swipe actions, no
+reorder, no habit editor from the label, and no New Habit or Blank Row — and
+the ••• menu gives its place to **Done**: a solid white capsule with a dark
+label, drawn outright the way the empty state's first button is, because the
+root tint is white and a styled prominent button renders white on white
+(#162). The pager stays and reaches twelve weeks ahead as well as back
+(`EditHistoryReach`); the title ladder mirrors forward — "Next Week", "Two
+Weeks Ahead", then the dates over "N weeks ahead" — and the forward chevron is
+drawn whenever there is a week ahead to reach. **Today** sits beside Done on
+every week but the current one, ahead as well as behind. Done returns the
+screen to browsing on the week it is showing, clamped back to the current week
+if that week was ahead of today, because browsing has no forward reach.
 
 **Editing has a toolbar of its own** (#399). While the list is fanned open the
 week pager and the week readout both leave — neither answers a question editing
@@ -691,8 +716,10 @@ asks, and the pager is the only control that could change the week, so hiding
 it is also what makes "edit mode ends when you leave this week" a rule nothing
 on screen can reach. What appears in their place is a **Done** checkmark,
 immediately left of the ellipsis, carrying the same `checkmark` symbol the menu
-item used to. The menu keeps New Habit, Blank Row and Edit History and drops
-Edit for as long as editing lasts, so Done is said once rather than twice.
+item used to. The menu keeps New Habit, Blank Row and Correct History and
+drops Edit Habits for as long as editing lasts, so Done is said once rather
+than twice. Correcting history has its own Done in the same slot (#557) — a
+filled capsule where the list's is a bare checkmark — and no menu at all.
 **Entering is still two taps and leaving is now one**: #320 put both ends in
 the menu for symmetry and named the cost, and this is that cost being paid back
 on the end that needed it — a mode whose exit is behind a menu reads as a mode
@@ -744,8 +771,9 @@ separate mode.
 
 **Only today responds inside the week view** (#543, superseding #116). The
 other six columns still show the cadence's record and judgement but carry no
-button. Corrections do not share the browsing surface any more; Edit History is
-the plain all-days matrix built for them.
+button. Corrections do not share the browsing surface's *marks* any more;
+Correct History is the plain all-days mode built for them, on this same screen
+(#557).
 
 **The week view pages back through earlier weeks** (#117, #190, #207). Two
 toolbar buttons, and **the pair is asymmetric**: on the current week only `<`,
@@ -757,8 +785,8 @@ one tap per week you came back through, and with no cap that walk is as long as
 the record. There is no gesture: #190's header swipe is out (#207), and the
 rows keep their own swipe actions for edit and delete. An earlier week is
 browse-only: nothing is open and none of its marks accepts a tap. Its trailing
-toolbar keeps Today and adds the same Edit History door, opening the matrix on
-that displayed week.
+toolbar keeps Today and the same menu with Correct History, which switches the
+displayed week into the correcting mode in place (#557).
 
 **How far back: the record, or twelve weeks, whichever is further** (#186,
 #259). The record starts at the first completion on record or the first habit's
@@ -881,9 +909,10 @@ where the crossfade already was.
 - [x] Tapping today's filled slot un-marks it, reverting to open with the glow
       resumed.
 - [x] This Week, installed widgets and in-app widget previews offer today and
-      nothing else; every other correction is made in Edit History.
-- [x] Edit History offers every day through exactly twelve weeks ahead and
-      writes each selected/unselected circle immediately.
+      nothing else; every other correction is made in Correct History.
+- [x] Correct History is This Week in place — same list, same scroll position,
+      no presentation — offers every day through exactly twelve weeks ahead,
+      and writes each selected/unselected circle immediately (#557).
 - [x] At most one slot per habit is open at a time, and it ends on today rather
       than painting future days.
 - [x] Without EDR the glow renders as flat colour, no crash, no artifact.
@@ -937,8 +966,8 @@ again by this change, now drawing a month (#321 closes with it).
 **The week, at medium and large.** Today's slot is an `AppIntent`-backed toggle
 (`SlotToggle`, #292), so a habit can be logged from the home screen without
 launching the app and the mark flips at the tap rather than at the next
-provider run. Past days are not tappable here or in This Week: Edit History is
-the one correction surface. `SlotEditing.todayOnly` is how every cadence
+provider run. Past days are not tappable here or in This Week's browsing:
+Correct History is the one correction surface. `SlotEditing.todayOnly` is how every cadence
 surface says so, and `HabitStore` refuses a day ahead unless that editor names
 the exception explicitly.
 Rows are as many as fit, then a hard cut — no "+N more" row, per

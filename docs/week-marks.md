@@ -140,7 +140,8 @@ alone. If it is the final rep owed, it reaches the final column instead. The
 ordinary week surface and the widget still write today; widening the shape does
 not widen their editing permission. Demo-seeded history may contain future
 facts, but its rendered cadence rows are today-only too. Future corrections now
-belong exclusively to Edit History (#495, #543).
+belong exclusively to Correct History, This Week's own correcting mode since
+#557 (#495, #543).
 
 ### 4.3 Worked states
 
@@ -565,7 +566,8 @@ order, is:
    earliest-day cross, and a finished unmet week becomes a seven-day diary.
 9. #495 lets a final open mark own the remainder of the week when no future rep
    needs those columns; production actions remain pinned to today.
-10. #543 moves arbitrary-date edits into a factual Edit History matrix. It
+10. #543 moves arbitrary-date edits into a factual Edit History matrix — a
+    separate screen then, This Week's own correcting mode since #557. It
     keeps every bonus completion as a mark, lets the latest bonus own the
     remainder, and displays pre-creation completions without judging blank
     pre-creation days.

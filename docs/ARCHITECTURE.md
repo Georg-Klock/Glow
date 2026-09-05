@@ -198,9 +198,10 @@ scope by #543). `WeekGrid.slots` and `WeekSpans.spans` require a
 `SlotEditing`; every production caller passes `.todayOnly`, with no default a
 new call site could accidentally widen. `SlotEditing.day(atColumn:in:today:)`
 is the single function that answers whether the cadence column may be written.
-Edit History is intentionally outside that projection: it draws exact factual
-days rather than cadence marks and is the one caller that explicitly permits a
-future store write.
+Correcting history (`WeekGridMode.correctingHistory`, #557) is intentionally
+outside that projection: `EditHistoryTrack` draws exact factual days rather
+than cadence marks, and `WeeklyGridView.correct(_:on:)` is the one caller that
+explicitly permits a future store write.
 
 **`WeekSpans` owns claimable rep windows** (#476). In the current week a
 completion owns the window ending on its logged day, today's open rep reaches
@@ -215,13 +216,14 @@ When completions meet the target, `WeekSpans` keeps every completion rather
 than clamping at the target. Each later completion is a bonus mark, up to the
 seven civil days the store can hold, and the chronologically latest completion
 owns the trailing remainder. A week entirely before creation remains free of
-cadence judgement, but if Edit History recorded real completions there it
+cadence judgement, but if a correction recorded real completions there it
 returns day-sized filled facts among inactive blanks instead of hiding them.
 
 Span geometry does not grant editing. A widened final open span still resolves
 to today on every cadence surface. Demo seeding may put future completions in
-the store, but it does not turn their rendered columns into controls; only Edit
-History exposes an arbitrary future date (#543, preserving #495's geometry).
+the store, but it does not turn their rendered columns into controls; only the
+correcting mode exposes an arbitrary future date (#543, preserving #495's
+geometry).
 
 Once an unmet week is entirely past, `WeekSpans` stops forecasting reps and
 returns seven day-sized diary spans: completed, missed, or inactive before the
@@ -231,11 +233,14 @@ browse-only outside today. Stored legacy rest-day rows intentionally stay on
 the pre-#476 divider; rest-day redesign is separate feature scope.
 
 **Browsing and correcting split in #543, superseding #117's shared scope.** The
-week view still holds the visible week's start as state and `WeekReach` bounds
-it, but a past week supplies no actions. Edit History receives that displayed
-week as its initial value and owns the arbitrary-day write. Nothing was added
-to the store for past dates — they were already valid — while future dates use
-the existing explicit permission.
+week view still holds the visible week's start as state, but a past week
+supplies no actions while browsing. Correcting is a mode of the same view
+(#557), so the displayed week simply stays where it is; the pager consults
+whichever reach the mode names — `WeekReach` while browsing or editing the
+list, `EditHistoryReach` while correcting — through the `WeekBounds` protocol
+both satisfy, and `WeeklyGridView.correct(_:on:)` owns the arbitrary-day
+write. Nothing was added to the store for past dates — they were already valid
+— while future dates use the existing explicit permission.
 
 A span covers several columns, so its view still resolves a touch to a weekday
 with `SlotLayout.column(atX:trackWidth:)`, the inverse of `columnCentre`, then
@@ -251,8 +256,8 @@ it: the grid uses `@Query`, so SwiftData drives updates.
 what makes R3 and R4 hold no matter who calls it. It refuses a rest day, a blank
 row, a habit of the wrong cadence, and — unless the caller asks otherwise — a day
 that has not happened yet. `allowingFuture` defaults to false, so every
-ordinary caller gets the strict answer without naming it and Edit History alone
-opts out explicitly. Tapping twice quickly cannot create a duplicate, because
+ordinary caller gets the strict answer without naming it and the correcting
+mode alone opts out explicitly. Tapping twice quickly cannot create a duplicate, because
 the second call finds the first completion and removes it — and it finds it by
 *fetching* the habit's rows for that day rather than reading the cached
 relationship array, so a row the widget tap's own context wrote is not missed
@@ -402,13 +407,21 @@ rather than collapsed so that #210 could fill it in the same position, and the
 bar reflowed once rather than twice. #238 then moved Widgets to the front,
 an order argued on its own terms rather than inherited.
 
-`EditHistoryView` is a full-screen editor presented from This Week's existing
-More menu. It draws one bounded week at a time as real habit rows by exact day,
-using plain circles and `Habit.snapshots(...within:)` rather than `WeekGrid` or
-`WeekSpans`: cadence judgement is deliberately absent. Every tap writes
-immediately with the explicit future permission; the presentation has no back
-destination or interactive dismissal, so its toolbar checkmark is the sole
-exit.
+**Correct History is a mode of `WeeklyGridView`, not a view** (#557; it was
+`EditHistoryView`, a `fullScreenCover`, from #543 to #557). `WeekGridMode` in
+`Glow/Logic` names the three modes — browsing, editing the list, correcting
+history — and the pure rules that differ between them: which reach the pager
+consults, and whether habit management is on offer. The grid holds one
+`@State` flag per mode it owns (`editMode` for the list, `isCorrectingHistory`
+for correcting) and derives the mode from them. While correcting, every
+`HabitRowView` is told so and swaps its track for `EditHistoryTrack` — seven
+plain circles from `Habit.snapshots(...within:)`, never `WeekGrid` or
+`WeekSpans`, so cadence judgement is deliberately absent — while the label
+column, the row height, the `List`, the panel and the scroll position are
+untouched. Swipe actions, `onDelete` and `onMove` are disabled per row, the
+••• menu leaves the bar and a drawn white `FilledCapsuleLabel` Done takes its
+place; that button is the sole exit and clamps the week back into browsing's
+reach on the way out.
 
 `WidgetsView` is that tab: every widget this bundle ships, previewed by the
 shipping view, as three named cards — "Large Week Widget", "Medium Week
@@ -625,7 +638,7 @@ changes. Three paths, and all are needed:
   override before it touches anything: the notification fires for every key
   the process writes, and a tap writes several.
 - `StoreChange.committed` covers what the *record* decides — how far back the
-  week pager and Edit History reach. Every save posts it, from `HabitStore` and
+  week pager reaches, in every mode. Every save posts it, from `HabitStore` and
   `DemoHistory` alike.
   These used to ride on the defaults notification too, which a save reached
   only through the trace line the widget reload writes; see decisions.md,
