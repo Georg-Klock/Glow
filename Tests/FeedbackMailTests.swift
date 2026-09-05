@@ -39,8 +39,14 @@ struct FeedbackMailTests {
         #expect(encoded == "a%20b%2Bc%26d%3De%3Ff%2Fg%0A%28h%29%20%C3%BC-._~")
         // What the URL actually carries: no raw space, newline, plus or
         // ampersand anywhere in the query, so no client can misread a field.
+        // Read through `URLComponents`, as `mailtoRoundTrips` does: on iOS 18.5
+        // `URL.query(percentEncoded:)` is nil for a `mailto:` URL and on 26.5 it
+        // is the string, so asserting through it tested the runtime, not the
+        // encoding (#573). The app never reads the query back; only this did.
         let url = try #require(FeedbackMail.mailtoURL(version: version))
-        let query = try #require(url.query(percentEncoded: true))
+        let query = try #require(
+            URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedQuery
+        )
         for raw in [" ", "\n", "+", "(", ")"] {
             #expect(!query.contains(raw), "raw \(raw.debugDescription) in query")
         }
