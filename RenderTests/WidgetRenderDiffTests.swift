@@ -65,14 +65,26 @@ struct WidgetRenderDiffTests {
         // of 217 on the widget's black ground composites there — measured
         // rather than derived, because 108.5 could round either way and the
         // probe found 107, 108 and 110 all empty.
+        //
+        // **Three buckets since #603, because type left the grey band.** Every
+        // habit name and weekday letter is `lit` — `#D9D9D9` opaque, 217 — so
+        // the "lit" bucket, which used to be everything above 200, would now
+        // count the text alongside the emitting white and say nothing about
+        // either. Emitting is above 240; the lit tier is 217 with the same
+        // three levels of slack; the resting grey band is what it was, and
+        // what is left in it is the ✕ and the antialiased edges of the marks.
         let pixels = try rgba(of: image)
-        var lit = 0, grey = 0
+        var emitting = 0, lit = 0, grey = 0
         for i in stride(from: 0, to: pixels.count, by: 4) {
             let value = max(pixels[i], pixels[i + 1], pixels[i + 2])
-            if value > 200 { lit += 1 }
+            if value > 240 { emitting += 1 }
+            else if (214...220).contains(value) { lit += 1 }
             else if (106...112).contains(value) { grey += 1 }
         }
-        #expect(lit > 500, "no lit marks in the render")
+        // Measured on the first #603 render: 2,474 emitting, 6,365 lit, 162 in
+        // the grey band, on iOS 26.5 at 2x.
+        #expect(emitting > 500, "no emitting marks in the render: \(emitting) pixels above 240")
+        #expect(lit > 2000, "no lit type or marks in the render: \(lit) pixels at the lit tier")
         // **200, down from 250, which was down from 500.** An upcoming slot
         // used to be *filled* at the resting grey, and filled sockets were most
         // of the original count. §8.3 says the socket has no fill at all and
@@ -91,7 +103,12 @@ struct WidgetRenderDiffTests {
         //
         // The floor is lowered in the same change as the one that lowered it,
         // which is the rule.
-        #expect(grey > 200, "nothing unlit in the render: \(grey) pixels at the grey")
+        //
+        // **100 since #603.** The text and the letters — 198 of the 247 — left
+        // this band for the lit tier above, and what remains at the resting
+        // grey is the ✕ and the marks' edges: 162 measured. The floor is set
+        // from that with the same proportion of slack the old one carried.
+        #expect(grey > 100, "nothing at the resting grey in the render: \(grey) pixels at the grey")
 
         let out = save(image, as: "widget-render@2x.png")
         print("render-diff: render written to \(out.path)")
