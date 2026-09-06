@@ -188,7 +188,7 @@ enum WeekCalendar {
     /// forward of it there is nothing to count.
     ///
     /// The number, not a phrase. #207's title ladder — *This Week*, *Last
-    /// Week*, *Two Weeks Ago*, then a date range — is a switch over this, and
+    /// Week*, then a date range (#604) — is a switch over this, and
     /// so is `weeksBackTitle` below; both had been counting it themselves.
     ///
     /// **Counted in whole days and divided, rather than in `weekOfYear`.**

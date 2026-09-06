@@ -233,7 +233,7 @@ struct WeekCalendarTests {
     // MARK: - How far back, as a number (#207)
 
     // What the title ladder switches on. The ladder itself — This Week, Last
-    // Week, Two Weeks Ago, then the range — is UI text composed in
+    // Week, then the range — is UI text composed in
     // `WeeklyGridView` from this number, and it is checked by looking at the
     // screen at each step; the arithmetic under it is checked here.
 

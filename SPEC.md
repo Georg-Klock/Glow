@@ -749,8 +749,8 @@ are one control in one shape (#592, superseding #557's white capsule). Nothing
 in the bar is filled, so the white-on-white tint trap (#162) does not arise.
 The pager stays and reaches a flat **four weeks either way** (`EditHistoryReach`;
 #592 narrowing #543's record-or-twelve back and twelve ahead); the title ladder
-mirrors forward — "Next Week", "Two Weeks Ahead", then the dates over "N weeks
-ahead" — and the forward chevron is drawn whenever there is a week ahead to
+mirrors forward — "Next Week", then the dates over "N weeks ahead" — and the
+forward chevron is drawn whenever there is a week ahead to
 reach. There is **no Today button** in this mode, on any week: the way back to
 the current week is the pager, four steps at most, or Done. A completion older
 than four weeks is outside this screen's reach and is not correctable in the
@@ -851,9 +851,10 @@ History shares that backward reach and alone continues forward, exactly twelve
 weeks.
 
 **The title names the week you are looking at: how long ago, then which days**
-(#190, #207). "This Week", "Last Week", "Two Weeks Ago" — and past the third
-rung a relative phrase stops being an answer, so the title becomes the days the
-week covers. "17 – 23 Aug" inside one month, "31 Aug – 6 Sep" across a month
+(#190, #207). "This Week", "Last Week" — and past the second rung a relative
+phrase stops being an answer, so the title becomes the days the week covers,
+with "N weeks ago" under it (#604 dropped "Two Weeks Ago": a date range is
+shorter than the phrase, which clipped in the title pill). "17 – 23 Aug" inside one month, "31 Aug – 6 Sep" across a month
 end; the year appears only when it is not today's, and a year both ends share is
 said once: "29 Dec 2025 – 4 Jan", "20 Oct – 26 Oct 2025". Under the title, the
 half it leaves out — the dates while the title is a phrase, "5 weeks ago" once
