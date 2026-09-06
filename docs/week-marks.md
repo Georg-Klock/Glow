@@ -465,13 +465,21 @@ single line, truncating with an ellipsis.
   rule. The column remains 24pt, so changing the glyph does not move the name.
 - **Weekday letter** — cell 24 × 14 at the column's own x, text centred.
 
-Colour is one hex and three steps of it, and it says what is still asked of you:
+Colour is one hex and, for type, two steps of it (#603; three from #335 until
+then), and it says what is still asked of you:
 
 | | Weekday letter | Habit label |
 | --- | --- | --- |
 | `#FFFFFF` + emitting glow | today, any habit open | this habit open today |
-| `#D9D9D9` @ 100% | today, everything closed | handled today |
-| `#D9D9D9` @ 50% | any other day | at rest |
+| `#D9D9D9` @ 100% | every other case | every other case |
+
+The half-strength `#D9D9D9` @ 50% step is for **marks** only — the missed ✕,
+the rest day's cut, a socket still to come. #335 gave it to type as well: every
+weekday letter but today's, and a label nothing had been logged for today. #603
+took that back. The header read as six dimmed letters and one bright one, and a
+row with nothing asked of it read as *less* than a row that had done its work
+— a judgement about a day the grid does not make (§1: what stays dark is
+absence, and a name is not absent). Type asks, or it is lit.
 
 An SF Symbol carries the **same value as its name** in every state; the two dim
 and emit together. An emoji is already a full-colour picture, not type: it

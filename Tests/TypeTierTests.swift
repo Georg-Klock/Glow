@@ -2,11 +2,12 @@ import Foundation
 import Testing
 @testable import Glow
 
-/// The three steps type takes (#335, `docs/week-marks.md` §8.5).
+/// The two tiers type takes (#334; #603 reversing #335's third step,
+/// `docs/week-marks.md` §8.5).
 ///
-/// The table the spec draws, as tests — including the two rows that are new,
-/// because before #335 type had two states and the middle one had nowhere to
-/// attach.
+/// The table the spec draws, as tests. #335 added a half-strength third step
+/// under these — every other weekday, and a label nothing was logged for today
+/// — and #603 took it out again: type either asks or it is lit.
 @Suite("Type tiers")
 struct TypeTierTests {
     private let calendar = TestCalendar.monday
@@ -32,25 +33,24 @@ struct TypeTierTests {
         #expect(TypeTier.weekday(isToday: true, anyHabitOpen: false) == .lit)
     }
 
-    @Test("Any other day rests, whatever the week is doing")
-    func otherDaysRest() {
-        #expect(TypeTier.weekday(isToday: false, anyHabitOpen: true) == .resting)
-        #expect(TypeTier.weekday(isToday: false, anyHabitOpen: false) == .resting)
+    @Test("Any other day is lit, whatever the week is doing")
+    func otherDaysAreLit() {
+        // #603: the header marks today by asking, not by dimming the other six.
+        #expect(TypeTier.weekday(isToday: false, anyHabitOpen: true) == .lit)
+        #expect(TypeTier.weekday(isToday: false, anyHabitOpen: false) == .lit)
     }
 
     // MARK: - The habit label
 
-    @Test("A label emits when open, is lit when handled, and rests otherwise")
-    func labelTakesThreeSteps() {
-        #expect(TypeTier.label(isOpenToday: true, isHandledToday: false) == .emitting)
-        #expect(TypeTier.label(isOpenToday: false, isHandledToday: true) == .lit)
-        #expect(TypeTier.label(isOpenToday: false, isHandledToday: false) == .resting)
-        // Open wins if both are somehow true: what is still asked outranks what
-        // is already done, which is the whole ordering of the three tiers.
-        #expect(TypeTier.label(isOpenToday: true, isHandledToday: true) == .emitting)
+    @Test("A label emits when open and is lit otherwise")
+    func labelTakesTwoTiers() {
+        #expect(TypeTier.label(isOpenToday: true) == .emitting)
+        // Whether or not anything was logged today: a name is not absent, so
+        // it is never dimmed for having nothing asked of it (#603).
+        #expect(TypeTier.label(isOpenToday: false) == .lit)
     }
 
-    // MARK: - Deriving the two states
+    // MARK: - Deriving the state
 
     @Test("Open is asked of WeekGrid, for both cadences")
     func openFollowsTheGrid() {
@@ -70,35 +70,13 @@ struct TypeTierTests {
         ))
     }
 
-    @Test("Handled means logged today, not goal met")
-    func handledIsAboutToday() {
-        // A 2x habit finished on Monday and Tuesday, read on Friday: nothing was
-        // asked of it today and nothing was done, so it rests rather than
-        // sitting lit all week. This is the distinction the middle step turns
-        // on, and the easy version of it — "is the goal met" — gets it wrong.
-        let met = habit(.timesPerWeek(2), done: [0, 1])
-        #expect(!TypeTier.isHandled(met, today: day(4), restDay: nil, calendar: calendar))
-        #expect(TypeTier.isHandled(met, today: day(1), restDay: nil, calendar: calendar))
-    }
-
-    @Test("The rest day hands out no tier at all")
-    func restDayIsNeverHandled() {
-        // #72: the rest day draws nothing and asks nothing, so a completion
-        // stored on one does not light its label either.
-        let rest = TestPreferences.weekday(ofColumn: 3, in: week)
-        #expect(!TypeTier.isHandled(
-            habit(.daily, done: [3]), today: day(3), restDay: rest, calendar: calendar
-        ))
-    }
-
-    @Test("A spacer is neither open nor handled")
+    @Test("A spacer is never open")
     func spacersAreInert() {
         let spacer = HabitSnapshot(
             id: UUID(), name: "", icon: "", frequency: .daily,
             completionCounts: [:], isSpacer: true
         )
         #expect(!TypeTier.isOpen(spacer, in: week, today: day(2), restDay: nil, calendar: calendar))
-        #expect(!TypeTier.isHandled(spacer, today: day(2), restDay: nil, calendar: calendar))
     }
 
     @Test("The week is open while any one habit is")

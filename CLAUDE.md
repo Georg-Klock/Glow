@@ -472,7 +472,10 @@ actual bug. Every line here is something that already happened.
 - **One hex at three steps, and white above them** (#335, 2026-08-28; before it
   #111, #194, #240 and the 2026-08-24 retirement — all in `docs/decisions.md`).
   `#FFFFFF` with the HDR tile emits, `#D9D9D9` at 100% is lit but not emitting, and
-  `#D9D9D9` at 50% is at rest.
+  `#D9D9D9` at 50% is at rest. **Type takes only the first two** (#603,
+  2026-09-05): a weekday letter or a habit name is emitting or lit, never at
+  rest — the resting step belongs to marks (the missed ✕, the cut, a socket
+  still to come). `TypeTier` has two cases and no `.resting`.
   **Not a grey ramp** — the palette used to stack opacities into four steps for
   one distinction and the grid read as a grey scale. These are three different
   claims: *do this now*, *this happened*, *nothing is asked here*. The middle

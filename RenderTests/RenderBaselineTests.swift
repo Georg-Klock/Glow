@@ -652,9 +652,9 @@ struct RenderBaselineTests {
     /// `WeeklyGridView`'s `listRowInsets` will not show up in this isolated
     /// frame; they are covered by the separate hosted weekly-screen frame.
     ///
-    /// **The label's three renderings are held, and that was checked rather
-    /// than assumed.** `HabitRowView` picks `GlowPalette.lit` or
-    /// `GlowPalette.grey` underneath from `isHandled`, and crossfades an
+    /// **The label's two renderings are held, and that was checked rather
+    /// than assumed.** `HabitRowView` draws `GlowPalette.lit` underneath (the
+    /// half-strength third step went with #603), and crossfades an
     /// emitting copy over it at `opacity(lit)` — where `lit` is `@State`
     /// initialised to 1 and set from `.onAppear`. A renderer that skipped
     /// `onAppear` would leave every name emitting, and the frame would silently

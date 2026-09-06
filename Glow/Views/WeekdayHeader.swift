@@ -60,14 +60,13 @@ struct WeekdayHeader: View {
                         .frame(height: geometry.headerHeight)
 
                     Group {
-                        // Three steps, not two (#335, §8.5). Today emits only
-                        // while something is still open; once every habit is
-                        // handled it steps down to the lit tier — still plainly
-                        // today, no longer asking.
+                        // Two tiers (#603, reversing #335's third). Today emits
+                        // only while something is still open; every other
+                        // letter, today's included once everything is handled,
+                        // is lit at full strength.
                         switch TypeTier.weekday(isToday: isToday, anyHabitOpen: anyOpen) {
                         case .emitting: column.glowing()
                         case .lit: column.foregroundStyle(GlowPalette.lit)
-                        case .resting: column.foregroundStyle(GlowPalette.grey)
                         }
                     }
                     .frame(
