@@ -529,9 +529,10 @@ private struct WidgetSpan: View {
             // faces are what this span's own two tappable states draw:
             // `.open` is the emitting ask, `.filled` is the lit mark it
             // becomes (#344). So the optimistic frame for a completion is the
-            // ring filling at this span's own width; the re-division of the
-            // row a write causes arrives with the reload — the toggle owns its
-            // own pixels and nothing beside them.
+            // ring filling at this span's own width — the rule `openSpan`
+            // follows too since #609; the re-division of the row a write
+            // causes arrives with the reload — the toggle owns its own pixels
+            // and nothing beside them.
             SlotToggle(
                 habitID: habit.id,
                 isDone: span.state == .filled,
@@ -581,10 +582,18 @@ private struct WidgetSpan: View {
     ///
     /// The off faces are clear because the socket is drawn once behind them;
     /// duplicating its two inner shadows per day would restore the scrolling
-    /// cost removed in #479 and would draw seams. An optimistic completion
-    /// overlays one lit, day-sized mark immediately. The provider's reload
-    /// then replaces that acknowledgement with `WeekSpans`' authoritative
-    /// redivision of the row.
+    /// cost removed in #479 and would draw seams.
+    ///
+    /// **An optimistic completion fills the whole pill at once** (#609). It
+    /// used to overlay one lit, day-sized mark in the tapped column and leave
+    /// the rest of the socket open until the provider's reload redivided the
+    /// row — a circle first, the pill a beat later, two frames for one tap. An
+    /// open span runs to today (`WeekSpansTests.openSpanEndsAtToday`) and a
+    /// completion today closes all of it, so the pill the reload draws *is* the
+    /// full span: the on face is that pill, `SlotMarkView`'s filled span at the
+    /// span's own width and rest window, placed over the socket from inside
+    /// the tapped column's control. The control's hit area stays the column;
+    /// only its drawn face reaches across the span.
     private func openSpan(
         mark: SlotMarkView,
         actions: [WidgetSpanActions.Action]
@@ -611,11 +620,21 @@ private struct WidgetSpan: View {
                                 habitName: habit.name, day: day, isDone: false
                             )
                         ) {
-                            SlotMarkView(
-                                mark: day == renderedDay ? .doneToday : .donePast,
-                                size: CGSize(width: side, height: side)
-                            )
-                            .frame(width: zoneWidth, height: side)
+                            // The face is drawn centred on this column's zone,
+                            // so it is shifted to the span's centre: the same
+                            // pill the reload draws, in the same place.
+                            let zoneCentre = (CGFloat(column - span.firstDay) + 0.5) * zoneWidth
+                            Color.clear
+                                .frame(width: zoneWidth, height: side)
+                                .overlay {
+                                    SlotMarkView(
+                                        mark: .donePast,
+                                        size: size,
+                                        spansDays: span.dayCount > 1,
+                                        restWindow: restWindow
+                                    )
+                                    .offset(x: size.width / 2 - zoneCentre)
+                                }
                         } offMark: {
                             Color.clear
                                 .frame(width: zoneWidth, height: side)
