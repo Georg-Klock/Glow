@@ -122,6 +122,13 @@ jobs:
       # App Groups, the entitlement or extension-only API enforcement is not
       # really there. Its own step so a capability failure is legible as one
       # rather than as a test failure.
+      # The baseline comparison is run by Tools/approve-baseline.sh under the
+      # Mac's /usr/bin/python3 — 3.9, where a 3.10 annotation is a TypeError at
+      # import. The gate job above proves the tool on a newer Python; this
+      # proves it on the interpreter that actually gates an approval.
+      - name: The baseline comparison runs under the Mac's own Python
+        run: /usr/bin/python3 Tools/compare-signatures.py --self-test
+
       - name: Generate and validate the project
         run: Tools/generate.sh
 

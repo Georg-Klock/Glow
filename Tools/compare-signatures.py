@@ -69,6 +69,14 @@ line after it is one difference. Exit status is 0 whenever the comparison could
 be made; the caller reads the word. 2 is usage or I/O.
 """
 
+# `Tools/approve-baseline.sh` and `Tools/test.sh` run this with /usr/bin/python3,
+# which is 3.9 on this Mac: annotations are evaluated at definition time there,
+# and `list[int] | None` is a TypeError in 3.9 that 3.10+ accepts. Deferred
+# annotations keep the one file that gates an approval runnable by the
+# interpreter that gates it; the self-test on CI's runner is a newer Python and
+# did not see this (#584's rows change is what introduced the spelling).
+from __future__ import annotations
+
 import argparse
 import json
 import sys
