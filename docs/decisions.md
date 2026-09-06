@@ -9073,3 +9073,28 @@ weekday header or a habit label — the six non-today letters and every
 not-open label go from a composited 124 to `lit`'s 217. That is the whole
 point of the diff, not a mistake to check against.
 
+## 2026-09-06 — The widget's open pill fills whole at the tap, not one circle first (#609)
+
+`WeekWidgetView.openSpan`'s toggle now draws, as its on face, the filled span
+at the span's own width and rest window, shifted from the tapped column's zone
+to the span's centre. It used to draw one day-sized lit mark in that column.
+
+**What it looked like.** Tapping the open pill on a weekly row lit a circle in
+today's column, and the pill filled a beat later when the provider's reload
+redivided the row: two frames for one tap, the first of them a shape the row
+never otherwise shows. Seen on a phone, on the Workout row of a large widget.
+
+**Why the whole pill is the honest optimistic frame.** An open span runs to
+today — `WeekSpansTests.openSpanEndsAtToday` — and `.todayOnly` editing gives
+it exactly one control, in today's column. A completion today therefore closes
+the entire span, and what the reload draws is `SlotSpan.mark` for `.filled`:
+`.donePast` at the span's width. Drawing that at the tap is drawing the answer
+early, which is what the optimistic face is for (#292); drawing a circle was
+drawing a different answer. The control's hit area is unchanged — still the
+column — and only its face reaches across the span, which WidgetKit allows
+because a face is a view rather than a frame.
+
+**Not changed.** The single-`actionDay` branch already filled at the span's
+width; the day slots' faces are day-sized because a day is. No render baseline
+sees an optimistic face, so none moved.
+
