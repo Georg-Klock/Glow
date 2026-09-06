@@ -93,8 +93,6 @@ struct HabitLabelView: View {
         switch tier {
         case .lit:
             content.foregroundStyle(GlowPalette.lit)
-        case .resting:
-            content.foregroundStyle(GlowPalette.grey)
         case .emitting:
             // Callers express emission with `emittingOpacity`; accepting this
             // case defensively keeps a future misuse visible rather than

@@ -795,12 +795,6 @@ struct HabitRowView: View {
         slots.contains { $0.state == .open } || spans.contains { $0.state == .open }
     }
 
-    /// Handled today: something was asked of this habit today and it was done.
-    /// The middle step of §8.5 — a finished row goes quiet rather than dark.
-    private var isHandled: Bool {
-        TypeTier.isHandled(snapshot, today: today, restDay: restDay)
-    }
-
     /// How lit the label is, 1 through 0. Driven by `isDue` on the same spring
     /// the slot closes on, so the row dims as the ring shuts rather than after.
     @State private var lit: Double = 1
@@ -822,7 +816,7 @@ struct HabitRowView: View {
             textSize: geometry.nameTextSize,
             nameMaxWidth: isEditing
                 ? geometry.editingNameMaxWidth : geometry.nameMaxWidth,
-            baseTier: isHandled ? .lit : .resting,
+            baseTier: .lit,
             emittingOpacity: isEditing ? 0 : lit,
             keepsTrailingSpacer: !isEditing,
             isPlain: isEditing

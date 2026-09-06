@@ -241,15 +241,12 @@ private struct WidgetHeader: View {
                         .font(.system(size: WidgetMetrics.textSize))
 
                     Group {
-                        // Three steps, not two (#335, §8.5). Today's letter
-                        // emits only while something is still open; once every
-                        // habit is handled it steps down to the lit tier — the
-                        // day is still today and still reads as today, it has
-                        // simply stopped asking.
+                        // Two tiers (#603, reversing #335's third). Today's
+                        // letter emits only while something is still open;
+                        // every other letter is lit at full strength.
                         switch TypeTier.weekday(isToday: isToday, anyHabitOpen: anyOpen) {
                         case .emitting: letter.glowing()
                         case .lit: letter.foregroundStyle(GlowPalette.lit)
-                        case .resting: letter.foregroundStyle(GlowPalette.grey)
                         }
                     }
                     .frame(width: SlotLayout.slotWidth(trackWidth: track, slotCount: 7))
@@ -317,13 +314,6 @@ private struct WidgetRow: View {
     /// Still waiting on today. The label follows the slot, same rule as the app.
     private var isDue: Bool {
         slots.contains { $0.state == .open } || spans.contains { $0.state == .open }
-    }
-
-    /// Handled today: something was asked of this habit today and it was done.
-    /// The middle step of §8.5, and the reason a finished row is quieter than
-    /// an untouched one rather than identical to it.
-    private var isHandled: Bool {
-        TypeTier.isHandled(habit, today: today, restDay: restDay)
     }
 
     var body: some View {
@@ -441,7 +431,7 @@ private struct WidgetRow: View {
     private var label: some View {
         // The field and the row share this width: truncate at the track, never
         // shrink type to make a long name appear to fit (#405, #456).
-        let tier = TypeTier.label(isOpenToday: isDue, isHandledToday: isHandled)
+        let tier = TypeTier.label(isOpenToday: isDue)
         HabitLabelView(
             icon: habit.icon,
             name: habit.name,

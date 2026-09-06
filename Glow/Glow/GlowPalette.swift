@@ -64,10 +64,11 @@ enum GlowPalette {
         opacity: 1
     )
 
-    /// Everything at rest: the resting habit name, the weekday letter that is
-    /// not today, the ✕ on a day that went unlogged, the rest day's cut, and
-    /// the socket on a day still to come. One name, because they are one claim
-    /// — nothing is asked here.
+    /// Every *mark* at rest: the ✕ on a day that went unlogged, the rest day's
+    /// cut, and the socket on a day still to come. One name, because they are
+    /// one claim — nothing is asked here. Type no longer takes it (#603): a
+    /// habit name and a weekday letter are `lit` whenever they are not
+    /// emitting, because a name is not absence.
     ///
     /// **A style rather than a `Color`, and that is the whole of the accented
     /// problem.** `resolve(in:)` reads the environment the mark is drawn in, so
@@ -92,7 +93,8 @@ enum GlowPalette {
     /// at 14.9:1 for what is done or handled, and this is what is left over.
     /// A reader is not being asked to read the app at 4:1 — they are being
     /// asked to read *the part of it that is asking nothing* at 4:1, with
-    /// everything live above it.
+    /// everything live above it. **Since #603 that part is marks only** — the
+    /// missed ✕, the cut, the socket still to come; no word is set at 4:1.
     ///
     /// **And the setting still answers.** `greyIncreasedContrast` is `lit`, so
     /// anyone who found the old grey hard to read gets 14.9:1 rather than the

@@ -1,16 +1,24 @@
 import Foundation
 
-/// Which of the three steps a piece of type takes (#335, `docs/week-marks.md`
-/// §8.5).
+/// Which of the two tiers a piece of type takes (#334; #603 reversing #335's
+/// third step, `docs/week-marks.md` §8.5).
 ///
-/// Light has two tiers (#334) and the reflecting one has two strengths, so type
-/// has three states and they say what is still asked of you:
+/// Light has two tiers and type has exactly those two: the emitting tier is
+/// reserved for what is still actionable, and everything else is lit at full
+/// strength.
 ///
 /// | | Weekday letter | Habit label |
 /// | --- | --- | --- |
 /// | `.emitting` | today, any habit open | this habit open today |
-/// | `.lit` | today, everything closed | handled today |
-/// | `.resting` | any other day | at rest |
+/// | `.lit` | every other case | every other case |
+///
+/// #335 had a third, half-strength step under these — every other weekday, and a
+/// label nothing was logged for today — so that a finished row went quiet rather
+/// than dark. In use the header read as six dimmed letters and one bright one,
+/// and a row that had nothing asked of it read as *less* than a row that had
+/// done its work, which is a judgement the grid does not make about a day
+/// (SPEC §1: what stays dark is absence, and a name is not absent). Two tiers:
+/// asking, or not.
 ///
 /// Pure and here rather than in a view, for the reason `WeekGrid` and
 /// `WeekSpans` are: two surfaces draw this row — the app's grid and the
@@ -21,8 +29,6 @@ enum TypeTier: Equatable, Sendable {
     case emitting
     /// `#D9D9D9` at full strength: lit, but not a source of light.
     case lit
-    /// `#D9D9D9` at half. Nothing is asked here.
-    case resting
 
     /// The weekday letter's tier.
     ///
@@ -30,10 +36,11 @@ enum TypeTier: Equatable, Sendable {
     /// today's letter glowed whatever the week was doing, which meant the
     /// emitting tier said *this is today* rather than *this wants you*. It
     /// steps down to `.lit` once every habit is handled — the day is still
-    /// today and still reads as today, it has simply stopped asking.
+    /// today and still reads as today, it has simply stopped asking. Every
+    /// other letter is lit too (#603): the header marks today by asking, not
+    /// by dimming the rest of the week.
     static func weekday(isToday: Bool, anyHabitOpen: Bool) -> TypeTier {
-        guard isToday else { return .resting }
-        return anyHabitOpen ? .emitting : .lit
+        isToday && anyHabitOpen ? .emitting : .lit
     }
 
     /// A habit's own label. The tier always belongs to the name, and an SF
@@ -41,12 +48,11 @@ enum TypeTier: Equatable, Sendable {
     /// keep their own full-colour pixels outside the tier's glow mask (#457).
     /// The state answer is still shared by both surfaces; only the view decides
     /// how that answer is painted for each kind of icon.
-    static func label(isOpenToday: Bool, isHandledToday: Bool) -> TypeTier {
-        if isOpenToday { return .emitting }
-        return isHandledToday ? .lit : .resting
+    static func label(isOpenToday: Bool) -> TypeTier {
+        isOpenToday ? .emitting : .lit
     }
 
-    // MARK: - Deriving the two states
+    // MARK: - Deriving the state
 
     /// Whether this habit is still waiting on today.
     ///
@@ -67,27 +73,6 @@ enum TypeTier: Equatable, Sendable {
             for: habit, in: week, today: today,
             editing: .todayOnly, restDay: restDay, calendar: calendar
         ).contains { $0.state == .open }
-    }
-
-    /// Whether this habit was logged today.
-    ///
-    /// **Logged today, not "goal met"**. A 2x habit that finished on Monday and
-    /// Tuesday is not *handled today* on Friday — nothing was asked of it and
-    /// nothing was done, so it rests. The middle step is for a habit that had
-    /// something to do today and did it.
-    static func isHandled(
-        _ habit: HabitSnapshot,
-        today: Date,
-        restDay: Int?,
-        calendar: Calendar = WeekCalendar.calendar
-    ) -> Bool {
-        guard !habit.isSpacer else { return false }
-        // The rest day draws nothing and asks nothing, so a completion stored
-        // on one does not light its label either (#72).
-        guard !WeekPreferences.isRestDay(today, restDay: restDay, calendar: calendar) else {
-            return false
-        }
-        return habit.completedDays.contains(WeekCalendar.day(today, calendar: calendar))
     }
 
     /// Whether anything in this week still wants doing today — what the weekday

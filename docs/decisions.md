@@ -9037,3 +9037,39 @@ is the widget's own. The hosted `weekly grid screen` frame gains the 7.5pt
 centring margin on each side, and `widgets screen` moves by the half of the
 slack its cards were leaving on the right. Both runtimes were approved together
 with `Tools/approve-baseline.sh`.
+
+## 2026-09-05 — Type takes two tiers, not three; the resting step is for marks (#603)
+
+`TypeTier` is `.emitting` or `.lit`. `.resting` is gone, and with it
+`TypeTier.isHandled` and both views' `isHandled` — the question it existed to
+answer. A weekday letter emits while it is today and something is still open,
+and is lit otherwise; a habit's name and SF Symbol emit while the habit is open
+today, and are lit otherwise. `GlowPalette.grey` and `greyResting` stay exactly
+as they are, for the marks that still take them: the missed ✕, the rest day's
+cut, a socket on a day still to come.
+
+**This reverses the type half of #335** (2026-08-28, "Type takes all three
+steps"), on purpose. #335's argument was that a finished row should go quiet
+rather than dark, and that six of seven weekday letters at half strength would
+tell you where in the week you are. In use the header read as six dimmed
+letters and one bright one — a spotlight on today the emitting tier already
+provides while today is asking — and a row that had nothing asked of it today
+(a 2× habit done on Monday and Tuesday, read on Friday) sat *dimmer* than a row
+that had just done its work. That is a judgement about a day the grid does not
+otherwise make: SPEC §1 says what stays dark is absence, and a habit's name is
+not absent on a day it was not due. Two tiers say one thing — asking, or not —
+and the marks under the name carry the rest, which is what they are for.
+
+**What #335 settled and this does not touch.** The resting step's contrast
+argument (4.0:1 defensible because it is the third of three) now applies to
+marks alone, and nobody is asked to read a word at 4:1 at all, which is a
+stronger position than #335's. `greyIncreasedContrast` is unchanged. The
+accented-rendering half of #335 — alpha is what Clear and Tinted keep — is
+unchanged too, and every letter and name is now opaque there rather than half
+of them. #334's ceiling is untouched: a completion is lit and does not emit.
+
+**What moved.** Both render baselines, on both runtimes: every frame with a
+weekday header or a habit label — the six non-today letters and every
+not-open label go from a composited 124 to `lit`'s 217. That is the whole
+point of the diff, not a mistake to check against.
+

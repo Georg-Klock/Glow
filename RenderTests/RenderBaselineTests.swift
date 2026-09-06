@@ -102,7 +102,8 @@ import UIKit
 /// is `tones`, because that is a *count* of pixels at one exact level — the
 /// property that makes it blind to a mark's thinness (#199) is the property
 /// that makes one pixel move it. It moves by exactly one, in both directions:
-/// `week large` at 255 is 4097 or 4098, `grid rows` at 124 is 230 or 231.
+/// `week large` at 255 is 4097 or 4098, `grid rows` at 124 was 230 or 231
+/// (before #603 took that level out of the list).
 /// `week large` is the clearest reading of the mechanism — the count *at* 255
 /// was 4106 in all 132 renders, and what oscillates is the neighbour
 /// `toneExcess` subtracts.
@@ -399,6 +400,10 @@ struct RenderBaselineTests {
     /// at 120 its 124 is a tone the frame has to go on painting. What genuinely
     /// narrows is the other side: `month small` paints 90 there and now clears
     /// the line by 30 rather than by 110.
+    ///
+    /// **Level 124 is history since #603**, which took the resting step away
+    /// from type; the paragraphs above are the record of why the floor is
+    /// where it is, and the two levels left both clear it by thousands.
     static let toneFloor = 120
 
     // MARK: - The scene
@@ -652,9 +657,9 @@ struct RenderBaselineTests {
     /// `WeeklyGridView`'s `listRowInsets` will not show up in this isolated
     /// frame; they are covered by the separate hosted weekly-screen frame.
     ///
-    /// **The label's three renderings are held, and that was checked rather
-    /// than assumed.** `HabitRowView` picks `GlowPalette.lit` or
-    /// `GlowPalette.grey` underneath from `isHandled`, and crossfades an
+    /// **The label's two renderings are held, and that was checked rather
+    /// than assumed.** `HabitRowView` draws `GlowPalette.lit` underneath (the
+    /// half-strength third step went with #603), and crossfades an
     /// emitting copy over it at `opacity(lit)` — where `lit` is `@State`
     /// initialised to 1 and set from `.onAppear`. A renderer that skipped
     /// `onAppear` would leave every name emitting, and the frame would silently
@@ -1159,7 +1164,15 @@ struct RenderSignature: Codable, Equatable {
     ///
     /// 217 and 255 are opaque and did not move at all, which is the other half
     /// of the same point.
-    static let flatTones = [124, 217, 255]
+    ///
+    /// **124 left the list with #603.** It was painted flat by type alone — the
+    /// six weekday letters that were not today, and every label with nothing
+    /// logged today — and type takes two tiers now, so no frame paints it flat
+    /// any more: `flatTonesAreReal` measured the most any family had at 75, in
+    /// `month small`, which is the antialiased edge of a ✕, not a tone. The
+    /// resting grey is still drawn — the ✕, the cut, a socket to come — but as
+    /// strokes and bevels, never as a flat field above `toneFloor`.
+    static let flatTones = [217, 255]
 
     var width: Int
     var height: Int
