@@ -123,9 +123,7 @@ enum WeekDistanceTitle {
         switch weeks {
         case 0: "This Week"
         case -1: "Last Week"
-        case -2: "Two Weeks Ago"
         case 1: "Next Week"
-        case 2: "Two Weeks Ahead"
         default: range
         }
     }
@@ -135,7 +133,7 @@ enum WeekDistanceTitle {
     static func subtitle(weeks: Int, range: String) -> String? {
         switch weeks {
         case 0: nil
-        case -2, -1, 1, 2: range
+        case -1, 1: range
         case ..<0: -weeks == 1 ? "1 week ago" : "\(-weeks) weeks ago"
         default: weeks == 1 ? "1 week ahead" : "\(weeks) weeks ahead"
         }

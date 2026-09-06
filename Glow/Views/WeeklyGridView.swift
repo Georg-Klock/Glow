@@ -963,10 +963,10 @@ struct WeeklyGridView: View {
     /// and the distance moves to the line underneath.
     ///
     /// **The ladder runs both ways since #557.** Correcting history pages
-    /// ahead as well as back, so `WeekDistanceTitle` mirrors the three rungs
-    /// forward — "Next Week", "Two Weeks Ahead", then the dates over "N weeks
-    /// ahead". Browsing never reaches a week ahead, so its titles are exactly
-    /// what #207 built.
+    /// ahead as well as back, so `WeekDistanceTitle` mirrors the two rungs
+    /// forward — "Next Week", then the dates over "N weeks ahead" (#604 took
+    /// the two-week phrase off both ends). Browsing never reaches a week
+    /// ahead, so its titles are exactly what #207 built, less that rung.
     private var weekTitle: String {
         WeekDistanceTitle.title(weeks: weekDistance, range: weekRangeTitle)
     }
