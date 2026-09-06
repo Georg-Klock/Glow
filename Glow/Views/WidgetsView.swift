@@ -330,7 +330,12 @@ struct WidgetsView: View {
             let rendered = widgetDisplaySizes.referenceSize(of: group.placement.family).width
                 * Self.previewScale(fitting: cardWidth, into: widgetDisplaySizes, family: group.placement.family)
             let rowWidth = rendered * CGFloat(perRow) + gutter * CGFloat(perRow - 1)
-            LazyVStack(alignment: .center, spacing: 12) {
+            // The row gap is the column gap (#602). For the Small family that
+            // is the Home Screen's own 18pt between two Smalls, so the grid
+            // reads as one grid rather than as rows of pairs; Large and Medium
+            // place one card per row, where the same number is simply the
+            // space between two placements.
+            LazyVStack(alignment: .center, spacing: gutter) {
                 ForEach(group.rows, id: \.self) { row in
                     HStack(alignment: .top, spacing: gutter) {
                         ForEach(row) { card in
