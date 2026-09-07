@@ -223,10 +223,11 @@ struct GoalPopTests {
         // one phrase twice as likely and the pool one shorter than it reads.
         //
         // 370 since #471, which widened the pool across nine varieties of
-        // English. The number is asserted rather than derived so that adding
-        // phrases stays a deliberate act with a diff, the way lowering a floor
-        // in Tools/test-inventory.json is.
-        #expect(GoalPop.lines.count == 370)
+        // English; 218 since the final cut of 2026-09-07, Georg's own list in
+        // his order. The number is asserted rather than derived so that adding
+        // or removing phrases stays a deliberate act with a diff, the way
+        // lowering a floor in Tools/test-inventory.json is.
+        #expect(GoalPop.lines.count == 218)
         #expect(Set(GoalPop.lines).count == GoalPop.lines.count)
     }
 
