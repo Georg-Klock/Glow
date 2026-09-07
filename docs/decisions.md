@@ -9098,3 +9098,23 @@ because a face is a view rather than a frame.
 width; the day slots' faces are day-sized because a day is. No render baseline
 sees an optimistic face, so none moved.
 
+## 2026-09-07 — The pop's pool is Georg's final 218, in his order
+
+`GoalPop.lines` is 218 phrases, down from #471's 370. The list is Georg's,
+handed over whole and entered in his order: a themed run of forty — sport,
+work, games, the odd flourish — and then plain speech with the regional voices
+that survived his read.
+
+**What went.** The naturalised loanwords #471 added (`ka pai`, `shabash`, `kya
+baat`, `lekker`, `aweh`, `irie`), most of the New Zealand, South African,
+Indian and Caribbean registers, and the long tail of near-duplicates the
+widening carried (`gains secured`, `iron sharpened`, `xp secured`, `boss
+cleared` and their like). **What stayed** is what read as a voice rather than
+a costume when the whole pool was read aloud: `proper job`, `grand stuff`,
+`good onya`, `away ye go`, `there's lovely`, `bless up`, `respect due`.
+
+**What did not change.** Fourteen characters, lowercase, nothing gendered, one
+shuffle bag, one pop per tap. 218 is still thirty-six times the six-word list
+#420 replaced; a person logging twice a day sees a phrase again after about
+three and a half months rather than inside a week.
+
