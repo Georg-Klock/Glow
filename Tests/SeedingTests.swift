@@ -1,6 +1,8 @@
+import CoreText
 import Foundation
 import SwiftData
 import Testing
+import UIKit
 @testable import Glow
 
 /// The curated set, and what putting it in means. It arrives on a tap now
@@ -601,5 +603,91 @@ struct ResetConfirmationTests {
         // waiting for another.
         #expect(ResetConfirmation.word == "RESET")
         #expect(ResetConfirmation.isConfirmed(ResetConfirmation.word))
+    }
+}
+
+/// The curated names against the column that draws them (#613).
+///
+/// The set carries its cadence in the name now — "3x Workout" — and a prefix
+/// is three or four characters a name did not have to fit before. Two of the
+/// eight did not: "4x Read Book" and "7x Early night" measured 77.80pt and
+/// 76.23pt against a 71.75pt column, and would have shipped cut on the first
+/// screen anyone sees. They are `4x Reading` and `7x Bedtime` for that reason,
+/// and this is what says so if either is ever lengthened again.
+///
+/// **Measured at the row's own size, not asserted about character counts.**
+/// The column is 5.979 text-sizes wide on both surfaces, and what fits in it
+/// is a fact about glyph advances rather than about how many letters there
+/// are: "7x Gratitude" is twelve characters and 69.33pt, "4x Read Book" is
+/// twelve characters and 77.80pt.
+@Suite("Curated names fit their column")
+struct DefaultHabitNameTests {
+    /// One line of CoreText, in the font `HabitLabelView` asks `Text` for.
+    ///
+    /// Not a re-implementation of anything: the app never computes this width,
+    /// it lets SwiftUI lay the name out and truncate it. This measures the
+    /// same font at the same size so a name that would be truncated is caught
+    /// here rather than on a screenshot.
+    private func width(_ name: String, size: CGFloat) -> CGFloat {
+        guard !name.isEmpty else { return 0 }
+        let line = CTLineCreateWithAttributedString(
+            NSAttributedString(
+                string: name,
+                attributes: [.font: UIFont.systemFont(ofSize: size)]
+            )
+        )
+        return CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+    }
+
+    /// Every width the app ships on, narrowest first.
+    ///
+    /// The narrow end is the one that matters and it is not obvious why: the
+    /// screen is the widget times one factor, so the name's size and its column
+    /// shrink together — but text width is not linear in point size (SF tracks
+    /// looser at small sizes), so a name is *relatively* wider on a small
+    /// phone. The SE is therefore a stricter test than the Pro Max, not an
+    /// equivalent one.
+    @Test(
+        "Every curated name fits the name column, on every phone",
+        arguments: [375.0, 390.0, 402.0, 430.0] as [CGFloat]
+    )
+    func curatedNamesFitTheColumn(screenWidth: CGFloat) {
+        let row = RowGeometry(
+            totalWidth: screenWidth - GridMetrics.horizontalPadding * 2
+        )
+        for template in DefaultHabits.all where !template.isSpacer {
+            let measured = width(template.name, size: row.nameTextSize)
+            #expect(
+                measured <= row.nameMaxWidth,
+                """
+                "\(template.name)" measures \(measured)pt against a \
+                \(row.nameMaxWidth)pt column at \(screenWidth)pt — it would \
+                ship truncated. Shorten the name or drop its prefix.
+                """
+            )
+        }
+    }
+
+    /// The prefix says the week the frequency beside it asks for.
+    ///
+    /// It is a literal and nothing keeps it honest at runtime — that is stated
+    /// in `DefaultHabits` and accepted. What this holds is the weaker, checkable
+    /// claim: the set *as shipped* does not contradict itself.
+    @Test("Each prefix matches the frequency it ships beside")
+    func prefixesMatchTheirFrequency() {
+        for template in DefaultHabits.all where !template.isSpacer {
+            let prefix = template.name.prefix { $0 != " " }
+            #expect(
+                prefix.hasSuffix("x"),
+                "\(template.name) has no Nx prefix"
+            )
+            #expect(
+                Int(prefix.dropLast()) == template.frequency.slotCount,
+                """
+                "\(template.name)" says \(prefix) but ships \
+                \(String(describing: template.frequency.slotCount))×/week.
+                """
+            )
+        }
     }
 }

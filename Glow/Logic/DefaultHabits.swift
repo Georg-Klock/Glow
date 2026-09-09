@@ -40,26 +40,49 @@ enum DefaultHabits {
     /// width, and a long name truncates on a small phone, which is a poor first
     /// impression for a screen whose whole claim is that it reads at a glance.
     ///
-    /// `Gratitude` and `Early night` say `.daily` rather than
-    /// `.timesPerWeek(7)`: `Frequency.init(timesPerWeek:)` folds seven into
-    /// `.daily` at runtime, so the literal may as well say what it means.
+    /// **Every name carries its week's count as a literal prefix.** A row draws
+    /// its cadence as the shape of its marks, which is exact but has to be
+    /// counted; the seed set says the number outright, so the first screen
+    /// reads "3x Workout" rather than asking anyone to count three sockets.
+    ///
+    /// It is a *literal*, and nothing keeps it honest. The name is stored,
+    /// editable and deletable like any other habit's, and no code here reads
+    /// the `frequency` beside it — so a habit re-targeted to 5×/week goes on
+    /// calling itself "3x Workout" until its owner renames it. That is the
+    /// accepted cost of writing the number into the name instead of deriving
+    /// it as a display element: a future reader should take the prefix as the
+    /// text this set happened to ship with, not as a fact about the row.
+    ///
+    /// **Two names shortened to make room** (#613). Prefixed, "4x Read Book"
+    /// measures 77.80pt and "7x Early night" 76.23pt against the 71.75pt name
+    /// column (`WidgetMetrics.nameMaxWidth`, at the row's own 12pt) — both
+    /// would have shipped truncated on a screen whose first impression is the
+    /// whole point. `Reading` and `Bedtime` are the same habits at 63.12pt and
+    /// 63.00pt. `SeedingTests` reads the names back off this list rather than
+    /// pinning literals, and measures every one of them against the column at
+    /// every phone width, so the next edit here cannot reintroduce a cut.
+    ///
+    /// `Gratitude` and `Bedtime` say `.daily` rather than `.timesPerWeek(7)`:
+    /// `Frequency.init(timesPerWeek:)` folds seven into `.daily` at runtime, so
+    /// the literal may as well say what it means. Their prefix is `7x` because
+    /// that is the week `.daily` asks for.
     static let all: [Template] = [
         // Eight, in three clusters by time of day. Morning:
-        Template(name: "Gratitude", icon: "pencil", frequency: .daily),
-        Template(name: "Stretch", icon: "figure.yoga", frequency: .timesPerWeek(4)),
-        Template(name: "Read Book", icon: "book", frequency: .timesPerWeek(4)),
+        Template(name: "7x Gratitude", icon: "pencil", frequency: .daily),
+        Template(name: "4x Stretch", icon: "figure.yoga", frequency: .timesPerWeek(4)),
+        Template(name: "4x Reading", icon: "book", frequency: .timesPerWeek(4)),
 
         Template(isSpacer: true, name: "", icon: "", frequency: .daily),
 
         // Midday:
-        Template(name: "Workout", icon: "dumbbell", frequency: .timesPerWeek(3)),
-        Template(name: "VO2 Max", icon: "figure.run", frequency: .timesPerWeek(2)),
-        Template(name: "Tutorial", icon: "play.rectangle", frequency: .timesPerWeek(3)),
+        Template(name: "3x Workout", icon: "dumbbell", frequency: .timesPerWeek(3)),
+        Template(name: "2x VO2 Max", icon: "figure.run", frequency: .timesPerWeek(2)),
+        Template(name: "3x Tutorial", icon: "play.rectangle", frequency: .timesPerWeek(3)),
 
         Template(isSpacer: true, name: "", icon: "", frequency: .daily),
 
         // Evening:
-        Template(name: "Sunset", icon: "sunset", frequency: .timesPerWeek(3)),
-        Template(name: "Early night", icon: "bed.double", frequency: .daily)
+        Template(name: "3x Sunset", icon: "sunset", frequency: .timesPerWeek(3)),
+        Template(name: "7x Bedtime", icon: "bed.double", frequency: .daily)
     ]
 }
