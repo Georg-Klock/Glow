@@ -460,12 +460,14 @@ private struct WidgetRow: View {
     }
 }
 
-/// A span on a widget row. Every non-future day the week-editing policy can
-/// resolve is tappable. WidgetKit does not expose a touch location inside one
-/// custom toggle, so an open span keeps one continuous drawn socket and lays
-/// one transparent `SlotToggle` over each exact eligible day (#523). Filled
-/// spans still have one meaningful action — their real completion — and keep
-/// their one fallback control from #508.
+/// A span on a widget row. WidgetKit does not expose a touch location inside
+/// one custom toggle, so an open span keeps one continuous drawn socket and
+/// lays a transparent `SlotToggle` over each of its columns (#523). Every one
+/// of them writes the same day — the only day the span can write (#614) — so
+/// the pill acts as the single control it looks like, and the subdivision
+/// exists only so the drawn face can follow the finger. Filled spans still
+/// have one meaningful action — their real completion — and keep their one
+/// fallback control from #508.
 private struct WidgetSpan: View {
     let span: SlotSpan
     let track: CGFloat
@@ -598,7 +600,6 @@ private struct WidgetSpan: View {
         mark: SlotMarkView,
         actions: [WidgetSpanActions.Action]
     ) -> some View {
-        let byColumn = Dictionary(uniqueKeysWithValues: actions.map { ($0.column, $0.day) })
         let zoneWidth = size.width / CGFloat(span.dayCount)
 
         return ZStack {
@@ -606,42 +607,47 @@ private struct WidgetSpan: View {
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
             HStack(spacing: 0) {
-                ForEach(span.firstDay...span.lastDay, id: \.self) { column in
-                    if let day = byColumn[column] {
-                        SlotToggle(
-                            habitID: habit.id,
-                            isDone: false,
-                            day: day,
-                            renderedDay: renderedDay,
-                            onLabel: SlotVoice.actionLabel(
-                                habitName: habit.name, day: day, isDone: true
-                            ),
-                            offLabel: SlotVoice.actionLabel(
-                                habitName: habit.name, day: day, isDone: false
-                            )
-                        ) {
-                            // The face is drawn centred on this column's zone,
-                            // so it is shifted to the span's centre: the same
-                            // pill the reload draws, in the same place.
-                            let zoneCentre = (CGFloat(column - span.firstDay) + 0.5) * zoneWidth
-                            Color.clear
-                                .frame(width: zoneWidth, height: side)
-                                .overlay {
-                                    SlotMarkView(
-                                        mark: .donePast,
-                                        size: size,
-                                        spansDays: span.dayCount > 1,
-                                        restWindow: restWindow
-                                    )
-                                    .offset(x: size.width / 2 - zoneCentre)
-                                }
-                        } offMark: {
-                            Color.clear
-                                .frame(width: zoneWidth, height: side)
-                                .contentShape(Rectangle())
-                        }
-                    } else {
-                        Color.clear.frame(width: zoneWidth, height: side)
+                // **Over the actions, not over the columns** (#614). Walking
+                // the columns and drawing a bare `Color.clear` wherever one had
+                // no action is what made the rest of an open pill open the app:
+                // an unadorned `Color.clear` is not a target WidgetKit knows,
+                // so a tap on it fell through to the widget's default. There is
+                // no such branch to fall into now — `openActions` returns one
+                // action per column of the span, so this covers the pill
+                // exactly and every zone of it writes.
+                ForEach(actions) { action in
+                    SlotToggle(
+                        habitID: habit.id,
+                        isDone: false,
+                        day: action.day,
+                        renderedDay: renderedDay,
+                        onLabel: SlotVoice.actionLabel(
+                            habitName: habit.name, day: action.day, isDone: true
+                        ),
+                        offLabel: SlotVoice.actionLabel(
+                            habitName: habit.name, day: action.day, isDone: false
+                        )
+                    ) {
+                        // The face is drawn centred on this column's zone,
+                        // so it is shifted to the span's centre: the same
+                        // pill the reload draws, in the same place.
+                        let zoneCentre =
+                            (CGFloat(action.column - span.firstDay) + 0.5) * zoneWidth
+                        Color.clear
+                            .frame(width: zoneWidth, height: side)
+                            .overlay {
+                                SlotMarkView(
+                                    mark: .donePast,
+                                    size: size,
+                                    spansDays: span.dayCount > 1,
+                                    restWindow: restWindow
+                                )
+                                .offset(x: size.width / 2 - zoneCentre)
+                            }
+                    } offMark: {
+                        Color.clear
+                            .frame(width: zoneWidth, height: side)
+                            .contentShape(Rectangle())
                     }
                 }
             }
