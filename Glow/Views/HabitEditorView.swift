@@ -40,9 +40,16 @@ enum HabitEditorGeometry {
     /// current Dynamic Type size in `HabitEditorView`.
     static let nameFieldBaseTextSize: CGFloat = 17
 
-    /// Enlarging both sides of the compact row's width-to-type ratio keeps the
-    /// field's ellipsis on the same character even though the field is easier
-    /// to read than the row it previews (#482).
+    /// The compact row's name column, in the field's larger type: the field is
+    /// as wide, relative to what it draws, as the row is (#482).
+    ///
+    /// **This is a layout width and no longer a truncation mechanism** (#615).
+    /// It was both, and the second job was one it could not do: enlarging both
+    /// sides of the ratio was supposed to keep the field's ellipsis on the same
+    /// character as the row's, and text width is not linear in point size, so
+    /// the field kept showing a character the row would cut. The cut is
+    /// `NameTruncation`'s now, resolved once at the row's own size; what this
+    /// still decides is how much of the platter the field occupies.
     static func nameFieldWidth(
         rowNameWidth: CGFloat,
         rowTextSize: CGFloat,
@@ -98,18 +105,19 @@ struct HabitEditorView: View {
     @State private var isConfirmingDelete = false
     @State private var isPickingIcon = false
 
-    /// How wide the typed name wants to be with nothing stopping it, and how
-    /// much width the row actually gives it. Both measured off real `Text`
-    /// views in the row's own font and the row's own layout, rather than
-    /// computed — the thing that decides where the ellipsis goes is the thing
-    /// being asked, so the warning and the preview cannot disagree about
-    /// whether there is one. When the name fits, the two are equal.
-    @State private var idealNameWidth: CGFloat = 0
-    @State private var grantedNameWidth: CGFloat = 0
     /// The sheet's own width, which on a phone is the window's, which is what
-    /// This Week measures its rows against. Starts at the widget's width so the
-    /// first pass is a real row rather than a zero-wide one.
-    @State private var sheetWidth: CGFloat = WidgetMetrics.largeWidth
+    /// This Week measures its rows against.
+    ///
+    /// **The fallback is the narrowest window the grid draws at full scale**,
+    /// not the widget's own width. It was `WidgetMetrics.largeWidth` — 338,
+    /// the width of the *panel* the grid draws, where this measures the
+    /// *window* the panel is laid out in. The row divides `sheetWidth` less its
+    /// two outer paddings, so 338 made the first pass a row scaled to 88% and
+    /// the preview briefly stricter than the row it previews. Written as the
+    /// sum it actually is, so it moves if either half does; the real width
+    /// arrives from `.onGeometryChange` on the pass after.
+    @State private var sheetWidth: CGFloat =
+        WidgetMetrics.largeWidth + GridMetrics.horizontalPadding * 2
 
     /// One corner for every outer platter on this screen.
     ///
@@ -285,72 +293,38 @@ struct HabitEditorView: View {
         )
     }
 
+    /// Exactly what This Week's row will show for this name.
+    ///
+    /// **The sheet stops truncating and starts quoting** (#615). It used to
+    /// draw the full name in a field whose width was `nameMaxWidth × 17/12` and
+    /// let `Text` cut it there, on the theory that scaling both sides of the
+    /// ratio preserves the character the ellipsis lands on. Text width is not
+    /// linear in point size, so it did not: over 1,296 names the two cuts
+    /// differed 597 times, always with the field one character more generous
+    /// than the row. "Crossbowww" showed in full here and read "Crossbow…" on
+    /// the grid.
+    ///
+    /// So this is not a second truncation to be reconciled with the row's —
+    /// it is the row's own answer, resolved by `NameTruncation` against the
+    /// row's font, size and column, and drawn as a string. The field displays
+    /// it; nothing measures it again.
+    private var rowVisibleName: String {
+        NameTruncation.visible(
+            trimmedName,
+            size: rowPreview.nameTextSize,
+            limit: rowPreview.nameMaxWidth
+        )
+    }
+
     /// Whether the name gets less room than it wants, and so ends in an
     /// ellipsis.
     ///
-    /// **Still measured rather than compared with a copied constant.** The
-    /// first version predicted the cut from `nameMaxWidth` and was a character
-    /// optimistic on the screenshot that caught it. The row below is the real
-    /// arrangement — icon column, its gap, name and trailing spacer — and it
-    /// reports what SwiftUI actually granted at this sheet's width. That keeps
-    /// the hint honest if any part of the arrangement moves again.
-    private var isNameCut: Bool { idealNameWidth > grantedNameWidth }
-
-    /// The typed name with nothing holding it back, which is the width the row
-    /// is not going to give it.
-    ///
-    /// **In the layout, not in a `.background`.** It was a background, and on
-    /// the New Habit sheet the warning never appeared for a 24-character name:
-    /// background content was not re-measured as the field's text changed, so
-    /// both widths stayed at whatever the first pass saw. A `0 × 0` frame costs
-    /// the same nothing and is measured every pass.
-    private var idealNameProbe: some View {
-        Text(trimmedName)
-            .font(.system(size: rowPreview.nameTextSize))
-            .fixedSize()
-            .onGeometryChange(for: CGFloat.self) { proxy in
-                proxy.size.width
-            } action: { width in
-                idealNameWidth = width
-            }
-            .frame(width: 0, height: 0)
-            .hidden()
-    }
-
-    /// `HabitRowView`'s label measured off-screen, laid out the way that view
-    /// lays it out when it is not editing: the icon column, the name, a spacer,
-    /// and the whole thing held to the label column's width.
-    ///
-    /// **The arrangement is copied, not the numbers.** Which width the name ends
-    /// up with is decided by this whole stack rather than by any one constant
-    /// in it, so reproducing the stack is the only way the sheet and the row
-    /// stay in step through a change to either.
-    ///
-    /// Editing is not reproduced. `HabitRowView` drops the spacer and the column
-    /// width while the list is in edit mode, which gives the name more room —
-    /// but that is a transient state of the list, not how the habit is read, and
-    /// a preview should show the narrower of the two.
-    private var rowLabelProbe: some View {
-        HStack(spacing: 0) {
-            if rowPreview.showsIcon {
-                HabitIconView(icon: icon, size: rowPreview.iconSize)
-                    .frame(width: rowPreview.iconWidth)
-                    .padding(.trailing, rowPreview.iconGap)
-            }
-            Text(trimmedName)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: rowPreview.nameMaxWidth, alignment: .leading)
-                .onGeometryChange(for: CGFloat.self) { proxy in
-                    proxy.size.width
-                } action: { width in
-                    grantedNameWidth = width
-                }
-            Spacer(minLength: 0)
-        }
-        .font(.system(size: rowPreview.nameTextSize))
-        .frame(width: rowPreview.labelWidth, alignment: .leading)
-    }
+    /// One derivation, from the one string above, rather than a comparison of
+    /// two independently measured widths. Those were a pair of
+    /// `.onGeometryChange` callbacks, and because they landed in different
+    /// render passes the warning could be seen switched on over a name the
+    /// field was still drawing in full — the same frame that reported #615.
+    private var isNameCut: Bool { rowVisibleName != trimmedName }
 
     /// Icon picker and name field, with the warning occupying a permanent line
     /// immediately above them.
@@ -359,14 +333,17 @@ struct HabitEditorView: View {
     /// field a place to enter one thing and the row beneath it the place to see
     /// another, and the block's arrival moved the frequency control. The field
     /// is the preview now. Its larger `.body` type and width are the row's type
-    /// and width multiplied by one factor, so the hidden probes and the field
-    /// still cut at the same character (#456, #482).
+    /// and width multiplied by one factor (#456, #482) — which makes the field
+    /// the row's shape, but not, on its own, the row's ellipsis: that comes
+    /// from `NameTruncation`, which resolves the cut once at the row's own size
+    /// so the field can quote it rather than repeat it (#615).
     ///
     /// The input remains the full string. Once it is wider than the row, the
-    /// native field's scrolling text becomes transparent and a tail-truncated
-    /// copy is drawn over the same bounds. The field still owns focus, input,
-    /// selection and accessibility; only its pixels are replaced. This is the
-    /// deliberate cost of always showing the shipped truncation while focused:
+    /// native field's scrolling text becomes transparent and the row's own
+    /// visible text is drawn over the same bounds. The field still owns focus,
+    /// input, selection and accessibility; only its pixels are replaced. This
+    /// is the deliberate cost of always showing the shipped truncation while
+    /// focused:
     /// the end being typed is no longer visible after the cut, exactly the
     /// choice made for this issue.
     ///
@@ -413,7 +390,19 @@ struct HabitEditorView: View {
                             .font(.system(size: nameFieldTextSize))
                             .lineLimit(1)
                             .truncationMode(.tail)
-                            .foregroundStyle(isNameCut ? Color.clear : Color.primary)
+                            // **`.opacity`, not `.foregroundStyle(.clear)`.**
+                            // A `TextField` goes on painting its own text
+                            // through a clear foreground style — the style
+                            // reaches the placeholder and the insertion point,
+                            // not the glyphs UIKit draws — so the truncated
+                            // copy below was being drawn *over* a field still
+                            // showing the full name. That was invisible for as
+                            // long as the two strings were identical, which
+                            // they were while the field truncated the same
+                            // text at its own width; the moment the copy
+                            // became the row's own shorter answer it showed as
+                            // an ellipsis stamped across "ww" (#615).
+                            .opacity(isNameCut ? 0 : 1)
                             .textInputAutocapitalization(.sentences)
                             .focused($isNameFocused)
                             .submitLabel(.done)
@@ -423,10 +412,17 @@ struct HabitEditorView: View {
                     }
 
                     if isNameCut {
-                        Text(trimmedName)
+                        // The row's own visible text, already ending in its
+                        // ellipsis — not the full name cut a second time at a
+                        // second size. `lineLimit` remains as a guard rather
+                        // than as the mechanism: this string is the row's
+                        // 71.75pt of 12pt type, and 17pt type is
+                        // proportionally narrower than the ratio, so it always
+                        // fits `nameFieldWidth`. `NameTruncationTests` holds
+                        // that.
+                        Text(rowVisibleName)
                             .font(.system(size: nameFieldTextSize))
                             .lineLimit(1)
-                            .truncationMode(.tail)
                             .frame(
                                 width: nameFieldWidth,
                                 alignment: .leading
@@ -443,17 +439,6 @@ struct HabitEditorView: View {
                     isNameCut ? HabitEditorCopy.nameWarning : ""
                 )
             }
-
-            // Kept in the ordinary layout rather than a background: both
-            // probes must be remeasured on every keystroke (#405). Their own
-            // explicit geometry is resolved before this zero-sized container
-            // removes them from the visible arrangement.
-            ZStack(alignment: .topLeading) {
-                idealNameProbe
-                rowLabelProbe
-            }
-            .frame(width: 0, height: 0)
-            .hidden()
         }
     }
 

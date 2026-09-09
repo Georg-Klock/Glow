@@ -531,6 +531,26 @@ actual bug. Every line here is something that already happened.
   state (`@State var editMode: EditMode`) and inject it with
   `.environment(\.editMode, $editMode)`.
 - **`Color.clear.frame(height:)` is greedy horizontally** and will eat a layout.
+- **`.foregroundStyle(.clear)` does not hide a `TextField`'s text** (#615). The
+  style reaches the placeholder and the insertion point; the glyphs UIKit draws
+  are not coloured by it. The habit editor replaces the field's pixels with a
+  truncated copy while a name is too long, and for two issues it was drawing
+  that copy *over* a field still showing the full name — invisible for exactly
+  as long as the two strings were identical, which they were until the copy
+  became the row's own shorter answer and read as an ellipsis stamped across
+  "ww". Use `.opacity`, and notice that any test comparing the two strings for
+  equality cannot see this: it is only wrong when they differ.
+- **Text width is not linear in point size, so one string at two sizes cannot
+  be made to truncate alike by scaling a width** (#615). A line measures
+  `size × Σ(unit advances) + (count − 1) × tracking(size)`, and SF's tracking
+  table is per-size — 17pt type comes out proportionally *narrower* than 12pt
+  type. `nameMaxWidth × 17/12` was supposed to keep the editor's ellipsis on
+  the row's character and missed on 597 of 1,296 names, always one character
+  too generous. Scaling by the measured ratio of the same string gets that to
+  35, not 0. If two surfaces must cut a string in the same place, resolve the
+  cut once and have the second surface draw the resulting string —
+  `NameTruncation` is that, and it is a measurement, not a second layout
+  engine.
 - **A root `.tint()` beats anything that derives a colour from it.** This tint
   is pure white, so any control that fills with it and draws its label in "the
   contrasting colour" renders white on white. Three instances so far:
