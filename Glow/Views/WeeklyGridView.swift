@@ -177,6 +177,46 @@ struct WeeklyGridView: View {
         habits.count > WidgetMetrics.largeRowCapacity
     }
 
+    /// Which drawn position the boundary occupies, or nil when there is none.
+    /// The same question `showsWidgetBoundary` answers, with the position as
+    /// well as the fact, because every list offset has to be translated
+    /// against it.
+    private var boundaryPosition: Int? {
+        GridBoundary.position(
+            habitCount: habits.count, capacity: WidgetMetrics.largeRowCapacity
+        )
+    }
+
+    /// A row of the list as drawn: a habit, or the boundary between two.
+    ///
+    /// Identified by the habit's own id, exactly as the `ForEach` was keyed
+    /// before, so a reorder still animates rows rather than rebuilding them.
+    /// The boundary's id is a case of its own: there is one, it is never
+    /// reordered, and it does not stand for a habit.
+    private enum DrawnRow: Identifiable {
+        case habit(Habit, index: Int)
+        case boundary
+
+        var id: AnyHashable {
+            switch self {
+            case .habit(let habit, _): AnyHashable(habit.id)
+            case .boundary: AnyHashable("widget-boundary")
+            }
+        }
+    }
+
+    /// The habits with the boundary inserted at its position.
+    private var drawnRows: [DrawnRow] {
+        let boundary = boundaryPosition
+        var rows: [DrawnRow] = []
+        rows.reserveCapacity(habits.count + 1)
+        for (index, habit) in habits.enumerated() {
+            if rows.count == boundary { rows.append(.boundary) }
+            rows.append(.habit(habit, index: index))
+        }
+        return rows
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -502,13 +542,19 @@ struct WeeklyGridView: View {
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-                ForEach(Array(habits.enumerated()), id: \.element.id) { index, habit in
-                    let bottomInset: CGFloat = if showsWidgetBoundary,
-                                                  index == WidgetMetrics.largeRowCapacity - 1 {
-                        geometry.rowInset + geometry.widgetBoundaryGap
-                    } else {
-                        geometry.rowInset
-                    }
+                // **One `ForEach`, over the rows the screen draws** (#621).
+                // The boundary is one of them now rather than a decoration
+                // hung on whichever habit reached `largeRowCapacity - 1`, so
+                // no habit carries it and no habit's cell is made taller by
+                // it. The region stays single, so a drag still crosses the
+                // line; `GridBoundary` translates the offsets `List` reports
+                // into offsets into `habits`, which is the whole cost of the
+                // change and the thing #515 assumed could not be paid.
+                ForEach(drawnRows) { row in
+                    switch row {
+                    case .boundary:
+                        boundaryRow(geometry: geometry, horizontal: horizontal)
+                    case .habit(let habit, let index):
                     HabitRowView(
                         snapshot: snapshots[index],
                         week: week,
@@ -552,7 +598,12 @@ struct WeeklyGridView: View {
                         // a separate row below the `ForEach`; putting it in
                         // the final cell makes the native edit controls centre
                         // themselves 15.6 pixels below the habit (#546).
-                        bottom: bottomInset,
+                        // Every editable cell is the same height. The
+                        // boundary's own row holds the gap now (#621); it
+                        // used to be this inset on one habit, which made the
+                        // system centre that habit's delete control 15.9pt
+                        // below its own label.
+                        bottom: geometry.rowInset,
                         trailing: horizontal.rowTrailing
                     ))
                     .listRowSeparator(.hidden)
@@ -568,25 +619,6 @@ struct WeeklyGridView: View {
                     // panel — after. The panel is now a single shape
                     // behind the whole list; see `panel`.
                     .listRowBackground(Color.clear)
-                    // Everything above this line is what an unconfigured
-                    // large widget shows. Below it a habit exists only in
-                    // the app, and without the line nothing would say so.
-                    // See `showsWidgetBoundary` for what #188 narrowed.
-                    //
-                    // Drawn only once there is a row beneath it, so it never
-                    // appears on a fresh install and never explains a limit
-                    // nobody has reached.
-                    //
-                    // See `RowGeometry.widgetBoundaryLineOffset` (#542) for
-                    // why this is not simply half of `widgetBoundaryGap`.
-                    .overlay(alignment: .bottom) {
-                        if showsWidgetBoundary, index == WidgetMetrics.largeRowCapacity - 1 {
-                            Rectangle()
-                                .fill(GlowPalette.grey)
-                                .frame(height: 0.5)
-                                .offset(y: geometry.widgetBoundaryLineOffset)
-                        }
-                    }
                     // Swipe actions rather than a long-press menu: this is
                     // where iOS users already reach for edit and delete.
                     .swipeActions(edge: .trailing) {
@@ -611,9 +643,17 @@ struct WeeklyGridView: View {
                             }
                         }
                     }
+                    }
                 }
-                .onMove(perform: move)
-                .onDelete(perform: deleteAt)
+                .onMove { source, destination in
+                    let translated = GridBoundary.move(
+                        source: source, destination: destination, boundary: boundaryPosition
+                    )
+                    move(from: translated.source, to: translated.destination)
+                }
+                .onDelete { offsets in
+                    deleteAt(GridBoundary.deleteOffsets(offsets, boundary: boundaryPosition))
+                }
                 // The widget's bottom inset belongs to the panel, not to the
                 // last editable cell (#546). `List` centres its native remove
                 // and reorder controls in a cell's full height, including row
@@ -725,6 +765,56 @@ struct WeeklyGridView: View {
     /// row's content insets (#400, #520, #548). Each side sums back to the
     /// ordinary 20pt — plus the centring margin the List carries on a wide
     /// phone (#588) — so the panel does not follow the system controls inward.
+    /// The widget boundary, as its own row (#621).
+    ///
+    /// **It holds the gap and no insets**, which is what keeps the geometry
+    /// identical to the decoration it replaces. The gap used to be an extra
+    /// bottom inset on the habit above, so the space between that habit's
+    /// content and the next one's was `rowInset + gap + rowInset`. A row with
+    /// zero vertical insets and `widgetBoundaryGap` of content sits in exactly
+    /// that span, and `panelHeight` goes on adding one `widgetBoundaryGap` for
+    /// it, unchanged.
+    ///
+    /// The line is centred in the row's own content, and that is now simply
+    /// true rather than corrected for: `RowGeometry.widgetBoundaryLineOffset`
+    /// existed because the line was drawn from a *habit's* bottom edge and had
+    /// to reach past that habit's own inset to find the middle of the gap
+    /// (#542). Drawn from inside the gap there is nothing to reach past, and
+    /// the span is symmetric about it either way.
+    ///
+    /// Not reorderable, not deletable, no swipe actions — the clause #515
+    /// asked for, now held by the row rather than by there being nothing
+    /// there. It is one element to a screen reader, saying what it separates.
+    private func boundaryRow(
+        geometry: RowGeometry,
+        horizontal: GridHorizontalInsets
+    ) -> some View {
+        Color.clear
+            .frame(height: geometry.widgetBoundaryGap)
+            .overlay {
+                Rectangle()
+                    .fill(GlowPalette.grey)
+                    .frame(height: 0.5)
+            }
+            .listRowInsets(EdgeInsets(
+                top: 0,
+                leading: horizontal.rowLeading,
+                bottom: 0,
+                trailing: horizontal.rowTrailing
+            ))
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .moveDisabled(true)
+            .deleteDisabled(true)
+            .accessibilityElement()
+            .accessibilityLabel(Self.boundaryVoice)
+    }
+
+    /// What the boundary says when it is reached, since it draws a hairline
+    /// and a hairline reads as nothing.
+    private static let boundaryVoice =
+        "Large widget ends here. Habits below this line appear only in the app."
+
     private func panel(
         geometry: RowGeometry,
         horizontal: GridHorizontalInsets
