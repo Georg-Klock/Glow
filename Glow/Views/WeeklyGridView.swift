@@ -217,6 +217,11 @@ struct WeeklyGridView: View {
         return rows
     }
 
+    /// How far the swipe crop is allowed to reach beyond the list vertically:
+    /// far enough that it never is the thing deciding a top or bottom edge.
+    /// The crop is horizontal; this is how a rectangle says so.
+    private static let uncroppedVertically: CGFloat = 10_000
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -684,6 +689,45 @@ struct WeeklyGridView: View {
             // material (#398). Vertically it receives the same content offset
             // as the rows, so its top and bottom corners travel with them.
             //
+            // **A swiped row is cropped by the card, not by the screen**
+            // (#620). The `List`'s own bounds sit `editControlInset` outside
+            // the card on the leading side, so that the system's edit-mode
+            // delete circle and reorder handle stand off it (#400) — they are
+            // laid out against those bounds and ignore `listRowInsets`
+            // entirely. Nothing lived in that gutter at rest, because a row's
+            // content is inset past it; a swipe translates the row straight
+            // into it, and its marks were drawn on the black page 10pt
+            // outside the card they belong to. Measured on a 390pt phone: the
+            // card's edge at 26.00pt, the swiped row's leftmost ink at
+            // 16.00pt.
+            //
+            // Masked with the *same* insets that place the card, so the two
+            // cannot disagree about where its edges are, and applied to the
+            // rows only — before `ScrollingPanel`, so the card itself is not
+            // masked by a rectangle its own corners are rounded inside.
+            //
+            // **Horizontal only.** The card travels vertically under the
+            // navigation and tab bars, where `TopFade` dissolves it;
+            // `ScrollingPanel` says clipping that "would strand those rows on
+            // black again". The negative vertical padding is that rule
+            // written down: this crop has no opinion about the top or bottom.
+            //
+            // **A no-op in edit mode, by construction rather than by a
+            // branch.** `panelInset` is `horizontalPadding - listInset`, and
+            // editing doubles `listInset` to the full 20 — so both insets fall
+            // to zero, the mask lands on the `List`'s own bounds, and the
+            // system's controls in that gutter are untouched. On the trailing
+            // side `panelTrailing` can go negative where a runtime's
+            // `swipeActionInset` is large (#548), which expands the mask
+            // rather than cropping, so a swipe action is never clipped.
+            // Measured: the Delete button ends 16.34pt inside the card's
+            // trailing edge.
+            .mask {
+                Rectangle()
+                    .padding(.leading, horizontal.panelLeading)
+                    .padding(.trailing, horizontal.panelTrailing)
+                    .padding(.vertical, -Self.uncroppedVertically)
+            }
             // **The offset lives in the modifier, not on this screen.** See
             // `ScrollingPanel` for the measurement: as this view's own `@State`
             // it re-evaluated the whole grid on every frame of a scroll.
