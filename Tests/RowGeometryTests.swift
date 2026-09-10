@@ -157,23 +157,31 @@ struct RowGeometryTests {
         }
     }
 
-    /// #542: the line sits centred in the gap the boundary row's bottom inset
-    /// actually creates, not in `widgetBoundaryGap` on its own — a smaller
-    /// span that skips the row's own ordinary `rowInset` and put the line one
-    /// `rowInset` above centre, confirmed on a device before this was fixed.
-    @Test("The widget boundary line is centred in the true gap, not half of it")
-    func widgetBoundaryLineIsCentred() {
+    /// #542, kept as the *span* it measured rather than as the offset that
+    /// corrected for it (#621).
+    ///
+    /// The line used to be drawn from a habit's bottom edge, so it needed
+    /// `rowInset + widgetBoundaryGap / 2` to reach the middle of the gap;
+    /// `widgetBoundaryGap / 2` alone sat one `rowInset` high, confirmed on a
+    /// device. The boundary is its own zero-inset row now, so the line is
+    /// centred in it by construction and there is no offset left to assert.
+    /// What still has to hold is the thing #542 was really about: the empty
+    /// span between the two habits either side of the boundary is
+    /// `rowInset + widgetBoundaryGap + rowInset`, and the row that holds it
+    /// contributes exactly `widgetBoundaryGap` of that.
+    @Test("The boundary's own row is the gap, and the neighbours keep their insets")
+    func widgetBoundaryGapSpansTheRow() {
         for width in [338, 402, 430, 1024] as [CGFloat] {
             let geometry = RowGeometry(totalWidth: width)
-            // The row's own bottom inset plus the next row's ordinary top
-            // inset — see `showsWidgetBoundary`'s bottomInset in
-            // `WeeklyGridView` and #542.
             let totalGap = geometry.rowInset + geometry.widgetBoundaryGap + geometry.rowInset
+            // The row holds the gap; the two ordinary insets are its
+            // neighbours' and are unchanged by it.
+            #expect(abs(totalGap - geometry.widgetBoundaryGap - 2 * geometry.rowInset) < 0.0001)
+            // And the gap is still one habit row tall (#515).
             #expect(
-                abs(geometry.widgetBoundaryLineOffset - totalGap / 2) < 0.0001
+                abs(geometry.widgetBoundaryGap - (geometry.slotHeight + 2 * geometry.rowInset))
+                    < 0.0001
             )
-            // The old, wrong offset — regression guard against reverting to it.
-            #expect(geometry.widgetBoundaryLineOffset != geometry.widgetBoundaryGap / 2)
         }
     }
 

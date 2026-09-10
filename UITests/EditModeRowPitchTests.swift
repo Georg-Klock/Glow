@@ -34,17 +34,22 @@ final class EditModeRowPitchTests: XCTestCase {
             guard rows.count == habitCount else {
                 throw MissingRows(actual: rows.count, expected: habitCount)
             }
+            // **Every habit's cell is the same height, index 9 included**
+            // (#621). This test used to exclude that one and then assert it
+            // was more than 10pt taller than the rest — it was encoding the
+            // defect: the boundary's empty row was an extra bottom inset on
+            // whichever habit reached `largeRowCapacity - 1`, so that habit's
+            // cell was half a boundary taller and `List` centred its delete
+            // control 15.9pt below its own label. The gap is its own row now,
+            // so no habit's cell knows about it.
             let frames = rows.map(\.frame)
-            let ordinaryFrames = frames.enumerated().compactMap { index, frame in
-                habitCount > 10 && index == 9 ? nil : frame
-            }
-            let shortest = try XCTUnwrap(ordinaryFrames.map(\.height).min())
-            let tallest = try XCTUnwrap(ordinaryFrames.map(\.height).max())
+            let shortest = try XCTUnwrap(frames.map(\.height).min())
+            let tallest = try XCTUnwrap(frames.map(\.height).max())
             XCTAssertEqual(
                 tallest,
                 shortest,
                 accuracy: 0.75,
-                "ordinary edit-cell heights at \(habitCount) rows were \(frames)"
+                "edit-cell heights at \(habitCount) rows were \(frames)"
             )
 
             let leadingCentres = frames.prefix(min(habitCount, 9)).map(\.midY)
@@ -60,11 +65,18 @@ final class EditModeRowPitchTests: XCTestCase {
             )
 
             if habitCount > 10 {
+                // The gap is still there and still one row's worth — it is
+                // between the two habits now rather than inside one of them,
+                // so it shows in the *pitch* across the boundary and in no
+                // cell's height.
+                let acrossTheBoundary = frames[10].midY - frames[9].midY
                 XCTAssertGreaterThan(
-                    frames[9].height,
-                    tallest + 10,
-                    "the deliberate widget boundary was not distinct: \(frames)"
+                    acrossTheBoundary,
+                    largestPitch + 10,
+                    "the widget boundary left no gap between rows 9 and 10: \(frames)"
                 )
+                // And the habits either side of it are ordinary cells.
+                XCTAssertEqual(frames[9].height, shortest, accuracy: 0.75)
                 XCTAssertEqual(frames[10].height, shortest, accuracy: 0.75)
             }
         }
