@@ -63,8 +63,8 @@
 --emitting-sdr: #FFFFFF;
 --tilt-x: 0deg; --tilt-y: 0deg; --shadow-x: 0px; --shadow-y: 0px;
 display: flex; flex-direction: column; align-items: center;
-gap: calc(28px * var(--s));
-padding: calc(40px * var(--s)) 0;
+gap: calc(14px * var(--s));
+padding: calc(40px * var(--s)) 0 calc(12px * var(--s));
 perspective: calc(900px * var(--s));
 font-family: 'GW Inter', 'Inter', system-ui, -apple-system, sans-serif;
 font-weight: 400; font-synthesis: none;
@@ -160,7 +160,7 @@ border: var(--ring) solid var(--emitting-sdr);
 }
 .gw-cross { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
 .gw-sentence {
-position: relative; width: 598px; max-width: 100%; margin-top: calc(6px * var(--s));
+position: relative; width: 598px; max-width: 100%;
 }
 @media (max-width: 991px) { .gw-sentence { width: 486px; } }
 @media (max-width: 767px) { .gw-sentence { width: 318px; } }
