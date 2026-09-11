@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glow Up · This Week (preview)</title>
+<style>
+  html, body { margin: 0; background: #141416; color: #ddd; font-family: system-ui, sans-serif; }
+  .page { min-height: 100vh; display: grid; place-items: center; }
+  .note { position: fixed; left: 12px; bottom: 12px; font-size: 12px; opacity: .6; }
+</style>
+<script>
+// Preview-only test hooks. ?sdr pretends the display has no headroom, so the
+// gate that decides whether a plate is ever fetched is what gets exercised.
+// ?corrupt points three plates at a truncated AVIF; ?missing at a 404.
+(function () {
+  var q = new URLSearchParams(location.search);
+  if (q.has('sdr')) {
+    var real = window.matchMedia.bind(window);
+    window.matchMedia = function (query) {
+      if (query === '(dynamic-range: high)') {
+        return { matches: false, media: query, addEventListener: function () {}, removeEventListener: function () {}, addListener: function () {}, removeListener: function () {} };
+      }
+      return real(query);
+    };
+  }
+  var bad = q.has('corrupt') ? 'data:image/avif;base64,AAAAIGZ0eXBhdmlmAAAAAE1pUHJhdmlmbWlhZm1pZjEAAAEhbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAAAAAAAkZGluZgAAABxkcmVmAAAAAAAAAAEAAAAMdXJsIAAAAAEAAAAOcGl0bQAAAAAAAQAAACNpaW5mAAAAAAABAAAAFWluZmUCAAAAAAEAAGF2MDEAAAAAgWlwcnAAAABgaXBjbwAAABNjb2xybmNseAAJABAAAYAAAAA=' : q.has('missing') ? './assets/does-not-exist.avif' : null;
+  if (bad) {
+    window.GLOW_WEEK_ASSET_MAP = {};
+    ['desktop-2x-day-F', 'desktop-2x-ring-1', 'desktop-2x-name-gratitude', 'desktop-1x-day-F', 'desktop-1x-ring-1', 'desktop-1x-name-gratitude'].forEach(function (k) {
+      window.GLOW_WEEK_ASSET_MAP['gw-' + k + '.avif'] = bad;
+    });
+  }
+})();
+</script>
+<style>@font-face{font-family:'GW Inter';font-style:normal;font-weight:400;font-display:block;src:url(https://cdn.prod.website-files.com/620d05babdddc967daa0780a/fonts/6aa43be4a588bf8e1b6d2fed-Inter-Regular.woff2) format('woff2');}.gw { --s: 2; }
+@media (max-width: 959px) { .gw { --s: 1.5; } }
+@media (max-width: 599px) { .gw { --s: 0.875; } }
+.gw {
+--cell: calc(24px * var(--s));
+--gap: calc(8px * var(--s));
+--text: calc(12px * var(--s));
+--icon-w: calc(24px * var(--s));
+--icon-gap: calc(2.25px * var(--s));
+--icon-box: calc(15px * var(--s));
+--label-w: calc(98px * var(--s));
+--label-gap: calc(4px * var(--s));
+--header-h: calc(14px * var(--s));
+--header-gap: calc(4px * var(--s));
+--inset: calc(1px * var(--s));
+--ring: calc(1px * var(--s));
+--bevel: calc(1.5px * var(--s));
+--well: calc(6px * var(--s));
+--pad-l: calc(6px * var(--s));
+--pad-r: calc(14px * var(--s));
+--pad-t: calc(10px * var(--s));
+--pad-b: calc(14px * var(--s));
+--radius: calc(22px * var(--s));
+--lit: #D9D9D9;
+--resting: rgba(217, 217, 217, 0.5);
+--emitting-sdr: #FFFFFF;
+--tilt-x: 0deg; --tilt-y: 0deg; --shadow-x: 0px; --shadow-y: 0px;
+display: flex; justify-content: center;
+padding: calc(40px * var(--s)) 0;
+perspective: calc(900px * var(--s));
+font-family: 'GW Inter', 'Inter', system-ui, -apple-system, sans-serif;
+font-weight: 400; font-synthesis: none;
+-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+user-select: none; -webkit-user-select: none;
+}
+.gw *, .gw *::before, .gw *::after { box-sizing: border-box; }
+.gw img { max-width: none; }
+.gw-card {
+position: relative;
+background: #000;
+border-radius: var(--radius);
+padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
+transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+transform-style: preserve-3d;
+box-shadow:
+var(--shadow-x) calc(var(--shadow-y) + 18px * var(--s)) calc(48px * var(--s)) rgba(0, 0, 0, 0.42),
+var(--shadow-x) calc(var(--shadow-y) + 4px * var(--s)) calc(12px * var(--s)) rgba(0, 0, 0, 0.28);
+will-change: transform;
+}
+.gw-header {
+display: flex; align-items: center; gap: var(--label-gap);
+height: var(--header-h); margin-bottom: var(--header-gap);
+}
+.gw-header-spacer { width: var(--label-w); flex: none; }
+.gw-days { display: flex; gap: var(--gap); }
+.gw-day {
+width: var(--cell); display: flex; justify-content: center; align-items: center;
+}
+.gw-rows { display: flex; flex-direction: column; gap: var(--gap); }
+.gw-row { display: flex; align-items: center; gap: var(--label-gap); height: var(--cell); }
+.gw-row.is-spacer { height: var(--cell); }
+.gw-label {
+width: var(--label-w); flex: none; display: flex; align-items: center; overflow: hidden;
+}
+.gw-icon-col {
+width: var(--icon-w); flex: none; display: flex; justify-content: center;
+margin-right: var(--icon-gap);
+}
+.gw-t {
+position: relative; display: inline-block; white-space: nowrap;
+font-size: var(--text);
+line-height: 1.2109375;
+color: var(--lit);
+}
+.gw-t.is-emitting { color: var(--emitting-sdr); }
+.gw-i {
+position: relative; display: block; width: var(--icon-box); height: var(--icon-box);
+color: var(--lit);
+}
+.gw-i.is-emitting { color: var(--emitting-sdr); }
+.gw-i > svg { display: block; width: 100%; height: 100%; }
+.gw-live { display: inline; }
+.gw-plate { position: absolute; display: none; pointer-events: none; }
+.gw-hdr .is-emitting.has-plate > .gw-plate.is-ready { display: block; }
+.gw-hdr .is-emitting.has-plate > .gw-live { visibility: hidden; }
+.gw-track {
+position: relative; flex: none;
+width: calc(7 * var(--cell) + 6 * var(--gap)); height: var(--cell);
+}
+.gw-span {
+position: absolute; top: 0; height: var(--cell);
+left: calc(var(--first) * (var(--cell) + var(--gap)));
+width: calc(var(--n) * var(--cell) + (var(--n) - 1) * var(--gap));
+margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit;
+-webkit-appearance: none; appearance: none;
+}
+.gw-span.is-open { z-index: 0; }
+.gw-span:not(.is-open) { z-index: 1; }
+.gw-icon-col { position: relative; z-index: 2; }
+.gw-t.gw-name { z-index: 1; }
+button.gw-span { cursor: pointer; }
+button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2px; border-radius: 999px; }
+.gw-socket {
+position: absolute; inset: 0; border-radius: 999px;
+background: rgba(0, 0, 0, 0.15);
+box-shadow:
+inset 0 var(--bevel) calc(2 * var(--bevel)) #000,
+inset 0 calc(-1 * var(--bevel)) calc(2 * var(--bevel)) rgba(255, 255, 255, 0.13);
+}
+.gw-done {
+position: absolute; inset: var(--inset); border-radius: 999px;
+background: var(--lit);
+box-shadow:
+inset 0 var(--well) calc(2 * var(--well)) rgba(0, 0, 0, 0.25),
+inset 0 calc(-1 * var(--inset)) calc(2 * var(--inset)) rgba(0, 0, 0, 0.30),
+inset 0 var(--inset) calc(2 * var(--inset)) #fff;
+}
+.gw-ring {
+position: absolute; inset: var(--inset); border-radius: 999px;
+border: var(--ring) solid var(--emitting-sdr);
+}
+.gw-cross { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.gw-card { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+.gw-card { transform: none !important; }
+}</style>
+</head>
+<body>
+<div class="page">
+<div class="gw" id="gw" data-manifest="./gw-manifest.local.json">
+  <div class="gw-card" id="gw-card">
+    <div class="gw-header" id="gw-header"></div>
+    <div class="gw-rows" id="gw-rows"></div>
+  </div>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <!-- CrossShape's three inner shadows (SlotMarkView.missedMark), in a
+           100-unit box: corner 3.52, well blur 12.5, well offset 16.67. -->
+      <filter id="gw-cross-well" x="-30%" y="-30%" width="160%" height="160%"
+              filterUnits="objectBoundingBox" primitiveUnits="userSpaceOnUse"
+              color-interpolation-filters="sRGB">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="3.52" result="b1"/>
+        <feOffset in="b1" dy="3.52" result="o1"/>
+        <feComposite in="SourceAlpha" in2="o1" operator="out" result="m1"/>
+        <feFlood flood-color="#000" flood-opacity="1" result="c1"/>
+        <feComposite in="c1" in2="m1" operator="in" result="s1"/>
+
+        <feOffset in="b1" dy="-3.52" result="o2"/>
+        <feComposite in="SourceAlpha" in2="o2" operator="out" result="m2"/>
+        <feFlood flood-color="#fff" flood-opacity="0.25" result="c2"/>
+        <feComposite in="c2" in2="m2" operator="in" result="s2"/>
+
+        <feGaussianBlur in="SourceAlpha" stdDeviation="12.5" result="b3"/>
+        <feOffset in="b3" dy="16.67" result="o3"/>
+        <feComposite in="SourceAlpha" in2="o3" operator="out" result="m3"/>
+        <feFlood flood-color="#000" flood-opacity="0.48" result="c3"/>
+        <feComposite in="c3" in2="m3" operator="in" result="s3"/>
+
+        <feMerge>
+          <feMergeNode in="SourceGraphic"/>
+          <feMergeNode in="s1"/>
+          <feMergeNode in="s2"/>
+          <feMergeNode in="s3"/>
+        </feMerge>
+      </filter>
+    </defs>
+  </svg>
+</div>
+<script>(function () {
+'use strict';
+var INLINE = null;
+var MANIFESTS, ASSET_MAP, ASSET_BASE, ICONS;
+function useData(data) {
+MANIFESTS = data.manifests;
+ASSET_MAP = window.GLOW_WEEK_ASSET_MAP || data.assetMap || {};
+ASSET_BASE = window.GLOW_WEEK_ASSET_BASE || data.assetBase || '';
+ICONS = data.icons;
+}
+var HABITS = [
+{ slug: 'gratitude',   name: 'Gratitude',   target: 7, miss: -2 },
+{ slug: 'stretch',     name: 'Stretch',     target: 4, pattern: [0, 1, 3, 5] },
+{ slug: 'read-book',   name: 'Read Book',   target: 4, pattern: [0, 2, 4] },
+{ slug: 'workout',     name: 'Workout',     target: 3, pattern: [1, 3] },
+{ slug: 'vo2-max',     name: 'VO2 Max',     target: 2, pattern: [2] },
+{ slug: 'tutorial',    name: 'Tutorial',    target: 3, pattern: [0, 3] },
+{ slug: 'sunset',      name: 'Sunset',      target: 3, pattern: [1, 4] },
+{ slug: 'early-night', name: 'Early night', target: 7, miss: -1 }
+];
+var LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+var LAST = 6;
+function widths(columns, count) {
+if (count <= 0 || columns < count) return [];
+var base = Math.floor(columns / count), extra = columns % count, out = [];
+for (var i = 0; i < count; i++) out.push(base + (i >= count - extra ? 1 : 0));
+return out;
+}
+function assignColumns(marks) {
+var count = marks.length, ends = [], previousEnd = -1, previousIndex = -1, i;
+for (i = 0; i < count; i++) {
+ends.push(null);
+if (marks[i].anchor === null) continue;
+var low = previousEnd + (i - previousIndex);
+var high = LAST - (count - 1 - i);
+var isFinal = i === count - 1 && (marks[i].state === 'done' || marks[i].state === 'open');
+var end = isFinal ? LAST : Math.max(low, Math.min(marks[i].anchor, high));
+ends[i] = end; previousEnd = end; previousIndex = i;
+}
+var spans = [], cursor = 0, runStart = 0;
+function push(mark, first, last) { spans.push({ state: mark.state, first: first, last: last }); }
+for (i = 0; i < count; i++) {
+if (ends[i] === null) continue;
+var w = widths(ends[i] - cursor, i - runStart), k;
+for (k = 0; k < w.length; k++) { push(marks[runStart + k], cursor, cursor + w[k] - 1); cursor += w[k]; }
+var first = marks[i].state === 'missed' ? ends[i] : cursor;
+push(marks[i], first, ends[i]);
+cursor = ends[i] + 1; runStart = i + 1;
+}
+var tail = widths(LAST - cursor + 1, count - runStart);
+for (i = 0; i < tail.length; i++) { push(marks[runStart + i], cursor, cursor + tail[i] - 1); cursor += tail[i]; }
+return spans;
+}
+function rowSpans(target, completed, today) {
+var done = Object.keys(completed).map(Number).sort(function (a, b) { return a - b; });
+var doneToday = !!completed[today];
+var repsLeft = Math.max(0, target - done.length);
+var actionableLeft = 0, c;
+for (c = today; c <= LAST; c++) if (!completed[c]) actionableLeft++;
+var lost = Math.max(0, repsLeft - actionableLeft), live = repsLeft - lost;
+var blankPast = [];
+for (c = 0; c < today; c++) if (!completed[c]) blankPast.push(c);
+var anchored = done.map(function (d) { return { state: 'done', anchor: d }; });
+blankPast.slice(0, lost).forEach(function (d) { anchored.push({ state: 'missed', anchor: d }); });
+var canOpen = live > 0 && !doneToday;
+if (canOpen) anchored.push({ state: 'open', anchor: today });
+anchored.sort(function (a, b) { return a.anchor - b.anchor; });
+var upcoming = live - (canOpen ? 1 : 0);
+for (c = 0; c < upcoming; c++) anchored.push({ state: 'upcoming', anchor: null });
+return assignColumns(anchored);
+}
+var root = document.getElementById('gw');
+if (!root) return;
+var card = document.getElementById('gw-card');
+var headerEl = document.getElementById('gw-header');
+var rowsEl = document.getElementById('gw-rows');
+var today = todayIndex();
+var rows = [];
+function todayIndex() { return (new Date().getDay() + 6) % 7; }
+function seed() {
+today = todayIndex();
+rows = HABITS.map(function (h) {
+var completed = {}, c;
+if (h.target === 7) {
+for (c = 0; c < today; c++) if (c !== today + h.miss) completed[c] = true;
+} else {
+h.pattern.forEach(function (d) { if (d < today) completed[d] = true; });
+}
+return { habit: h, completed: completed, spans: [] };
+});
+}
+var hdrQuery = window.matchMedia('(dynamic-range: high)');
+var tierQueries = {
+mobile: window.matchMedia('(max-width: 599px)'),
+tablet: window.matchMedia('(min-width: 600px) and (max-width: 959px)')
+};
+var currentSet = null;
+function chooseSet() {
+var tier = tierQueries.mobile.matches ? 'mobile' : tierQueries.tablet.matches ? 'tablet' : 'desktop';
+var dpr = window.devicePixelRatio || 1, best = null, bestDpr = 0;
+Object.keys(MANIFESTS).forEach(function (name) {
+var m = MANIFESTS[name];
+if (m.tier !== tier) return;
+if (best === null || (m.dpr >= dpr && (bestDpr < dpr || m.dpr < bestDpr)) || (bestDpr < dpr && m.dpr > bestDpr)) {
+best = name; bestDpr = m.dpr;
+}
+});
+return best;
+}
+function assetURL(file) {
+return ASSET_MAP[file] || (ASSET_BASE + currentSet + '/' + file);
+}
+var plates = [];
+function plate(host, key) {
+var img = document.createElement('img');
+img.className = 'gw-plate'; img.alt = ''; img.setAttribute('aria-hidden', 'true');
+img.decoding = 'async'; img.draggable = false;
+host.appendChild(img);
+plates.push({ img: img, key: key, host: host });
+return img;
+}
+function loadPlates() {
+var wantHDR = hdrQuery.matches;
+root.classList.toggle('gw-hdr', wantHDR);
+if (!wantHDR) return;
+var set = chooseSet();
+if (!set) return;
+var manifest = MANIFESTS[set];
+var changed = set !== currentSet;
+currentSet = set;
+plates.forEach(function (p) {
+var entry = manifest.plates[p.key];
+if (!entry) return;
+p.img.style.width = entry.cssWidth + 'px';
+p.img.style.height = entry.cssHeight + 'px';
+p.img.style.left = entry.offsetLeft + 'px';
+p.img.style.top = entry.offsetTop + 'px';
+if (!changed && p.img.getAttribute('src')) return;
+p.img.classList.remove('is-ready', 'is-broken');
+p.host.classList.remove('has-plate');
+var url = assetURL(entry.file);
+p.img.onerror = function () { if (p.img.getAttribute('src') === url) fail(p); };
+p.img.onload = function () {
+if (p.img.getAttribute('src') !== url) return;
+if (!p.img.naturalWidth) { fail(p); return; }
+p.img.classList.add('is-ready'); p.host.classList.add('has-plate');
+};
+p.img.src = url;
+if (p.img.decode) p.img.decode().catch(function () {});
+});
+}
+function fail(p) {
+p.img.classList.remove('is-ready'); p.img.classList.add('is-broken');
+p.host.classList.remove('has-plate');
+}
+function textNode(text, key, className) {
+var host = document.createElement('span');
+host.className = 'gw-t ' + (className || '');
+var live = document.createElement('span'); live.className = 'gw-live'; live.textContent = text;
+host.appendChild(live);
+plate(host, key);
+return host;
+}
+function iconNode(slug) {
+var host = document.createElement('span');
+host.className = 'gw-i';
+var live = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+live.setAttribute('viewBox', '0 0 256 256'); live.setAttribute('fill', 'currentColor');
+live.classList.add('gw-live');
+live.innerHTML = ICONS[slug] || '';
+host.appendChild(live);
+plate(host, 'icon-' + slug);
+return host;
+}
+var CROSS = (function () {
+var side = 100, t = side * 9 / 32, r = side * 0.0352, half = side * 11 / 12 / 2;
+var len = 2 * (half - r) * Math.SQRT2 - t + 4 * r;
+var bar = '<rect x="' + (-len / 2) + '" y="' + (-t / 2) + '" width="' + len + '" height="' + t + '" rx="' + r + '" ry="' + r + '"/>';
+return '<svg class="gw-cross" viewBox="0 0 100 100" aria-hidden="true">' +
+'<g transform="translate(50 50)" fill="rgba(0,0,0,0.15)" filter="url(#gw-cross-well)">' +
+'<g transform="rotate(45)">' + bar + '</g><g transform="rotate(-45)">' + bar + '</g></g></svg>';
+})();
+function buildHeader() {
+headerEl.innerHTML = '';
+var spacer = document.createElement('div'); spacer.className = 'gw-header-spacer';
+headerEl.appendChild(spacer);
+var days = document.createElement('div'); days.className = 'gw-days';
+LETTERS.forEach(function (letter, i) {
+var day = document.createElement('div'); day.className = 'gw-day';
+var t = textNode(letter, 'day-' + letter, 'gw-day-t');
+t.dataset.column = i;
+day.appendChild(t); days.appendChild(day);
+});
+headerEl.appendChild(days);
+}
+function buildRows() {
+rowsEl.innerHTML = '';
+rows.forEach(function (row, index) {
+var el = document.createElement('div'); el.className = 'gw-row';
+var label = document.createElement('div'); label.className = 'gw-label';
+var iconCol = document.createElement('div'); iconCol.className = 'gw-icon-col';
+row.icon = iconNode(row.habit.slug);
+iconCol.appendChild(row.icon);
+row.name = textNode(row.habit.name, 'name-' + row.habit.slug, 'gw-name');
+label.appendChild(iconCol); label.appendChild(row.name);
+var track = document.createElement('div'); track.className = 'gw-track';
+row.track = track;
+el.appendChild(label); el.appendChild(track);
+rowsEl.appendChild(el);
+renderRow(index);
+});
+loadPlates();
+updateTiers();
+}
+function renderRow(index) {
+var row = rows[index];
+row.spans = rowSpans(row.habit.target, row.completed, today);
+row.track.innerHTML = '';
+row.spans.forEach(function (span) {
+var n = span.last - span.first + 1;
+var tappable = span.state === 'open' || (span.state === 'done' && span.first <= today && today <= span.last && row.completed[today]);
+var el = document.createElement(tappable ? 'button' : 'div');
+el.className = 'gw-span is-' + span.state;
+el.style.setProperty('--first', span.first);
+el.style.setProperty('--n', n);
+if (tappable) {
+el.type = 'button';
+el.setAttribute('aria-label', row.habit.name + (span.state === 'open' ? ', open today. Mark done' : ', done today. Undo'));
+el.addEventListener('click', function () { toggleToday(index); });
+}
+if (span.state === 'missed') {
+el.innerHTML = CROSS;
+} else {
+var socket = document.createElement('div'); socket.className = 'gw-socket'; el.appendChild(socket);
+if (span.state === 'done') {
+var done = document.createElement('div'); done.className = 'gw-done'; el.appendChild(done);
+} else if (span.state === 'open') {
+var ring = document.createElement('div'); ring.className = 'gw-ring gw-live'; el.appendChild(ring);
+el.classList.add('is-emitting');
+plate(el, 'ring-' + n);
+}
+}
+row.track.appendChild(el);
+});
+}
+function toggleToday(index) {
+var row = rows[index];
+if (row.completed[today]) delete row.completed[today]; else row.completed[today] = true;
+plates = plates.filter(function (p) { return !row.track.contains(p.img); });
+renderRow(index);
+loadPlates();
+updateTiers();
+}
+function updateTiers() {
+var anyOpen = false;
+rows.forEach(function (row) {
+var open = row.spans.some(function (s) { return s.state === 'open'; });
+anyOpen = anyOpen || open;
+row.name.classList.toggle('is-emitting', open);
+row.icon.classList.toggle('is-emitting', open);
+});
+var letters = headerEl.querySelectorAll('.gw-day-t');
+for (var i = 0; i < letters.length; i++) {
+letters[i].classList.toggle('is-emitting', i === today && anyOpen);
+}
+}
+(function tilt() {
+var fine = window.matchMedia('(hover: hover) and (pointer: fine)');
+var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+root.dataset.tilt = (fine.matches && !reduced.matches) ? 'on' : 'off';
+if (!fine.matches || reduced.matches) return;
+var MAX = 7, targetX = 0, targetY = 0, x = 0, y = 0, running = false;
+function frame() {
+x += (targetX - x) * 0.055; y += (targetY - y) * 0.055;
+card.style.setProperty('--tilt-y', (x * MAX).toFixed(3) + 'deg');
+card.style.setProperty('--tilt-x', (-y * MAX).toFixed(3) + 'deg');
+card.style.setProperty('--shadow-x', (-x * 22).toFixed(2) + 'px');
+card.style.setProperty('--shadow-y', (-y * 22).toFixed(2) + 'px');
+if (Math.abs(targetX - x) + Math.abs(targetY - y) > 0.0005) requestAnimationFrame(frame);
+else running = false;
+}
+function kick() { if (!running) { running = true; requestAnimationFrame(frame); } }
+window.addEventListener('pointermove', function (e) {
+if (e.pointerType && e.pointerType !== 'mouse') return;
+var r = card.getBoundingClientRect();
+var dx = (e.clientX - (r.left + r.width / 2)) / (window.innerWidth / 2);
+var dy = (e.clientY - (r.top + r.height / 2)) / (window.innerHeight / 2);
+targetX = Math.max(-1, Math.min(1, dx)); targetY = Math.max(-1, Math.min(1, dy));
+kick();
+}, { passive: true });
+document.addEventListener('pointerleave', function () { targetX = 0; targetY = 0; kick(); });
+document.addEventListener('visibilitychange', function () { if (document.hidden) { targetX = 0; targetY = 0; kick(); } });
+reduced.addEventListener('change', function (e) { if (e.matches) { targetX = targetY = x = y = 0; card.style.transform = ''; } });
+})();
+function boot(data) {
+useData(data);
+seed(); buildHeader(); buildRows();
+hdrQuery.addEventListener('change', loadPlates);
+Object.keys(tierQueries).forEach(function (k) { tierQueries[k].addEventListener('change', loadPlates); });
+window.addEventListener('resize', loadPlates);
+(function scheduleMidnight() {
+var now = new Date(), next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+setTimeout(function () { plates = plates.filter(function (p) { return !rowsEl.contains(p.img); }); seed(); buildRows(); scheduleMidnight(); }, next - now);
+})();
+}
+if (INLINE) {
+boot(INLINE);
+} else if (root.dataset.manifest) {
+fetch(root.dataset.manifest, { credentials: 'omit' })
+.then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+.then(boot, function () { boot({ manifests: {}, icons: {} }); });
+}
+window.GlowWeek = { get set() { return currentSet; }, get hdr() { return hdrQuery.matches; }, get today() { return today; }, rows: function () { return rows.map(function (r) { return { name: r.habit.name, spans: r.spans }; }); } };
+})();</script>
+</div>
+<div class="note">preview · three blocks + JSON, the Webflow shape</div>
+</body>
+</html>

@@ -29,41 +29,66 @@ of the day goes so does the weekday letter. Nothing is stored or sent.
 The renderer and the verifier live with the app's other tools:
 `Tools/make-week-plates.swift` and `Tools/check-week-plates.swift`.
 
-## Putting it on Webflow
+## On the site, 2026-09-11
 
-1. **Upload the plates.** Drag every file under `assets/*/` into the Asset
-   Manager. Names are unique across tiers (`gw-desktop-2x-ring-1.avif`), so
-   they can all go in one folder. Webflow keeps an AVIF byte-identical and
-   generates no variants (measured for the word slider), but only at the raw
-   asset URL — never place these through an Image element, which emits a
+It is live on georgklock.com/glow-up, in a new `.section.centered` directly
+under the headline block, and it is in **three pieces**, because Webflow caps
+every custom-code block at 10,000 characters and the one-block embed is 44 KB:
+
+| Where | What | Size |
+| --- | --- | --- |
+| Page settings → head code | `webflow/head.html` — the CSS and the `@font-face` | 5.0 K |
+| An HTML Embed element in the section | `webflow/embed.html` — the markup, with `data-manifest` naming the JSON asset | 1.9 K |
+| **Site** settings → footer code | `webflow/footer.html` — the script, comments stripped | 13.4 K |
+| Asset `gw-manifest.json` | `webflow/gw-manifest.json` — manifests, icon outlines and the name→URL map, fetched once at load | 32 K |
+| 112 assets `gw-*.avif` | the plates, byte-identical on the CDN (spot-checked), served `image/avif` | 199 K |
+| Custom font `Inter` | `fonts/Inter-Regular.woff2`, family name `Inter` | 111 K |
+
+The script is site-wide only because the page-level footer is also capped at
+10,000; it returns at once on any page without `#gw`. The upload used the
+Webflow MCP's `create_asset` plus a multipart POST; note that the assets API
+returns its S3 fields in camelCase (`xAmzSignature`, `policy`,
+`successActionStatus`) and S3 wants them spelled `X-Amz-Signature`, `Policy`,
+`success_action_status` — the first 28 uploads came back 403 until renamed.
+
+**To change it**, edit `embed.template.html`, then:
+
+```bash
+python3 Website/week-widget/build-embed.py --webflow --asset-map private/week-widget-asset-map.json --asset-base "https://cdn.prod.website-files.com/620d05babdddc967daa0780a/" --font-url "<Inter hostedUrl>" --manifest-url "<gw-manifest.json hostedUrl>"
+```
+
+and paste `webflow/head.html` and `webflow/footer.html` over the two code
+blocks. Re-cut plates need re-uploading, a fresh map, a fresh manifest asset,
+and a new `data-manifest` URL in the embed. `webflow/preview.html` serves the
+same three blocks from a local server, which is where a change is checked
+first.
+
+Verified on the live page in Chrome 152 on the XDR: HDR true, 31 plates
+ready, Inter loaded, a click on today's Gratitude ring goes to done and undo
+restores it, no console errors.
+
+### Doing it by hand instead
+
+1. **Upload the plates.** Every file under `assets/*/`; names are unique across
+   tiers. Webflow keeps an AVIF byte-identical and generates no variants, but
+   only at the raw asset URL — never through an Image element, which emits a
    `srcset` of re-encoded SDR copies.
-2. **Map the URLs.** Webflow prefixes each upload with a hash, so the page
-   cannot derive a plate's address from its name:
+2. **Map the URLs.** Webflow prefixes each upload with a hash:
 
    ```bash
    python3 Website/week-widget/webflow-asset-map.py --site <site id> --token "$WEBFLOW_TOKEN" > private/week-widget-asset-map.json
    ```
 
-   The token needs `assets:read` only. Keep the map out of the repo; it is a
-   list of one site's CDN paths.
-3. **The font.** Either add `fonts/Inter-Regular.woff2` under Site settings →
-   Fonts as a custom font named `Inter` and build with `--font-url ""`, or host
-   the `.woff2` somewhere and pass its URL. The page's stack is
-   `'GW Inter', 'Inter', system-ui`. The plates and the live text **must** be
-   the same cut of the same font, or the emit→lit swap jumps.
-4. **Build and paste.**
+3. **The font.** Site settings → Fonts, `Inter-Regular.woff2` as family
+   `Inter`, or host the `.woff2` and pass `--font-url`. The plates and the live
+   text **must** be the same cut of the same font, or the emit→lit swap jumps.
+4. **Build** with `--webflow`, upload `webflow/gw-manifest.json` as an asset,
+   rebuild with its URL as `--manifest-url`, and paste the three blocks.
+5. **Look at it on a screen with headroom**, in Chrome and in Safari.
 
-   ```bash
-   python3 Website/week-widget/build-embed.py --asset-map private/week-widget-asset-map.json --font-url "https://…/Inter-Regular.woff2"
-   ```
-
-   Paste `embed.html` into an Embed element. It is self-contained: the only
-   requests it makes are for the plates it will show and the font.
-5. **Publish to staging and look at it on a screen with headroom**, in Chrome
-   and in Safari. A screenshot cannot show the glow; only the screen can.
-
-Without a map, the embed expects `<asset base>/<set>/<file>` — the layout of
-`assets/` here — which suits any host that keeps file names.
+Without a map, the one-block `embed.html` expects `<asset base>/<set>/<file>`
+— the layout of `assets/` here — which suits any host that keeps file names
+and has no size cap.
 
 ## How the page decides what to show
 

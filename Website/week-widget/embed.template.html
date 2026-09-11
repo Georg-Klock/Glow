@@ -216,16 +216,23 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   'use strict';
 
   // ─── Assets ────────────────────────────────────────────────────────────
-  // Every plate, per tier and density, as make-week-plates.swift wrote it.
-  // Sizes and offsets are CSS pixels relative to the element the plate sits
-  // over. Filled in by build-embed.py from the manifests.
-  var MANIFESTS = __MANIFESTS__;
-  // File name → URL. Webflow prefixes every upload with a hash, so the page
-  // cannot guess a plate's address from its name; build-embed.py --asset-map
-  // fills this from the site's asset list. Empty means ASSET_BASE/<set>/<file>.
-  var ASSET_MAP = window.GLOW_WEEK_ASSET_MAP || __ASSET_MAP__;
-  var ASSET_BASE = window.GLOW_WEEK_ASSET_BASE || __ASSET_BASE__;
-  var ICONS = __ICONS__;   // slug → SVG path data (Phosphor, MIT; play-rectangle drawn by hand)
+  // Every plate, per tier and density, as make-week-plates.swift wrote it,
+  // with sizes and offsets in CSS pixels relative to the element the plate
+  // sits over; the icon outlines; and where the files live. build-embed.py
+  // either inlines all of it here or, for Webflow's 10,000-character code
+  // blocks, writes it to one JSON asset named on the root element's
+  // data-manifest attribute and inlines null.
+  var INLINE = __INLINE__;
+  var MANIFESTS, ASSET_MAP, ASSET_BASE, ICONS;
+  function useData(data) {
+    MANIFESTS = data.manifests;
+    // File name → URL. Webflow prefixes every upload with a hash, so the page
+    // cannot guess a plate's address from its name. Empty means
+    // ASSET_BASE/<set>/<file>, the layout of the repository's assets/.
+    ASSET_MAP = window.GLOW_WEEK_ASSET_MAP || data.assetMap || {};
+    ASSET_BASE = window.GLOW_WEEK_ASSET_BASE || data.assetBase || '';
+    ICONS = data.icons;   // slug → SVG path data (Phosphor, MIT; play-rectangle drawn by hand)
+  }
 
   // ─── Content ───────────────────────────────────────────────────────────
   // The app's default seed list, in order. `pattern` is the demo's history:
@@ -305,6 +312,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   // ─── State ─────────────────────────────────────────────────────────────
   // In memory only. Nothing here is stored or sent; a reload starts over.
   var root = document.getElementById('gw');
+  if (!root) return;   // site-wide code on a page without the card
   var card = document.getElementById('gw-card');
   var headerEl = document.getElementById('gw-header');
   var rowsEl = document.getElementById('gw-rows');
@@ -416,7 +424,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     var live = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     live.setAttribute('viewBox', '0 0 256 256'); live.setAttribute('fill', 'currentColor');
     live.classList.add('gw-live');
-    live.innerHTML = ICONS[slug];
+    live.innerHTML = ICONS[slug] || '';
     host.appendChild(live);
     plate(host, 'icon-' + slug);
     return host;
@@ -557,17 +565,29 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   })();
 
   // ─── Boot ──────────────────────────────────────────────────────────────
-  seed(); buildHeader(); buildRows();
+  function boot(data) {
+    useData(data);
+    seed(); buildHeader(); buildRows();
 
-  hdrQuery.addEventListener('change', loadPlates);                 // moved to another screen
-  Object.keys(tierQueries).forEach(function (k) { tierQueries[k].addEventListener('change', loadPlates); });
-  window.addEventListener('resize', loadPlates);                   // devicePixelRatio has no event of its own
+    hdrQuery.addEventListener('change', loadPlates);                 // moved to another screen
+    Object.keys(tierQueries).forEach(function (k) { tierQueries[k].addEventListener('change', loadPlates); });
+    window.addEventListener('resize', loadPlates);                   // devicePixelRatio has no event of its own
 
-  // A day boundary re-seeds: "today" is the visitor's date, not the load time.
-  (function scheduleMidnight() {
-    var now = new Date(), next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
-    setTimeout(function () { plates = plates.filter(function (p) { return !rowsEl.contains(p.img); }); seed(); buildRows(); scheduleMidnight(); }, next - now);
-  })();
+    // A day boundary re-seeds: "today" is the visitor's date, not the load time.
+    (function scheduleMidnight() {
+      var now = new Date(), next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+      setTimeout(function () { plates = plates.filter(function (p) { return !rowsEl.contains(p.img); }); seed(); buildRows(); scheduleMidnight(); }, next - now);
+    })();
+  }
+  if (INLINE) {
+    boot(INLINE);
+  } else if (root.dataset.manifest) {
+    // One request, before anything is drawn, for the manifest. If it fails the
+    // card still draws — every tier as live CSS, no plates, as on an SDR screen.
+    fetch(root.dataset.manifest, { credentials: 'omit' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(boot, function () { boot({ manifests: {}, icons: {} }); });
+  }
 
   // For the page's own checks (and nothing else): what the card decided.
   window.GlowWeek = { get set() { return currentSet; }, get hdr() { return hdrQuery.matches; }, get today() { return today; }, rows: function () { return rows.map(function (r) { return { name: r.habit.name, spans: r.spans }; }); } };
