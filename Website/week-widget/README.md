@@ -229,6 +229,12 @@ thing now.
 - **The seed, on review.** Workout, VO2 Max and Tutorial are complete for
   the week (every rep logged, the last one today); Sunset is done Monday
   and Tuesday and open today.
+- **Readable without headroom.** On a screen without headroom the emitting
+  tier is plain white and the app's lit grey (`#D9D9D9`) sits too close to
+  it, so lit names and icons drop to `#B4B4B4` there (`--lit-sdr`); with
+  headroom the plate carries the difference and lit stays the app's grey.
+  The six weekday letters that are not today are `#A0A0A0` on every screen
+  (`--off-day`).
 - **The page tree.** The hero embed moved into the centered section in place
   of the old word-slider embed, ahead of the "if the text above doesn't glow"
   note; the empty section and paragraph went. The Dynamic Island video moved

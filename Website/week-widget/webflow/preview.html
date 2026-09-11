@@ -61,6 +61,8 @@
 --lit: #D9D9D9;
 --resting: rgba(217, 217, 217, 0.5);
 --emitting-sdr: #FFFFFF;
+--lit-sdr: #B4B4B4;
+--off-day: #A0A0A0;
 --tilt-x: 0deg; --tilt-y: 0deg; --shadow-x: 0px; --shadow-y: 0px;
 display: flex; flex-direction: column; align-items: center;
 gap: calc(14px * var(--s));
@@ -111,6 +113,10 @@ line-height: 1.2109375;
 color: var(--lit);
 }
 .gw-t.is-emitting { color: var(--emitting-sdr); }
+.gw-day-t { color: var(--off-day); }
+.gw:not(.gw-hdr) .gw-t, .gw:not(.gw-hdr) .gw-i { color: var(--lit-sdr); }
+.gw:not(.gw-hdr) .gw-day-t { color: var(--off-day); }
+.gw-day-t.is-emitting, .gw:not(.gw-hdr) .gw-t.is-emitting, .gw:not(.gw-hdr) .gw-i.is-emitting { color: var(--emitting-sdr); }
 .gw-i {
 position: relative; display: block; color: var(--lit);
 }
