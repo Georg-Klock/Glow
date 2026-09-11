@@ -56,6 +56,7 @@
 --pad-t: calc(10px * var(--s));
 --pad-b: calc(14px * var(--s));
 --radius: calc(22px * var(--s));
+--card: #202020;
 --lit: #D9D9D9;
 --resting: rgba(217, 217, 217, 0.5);
 --emitting-sdr: #FFFFFF;
@@ -72,7 +73,7 @@ user-select: none; -webkit-user-select: none;
 .gw img { max-width: none; }
 .gw-card {
 position: relative;
-background: #000;
+background: var(--card);
 border-radius: var(--radius);
 padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
 transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));

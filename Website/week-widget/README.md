@@ -137,28 +137,27 @@ Two things follow the brief rather than the app: the eight rows have no spacer
 rows between groups (the app's seed list has two), and the week starts on
 Monday, where the app makes it a setting.
 
-## Open: the ring's halo
+## No halo, and a grey card (2026-09-11, second cut)
 
-The halo numbers (`radius 0.155 × cell`, `strength 0.085`, `grain 0.22`
-multiplied, `softness 1.6`) are the word slider's, judged on letterforms. The
-ring is a far thinner shape and nobody has yet looked at it lit. `tuning.html`
-shows six cuts side by side; open it from a local server on a screen with
-headroom, choose, and re-cut all four sets with the chosen values:
-
-```bash
-swift Tools/make-week-plates.swift --out Website/week-widget/assets --font-file Website/week-widget/fonts/Inter-Regular.otf --icons Website/week-widget/icons --halo-radius 0.155 --halo-strength 0.085
-swift Tools/check-week-plates.swift --dir Website/week-widget/assets
-python3 Website/week-widget/build-embed.py
-```
-
-The plates ship at the app's default peak, `--gain 2` (`GlowSettings.defaultValue`).
+The first cut carried the word slider's halo and sat on a `#000000` card. Both
+went on review: the halo read as a drop shadow on every emitting mark and
+letter, and a black card looked nothing like the widget in the screenshots
+beside it. The plates are now cut with `--halo-strength 0 --grain-depth 0
+--pad 0.08` — the shape and a two-pixel antialiased edge, nothing else — and
+the card is `#202020`, the mode of the widget's material over a dark
+wallpaper measured on the App Store frame (28–32). A PQ plate carries no
+alpha, so the plates are cut with that same grey as their surround
+(`--surround 202020`); decoded through libavif the surround comes back at
+2.93 nits, which is exactly sRGB 32 at 203-nit white, so the browser lands it
+on the card's own colour. The card must never change colour without the
+plates being re-cut, and `tuning.html` (the halo variants) is now history.
 
 ## Verified, 2026-09-11
 
 | Check | Result |
 | --- | --- |
 | Strict decoder | All 112 plates pass `avifdec` 1.4.2: even dimensions, 10-bit, YUV 4:2:0, primaries 9, transfer 16 (PQ), no alpha |
-| Decoded peak | 424–440 nits, 2.09–2.17× SDR white, via libavif's own 16-bit decode; the ~8% over the requested 2× is the PQ round trip already measured for the word slider |
+| Decoded peak | 428–440 nits, 2.09–2.17× SDR white, via libavif's own 16-bit decode; the ~8% over the requested 2× is the PQ round trip already measured for the word slider |
 | HDR display, Chrome 152 on the MacBook's XDR | `(dynamic-range: high)` true; 31 plates loaded and shown; a real click on today's Gratitude ring turns it into a done disc, drops the name and icon to lit, and the F letter drops once the last open mark of the day is done; undo restores it |
 | Emit → lit swap | Plate and live twin compared at 4× for the name, the icon, the letters and the ring: same position, same size |
 | Seam | None: the first capture showed ring plates clipping the sockets beside them and the rows above and below; fixed by paint order, re-captured clean |

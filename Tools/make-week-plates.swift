@@ -29,6 +29,7 @@
 //       [--only ring|day|name|icon] [--suffix -test]
 //       [--halo-radius 0.155] [--halo-strength 0.085]
 //       [--grain-depth 0.22] [--grain-softness 1.6] [--icon-box 15]
+//       [--pad 0.34] [--surround 000000]
 
 import AppKit
 import CoreGraphics
@@ -66,6 +67,13 @@ let haloRadiusRatio = number("halo-radius", 0.155)
 let haloStrength = number("halo-strength", 0.085)
 let grainDepth = number("grain-depth", 0.22)
 let grainSoftness = number("grain-softness", 1.6)
+/// Room around the shape, as a fraction of its reference size. The halo needs
+/// about a third; with no halo, a few pixels for the antialiased edge suffice.
+let padRatio = number("pad", 0.34)
+/// The plate's surround, as a CSS hex. It has to be exactly the colour of the
+/// card the plate sits on — a PQ AVIF carries no alpha — so a card that is not
+/// black needs plates cut with its colour here (#202020 for the widget grey).
+let surroundHex = arg("surround", "000000")
 /// The square the icon glyph is drawn into, in reference points (a 24pt cell).
 /// SF Symbols at 12pt ink about 12–14pt; Phosphor glyphs ink ~80% of their box.
 let iconBoxRef = number("icon-box", 15)
@@ -148,6 +156,19 @@ let fontPostScriptName = CTFontCopyPostScriptName(
 ) as String
 
 guard let avifType = UTType("public.avif") else { fatalError("no AVIF writer on this machine") }
+
+/// sRGB hex to the linear working space.
+func linear(_ hex: String) -> (CGFloat, CGFloat, CGFloat) {
+    var h = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+    if h.count == 3 { h = h.map { "\($0)\($0)" }.joined() }
+    guard h.count == 6, let v = UInt32(h, radix: 16) else { fatalError("bad --surround \(hex)") }
+    func channel(_ c: UInt32) -> CGFloat {
+        let s = CGFloat(c) / 255
+        return s <= 0.04045 ? s / 12.92 : pow((s + 0.055) / 1.055, 2.4)
+    }
+    return (channel((v >> 16) & 0xff), channel((v >> 8) & 0xff), channel(v & 0xff))
+}
+let surround = linear(surroundHex)
 let ciContext = CIContext(options: [.workingColorSpace: workingSpace])
 
 // MARK: - Masks
@@ -188,7 +209,7 @@ func ringPlate(set: RenderSet, columns: Int) -> Plate {
     let cssWidth = CGFloat(columns) * set.tier.cell + CGFloat(columns - 1) * Reference.gap * s
     let cssHeight = set.tier.cell
     let w = set.px(cssWidth), h = set.px(cssHeight)
-    let pad = (set.px(set.tier.cell) * 0.34).rounded()
+    let pad = max(2, (set.px(set.tier.cell) * padRatio).rounded())
     let width = evened(w + pad * 2), height = evened(h + pad * 2)
     let ctx = maskContext(width: width, height: height)
 
@@ -223,7 +244,7 @@ func textPlate(set: RenderSet, text: String) -> (Plate, ascent: CGFloat, descent
     var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
     let advance = CGFloat(CTLineGetTypographicBounds(line, &ascent, &descent, &leading))
 
-    let padX = (fontSize * 0.34).rounded(), padY = (fontSize * 0.32).rounded()
+    let padX = max(2, (fontSize * padRatio).rounded()), padY = max(2, (fontSize * padRatio * 0.94).rounded())
     let width = evened(advance + padX * 2), height = evened(ascent + descent + padY * 2)
     let ctx = maskContext(width: width, height: height)
     // No stem darkening: the browser does not, and the lit text beside this
@@ -248,7 +269,7 @@ func textPlate(set: RenderSet, text: String) -> (Plate, ascent: CGFloat, descent
 func iconPlate(set: RenderSet, icon: String) -> Plate {
     let s = set.tier.scale
     let box = set.px(iconBoxRef * s)
-    let pad = (box * 0.34).rounded()
+    let pad = max(2, (box * padRatio).rounded())
     let width = evened(box + pad * 2), height = evened(box + pad * 2)
     let ctx = maskContext(width: width, height: height)
 
@@ -477,8 +498,8 @@ func lit(_ plate: Plate, haloRadius: CGFloat) -> CIImage {
 
     let white = CIImage(color: CIColor(red: gain, green: gain, blue: gain, colorSpace: workingSpace)!)
         .cropped(to: bounds)
-    let black = CIImage(color: CIColor(red: 0, green: 0, blue: 0, colorSpace: workingSpace)!)
-        .cropped(to: bounds)
+    let black = CIImage(color: CIColor(red: surround.0, green: surround.1, blue: surround.2,
+                                       colorSpace: workingSpace)!).cropped(to: bounds)
     guard let out = CIFilter(name: "CIBlendWithMask", parameters: [
         kCIInputImageKey: white, kCIInputBackgroundImageKey: black, kCIInputMaskImageKey: shape,
     ])?.outputImage else { fatalError("blend failed") }
@@ -589,6 +610,8 @@ for set in sets {
         "iconBox": Double(iconBoxRef * s),
         "font": fontPostScriptName,
         "gain": Double(gain),
+        "surround": "#" + surroundHex.replacingOccurrences(of: "#", with: ""),
+        "padRatio": Double(padRatio),
         "halo": [
             "radiusRatio": Double(haloRadiusRatio), "strength": Double(haloStrength),
             "grainDepth": Double(grainDepth), "grainSoftness": Double(grainSoftness),

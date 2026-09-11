@@ -29,6 +29,9 @@
   --pad-t: calc(10px * var(--s));        /* WidgetMetrics.padTop */
   --pad-b: calc(14px * var(--s));        /* WidgetMetrics.padBottom */
   --radius: calc(22px * var(--s));
+  --card: #202020;                       /* the widget's material over a dark wallpaper, measured
+                                            on the App Store frame (mode 28–32); every plate's
+                                            surround is cut in this exact colour */
   --lit: #D9D9D9;                        /* GlowPalette.lit */
   --resting: rgba(217, 217, 217, 0.5);   /* GlowPalette.greyResting — marks only, never text */
   --emitting-sdr: #FFFFFF;               /* what emitting means on a screen without headroom */
@@ -48,7 +51,7 @@
 /* ─── The card ─────────────────────────────────────────────────────────── */
 .gw-card {
   position: relative;
-  background: #000;                      /* the black every plate was cut against */
+  background: var(--card);               /* the colour every plate was cut against */
   border-radius: var(--radius);
   padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
   transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
