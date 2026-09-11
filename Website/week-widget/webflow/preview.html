@@ -200,11 +200,11 @@ width: calc(11px * var(--s)); height: calc(11px * var(--s)); border: 0; border-r
 <body>
 <div class="page">
 <div class="gw" id="gw" data-manifest="./gw-manifest.local.json">
+  <div class="gw-sentence" id="gw-sentence"></div>
   <div class="gw-card" id="gw-card">
     <div class="gw-header" id="gw-header"></div>
     <div class="gw-rows" id="gw-rows"></div>
   </div>
-  <div class="gw-sentence" id="gw-sentence"></div>
   <div class="gw-slider">
     <output class="gw-slider-out" id="gw-out">1×</output>
     <input class="gw-slider-range" id="gw-range" type="range" min="1" max="12" step="any" value="1"
@@ -220,14 +220,15 @@ MANIFESTS = data.manifests || {};
 ASSET_MAP = window.GLOW_WEEK_ASSET_MAP || data.assetMap || {};
 ASSET_BASE = window.GLOW_WEEK_ASSET_BASE || data.assetBase || '';
 }
+var TODAY = 3;
 var HABITS = [
 { slug: 'gratitude',   name: 'Gratitude',   target: 7, miss: -2 },
-{ slug: 'stretch',     name: 'Stretch',     target: 4, pattern: [0, 1, 3, 5] },
-{ slug: 'read-book',   name: 'Read Book',   target: 4, pattern: [0, 2, 4] },
-{ slug: 'workout',     name: 'Workout',     target: 3, pattern: [1, 3] },
-{ slug: 'vo2-max',     name: 'VO2 Max',     target: 2, pattern: [2] },
-{ slug: 'tutorial',    name: 'Tutorial',    target: 3, pattern: [0, 3] },
-{ slug: 'sunset',      name: 'Sunset',      target: 3, pattern: [1, 4] },
+{ slug: 'stretch',     name: 'Stretch',     target: 4, pattern: [0, 1] },
+{ slug: 'read-book',   name: 'Read Book',   target: 4, pattern: [0, 2] },
+{ slug: 'workout',     name: 'Workout',     target: 3, pattern: [1], doneToday: true },
+{ slug: 'vo2-max',     name: 'VO2 Max',     target: 2, pattern: [2], doneToday: true },
+{ slug: 'tutorial',    name: 'Tutorial',    target: 3, pattern: [0], doneToday: true },
+{ slug: 'sunset',      name: 'Sunset',      target: 3, pattern: [1] },
 { slug: 'early-night', name: 'Early night', target: 7, miss: -1 }
 ];
 var LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -292,7 +293,7 @@ var outEl = document.getElementById('gw-out');
 var today = todayIndex();
 var rows = [];
 var gainValue = 1;
-function todayIndex() { return (new Date().getDay() + 6) % 7; }
+function todayIndex() { return TODAY; }               // not the visitor's date: the demo is one fixed week
 function seed() {
 today = todayIndex();
 rows = HABITS.map(function (h) {
@@ -301,6 +302,7 @@ if (h.target === 7) {
 for (c = 0; c < today; c++) if (c !== today + h.miss) completed[c] = true;
 } else {
 h.pattern.forEach(function (d) { if (d < today) completed[d] = true; });
+if (h.doneToday) completed[today] = true;
 }
 return { habit: h, completed: completed, spans: [] };
 });
@@ -634,10 +636,6 @@ sweepStart();
 hdrQuery.addEventListener('change', function () { loadPlates(); sweepStart(); });
 Object.keys(tierQueries).forEach(function (k) { tierQueries[k].addEventListener('change', loadPlates); });
 window.addEventListener('resize', loadPlates);
-(function scheduleMidnight() {
-var now = new Date(), next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
-setTimeout(function () { seed(); buildRows(); scheduleMidnight(); }, next - now);
-})();
 }
 if (INLINE) {
 boot(INLINE);

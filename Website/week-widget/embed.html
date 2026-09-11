@@ -36,7 +36,7 @@
   --tilt-x: 0deg; --tilt-y: 0deg; --shadow-x: 0px; --shadow-y: 0px;
 
   display: flex; flex-direction: column; align-items: center;
-  gap: calc(14px * var(--s));                       /* card → sentence → slider */
+  gap: calc(14px * var(--s));                       /* sentence → card → slider */
   padding: calc(40px * var(--s)) 0 calc(12px * var(--s));
   perspective: calc(900px * var(--s));
   font-family: 'GW Inter', 'Inter', system-ui, -apple-system, sans-serif;
@@ -219,11 +219,11 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
 }
 </style>
 <div class="gw" id="gw">
+  <div class="gw-sentence" id="gw-sentence"></div>
   <div class="gw-card" id="gw-card">
     <div class="gw-header" id="gw-header"></div>
     <div class="gw-rows" id="gw-rows"></div>
   </div>
-  <div class="gw-sentence" id="gw-sentence"></div>
   <div class="gw-slider">
     <output class="gw-slider-out" id="gw-out">1×</output>
     <input class="gw-slider-range" id="gw-range" type="range" min="1" max="12" step="any" value="1"
@@ -253,19 +253,21 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   }
 
   // ─── Content ───────────────────────────────────────────────────────────
-  // The app's default seed list, in order. `pattern` is the demo's history:
-  // the columns (Monday = 0) that count as completed once they are in the
-  // past. `miss` is a day a daily habit was skipped, relative to today. Both
-  // are filtered against today at seed time, so the card is plausible on any
-  // weekday and shows a fresh week on Monday.
+  // The app's default seed list, in order. The card always shows the same
+  // Thursday: `pattern` is the demo's history, the columns (Monday = 0) that
+  // count as completed before today; `doneToday` marks a habit already
+  // logged today, so its mark is a lit disc and its name and icon do not
+  // emit — the same tier the app gives a completion. `miss` is a day a daily
+  // habit was skipped, relative to today.
+  var TODAY = 3;                                          // Thursday, always
   var HABITS = [
     { slug: 'gratitude',   name: 'Gratitude',   target: 7, miss: -2 },
-    { slug: 'stretch',     name: 'Stretch',     target: 4, pattern: [0, 1, 3, 5] },
-    { slug: 'read-book',   name: 'Read Book',   target: 4, pattern: [0, 2, 4] },
-    { slug: 'workout',     name: 'Workout',     target: 3, pattern: [1, 3] },
-    { slug: 'vo2-max',     name: 'VO2 Max',     target: 2, pattern: [2] },
-    { slug: 'tutorial',    name: 'Tutorial',    target: 3, pattern: [0, 3] },
-    { slug: 'sunset',      name: 'Sunset',      target: 3, pattern: [1, 4] },
+    { slug: 'stretch',     name: 'Stretch',     target: 4, pattern: [0, 1] },
+    { slug: 'read-book',   name: 'Read Book',   target: 4, pattern: [0, 2] },
+    { slug: 'workout',     name: 'Workout',     target: 3, pattern: [1], doneToday: true },
+    { slug: 'vo2-max',     name: 'VO2 Max',     target: 2, pattern: [2], doneToday: true },
+    { slug: 'tutorial',    name: 'Tutorial',    target: 3, pattern: [0], doneToday: true },
+    { slug: 'sunset',      name: 'Sunset',      target: 3, pattern: [1] },
     { slug: 'early-night', name: 'Early night', target: 7, miss: -1 }
   ];
   var LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];   // Monday start, hardcoded for the demo
@@ -341,7 +343,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   var rows = [];
   var gainValue = 1;                                     // the floor; the sweep takes it up from here
 
-  function todayIndex() { return (new Date().getDay() + 6) % 7; }
+  function todayIndex() { return TODAY; }               // not the visitor's date: the demo is one fixed week
 
   function seed() {
     today = todayIndex();
@@ -351,6 +353,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
         for (c = 0; c < today; c++) if (c !== today + h.miss) completed[c] = true;
       } else {
         h.pattern.forEach(function (d) { if (d < today) completed[d] = true; });
+        if (h.doneToday) completed[today] = true;
       }
       return { habit: h, completed: completed, spans: [] };
     });
@@ -739,12 +742,6 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     hdrQuery.addEventListener('change', function () { loadPlates(); sweepStart(); });   // moved to another screen
     Object.keys(tierQueries).forEach(function (k) { tierQueries[k].addEventListener('change', loadPlates); });
     window.addEventListener('resize', loadPlates);                   // devicePixelRatio has no event of its own
-
-    // A day boundary re-seeds: "today" is the visitor's date, not the load time.
-    (function scheduleMidnight() {
-      var now = new Date(), next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
-      setTimeout(function () { seed(); buildRows(); scheduleMidnight(); }, next - now);
-    })();
   }
   if (INLINE) {
     boot(INLINE);

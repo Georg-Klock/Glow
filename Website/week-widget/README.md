@@ -208,6 +208,16 @@ thing now.
 - **Every step is fetched up front** once the plate path opens, so the first
   pass never meets a plate mid-load and shows the live twin for a frame. One
   tier at one density is about 550 KB across 12 steps.
+- **The sentence sits above the card** (moved there on review), the slider
+  below it.
+- **The card is always the same Thursday.** `today` used to be the visitor's
+  weekday, re-seeded at midnight; the demo now pins Thursday so the picture is
+  the one that was reviewed: five habits open, Thursday's letter the only one
+  emitting, and Workout, VO2 Max and Tutorial already logged today
+  (`doneToday` in the seed) — a lit disc, name and icon lit rather than
+  emitting, the tier the app gives a completion. Clicking a done mark undoes
+  it, and clicking an open ring completes it and drops its row to lit, as
+  before.
 - **The page tree.** The hero embed moved into the centered section in place
   of the old word-slider embed, ahead of the "if the text above doesn't glow"
   note; the empty section and paragraph went. The Dynamic Island video moved
