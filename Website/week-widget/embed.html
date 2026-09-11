@@ -264,10 +264,10 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     { slug: 'gratitude',   name: 'Gratitude',   target: 7, miss: -2 },
     { slug: 'stretch',     name: 'Stretch',     target: 4, pattern: [0, 1] },
     { slug: 'read-book',   name: 'Read Book',   target: 4, pattern: [0, 2] },
-    { slug: 'workout',     name: 'Workout',     target: 3, pattern: [1], doneToday: true },
-    { slug: 'vo2-max',     name: 'VO2 Max',     target: 2, pattern: [2], doneToday: true },
-    { slug: 'tutorial',    name: 'Tutorial',    target: 3, pattern: [0], doneToday: true },
-    { slug: 'sunset',      name: 'Sunset',      target: 3, pattern: [1] },
+    { slug: 'workout',     name: 'Workout',     target: 3, pattern: [0, 1], doneToday: true },   // complete for the week
+    { slug: 'vo2-max',     name: 'VO2 Max',     target: 2, pattern: [2], doneToday: true },      // complete for the week
+    { slug: 'tutorial',    name: 'Tutorial',    target: 3, pattern: [0, 2], doneToday: true },   // complete for the week
+    { slug: 'sunset',      name: 'Sunset',      target: 3, pattern: [0, 1] },
     { slug: 'early-night', name: 'Early night', target: 7, miss: -1 }
   ];
   var LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];   // Monday start, hardcoded for the demo
@@ -426,11 +426,13 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     return { lower: lower, upper: upper, f: v - lower };
   }
   function applyGain(p) {
-    var wantHDR = hdrQuery.matches && currentSet;
+    // A plate is the emitting tier and nothing else: a name, icon or letter
+    // that is merely lit keeps its live CSS twin and shows no plate at all.
+    var wantHDR = hdrQuery.matches && currentSet && p.host.classList.contains('is-emitting');
     var st = steps();
     var lower = wantHDR ? plateImage(p, st.lower) : null;
     var upper = wantHDR && st.upper !== st.lower ? plateImage(p, st.upper) : null;
-    var covered = ready(lower);
+    var covered = wantHDR && ready(lower);
     Object.keys(p.imgs).forEach(function (g) {
       var img = p.imgs[g];
       var on = wantHDR && ((img === lower && covered) || (img === upper && ready(upper) && st.f > 0));
@@ -588,8 +590,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     plates = plates.filter(function (p) { return !row.track.contains(p.host); });
     renderRow(index);
     applyMasks();
-    applyGainAll();
-    updateTiers();
+    updateTiers();          // ends by re-applying the plates: the tier decides what glows
   }
 
   // TypeTier: a name and its icon emit while the row has an open mark today;
@@ -606,6 +607,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     for (var i = 0; i < letters.length; i++) {
       letters[i].classList.toggle('is-emitting', i === today && anyOpen);
     }
+    applyGainAll();
   }
 
   // ─── The sentence ──────────────────────────────────────────────────────

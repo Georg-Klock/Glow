@@ -218,6 +218,17 @@ thing now.
   emitting, the tier the app gives a completion. Clicking a done mark undoes
   it, and clicking an open ring completes it and drops its row to lit, as
   before.
+- **A plate is the emitting tier and nothing else.** Until this cut every
+  host — each weekday letter, every name and icon — showed its plate on a
+  screen with headroom whatever its tier, so the whole card glowed and a
+  click changed nothing visible; the tier classes were right, the plates
+  ignored them. `applyGain` now shows a plate only on a host carrying
+  `is-emitting`, and `updateTiers` ends by re-applying the plates, so a
+  click on today's mark takes the row's name and icon out of the glow at
+  once and puts them back on undo. Only Thursday's letter carries a plate.
+- **The seed, on review.** Workout, VO2 Max and Tutorial are complete for
+  the week (every rep logged, the last one today); Sunset is done Monday
+  and Tuesday and open today.
 - **The page tree.** The hero embed moved into the centered section in place
   of the old word-slider embed, ahead of the "if the text above doesn't glow"
   note; the empty section and paragraph went. The Dynamic Island video moved

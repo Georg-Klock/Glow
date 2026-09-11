@@ -225,10 +225,10 @@ var HABITS = [
 { slug: 'gratitude',   name: 'Gratitude',   target: 7, miss: -2 },
 { slug: 'stretch',     name: 'Stretch',     target: 4, pattern: [0, 1] },
 { slug: 'read-book',   name: 'Read Book',   target: 4, pattern: [0, 2] },
-{ slug: 'workout',     name: 'Workout',     target: 3, pattern: [1], doneToday: true },
+{ slug: 'workout',     name: 'Workout',     target: 3, pattern: [0, 1], doneToday: true },
 { slug: 'vo2-max',     name: 'VO2 Max',     target: 2, pattern: [2], doneToday: true },
-{ slug: 'tutorial',    name: 'Tutorial',    target: 3, pattern: [0], doneToday: true },
-{ slug: 'sunset',      name: 'Sunset',      target: 3, pattern: [1] },
+{ slug: 'tutorial',    name: 'Tutorial',    target: 3, pattern: [0, 2], doneToday: true },
+{ slug: 'sunset',      name: 'Sunset',      target: 3, pattern: [0, 1] },
 { slug: 'early-night', name: 'Early night', target: 7, miss: -1 }
 ];
 var LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -359,11 +359,11 @@ var lower = Math.floor(v), upper = Math.min(MAX_GAIN, Math.ceil(v));
 return { lower: lower, upper: upper, f: v - lower };
 }
 function applyGain(p) {
-var wantHDR = hdrQuery.matches && currentSet;
+var wantHDR = hdrQuery.matches && currentSet && p.host.classList.contains('is-emitting');
 var st = steps();
 var lower = wantHDR ? plateImage(p, st.lower) : null;
 var upper = wantHDR && st.upper !== st.lower ? plateImage(p, st.upper) : null;
-var covered = ready(lower);
+var covered = wantHDR && ready(lower);
 Object.keys(p.imgs).forEach(function (g) {
 var img = p.imgs[g];
 var on = wantHDR && ((img === lower && covered) || (img === upper && ready(upper) && st.f > 0));
@@ -506,7 +506,6 @@ if (row.completed[today]) delete row.completed[today]; else row.completed[today]
 plates = plates.filter(function (p) { return !row.track.contains(p.host); });
 renderRow(index);
 applyMasks();
-applyGainAll();
 updateTiers();
 }
 function updateTiers() {
@@ -521,6 +520,7 @@ var letters = headerEl.querySelectorAll('.gw-day-t');
 for (var i = 0; i < letters.length; i++) {
 letters[i].classList.toggle('is-emitting', i === today && anyOpen);
 }
+applyGainAll();
 }
 var sentenceEl = document.getElementById('gw-sentence');
 var SENTENCE_BASE = 'https://cdn.prod.website-files.com/620d05babdddc967daa0780a/';
