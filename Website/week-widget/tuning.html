@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ring halo tuning</title>
+<style>
+  html, body { margin: 0; background: #000; color: #8d8d8d; font: 13px/1.5 system-ui, sans-serif; }
+  main { padding: 32px; max-width: 1100px; }
+  h1 { font-weight: 500; color: #d9d9d9; font-size: 16px; }
+  p { max-width: 62ch; }
+  .row { display: flex; align-items: center; gap: 40px; padding: 18px 0; border-top: 1px solid #1a1a1a; }
+  .row .label { width: 220px; flex: none; }
+  .row .label b { color: #d9d9d9; font-weight: 500; display: block; }
+  .plate { display: block; max-width: none; }
+  .live { position: relative; width: 48px; height: 48px; flex: none; }
+  .live::after { content: ""; position: absolute; inset: 2px; border-radius: 999px; border: 2px solid #fff; }
+  .warn { color: #ffb838; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ring halo tuning — desktop tier, 2x</h1>
+  <p>The halo numbers were measured on letterforms. A ring is a much thinner
+  shape, so each row below is the open ring cut at a different radius and
+  strength (radius as a fraction of the cell, strength as a fraction of the
+  peak). Judge on a screen with headroom in Chrome or Safari; on any other
+  screen every plate tone-maps to the same grey and this page says so. The
+  first row is what the card ships with. The live CSS ring at the far left of
+  each row is the SDR fallback, for size comparison only.</p>
+  <p id="gate" class="warn" hidden>This screen reports no extended range, so the
+  plates below are tone-mapped and cannot be judged here.</p>
+  <div id="rows"></div>
+  <p>To ship a variant: re-run <code>Tools/make-week-plates.swift</code> for all
+  sets with the chosen <code>--halo-radius</code> / <code>--halo-strength</code> /
+  <code>--grain-depth</code>, verify with <code>Tools/check-week-plates.swift</code>,
+  rebuild the embed and re-upload the ring plates.</p>
+</main>
+<script>
+  var variants = [
+    ['r0.155-s0.085', 'radius 0.155 · strength 0.085 · grain 0.22', 'the word slider’s numbers — ships by default'],
+    ['r0.10-s0.085', 'radius 0.10 · strength 0.085', 'tighter'],
+    ['r0.25-s0.085', 'radius 0.25 · strength 0.085', 'wider'],
+    ['r0.155-s0.05', 'radius 0.155 · strength 0.05', 'fainter'],
+    ['r0.155-s0.15', 'radius 0.155 · strength 0.15', 'stronger'],
+    ['r0.155-s0.085-nograin', 'radius 0.155 · strength 0.085 · no grain', 'clean falloff'],
+  ];
+  document.getElementById('gate').hidden = window.matchMedia('(dynamic-range: high)').matches;
+  var rows = document.getElementById('rows');
+  variants.forEach(function (v) {
+    var row = document.createElement('div'); row.className = 'row';
+    row.innerHTML = '<div class="label"><b>' + v[1] + '</b>' + v[2] + '</div><div class="live"></div>';
+    ['ring-1', 'ring-3', 'ring-7'].forEach(function (key) {
+      var img = document.createElement('img'); img.className = 'plate';
+      img.src = 'tuning/' + v[0] + '/desktop@2x/gw-desktop-2x-' + key + '.avif';
+      img.onload = function () { img.style.width = img.naturalWidth / 2 + 'px'; img.style.height = img.naturalHeight / 2 + 'px'; };
+      row.appendChild(img);
+    });
+    rows.appendChild(row);
+  });
+</script>
+</body>
+</html>

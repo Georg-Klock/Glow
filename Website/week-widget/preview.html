@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glow Up · This Week (preview)</title>
+<style>
+  html, body { margin: 0; background: #141416; color: #ddd; font-family: system-ui, sans-serif; }
+  .page { min-height: 100vh; display: grid; place-items: center; }
+  .note { position: fixed; left: 12px; bottom: 12px; font-size: 12px; opacity: .6; }
+</style>
+<script>
+// Preview-only test hooks. ?sdr pretends the display has no headroom, so the
+// gate that decides whether a plate is ever fetched is what gets exercised.
+// ?corrupt points three plates at a truncated AVIF; ?missing at a 404.
+(function () {
+  var q = new URLSearchParams(location.search);
+  if (q.has('sdr')) {
+    var real = window.matchMedia.bind(window);
+    window.matchMedia = function (query) {
+      if (query === '(dynamic-range: high)') {
+        return { matches: false, media: query, addEventListener: function () {}, removeEventListener: function () {}, addListener: function () {}, removeListener: function () {} };
+      }
+      return real(query);
+    };
+  }
+  var bad = q.has('corrupt') ? 'data:image/avif;base64,AAAAIGZ0eXBhdmlmAAAAAE1pUHJhdmlmbWlhZm1pZjEAAAEhbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAAAAAAAkZGluZgAAABxkcmVmAAAAAAAAAAEAAAAMdXJsIAAAAAEAAAAOcGl0bQAAAAAAAQAAACNpaW5mAAAAAAABAAAAFWluZmUCAAAAAAEAAGF2MDEAAAAAgWlwcnAAAABgaXBjbwAAABNjb2xybmNseAAJABAAAYAAAAA=' : q.has('missing') ? './assets/does-not-exist.avif' : null;
+  if (bad) {
+    window.GLOW_WEEK_ASSET_MAP = {};
+    ['desktop-2x-day-F', 'desktop-2x-ring-1', 'desktop-2x-name-gratitude', 'desktop-1x-day-F', 'desktop-1x-ring-1', 'desktop-1x-name-gratitude'].forEach(function (k) {
+      window.GLOW_WEEK_ASSET_MAP['gw-' + k + '.avif'] = bad;
+    });
+  }
+})();
+</script>
+
+</head>
+<body>
+<div class="page">
+<style>@font-face{font-family:'GW Inter';font-style:normal;font-weight:400;font-display:block;src:url(./fonts/Inter-Regular.woff2) format('woff2');}</style>
+<!-- Glow Up · "This Week" hero. Built by build-embed.py — edit the template, not embed.html. -->
+<style>
+/* ─── Geometry ───────────────────────────────────────────────────────────
+   Everything is the app's 24pt reference cell times one scale, --s, so the
+   ratios in WidgetMetrics / SlotLayout / GlowShape survive at every tier.
+   The tiers are discrete on purpose: a plate is a fixed raster and the CSS
+   below must land on the exact sizes the plates were cut at. */
+.gw { --s: 2; }                                   /* desktop: 48px cell */
+@media (max-width: 959px) { .gw { --s: 1.5; } }   /* tablet:  36px cell */
+@media (max-width: 599px) { .gw { --s: 0.875; } } /* mobile:  21px cell */
+
+.gw {
+  --cell: calc(24px * var(--s));
+  --gap: calc(8px * var(--s));           /* SlotLayout.gapRatio 8/24 — both axes */
+  --text: calc(12px * var(--s));         /* WidgetMetrics.textSize */
+  --icon-w: calc(24px * var(--s));       /* WidgetMetrics.iconWidth */
+  --icon-gap: calc(2.25px * var(--s));   /* WidgetMetrics.iconGap */
+  --icon-box: calc(15px * var(--s));     /* the glyph's square; see make-week-plates --icon-box */
+  --label-w: calc(98px * var(--s));      /* WidgetMetrics.labelWidth */
+  --label-gap: calc(4px * var(--s));     /* WidgetMetrics.labelGap */
+  --header-h: calc(14px * var(--s));     /* WidgetMetrics.headerHeight */
+  --header-gap: calc(4px * var(--s));    /* WidgetMetrics.headerGap */
+  --inset: calc(1px * var(--s));         /* GlowShape.socketInset */
+  --ring: calc(1px * var(--s));          /* GlowShape.ringWeight */
+  --bevel: calc(1.5px * var(--s));       /* SlotMarkView.bevel = cell/16 */
+  --well: calc(6px * var(--s));          /* SlotMarkView.well = cell/4 */
+  --pad-l: calc(6px * var(--s));         /* WidgetMetrics.padLeading */
+  --pad-r: calc(14px * var(--s));        /* WidgetMetrics.padTrailing */
+  --pad-t: calc(10px * var(--s));        /* WidgetMetrics.padTop */
+  --pad-b: calc(14px * var(--s));        /* WidgetMetrics.padBottom */
+  --radius: calc(22px * var(--s));
+  --lit: #D9D9D9;                        /* GlowPalette.lit */
+  --resting: rgba(217, 217, 217, 0.5);   /* GlowPalette.greyResting — marks only, never text */
+  --emitting-sdr: #FFFFFF;               /* what emitting means on a screen without headroom */
+  --tilt-x: 0deg; --tilt-y: 0deg; --shadow-x: 0px; --shadow-y: 0px;
+
+  display: flex; justify-content: center;
+  padding: calc(40px * var(--s)) 0;
+  perspective: calc(900px * var(--s));
+  font-family: 'GW Inter', 'Inter', system-ui, -apple-system, sans-serif;
+  font-weight: 400; font-synthesis: none;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  user-select: none; -webkit-user-select: none;
+}
+.gw *, .gw *::before, .gw *::after { box-sizing: border-box; }
+.gw img { max-width: none; }             /* Webflow's global img rule squashed the word slider */
+
+/* ─── The card ─────────────────────────────────────────────────────────── */
+.gw-card {
+  position: relative;
+  background: #000;                      /* the black every plate was cut against */
+  border-radius: var(--radius);
+  padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
+  transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  transform-style: preserve-3d;
+  box-shadow:
+    var(--shadow-x) calc(var(--shadow-y) + 18px * var(--s)) calc(48px * var(--s)) rgba(0, 0, 0, 0.42),
+    var(--shadow-x) calc(var(--shadow-y) + 4px * var(--s)) calc(12px * var(--s)) rgba(0, 0, 0, 0.28);
+  will-change: transform;
+}
+
+/* ─── Header ───────────────────────────────────────────────────────────── */
+.gw-header {
+  display: flex; align-items: center; gap: var(--label-gap);
+  height: var(--header-h); margin-bottom: var(--header-gap);
+}
+.gw-header-spacer { width: var(--label-w); flex: none; }
+.gw-days { display: flex; gap: var(--gap); }
+.gw-day {
+  width: var(--cell); display: flex; justify-content: center; align-items: center;
+}
+
+/* ─── Rows ─────────────────────────────────────────────────────────────── */
+.gw-rows { display: flex; flex-direction: column; gap: var(--gap); }
+.gw-row { display: flex; align-items: center; gap: var(--label-gap); height: var(--cell); }
+.gw-row.is-spacer { height: var(--cell); }
+.gw-label {
+  width: var(--label-w); flex: none; display: flex; align-items: center; overflow: hidden;
+}
+.gw-icon-col {
+  width: var(--icon-w); flex: none; display: flex; justify-content: center;
+  margin-right: var(--icon-gap);
+}
+
+/* ─── Type: live text, with the plate over it ─────────────────────────── */
+.gw-t {
+  position: relative; display: inline-block; white-space: nowrap;
+  font-size: var(--text);
+  /* Inter's ascent + descent (0.96875 + 0.2421875 em). The plate was cut on
+     the same typographic box, so with this line height the two share a
+     baseline. If the font is ever swapped, this number goes with it. */
+  line-height: 1.2109375;
+  color: var(--lit);
+}
+.gw-t.is-emitting { color: var(--emitting-sdr); }
+.gw-i {
+  position: relative; display: block; width: var(--icon-box); height: var(--icon-box);
+  color: var(--lit);
+}
+.gw-i.is-emitting { color: var(--emitting-sdr); }
+.gw-i > svg { display: block; width: 100%; height: 100%; }
+.gw-live { display: inline; }
+
+/* The plate: hidden until it has decoded, and only ever shown on a screen
+   with headroom, over an element that is emitting. It is opaque black, so it
+   covers its live twin completely; the twin is also hidden so nothing bleeds
+   at the plate's edge. */
+.gw-plate { position: absolute; display: none; pointer-events: none; }
+.gw-hdr .is-emitting.has-plate > .gw-plate.is-ready { display: block; }
+.gw-hdr .is-emitting.has-plate > .gw-live { visibility: hidden; }
+
+/* ─── Marks ────────────────────────────────────────────────────────────── */
+.gw-track {
+  position: relative; flex: none;
+  width: calc(7 * var(--cell) + 6 * var(--gap)); height: var(--cell);
+}
+.gw-span {
+  position: absolute; top: 0; height: var(--cell);
+  left: calc(var(--first) * (var(--cell) + var(--gap)));
+  width: calc(var(--n) * var(--cell) + (var(--n) - 1) * var(--gap));
+  margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit;
+  -webkit-appearance: none; appearance: none;
+}
+/* Paint order. A plate is opaque black out to its halo padding, which is wider
+   than half a gap, so an open ring's plate would cover the sockets beside it
+   and the rows above and below. Everything that is not a plate paints on top
+   instead: the card and the plate are the same #000, so a socket drawn over a
+   plate's surround is indistinguishable from one drawn over the card, and only
+   the halo goes behind the neighbour — which is where spilled light belongs.
+   Nothing between here and .gw-card may open a stacking context, or rows stop
+   sharing one order. */
+.gw-span.is-open { z-index: 0; }
+.gw-span:not(.is-open) { z-index: 1; }
+.gw-icon-col { position: relative; z-index: 2; }   /* above the name plate's left padding */
+.gw-t.gw-name { z-index: 1; }
+button.gw-span { cursor: pointer; }
+button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2px; border-radius: 999px; }
+
+/* The socket: SlotMarkView.socket — 15% black, a black bevel on the top
+   edge and a 13% white one on the bottom. On #000 only the bottom rim shows,
+   which is how the This Week screen looks too. */
+.gw-socket {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.15);
+  box-shadow:
+    inset 0 var(--bevel) calc(2 * var(--bevel)) #000,
+    inset 0 calc(-1 * var(--bevel)) calc(2 * var(--bevel)) rgba(255, 255, 255, 0.13);
+}
+/* Done: SlotMarkView.doneMark — the lit fill, a white rim at the top, a 30%
+   black one at the bottom, and a soft well a quarter-cell deep. */
+.gw-done {
+  position: absolute; inset: var(--inset); border-radius: 999px;
+  background: var(--lit);
+  box-shadow:
+    inset 0 var(--well) calc(2 * var(--well)) rgba(0, 0, 0, 0.25),
+    inset 0 calc(-1 * var(--inset)) calc(2 * var(--inset)) rgba(0, 0, 0, 0.30),
+    inset 0 var(--inset) calc(2 * var(--inset)) #fff;
+}
+/* Open: the ring. Live version is the SDR fallback; the plate sits over it. */
+.gw-ring {
+  position: absolute; inset: var(--inset); border-radius: 999px;
+  border: var(--ring) solid var(--emitting-sdr);
+}
+/* Missed: CrossShape in its own well. No socket underneath. */
+.gw-cross { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+
+/* ─── Motion ───────────────────────────────────────────────────────────── */
+.gw-card { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .gw-card { transform: none !important; }
+}
+</style>
+
+<div class="gw" id="gw">
+  <div class="gw-card" id="gw-card">
+    <div class="gw-header" id="gw-header"></div>
+    <div class="gw-rows" id="gw-rows"></div>
+  </div>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <!-- CrossShape's three inner shadows (SlotMarkView.missedMark), in a
+           100-unit box: corner 3.52, well blur 12.5, well offset 16.67. -->
+      <filter id="gw-cross-well" x="-30%" y="-30%" width="160%" height="160%"
+              filterUnits="objectBoundingBox" primitiveUnits="userSpaceOnUse"
+              color-interpolation-filters="sRGB">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="3.52" result="b1"/>
+        <feOffset in="b1" dy="3.52" result="o1"/>
+        <feComposite in="SourceAlpha" in2="o1" operator="out" result="m1"/>
+        <feFlood flood-color="#000" flood-opacity="1" result="c1"/>
+        <feComposite in="c1" in2="m1" operator="in" result="s1"/>
+
+        <feOffset in="b1" dy="-3.52" result="o2"/>
+        <feComposite in="SourceAlpha" in2="o2" operator="out" result="m2"/>
+        <feFlood flood-color="#fff" flood-opacity="0.25" result="c2"/>
+        <feComposite in="c2" in2="m2" operator="in" result="s2"/>
+
+        <feGaussianBlur in="SourceAlpha" stdDeviation="12.5" result="b3"/>
+        <feOffset in="b3" dy="16.67" result="o3"/>
+        <feComposite in="SourceAlpha" in2="o3" operator="out" result="m3"/>
+        <feFlood flood-color="#000" flood-opacity="0.48" result="c3"/>
+        <feComposite in="c3" in2="m3" operator="in" result="s3"/>
+
+        <feMerge>
+          <feMergeNode in="SourceGraphic"/>
+          <feMergeNode in="s1"/>
+          <feMergeNode in="s2"/>
+          <feMergeNode in="s3"/>
+        </feMerge>
+      </filter>
+    </defs>
+  </svg>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ─── Assets ────────────────────────────────────────────────────────────
+  // Every plate, per tier and density, as make-week-plates.swift wrote it.
+  // Sizes and offsets are CSS pixels relative to the element the plate sits
+  // over. Filled in by build-embed.py from the manifests.
+  var MANIFESTS = {"desktop@1x":{"tier":"desktop","dpr":1,"plates":{"day-F":{"file":"gw-desktop-1x-day-F.avif","cssWidth":32,"cssHeight":46,"offsetLeft":-8,"offsetTop":-8.9609},"day-M":{"file":"gw-desktop-1x-day-M.avif","cssWidth":38,"cssHeight":46,"offsetLeft":-8,"offsetTop":-8.9609},"day-S":{"file":"gw-desktop-1x-day-S.avif","cssWidth":32,"cssHeight":46,"offsetLeft":-8,"offsetTop":-8.9609},"day-T":{"file":"gw-desktop-1x-day-T.avif","cssWidth":32,"cssHeight":46,"offsetLeft":-8,"offsetTop":-8.9609},"day-W":{"file":"gw-desktop-1x-day-W.avif","cssWidth":40,"cssHeight":46,"offsetLeft":-8,"offsetTop":-8.9609},"icon-early-night":{"file":"gw-desktop-1x-icon-early-night.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"icon-gratitude":{"file":"gw-desktop-1x-icon-gratitude.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"icon-read-book":{"file":"gw-desktop-1x-icon-read-book.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"icon-stretch":{"file":"gw-desktop-1x-icon-stretch.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"icon-sunset":{"file":"gw-desktop-1x-icon-sunset.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"icon-tutorial":{"file":"gw-desktop-1x-icon-tutorial.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"icon-vo2-max":{"file":"gw-desktop-1x-icon-vo2-max.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"icon-workout":{"file":"gw-desktop-1x-icon-workout.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"name-early-night":{"file":"gw-desktop-1x-name-early-night.avif","cssWidth":138,"cssHeight":46,"offsetLeft":-8,"offsetTop":-8.9609},"name-gratitude":{"file":"gw-desktop-1x-name-gratitude.avif","cssWidth":122,"cssHeight":46,"offsetLeft":-8,"offsetTop":-8.9609},"name-read-book":{"file":"gw-desktop-1x-name-read-book.avif","cssWidth":138,"cssHeight":46,"offsetLeft":-8,"offsetTop":-8.9609},"name-stretch":{"file":"gw-desktop-1x-name-stretch.avif","cssWidth":98,"cssHeight":46,"offsetLeft":-8,"offsetTop":-8.9609},"name-sunset":{"file":"gw-desktop-1x-name-sunset.avif","cssWidth":96,"cssHeight":46,"offsetLeft":-8,"offsetTop":-8.9609},"name-tutorial":{"file":"gw-desktop-1x-name-tutorial.avif","cssWidth":102,"cssHeight":46,"offsetLeft":-8,"offsetTop":-8.9609},"name-vo2-max":{"file":"gw-desktop-1x-name-vo2-max.avif","cssWidth":120,"cssHeight":46,"offsetLeft":-8,"offsetTop":-8.9609},"name-workout":{"file":"gw-desktop-1x-name-workout.avif","cssWidth":112,"cssHeight":46,"offsetLeft":-8,"offsetTop":-8.9609},"ring-1":{"file":"gw-desktop-1x-ring-1.avif","cssWidth":80,"cssHeight":80,"offsetLeft":-16,"offsetTop":-16},"ring-2":{"file":"gw-desktop-1x-ring-2.avif","cssWidth":144,"cssHeight":80,"offsetLeft":-16,"offsetTop":-16},"ring-3":{"file":"gw-desktop-1x-ring-3.avif","cssWidth":208,"cssHeight":80,"offsetLeft":-16,"offsetTop":-16},"ring-4":{"file":"gw-desktop-1x-ring-4.avif","cssWidth":272,"cssHeight":80,"offsetLeft":-16,"offsetTop":-16},"ring-5":{"file":"gw-desktop-1x-ring-5.avif","cssWidth":336,"cssHeight":80,"offsetLeft":-16,"offsetTop":-16},"ring-6":{"file":"gw-desktop-1x-ring-6.avif","cssWidth":400,"cssHeight":80,"offsetLeft":-16,"offsetTop":-16},"ring-7":{"file":"gw-desktop-1x-ring-7.avif","cssWidth":464,"cssHeight":80,"offsetLeft":-16,"offsetTop":-16}}},"desktop@2x":{"tier":"desktop","dpr":2,"plates":{"day-F":{"file":"gw-desktop-2x-day-F.avif","cssWidth":31,"cssHeight":45,"offsetLeft":-8,"offsetTop":-8.4609},"day-M":{"file":"gw-desktop-2x-day-M.avif","cssWidth":38,"cssHeight":45,"offsetLeft":-8,"offsetTop":-8.4609},"day-S":{"file":"gw-desktop-2x-day-S.avif","cssWidth":32,"cssHeight":45,"offsetLeft":-8,"offsetTop":-8.4609},"day-T":{"file":"gw-desktop-2x-day-T.avif","cssWidth":32,"cssHeight":45,"offsetLeft":-8,"offsetTop":-8.4609},"day-W":{"file":"gw-desktop-2x-day-W.avif","cssWidth":40,"cssHeight":45,"offsetLeft":-8,"offsetTop":-8.4609},"icon-early-night":{"file":"gw-desktop-2x-icon-early-night.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"icon-gratitude":{"file":"gw-desktop-2x-icon-gratitude.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"icon-read-book":{"file":"gw-desktop-2x-icon-read-book.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"icon-stretch":{"file":"gw-desktop-2x-icon-stretch.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"icon-sunset":{"file":"gw-desktop-2x-icon-sunset.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"icon-tutorial":{"file":"gw-desktop-2x-icon-tutorial.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"icon-vo2-max":{"file":"gw-desktop-2x-icon-vo2-max.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"icon-workout":{"file":"gw-desktop-2x-icon-workout.avif","cssWidth":50,"cssHeight":50,"offsetLeft":-10,"offsetTop":-10},"name-early-night":{"file":"gw-desktop-2x-name-early-night.avif","cssWidth":137,"cssHeight":45,"offsetLeft":-8,"offsetTop":-8.4609},"name-gratitude":{"file":"gw-desktop-2x-name-gratitude.avif","cssWidth":121,"cssHeight":45,"offsetLeft":-8,"offsetTop":-8.4609},"name-read-book":{"file":"gw-desktop-2x-name-read-book.avif","cssWidth":138,"cssHeight":45,"offsetLeft":-8,"offsetTop":-8.4609},"name-stretch":{"file":"gw-desktop-2x-name-stretch.avif","cssWidth":98,"cssHeight":45,"offsetLeft":-8,"offsetTop":-8.4609},"name-sunset":{"file":"gw-desktop-2x-name-sunset.avif","cssWidth":95,"cssHeight":45,"offsetLeft":-8,"offsetTop":-8.4609},"name-tutorial":{"file":"gw-desktop-2x-name-tutorial.avif","cssWidth":101,"cssHeight":45,"offsetLeft":-8,"offsetTop":-8.4609},"name-vo2-max":{"file":"gw-desktop-2x-name-vo2-max.avif","cssWidth":120,"cssHeight":45,"offsetLeft":-8,"offsetTop":-8.4609},"name-workout":{"file":"gw-desktop-2x-name-workout.avif","cssWidth":112,"cssHeight":45,"offsetLeft":-8,"offsetTop":-8.4609},"ring-1":{"file":"gw-desktop-2x-ring-1.avif","cssWidth":81,"cssHeight":81,"offsetLeft":-16.5,"offsetTop":-16.5},"ring-2":{"file":"gw-desktop-2x-ring-2.avif","cssWidth":145,"cssHeight":81,"offsetLeft":-16.5,"offsetTop":-16.5},"ring-3":{"file":"gw-desktop-2x-ring-3.avif","cssWidth":209,"cssHeight":81,"offsetLeft":-16.5,"offsetTop":-16.5},"ring-4":{"file":"gw-desktop-2x-ring-4.avif","cssWidth":273,"cssHeight":81,"offsetLeft":-16.5,"offsetTop":-16.5},"ring-5":{"file":"gw-desktop-2x-ring-5.avif","cssWidth":337,"cssHeight":81,"offsetLeft":-16.5,"offsetTop":-16.5},"ring-6":{"file":"gw-desktop-2x-ring-6.avif","cssWidth":401,"cssHeight":81,"offsetLeft":-16.5,"offsetTop":-16.5},"ring-7":{"file":"gw-desktop-2x-ring-7.avif","cssWidth":465,"cssHeight":81,"offsetLeft":-16.5,"offsetTop":-16.5}}},"mobile@3x":{"tier":"mobile","dpr":3,"plates":{"day-F":{"file":"gw-mobile-3x-day-F.avif","cssWidth":14,"cssHeight":20,"offsetLeft":-3.6667,"offsetTop":-3.9621},"day-M":{"file":"gw-mobile-3x-day-M.avif","cssWidth":17.3333,"cssHeight":20,"offsetLeft":-3.6667,"offsetTop":-3.9621},"day-S":{"file":"gw-mobile-3x-day-S.avif","cssWidth":14.6667,"cssHeight":20,"offsetLeft":-3.6667,"offsetTop":-3.9621},"day-T":{"file":"gw-mobile-3x-day-T.avif","cssWidth":14.6667,"cssHeight":20,"offsetLeft":-3.6667,"offsetTop":-3.9621},"day-W":{"file":"gw-mobile-3x-day-W.avif","cssWidth":18,"cssHeight":20,"offsetLeft":-3.6667,"offsetTop":-3.9621},"icon-early-night":{"file":"gw-mobile-3x-icon-early-night.avif","cssWidth":22,"cssHeight":22,"offsetLeft":-4.3333,"offsetTop":-4.5417},"icon-gratitude":{"file":"gw-mobile-3x-icon-gratitude.avif","cssWidth":22,"cssHeight":22,"offsetLeft":-4.3333,"offsetTop":-4.5417},"icon-read-book":{"file":"gw-mobile-3x-icon-read-book.avif","cssWidth":22,"cssHeight":22,"offsetLeft":-4.3333,"offsetTop":-4.5417},"icon-stretch":{"file":"gw-mobile-3x-icon-stretch.avif","cssWidth":22,"cssHeight":22,"offsetLeft":-4.3333,"offsetTop":-4.5417},"icon-sunset":{"file":"gw-mobile-3x-icon-sunset.avif","cssWidth":22,"cssHeight":22,"offsetLeft":-4.3333,"offsetTop":-4.5417},"icon-tutorial":{"file":"gw-mobile-3x-icon-tutorial.avif","cssWidth":22,"cssHeight":22,"offsetLeft":-4.3333,"offsetTop":-4.5417},"icon-vo2-max":{"file":"gw-mobile-3x-icon-vo2-max.avif","cssWidth":22,"cssHeight":22,"offsetLeft":-4.3333,"offsetTop":-4.5417},"icon-workout":{"file":"gw-mobile-3x-icon-workout.avif","cssWidth":22,"cssHeight":22,"offsetLeft":-4.3333,"offsetTop":-4.5417},"name-early-night":{"file":"gw-mobile-3x-name-early-night.avif","cssWidth":60,"cssHeight":20,"offsetLeft":-3.6667,"offsetTop":-3.9621},"name-gratitude":{"file":"gw-mobile-3x-name-gratitude.avif","cssWidth":53.3333,"cssHeight":20,"offsetLeft":-3.6667,"offsetTop":-3.9621},"name-read-book":{"file":"gw-mobile-3x-name-read-book.avif","cssWidth":60.6667,"cssHeight":20,"offsetLeft":-3.6667,"offsetTop":-3.9621},"name-stretch":{"file":"gw-mobile-3x-name-stretch.avif","cssWidth":43.3333,"cssHeight":20,"offsetLeft":-3.6667,"offsetTop":-3.9621},"name-sunset":{"file":"gw-mobile-3x-name-sunset.avif","cssWidth":42,"cssHeight":20,"offsetLeft":-3.6667,"offsetTop":-3.9621},"name-tutorial":{"file":"gw-mobile-3x-name-tutorial.avif","cssWidth":44.6667,"cssHeight":20,"offsetLeft":-3.6667,"offsetTop":-3.9621},"name-vo2-max":{"file":"gw-mobile-3x-name-vo2-max.avif","cssWidth":53.3333,"cssHeight":20,"offsetLeft":-3.6667,"offsetTop":-3.9621},"name-workout":{"file":"gw-mobile-3x-name-workout.avif","cssWidth":49.3333,"cssHeight":20,"offsetLeft":-3.6667,"offsetTop":-3.9621},"ring-1":{"file":"gw-mobile-3x-ring-1.avif","cssWidth":35.3333,"cssHeight":35.3333,"offsetLeft":-7,"offsetTop":-7.3333},"ring-2":{"file":"gw-mobile-3x-ring-2.avif","cssWidth":63.3333,"cssHeight":35.3333,"offsetLeft":-7,"offsetTop":-7.3333},"ring-3":{"file":"gw-mobile-3x-ring-3.avif","cssWidth":91.3333,"cssHeight":35.3333,"offsetLeft":-7,"offsetTop":-7.3333},"ring-4":{"file":"gw-mobile-3x-ring-4.avif","cssWidth":119.3333,"cssHeight":35.3333,"offsetLeft":-7,"offsetTop":-7.3333},"ring-5":{"file":"gw-mobile-3x-ring-5.avif","cssWidth":147.3333,"cssHeight":35.3333,"offsetLeft":-7,"offsetTop":-7.3333},"ring-6":{"file":"gw-mobile-3x-ring-6.avif","cssWidth":175.3333,"cssHeight":35.3333,"offsetLeft":-7,"offsetTop":-7.3333},"ring-7":{"file":"gw-mobile-3x-ring-7.avif","cssWidth":203.3333,"cssHeight":35.3333,"offsetLeft":-7,"offsetTop":-7.3333}}},"tablet@2x":{"tier":"tablet","dpr":2,"plates":{"day-F":{"file":"gw-tablet-2x-day-F.avif","cssWidth":23,"cssHeight":34,"offsetLeft":-6,"offsetTop":-6.2207},"day-M":{"file":"gw-tablet-2x-day-M.avif","cssWidth":29,"cssHeight":34,"offsetLeft":-6,"offsetTop":-6.2207},"day-S":{"file":"gw-tablet-2x-day-S.avif","cssWidth":24,"cssHeight":34,"offsetLeft":-6,"offsetTop":-6.2207},"day-T":{"file":"gw-tablet-2x-day-T.avif","cssWidth":24,"cssHeight":34,"offsetLeft":-6,"offsetTop":-6.2207},"day-W":{"file":"gw-tablet-2x-day-W.avif","cssWidth":30,"cssHeight":34,"offsetLeft":-6,"offsetTop":-6.2207},"icon-early-night":{"file":"gw-tablet-2x-icon-early-night.avif","cssWidth":38,"cssHeight":38,"offsetLeft":-7.5,"offsetTop":-8},"icon-gratitude":{"file":"gw-tablet-2x-icon-gratitude.avif","cssWidth":38,"cssHeight":38,"offsetLeft":-7.5,"offsetTop":-8},"icon-read-book":{"file":"gw-tablet-2x-icon-read-book.avif","cssWidth":38,"cssHeight":38,"offsetLeft":-7.5,"offsetTop":-8},"icon-stretch":{"file":"gw-tablet-2x-icon-stretch.avif","cssWidth":38,"cssHeight":38,"offsetLeft":-7.5,"offsetTop":-8},"icon-sunset":{"file":"gw-tablet-2x-icon-sunset.avif","cssWidth":38,"cssHeight":38,"offsetLeft":-7.5,"offsetTop":-8},"icon-tutorial":{"file":"gw-tablet-2x-icon-tutorial.avif","cssWidth":38,"cssHeight":38,"offsetLeft":-7.5,"offsetTop":-8},"icon-vo2-max":{"file":"gw-tablet-2x-icon-vo2-max.avif","cssWidth":38,"cssHeight":38,"offsetLeft":-7.5,"offsetTop":-8},"icon-workout":{"file":"gw-tablet-2x-icon-workout.avif","cssWidth":38,"cssHeight":38,"offsetLeft":-7.5,"offsetTop":-8},"name-early-night":{"file":"gw-tablet-2x-name-early-night.avif","cssWidth":103,"cssHeight":34,"offsetLeft":-6,"offsetTop":-6.2207},"name-gratitude":{"file":"gw-tablet-2x-name-gratitude.avif","cssWidth":91,"cssHeight":34,"offsetLeft":-6,"offsetTop":-6.2207},"name-read-book":{"file":"gw-tablet-2x-name-read-book.avif","cssWidth":104,"cssHeight":34,"offsetLeft":-6,"offsetTop":-6.2207},"name-stretch":{"file":"gw-tablet-2x-name-stretch.avif","cssWidth":74,"cssHeight":34,"offsetLeft":-6,"offsetTop":-6.2207},"name-sunset":{"file":"gw-tablet-2x-name-sunset.avif","cssWidth":71,"cssHeight":34,"offsetLeft":-6,"offsetTop":-6.2207},"name-tutorial":{"file":"gw-tablet-2x-name-tutorial.avif","cssWidth":76,"cssHeight":34,"offsetLeft":-6,"offsetTop":-6.2207},"name-vo2-max":{"file":"gw-tablet-2x-name-vo2-max.avif","cssWidth":90,"cssHeight":34,"offsetLeft":-6,"offsetTop":-6.2207},"name-workout":{"file":"gw-tablet-2x-name-workout.avif","cssWidth":84,"cssHeight":34,"offsetLeft":-6,"offsetTop":-6.2207},"ring-1":{"file":"gw-tablet-2x-ring-1.avif","cssWidth":60,"cssHeight":60,"offsetLeft":-12,"offsetTop":-12},"ring-2":{"file":"gw-tablet-2x-ring-2.avif","cssWidth":108,"cssHeight":60,"offsetLeft":-12,"offsetTop":-12},"ring-3":{"file":"gw-tablet-2x-ring-3.avif","cssWidth":156,"cssHeight":60,"offsetLeft":-12,"offsetTop":-12},"ring-4":{"file":"gw-tablet-2x-ring-4.avif","cssWidth":204,"cssHeight":60,"offsetLeft":-12,"offsetTop":-12},"ring-5":{"file":"gw-tablet-2x-ring-5.avif","cssWidth":252,"cssHeight":60,"offsetLeft":-12,"offsetTop":-12},"ring-6":{"file":"gw-tablet-2x-ring-6.avif","cssWidth":300,"cssHeight":60,"offsetLeft":-12,"offsetTop":-12},"ring-7":{"file":"gw-tablet-2x-ring-7.avif","cssWidth":348,"cssHeight":60,"offsetLeft":-12,"offsetTop":-12}}}};
+  // File name → URL. Webflow prefixes every upload with a hash, so the page
+  // cannot guess a plate's address from its name; build-embed.py --asset-map
+  // fills this from the site's asset list. Empty means ASSET_BASE/<set>/<file>.
+  var ASSET_MAP = window.GLOW_WEEK_ASSET_MAP || {};
+  var ASSET_BASE = window.GLOW_WEEK_ASSET_BASE || "./assets/";
+  var ICONS = {"gratitude":"<path d=\"M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z\"/>","stretch":"<path d=\"M128,80A32,32,0,1,0,96,48,32,32,0,0,0,128,80Zm0-48a16,16,0,1,1-16,16A16,16,0,0,1,128,32Zm96,72a8,8,0,0,1-8,8H136v26.72l51.15,21.93A8,8,0,0,1,192,168v48a8,8,0,0,1-16,0V173.28l-46.45-19.91L53.35,222a8,8,0,1,1-10.7-11.9L120,140.44V112H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,104Z\"/>","read-book":"<path d=\"M232,48H160a40,40,0,0,0-32,16A40,40,0,0,0,96,48H24a8,8,0,0,0-8,8V200a8,8,0,0,0,8,8H96a24,24,0,0,1,24,24,8,8,0,0,0,16,0,24,24,0,0,1,24-24h72a8,8,0,0,0,8-8V56A8,8,0,0,0,232,48ZM96,192H32V64H96a24,24,0,0,1,24,24V200A39.81,39.81,0,0,0,96,192Zm128,0H160a39.81,39.81,0,0,0-24,8V88a24,24,0,0,1,24-24h64Z\"/>","workout":"<path d=\"M248,120h-8V88a16,16,0,0,0-16-16H208V64a16,16,0,0,0-16-16H168a16,16,0,0,0-16,16v56H104V64A16,16,0,0,0,88,48H64A16,16,0,0,0,48,64v8H32A16,16,0,0,0,16,88v32H8a8,8,0,0,0,0,16h8v32a16,16,0,0,0,16,16H48v8a16,16,0,0,0,16,16H88a16,16,0,0,0,16-16V136h48v56a16,16,0,0,0,16,16h24a16,16,0,0,0,16-16v-8h16a16,16,0,0,0,16-16V136h8a8,8,0,0,0,0-16ZM32,168V88H48v80Zm56,24H64V64H88V192Zm104,0H168V64h24V175.82c0,.06,0,.12,0,.18s0,.12,0,.18V192Zm32-24H208V88h16Z\"/>","vo2-max":"<path d=\"M152,88a32,32,0,1,0-32-32A32,32,0,0,0,152,88Zm0-48a16,16,0,1,1-16,16A16,16,0,0,1,152,40Zm67.31,100.68c-.61.28-7.49,3.28-19.67,3.28-13.85,0-34.55-3.88-60.69-20a169.31,169.31,0,0,1-15.41,32.34,104.29,104.29,0,0,1,31.31,15.81C173.92,186.65,184,207.35,184,232a8,8,0,0,1-16,0c0-41.7-34.69-56.71-54.14-61.85-.55.7-1.12,1.41-1.69,2.1-19.64,23.8-44.25,36.18-71.63,36.18A92.29,92.29,0,0,1,31.2,208,8,8,0,0,1,32.8,192c25.92,2.58,48.47-7.49,67-30,12.49-15.14,21-33.61,25.25-47C86.13,92.35,61.27,111.63,61,111.84A8,8,0,1,1,51,99.36c1.5-1.2,37.22-29,89.51,6.57,45.47,30.91,71.93,20.31,72.18,20.19a8,8,0,1,1,6.63,14.56Z\"/>","tutorial":"<path fill-rule=\"evenodd\" d=\"M48 48h160a24 24 0 0 1 24 24v112a24 24 0 0 1-24 24H48a24 24 0 0 1-24-24V72a24 24 0 0 1 24-24Zm0 16a8 8 0 0 0-8 8v112a8 8 0 0 0 8 8h160a8 8 0 0 0 8-8V72a8 8 0 0 0-8-8H48Zm56 30.4c0-6.2 6.8-10 12.1-6.8l56 33.6a8 8 0 0 1 0 13.6l-56 33.6c-5.3 3.2-12.1-0.6-12.1-6.8Z\"/>","sunset":"<path d=\"M240,152H199.55a73.54,73.54,0,0,0,.45-8,72,72,0,0,0-144,0,73.54,73.54,0,0,0,.45,8H16a8,8,0,0,0,0,16H240a8,8,0,0,0,0-16ZM72,144a56,56,0,1,1,111.41,8H72.59A56.13,56.13,0,0,1,72,144Zm144,56a8,8,0,0,1-8,8H48a8,8,0,0,1,0-16H208A8,8,0,0,1,216,200ZM72.84,43.58a8,8,0,0,1,14.32-7.16l8,16a8,8,0,0,1-14.32,7.16Zm-56,48.84a8,8,0,0,1,10.74-3.57l16,8a8,8,0,0,1-7.16,14.31l-16-8A8,8,0,0,1,16.84,92.42Zm192,15.16a8,8,0,0,1,3.58-10.73l16-8a8,8,0,1,1,7.16,14.31l-16,8a8,8,0,0,1-10.74-3.58Zm-48-55.16,8-16a8,8,0,0,1,14.32,7.16l-8,16a8,8,0,1,1-14.32-7.16Z\"/>","early-night":"<path d=\"M216,72H32V48a8,8,0,0,0-16,0V208a8,8,0,0,0,16,0V176H240v32a8,8,0,0,0,16,0V112A40,40,0,0,0,216,72ZM32,88h72v72H32Zm88,72V88h96a24,24,0,0,1,24,24v48Z\"/>"};   // slug → SVG path data (Phosphor, MIT; play-rectangle drawn by hand)
+
+  // ─── Content ───────────────────────────────────────────────────────────
+  // The app's default seed list, in order. `pattern` is the demo's history:
+  // the columns (Monday = 0) that count as completed once they are in the
+  // past. `miss` is a day a daily habit was skipped, relative to today. Both
+  // are filtered against today at seed time, so the card is plausible on any
+  // weekday and shows a fresh week on Monday.
+  var HABITS = [
+    { slug: 'gratitude',   name: 'Gratitude',   target: 7, miss: -2 },
+    { slug: 'stretch',     name: 'Stretch',     target: 4, pattern: [0, 1, 3, 5] },
+    { slug: 'read-book',   name: 'Read Book',   target: 4, pattern: [0, 2, 4] },
+    { slug: 'workout',     name: 'Workout',     target: 3, pattern: [1, 3] },
+    { slug: 'vo2-max',     name: 'VO2 Max',     target: 2, pattern: [2] },
+    { slug: 'tutorial',    name: 'Tutorial',    target: 3, pattern: [0, 3] },
+    { slug: 'sunset',      name: 'Sunset',      target: 3, pattern: [1, 4] },
+    { slug: 'early-night', name: 'Early night', target: 7, miss: -1 }
+  ];
+  var LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];   // Monday start, hardcoded for the demo
+  var LAST = 6;
+
+  // ─── Placement: WeekSpans.dividedWithoutRestDay + assignColumns, ported ─
+  // A habit due N times draws N marks against seven columns. Completions
+  // anchor on their day, lost reps are one-day ✕ on the earliest blank past
+  // day, the open mark reaches back over unused days and ends on today (or
+  // on Sunday when it is the final rep), and future reps divide what is left
+  // with the remainder to the right. docs/week-marks.md §4.
+  function widths(columns, count) {
+    if (count <= 0 || columns < count) return [];
+    var base = Math.floor(columns / count), extra = columns % count, out = [];
+    for (var i = 0; i < count; i++) out.push(base + (i >= count - extra ? 1 : 0));
+    return out;
+  }
+  function assignColumns(marks) {
+    var count = marks.length, ends = [], previousEnd = -1, previousIndex = -1, i;
+    for (i = 0; i < count; i++) {
+      ends.push(null);
+      if (marks[i].anchor === null) continue;
+      var low = previousEnd + (i - previousIndex);
+      var high = LAST - (count - 1 - i);
+      var isFinal = i === count - 1 && (marks[i].state === 'done' || marks[i].state === 'open');
+      var end = isFinal ? LAST : Math.max(low, Math.min(marks[i].anchor, high));
+      ends[i] = end; previousEnd = end; previousIndex = i;
+    }
+    var spans = [], cursor = 0, runStart = 0;
+    function push(mark, first, last) { spans.push({ state: mark.state, first: first, last: last }); }
+    for (i = 0; i < count; i++) {
+      if (ends[i] === null) continue;
+      var w = widths(ends[i] - cursor, i - runStart), k;
+      for (k = 0; k < w.length; k++) { push(marks[runStart + k], cursor, cursor + w[k] - 1); cursor += w[k]; }
+      var first = marks[i].state === 'missed' ? ends[i] : cursor;
+      push(marks[i], first, ends[i]);
+      cursor = ends[i] + 1; runStart = i + 1;
+    }
+    var tail = widths(LAST - cursor + 1, count - runStart);
+    for (i = 0; i < tail.length; i++) { push(marks[runStart + i], cursor, cursor + tail[i] - 1); cursor += tail[i]; }
+    return spans;
+  }
+  function rowSpans(target, completed, today) {
+    var done = Object.keys(completed).map(Number).sort(function (a, b) { return a - b; });
+    var doneToday = !!completed[today];
+    var repsLeft = Math.max(0, target - done.length);
+    var actionableLeft = 0, c;
+    for (c = today; c <= LAST; c++) if (!completed[c]) actionableLeft++;
+    var lost = Math.max(0, repsLeft - actionableLeft), live = repsLeft - lost;
+    var blankPast = [];
+    for (c = 0; c < today; c++) if (!completed[c]) blankPast.push(c);
+    var anchored = done.map(function (d) { return { state: 'done', anchor: d }; });
+    blankPast.slice(0, lost).forEach(function (d) { anchored.push({ state: 'missed', anchor: d }); });
+    var canOpen = live > 0 && !doneToday;
+    if (canOpen) anchored.push({ state: 'open', anchor: today });
+    anchored.sort(function (a, b) { return a.anchor - b.anchor; });
+    var upcoming = live - (canOpen ? 1 : 0);
+    for (c = 0; c < upcoming; c++) anchored.push({ state: 'upcoming', anchor: null });
+    return assignColumns(anchored);
+  }
+
+  // ─── State ─────────────────────────────────────────────────────────────
+  // In memory only. Nothing here is stored or sent; a reload starts over.
+  var root = document.getElementById('gw');
+  var card = document.getElementById('gw-card');
+  var headerEl = document.getElementById('gw-header');
+  var rowsEl = document.getElementById('gw-rows');
+  var today = todayIndex();
+  var rows = [];
+
+  function todayIndex() { return (new Date().getDay() + 6) % 7; }
+
+  function seed() {
+    today = todayIndex();
+    rows = HABITS.map(function (h) {
+      var completed = {}, c;
+      if (h.target === 7) {
+        for (c = 0; c < today; c++) if (c !== today + h.miss) completed[c] = true;
+      } else {
+        h.pattern.forEach(function (d) { if (d < today) completed[d] = true; });
+      }
+      return { habit: h, completed: completed, spans: [] };
+    });
+  }
+
+  // ─── Plates ────────────────────────────────────────────────────────────
+  var hdrQuery = window.matchMedia('(dynamic-range: high)');
+  var tierQueries = {
+    mobile: window.matchMedia('(max-width: 599px)'),
+    tablet: window.matchMedia('(min-width: 600px) and (max-width: 959px)')
+  };
+  var currentSet = null;
+
+  function chooseSet() {
+    var tier = tierQueries.mobile.matches ? 'mobile' : tierQueries.tablet.matches ? 'tablet' : 'desktop';
+    var dpr = window.devicePixelRatio || 1, best = null, bestDpr = 0;
+    Object.keys(MANIFESTS).forEach(function (name) {
+      var m = MANIFESTS[name];
+      if (m.tier !== tier) return;
+      // The smallest density that is not below the screen's; else the largest.
+      if (best === null || (m.dpr >= dpr && (bestDpr < dpr || m.dpr < bestDpr)) || (bestDpr < dpr && m.dpr > bestDpr)) {
+        best = name; bestDpr = m.dpr;
+      }
+    });
+    return best;
+  }
+  function assetURL(file) {
+    return ASSET_MAP[file] || (ASSET_BASE + currentSet + '/' + file);
+  }
+  // Every plate <img> on the page, keyed so a tier change can re-point them.
+  var plates = [];
+  function plate(host, key) {
+    var img = document.createElement('img');
+    img.className = 'gw-plate'; img.alt = ''; img.setAttribute('aria-hidden', 'true');
+    img.decoding = 'async'; img.draggable = false;
+    host.appendChild(img);
+    plates.push({ img: img, key: key, host: host });
+    return img;
+  }
+  function loadPlates() {
+    var wantHDR = hdrQuery.matches;
+    root.classList.toggle('gw-hdr', wantHDR);
+    if (!wantHDR) return;                       // an SDR screen never fetches a plate
+    var set = chooseSet();
+    if (!set) return;
+    var manifest = MANIFESTS[set];
+    var changed = set !== currentSet;
+    currentSet = set;
+    plates.forEach(function (p) {
+      var entry = manifest.plates[p.key];
+      if (!entry) return;
+      p.img.style.width = entry.cssWidth + 'px';
+      p.img.style.height = entry.cssHeight + 'px';
+      p.img.style.left = entry.offsetLeft + 'px';
+      p.img.style.top = entry.offsetTop + 'px';
+      if (!changed && p.img.getAttribute('src')) return;
+      p.img.classList.remove('is-ready', 'is-broken');
+      p.host.classList.remove('has-plate');
+      var url = assetURL(entry.file);
+      // A file the server happily sends but the decoder refuses (the odd-grid
+      // AVIF in docs/glow.md) arrives as `error`, not as a 404, and a file that
+      // loads but has no pixels reports naturalWidth 0. Both keep the live
+      // element and never show a broken-image icon. decode() is only a warm-up
+      // here — Chromium rejects it spuriously for an image that is display:none
+      // while still going on to paint it.
+      p.img.onerror = function () { if (p.img.getAttribute('src') === url) fail(p); };
+      p.img.onload = function () {
+        if (p.img.getAttribute('src') !== url) return;
+        if (!p.img.naturalWidth) { fail(p); return; }
+        p.img.classList.add('is-ready'); p.host.classList.add('has-plate');
+      };
+      p.img.src = url;
+      if (p.img.decode) p.img.decode().catch(function () {});
+    });
+  }
+  function fail(p) {
+    p.img.classList.remove('is-ready'); p.img.classList.add('is-broken');
+    p.host.classList.remove('has-plate');  // the live element takes over, no broken-image icon
+  }
+
+  // ─── Render ────────────────────────────────────────────────────────────
+  function textNode(text, key, className) {
+    var host = document.createElement('span');
+    host.className = 'gw-t ' + (className || '');
+    var live = document.createElement('span'); live.className = 'gw-live'; live.textContent = text;
+    host.appendChild(live);
+    plate(host, key);
+    return host;
+  }
+  function iconNode(slug) {
+    var host = document.createElement('span');
+    host.className = 'gw-i';
+    var live = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    live.setAttribute('viewBox', '0 0 256 256'); live.setAttribute('fill', 'currentColor');
+    live.classList.add('gw-live');
+    live.innerHTML = ICONS[slug];
+    host.appendChild(live);
+    plate(host, 'icon-' + slug);
+    return host;
+  }
+  var CROSS = (function () {
+    // CrossShape in a 100-unit box: span 11/12, thickness 9/32, corner 0.0352.
+    var side = 100, t = side * 9 / 32, r = side * 0.0352, half = side * 11 / 12 / 2;
+    var len = 2 * (half - r) * Math.SQRT2 - t + 4 * r;
+    var bar = '<rect x="' + (-len / 2) + '" y="' + (-t / 2) + '" width="' + len + '" height="' + t + '" rx="' + r + '" ry="' + r + '"/>';
+    return '<svg class="gw-cross" viewBox="0 0 100 100" aria-hidden="true">' +
+      '<g transform="translate(50 50)" fill="rgba(0,0,0,0.15)" filter="url(#gw-cross-well)">' +
+      '<g transform="rotate(45)">' + bar + '</g><g transform="rotate(-45)">' + bar + '</g></g></svg>';
+  })();
+
+  function buildHeader() {
+    headerEl.innerHTML = '';
+    var spacer = document.createElement('div'); spacer.className = 'gw-header-spacer';
+    headerEl.appendChild(spacer);
+    var days = document.createElement('div'); days.className = 'gw-days';
+    LETTERS.forEach(function (letter, i) {
+      var day = document.createElement('div'); day.className = 'gw-day';
+      var t = textNode(letter, 'day-' + letter, 'gw-day-t');
+      t.dataset.column = i;
+      day.appendChild(t); days.appendChild(day);
+    });
+    headerEl.appendChild(days);
+  }
+
+  function buildRows() {
+    rowsEl.innerHTML = '';
+    rows.forEach(function (row, index) {
+      var el = document.createElement('div'); el.className = 'gw-row';
+      var label = document.createElement('div'); label.className = 'gw-label';
+      var iconCol = document.createElement('div'); iconCol.className = 'gw-icon-col';
+      row.icon = iconNode(row.habit.slug);
+      iconCol.appendChild(row.icon);
+      row.name = textNode(row.habit.name, 'name-' + row.habit.slug, 'gw-name');
+      label.appendChild(iconCol); label.appendChild(row.name);
+      var track = document.createElement('div'); track.className = 'gw-track';
+      row.track = track;
+      el.appendChild(label); el.appendChild(track);
+      rowsEl.appendChild(el);
+      renderRow(index);
+    });
+    loadPlates();
+    updateTiers();
+  }
+
+  function renderRow(index) {
+    var row = rows[index];
+    row.spans = rowSpans(row.habit.target, row.completed, today);
+    row.track.innerHTML = '';
+    row.spans.forEach(function (span) {
+      var n = span.last - span.first + 1;
+      var tappable = span.state === 'open' || (span.state === 'done' && span.first <= today && today <= span.last && row.completed[today]);
+      var el = document.createElement(tappable ? 'button' : 'div');
+      el.className = 'gw-span is-' + span.state;
+      el.style.setProperty('--first', span.first);
+      el.style.setProperty('--n', n);
+      if (tappable) {
+        el.type = 'button';
+        el.setAttribute('aria-label', row.habit.name + (span.state === 'open' ? ', open today. Mark done' : ', done today. Undo'));
+        el.addEventListener('click', function () { toggleToday(index); });
+      }
+      if (span.state === 'missed') {
+        el.innerHTML = CROSS;
+      } else {
+        var socket = document.createElement('div'); socket.className = 'gw-socket'; el.appendChild(socket);
+        if (span.state === 'done') {
+          var done = document.createElement('div'); done.className = 'gw-done'; el.appendChild(done);
+        } else if (span.state === 'open') {
+          var ring = document.createElement('div'); ring.className = 'gw-ring gw-live'; el.appendChild(ring);
+          el.classList.add('is-emitting');
+          plate(el, 'ring-' + n);
+        }
+      }
+      row.track.appendChild(el);
+    });
+  }
+
+  function toggleToday(index) {
+    var row = rows[index];
+    if (row.completed[today]) delete row.completed[today]; else row.completed[today] = true;
+    // Invariant 7: completing today changes the open window to filled without
+    // moving the remaining future windows, so the row can simply be redrawn.
+    plates = plates.filter(function (p) { return !row.track.contains(p.img); });
+    renderRow(index);
+    loadPlates();
+    updateTiers();
+  }
+
+  // TypeTier: a name and its icon emit while the row has an open mark today;
+  // today's letter emits while any row does. Everything else is lit.
+  function updateTiers() {
+    var anyOpen = false;
+    rows.forEach(function (row) {
+      var open = row.spans.some(function (s) { return s.state === 'open'; });
+      anyOpen = anyOpen || open;
+      row.name.classList.toggle('is-emitting', open);
+      row.icon.classList.toggle('is-emitting', open);
+    });
+    var letters = headerEl.querySelectorAll('.gw-day-t');
+    for (var i = 0; i < letters.length; i++) {
+      letters[i].classList.toggle('is-emitting', i === today && anyOpen);
+    }
+  }
+
+  // ─── Tilt ──────────────────────────────────────────────────────────────
+  // A slow, weighty float under a fine pointer. Nothing on touch, nothing
+  // under reduced motion: the card just sits.
+  (function tilt() {
+    var fine = window.matchMedia('(hover: hover) and (pointer: fine)');
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    root.dataset.tilt = (fine.matches && !reduced.matches) ? 'on' : 'off';
+    if (!fine.matches || reduced.matches) return;
+    var MAX = 7, targetX = 0, targetY = 0, x = 0, y = 0, running = false;
+    function frame() {
+      x += (targetX - x) * 0.055; y += (targetY - y) * 0.055;
+      card.style.setProperty('--tilt-y', (x * MAX).toFixed(3) + 'deg');
+      card.style.setProperty('--tilt-x', (-y * MAX).toFixed(3) + 'deg');
+      card.style.setProperty('--shadow-x', (-x * 22).toFixed(2) + 'px');
+      card.style.setProperty('--shadow-y', (-y * 22).toFixed(2) + 'px');
+      if (Math.abs(targetX - x) + Math.abs(targetY - y) > 0.0005) requestAnimationFrame(frame);
+      else running = false;
+    }
+    function kick() { if (!running) { running = true; requestAnimationFrame(frame); } }
+    window.addEventListener('pointermove', function (e) {
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      var r = card.getBoundingClientRect();
+      var dx = (e.clientX - (r.left + r.width / 2)) / (window.innerWidth / 2);
+      var dy = (e.clientY - (r.top + r.height / 2)) / (window.innerHeight / 2);
+      targetX = Math.max(-1, Math.min(1, dx)); targetY = Math.max(-1, Math.min(1, dy));
+      kick();
+    }, { passive: true });
+    document.addEventListener('pointerleave', function () { targetX = 0; targetY = 0; kick(); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) { targetX = 0; targetY = 0; kick(); } });
+    reduced.addEventListener('change', function (e) { if (e.matches) { targetX = targetY = x = y = 0; card.style.transform = ''; } });
+  })();
+
+  // ─── Boot ──────────────────────────────────────────────────────────────
+  seed(); buildHeader(); buildRows();
+
+  hdrQuery.addEventListener('change', loadPlates);                 // moved to another screen
+  Object.keys(tierQueries).forEach(function (k) { tierQueries[k].addEventListener('change', loadPlates); });
+  window.addEventListener('resize', loadPlates);                   // devicePixelRatio has no event of its own
+
+  // A day boundary re-seeds: "today" is the visitor's date, not the load time.
+  (function scheduleMidnight() {
+    var now = new Date(), next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+    setTimeout(function () { plates = plates.filter(function (p) { return !rowsEl.contains(p.img); }); seed(); buildRows(); scheduleMidnight(); }, next - now);
+  })();
+
+  // For the page's own checks (and nothing else): what the card decided.
+  window.GlowWeek = { get set() { return currentSet; }, get hdr() { return hdrQuery.matches; }, get today() { return today; }, rows: function () { return rows.map(function (r) { return { name: r.habit.name, spans: r.spans }; }); } };
+})();
+</script>
+
+</div>
+<div class="note">preview · background is deliberately not black</div>
+</body>
+</html>

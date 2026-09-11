@@ -1,0 +1,97 @@
+{
+  "cell" : 48,
+  "dpr" : 2,
+  "font" : "Inter-Regular",
+  "gain" : 2,
+  "gap" : 16,
+  "halo" : {
+    "grainDepth" : 0.22,
+    "grainSoftness" : 1.6000000000000001,
+    "radiusRatio" : 0.155,
+    "strength" : 0.085000000000000006
+  },
+  "iconBox" : 30,
+  "plates" : {
+    "ring-1" : {
+      "contentHeight" : 48,
+      "contentWidth" : 48,
+      "cssHeight" : 81,
+      "cssWidth" : 81,
+      "file" : "gw-desktop-2x-ring-1.avif",
+      "offsetLeft" : -16.5,
+      "offsetTop" : -16.5,
+      "pixelHeight" : 162,
+      "pixelWidth" : 162
+    },
+    "ring-2" : {
+      "contentHeight" : 48,
+      "contentWidth" : 112,
+      "cssHeight" : 81,
+      "cssWidth" : 145,
+      "file" : "gw-desktop-2x-ring-2.avif",
+      "offsetLeft" : -16.5,
+      "offsetTop" : -16.5,
+      "pixelHeight" : 162,
+      "pixelWidth" : 290
+    },
+    "ring-3" : {
+      "contentHeight" : 48,
+      "contentWidth" : 176,
+      "cssHeight" : 81,
+      "cssWidth" : 209,
+      "file" : "gw-desktop-2x-ring-3.avif",
+      "offsetLeft" : -16.5,
+      "offsetTop" : -16.5,
+      "pixelHeight" : 162,
+      "pixelWidth" : 418
+    },
+    "ring-4" : {
+      "contentHeight" : 48,
+      "contentWidth" : 240,
+      "cssHeight" : 81,
+      "cssWidth" : 273,
+      "file" : "gw-desktop-2x-ring-4.avif",
+      "offsetLeft" : -16.5,
+      "offsetTop" : -16.5,
+      "pixelHeight" : 162,
+      "pixelWidth" : 546
+    },
+    "ring-5" : {
+      "contentHeight" : 48,
+      "contentWidth" : 304,
+      "cssHeight" : 81,
+      "cssWidth" : 337,
+      "file" : "gw-desktop-2x-ring-5.avif",
+      "offsetLeft" : -16.5,
+      "offsetTop" : -16.5,
+      "pixelHeight" : 162,
+      "pixelWidth" : 674
+    },
+    "ring-6" : {
+      "contentHeight" : 48,
+      "contentWidth" : 368,
+      "cssHeight" : 81,
+      "cssWidth" : 401,
+      "file" : "gw-desktop-2x-ring-6.avif",
+      "offsetLeft" : -16.5,
+      "offsetTop" : -16.5,
+      "pixelHeight" : 162,
+      "pixelWidth" : 802
+    },
+    "ring-7" : {
+      "contentHeight" : 48,
+      "contentWidth" : 432,
+      "cssHeight" : 81,
+      "cssWidth" : 465,
+      "file" : "gw-desktop-2x-ring-7.avif",
+      "offsetLeft" : -16.5,
+      "offsetTop" : -16.5,
+      "pixelHeight" : 162,
+      "pixelWidth" : 930
+    }
+  },
+  "scale" : 2,
+  "set" : "desktop@2x",
+  "textSize" : 24,
+  "tier" : "desktop"
+}

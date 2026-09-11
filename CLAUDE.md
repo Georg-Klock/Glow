@@ -236,6 +236,16 @@ contradiction left standing reads as an instruction to whoever finds it next.
   page. See the end of `docs/glow.md` for what was measured, including the one
   trap: a screen without headroom tone-maps the result to grey, so the page has
   to test for headroom before showing it at all.
+- **Render the website's This Week hero plates:** `Tools/make-week-plates.swift`,
+  then **verify them with libavif:** `Tools/check-week-plates.swift`
+
+  The same technique as the word images, applied to the open ring, the weekday
+  letters, the habit names and their icons, per responsive tier and density.
+  The check reads every plate back with `avifdec` — the decoder the browser
+  uses, not the one that wrote the file — and fails on an odd dimension, a
+  missing PQ tag, an alpha plane, or a peak that is not above SDR white. The
+  page, its build script and the Webflow upload notes are in
+  `Website/week-widget/`; see the end of `docs/glow.md`.
 - **Shut down simulators nothing is testing on:** `Tools/reap-simulators.sh`
 
   A booted runtime is not free — ten booted devices with two in use measured
