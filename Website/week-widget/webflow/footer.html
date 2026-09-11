@@ -1,12 +1,11 @@
 <script>(function () {
 'use strict';
 var INLINE = null;
-var MANIFESTS, ASSET_MAP, ASSET_BASE, ICONS;
+var MANIFESTS, ASSET_MAP, ASSET_BASE;
 function useData(data) {
-MANIFESTS = data.manifests;
+MANIFESTS = data.manifests || {};
 ASSET_MAP = window.GLOW_WEEK_ASSET_MAP || data.assetMap || {};
 ASSET_BASE = window.GLOW_WEEK_ASSET_BASE || data.assetBase || '';
-ICONS = data.icons;
 }
 var HABITS = [
 { slug: 'gratitude',   name: 'Gratitude',   target: 7, miss: -2 },
@@ -20,6 +19,7 @@ var HABITS = [
 ];
 var LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 var LAST = 6;
+var MIN_GAIN = 1, MAX_GAIN = 8;
 function widths(columns, count) {
 if (count <= 0 || columns < count) return [];
 var base = Math.floor(columns / count), extra = columns % count, out = [];
@@ -74,8 +74,11 @@ if (!root) return;
 var card = document.getElementById('gw-card');
 var headerEl = document.getElementById('gw-header');
 var rowsEl = document.getElementById('gw-rows');
+var rangeEl = document.getElementById('gw-range');
+var outEl = document.getElementById('gw-out');
 var today = todayIndex();
 var rows = [];
+var gainValue = 2;
 function todayIndex() { return (new Date().getDay() + 6) % 7; }
 function seed() {
 today = todayIndex();
@@ -112,46 +115,82 @@ return ASSET_MAP[file] || (ASSET_BASE + currentSet + '/' + file);
 }
 var plates = [];
 function plate(host, key) {
+var p = { host: host, key: key, imgs: {} };
+plates.push(p);
+return p;
+}
+function plateImage(p, gain) {
+if (p.imgs[gain]) return p.imgs[gain];
+var entry = MANIFESTS[currentSet] && MANIFESTS[currentSet].plates[p.key];
+if (!entry || !entry.files[gain]) return null;
 var img = document.createElement('img');
 img.className = 'gw-plate'; img.alt = ''; img.setAttribute('aria-hidden', 'true');
 img.decoding = 'async'; img.draggable = false;
-host.appendChild(img);
-plates.push({ img: img, key: key, host: host });
+img.style.width = entry.cssWidth + 'px'; img.style.height = entry.cssHeight + 'px';
+img.style.left = entry.offsetLeft + 'px'; img.style.top = entry.offsetTop + 'px';
+img.style.setProperty('--mask', 'url("' + assetURL(entry.mask) + '")');
+var url = assetURL(entry.files[gain]);
+img.onerror = function () { img.dataset.state = 'broken'; applyGain(p); };
+img.onload = function () { img.dataset.state = img.naturalWidth ? 'ready' : 'broken'; applyGain(p); };
+img.src = url;
+p.host.appendChild(img);
+p.imgs[gain] = img;
 return img;
 }
+function ready(img) { return !!img && img.dataset.state === 'ready'; }
+function steps() {
+var v = Math.max(MIN_GAIN, Math.min(MAX_GAIN, gainValue));
+var lower = Math.floor(v), upper = Math.min(MAX_GAIN, Math.ceil(v));
+return { lower: lower, upper: upper, f: v - lower };
+}
+function applyGain(p) {
+var wantHDR = hdrQuery.matches && currentSet;
+var st = steps();
+var lower = wantHDR ? plateImage(p, st.lower) : null;
+var upper = wantHDR && st.upper !== st.lower ? plateImage(p, st.upper) : null;
+var covered = ready(lower);
+Object.keys(p.imgs).forEach(function (g) {
+var img = p.imgs[g];
+var on = wantHDR && ((img === lower && covered) || (img === upper && ready(upper) && st.f > 0));
+img.style.display = on ? 'block' : 'none';
+img.style.opacity = img === upper ? String(st.f) : '1';
+});
+p.host.classList.toggle('has-plate', !!covered);
+}
+function applyGainAll() { plates.forEach(applyGain); }
 function loadPlates() {
 var wantHDR = hdrQuery.matches;
 root.classList.toggle('gw-hdr', wantHDR);
-if (!wantHDR) return;
 var set = chooseSet();
-if (!set) return;
-var manifest = MANIFESTS[set];
-var changed = set !== currentSet;
+if (set !== currentSet) {
 currentSet = set;
 plates.forEach(function (p) {
-var entry = manifest.plates[p.key];
-if (!entry) return;
-p.img.style.width = entry.cssWidth + 'px';
-p.img.style.height = entry.cssHeight + 'px';
-p.img.style.left = entry.offsetLeft + 'px';
-p.img.style.top = entry.offsetTop + 'px';
-if (!changed && p.img.getAttribute('src')) return;
-p.img.classList.remove('is-ready', 'is-broken');
-p.host.classList.remove('has-plate');
-var url = assetURL(entry.file);
-p.img.onerror = function () { if (p.img.getAttribute('src') === url) fail(p); };
-p.img.onload = function () {
-if (p.img.getAttribute('src') !== url) return;
-if (!p.img.naturalWidth) { fail(p); return; }
-p.img.classList.add('is-ready'); p.host.classList.add('has-plate');
-};
-p.img.src = url;
-if (p.img.decode) p.img.decode().catch(function () {});
+Object.keys(p.imgs).forEach(function (g) { p.imgs[g].remove(); });
+p.imgs = {};
+});
+applyMasks();
+applyCard();
+}
+applyGainAll();
+}
+var iconHosts = [], missedImgs = [];
+function applyMasks() {
+var m = MANIFESTS[currentSet];
+iconHosts.forEach(function (h) {
+var mask = m && m.masks && m.masks[h.dataset.slug];
+if (!mask) { h.style.removeProperty('--mask'); return; }
+h.style.width = mask.cssWidth + 'px'; h.style.height = mask.cssHeight + 'px';
+h.style.setProperty('--mask', 'url("' + assetURL(mask.file) + '")');
+});
+missedImgs.forEach(function (img) {
+if (m && m.missed && m.missed.file) img.src = assetURL(m.missed.file);
 });
 }
-function fail(p) {
-p.img.classList.remove('is-ready'); p.img.classList.add('is-broken');
-p.host.classList.remove('has-plate');
+function applyCard() {
+var m = MANIFESTS[currentSet];
+if (m && m.card && m.card.file) {
+card.style.backgroundImage = 'url("' + (ASSET_MAP[m.card.file] || (ASSET_BASE + m.card.file)) + '")';
+}
 }
 function textNode(text, key, className) {
 var host = document.createElement('span');
@@ -163,23 +202,19 @@ return host;
 }
 function iconNode(slug) {
 var host = document.createElement('span');
-host.className = 'gw-i';
-var live = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-live.setAttribute('viewBox', '0 0 256 256'); live.setAttribute('fill', 'currentColor');
-live.classList.add('gw-live');
-live.innerHTML = ICONS[slug] || '';
+host.className = 'gw-i'; host.dataset.slug = slug;
+var live = document.createElement('span'); live.className = 'gw-live';
 host.appendChild(live);
+iconHosts.push(host);
 plate(host, 'icon-' + slug);
 return host;
 }
-var CROSS = (function () {
-var side = 100, t = side * 9 / 32, r = side * 0.0352, half = side * 11 / 12 / 2;
-var len = 2 * (half - r) * Math.SQRT2 - t + 4 * r;
-var bar = '<rect x="' + (-len / 2) + '" y="' + (-t / 2) + '" width="' + len + '" height="' + t + '" rx="' + r + '" ry="' + r + '"/>';
-return '<svg class="gw-cross" viewBox="0 0 100 100" aria-hidden="true">' +
-'<g transform="translate(50 50)" fill="rgba(0,0,0,0.15)" filter="url(#gw-cross-well)">' +
-'<g transform="rotate(45)">' + bar + '</g><g transform="rotate(-45)">' + bar + '</g></g></svg>';
-})();
+function missedNode() {
+var img = document.createElement('img');
+img.className = 'gw-cross'; img.alt = ''; img.setAttribute('aria-hidden', 'true'); img.draggable = false;
+missedImgs.push(img);
+return img;
+}
 function buildHeader() {
 headerEl.innerHTML = '';
 var spacer = document.createElement('div'); spacer.className = 'gw-header-spacer';
@@ -195,6 +230,8 @@ headerEl.appendChild(days);
 }
 function buildRows() {
 rowsEl.innerHTML = '';
+iconHosts = []; missedImgs = [];
+plates = plates.filter(function (p) { return headerEl.contains(p.host); });
 rows.forEach(function (row, index) {
 var el = document.createElement('div'); el.className = 'gw-row';
 var label = document.createElement('div'); label.className = 'gw-label';
@@ -216,6 +253,7 @@ function renderRow(index) {
 var row = rows[index];
 row.spans = rowSpans(row.habit.target, row.completed, today);
 row.track.innerHTML = '';
+missedImgs = missedImgs.filter(function (img) { return document.contains(img); });
 row.spans.forEach(function (span) {
 var n = span.last - span.first + 1;
 var tappable = span.state === 'open' || (span.state === 'done' && span.first <= today && today <= span.last && row.completed[today]);
@@ -229,7 +267,7 @@ el.setAttribute('aria-label', row.habit.name + (span.state === 'open' ? ', open 
 el.addEventListener('click', function () { toggleToday(index); });
 }
 if (span.state === 'missed') {
-el.innerHTML = CROSS;
+el.appendChild(missedNode());
 } else {
 var socket = document.createElement('div'); socket.className = 'gw-socket'; el.appendChild(socket);
 if (span.state === 'done') {
@@ -246,9 +284,10 @@ row.track.appendChild(el);
 function toggleToday(index) {
 var row = rows[index];
 if (row.completed[today]) delete row.completed[today]; else row.completed[today] = true;
-plates = plates.filter(function (p) { return !row.track.contains(p.img); });
+plates = plates.filter(function (p) { return !row.track.contains(p.host); });
 renderRow(index);
-loadPlates();
+applyMasks();
+applyGainAll();
 updateTiers();
 }
 function updateTiers() {
@@ -264,6 +303,12 @@ for (var i = 0; i < letters.length; i++) {
 letters[i].classList.toggle('is-emitting', i === today && anyOpen);
 }
 }
+function setGain(v) {
+gainValue = Math.max(MIN_GAIN, Math.min(MAX_GAIN, v));
+outEl.textContent = (Math.round(gainValue * 10) / 10).toString().replace(/\.0$/, '') + '×';
+applyGainAll();
+}
+rangeEl.addEventListener('input', function () { setGain(parseFloat(rangeEl.value)); });
 (function tilt() {
 var fine = window.matchMedia('(hover: hover) and (pointer: fine)');
 var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -295,12 +340,13 @@ reduced.addEventListener('change', function (e) { if (e.matches) { targetX = tar
 function boot(data) {
 useData(data);
 seed(); buildHeader(); buildRows();
+setGain(parseFloat(rangeEl.value) || 2);
 hdrQuery.addEventListener('change', loadPlates);
 Object.keys(tierQueries).forEach(function (k) { tierQueries[k].addEventListener('change', loadPlates); });
 window.addEventListener('resize', loadPlates);
 (function scheduleMidnight() {
 var now = new Date(), next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
-setTimeout(function () { plates = plates.filter(function (p) { return !rowsEl.contains(p.img); }); seed(); buildRows(); scheduleMidnight(); }, next - now);
+setTimeout(function () { seed(); buildRows(); scheduleMidnight(); }, next - now);
 })();
 }
 if (INLINE) {
@@ -308,7 +354,12 @@ boot(INLINE);
 } else if (root.dataset.manifest) {
 fetch(root.dataset.manifest, { credentials: 'omit' })
 .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-.then(boot, function () { boot({ manifests: {}, icons: {} }); });
+.then(boot, function () { boot({ manifests: {} }); });
 }
-window.GlowWeek = { get set() { return currentSet; }, get hdr() { return hdrQuery.matches; }, get today() { return today; }, rows: function () { return rows.map(function (r) { return { name: r.habit.name, spans: r.spans }; }); } };
+window.GlowWeek = {
+get set() { return currentSet; }, get hdr() { return hdrQuery.matches; }, get today() { return today; },
+get gain() { return gainValue; }, set gain(v) { rangeEl.value = v; setGain(v); },
+plates: function () { return plates.map(function (p) { return { key: p.key, imgs: Object.keys(p.imgs).map(function (g) { return g + ':' + (p.imgs[g].dataset.state || 'loading') + ':' + p.imgs[g].style.display + '@' + p.imgs[g].style.opacity; }) }; }); },
+rows: function () { return rows.map(function (r) { return { name: r.habit.name, spans: r.spans }; }); }
+};
 })();</script>

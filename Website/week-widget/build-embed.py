@@ -51,9 +51,11 @@ for manifest_path in sorted((HERE / "assets").glob("*/manifest.json")):
     manifests[manifest["set"]] = {
         "tier": manifest["tier"],
         "dpr": manifest["dpr"],
+        "gains": manifest["gains"],
         "plates": {
             key: {
-                "file": plate["file"],
+                "files": plate["files"],
+                "mask": plate["mask"],
                 "cssWidth": round(plate["cssWidth"], 4),
                 "cssHeight": round(plate["cssHeight"], 4),
                 "offsetLeft": round(plate["offsetLeft"], 4),
@@ -61,29 +63,34 @@ for manifest_path in sorted((HERE / "assets").glob("*/manifest.json")):
             }
             for key, plate in manifest["plates"].items()
         },
+        "masks": {
+            slug: {"file": m["file"], "cssWidth": round(m["cssWidth"], 4), "cssHeight": round(m["cssHeight"], 4)}
+            for slug, m in manifest["masks"].items()
+        },
+        "missed": {"file": manifest["missed"]["file"]},
+        "card": {"file": "gw-card-glass.jpg"},
     }
 assert manifests, "no assets/*/manifest.json — run Tools/make-week-plates.swift first"
 
-# The icon outlines the page draws live, from the same files the plates were
-# cut from, so the lit and emitting tiers share one shape.
-icons = {}
-slugs = {
-    "gratitude": "pencil", "stretch": "yoga", "read-book": "book", "workout": "dumbbell",
-    "vo2-max": "run", "tutorial": "play-rectangle", "sunset": "sunset", "early-night": "bed",
-}
-for slug, icon in slugs.items():
-    svg = (HERE / "icons" / f"{icon}.svg").read_text()
-    paths = re.findall(r"<path\b[^>]*>", svg)
-    assert paths, f"no <path> in {icon}.svg"
-    icons[slug] = "".join(paths)
+
+def all_files():
+    for m in manifests.values():
+        for p in m["plates"].values():
+            yield from p["files"].values()
+            yield p["mask"]
+        for mk in m["masks"].values():
+            yield mk["file"]
+        yield m["missed"]["file"]
+        yield "gw-card-glass.jpg"
+
 
 asset_map = json.loads(Path(args.asset_map).read_text()) if args.asset_map else {}
 if asset_map:
-    expected = {p["file"] for m in manifests.values() for p in m["plates"].values()}
+    expected = set(all_files())
     missing = sorted(expected - set(asset_map))
-    assert not missing, f"asset map is missing {len(missing)} plates, e.g. {missing[:3]}"
+    assert not missing, f"asset map is missing {len(missing)} files, e.g. {missing[:3]}"
 
-data = {"manifests": manifests, "icons": icons, "assetMap": asset_map, "assetBase": args.asset_base}
+data = {"manifests": manifests, "assetMap": asset_map, "assetBase": args.asset_base}
 compact = dict(separators=(",", ":"))
 
 # ─── Template parts ─────────────────────────────────────────────────────────
@@ -135,7 +142,7 @@ out = Path(args.out)
 
 # A deliberately unreadable AVIF for the decode-failure check: the first 200
 # bytes of a real plate, which any decoder refuses outright.
-sample = next((HERE / "assets").glob("*/gw-*-ring-1.avif"))
+sample = next((HERE / "assets").glob("*/gw-*-g2-ring-1.avif"))
 corrupt = "data:image/avif;base64," + base64.b64encode(sample.read_bytes()[:200]).decode()
 hooks = """<script>
 // Preview-only test hooks. ?sdr pretends the display has no headroom, so the
@@ -143,11 +150,13 @@ hooks = """<script>
 // ?corrupt points three plates at a truncated AVIF; ?missing at a 404.
 (function () {
   var q = new URLSearchParams(location.search);
-  if (q.has('sdr')) {
-    var real = window.matchMedia.bind(window);
+  // ?hdr forces the opposite: the plate path on a screen without headroom,
+  // where the plates simply tone-map — enough to exercise the slider.
+  if (q.has('sdr') || q.has('hdr')) {
+    var real = window.matchMedia.bind(window), forced = q.has('hdr');
     window.matchMedia = function (query) {
       if (query === '(dynamic-range: high)') {
-        return { matches: false, media: query, addEventListener: function () {}, removeEventListener: function () {}, addListener: function () {}, removeListener: function () {} };
+        return { matches: forced, media: query, addEventListener: function () {}, removeEventListener: function () {}, addListener: function () {}, removeListener: function () {} };
       }
       return real(query);
     };
@@ -155,7 +164,7 @@ hooks = """<script>
   var bad = q.has('corrupt') ? '__CORRUPT__' : q.has('missing') ? './assets/does-not-exist.avif' : null;
   if (bad) {
     window.GLOW_WEEK_ASSET_MAP = {};
-    ['desktop-2x-day-F', 'desktop-2x-ring-1', 'desktop-2x-name-gratitude', 'desktop-1x-day-F', 'desktop-1x-ring-1', 'desktop-1x-name-gratitude'].forEach(function (k) {
+    ['desktop-2x-g2-day-F', 'desktop-2x-g2-ring-1', 'desktop-2x-g2-name-gratitude'].forEach(function (k) {
       window.GLOW_WEEK_ASSET_MAP['gw-' + k + '.avif'] = bad;
     });
   }

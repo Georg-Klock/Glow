@@ -1,39 +1,11 @@
-<div class="gw" id="gw" data-manifest="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa441e26dd77813048ba17d_gw-manifest.json">
+<div class="gw" id="gw" data-manifest="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa4779ad904d84a403e4ea6_gw-manifest.json">
   <div class="gw-card" id="gw-card">
     <div class="gw-header" id="gw-header"></div>
     <div class="gw-rows" id="gw-rows"></div>
   </div>
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <defs>
-      <!-- CrossShape's three inner shadows (SlotMarkView.missedMark), in a
-           100-unit box: corner 3.52, well blur 12.5, well offset 16.67. -->
-      <filter id="gw-cross-well" x="-30%" y="-30%" width="160%" height="160%"
-              filterUnits="objectBoundingBox" primitiveUnits="userSpaceOnUse"
-              color-interpolation-filters="sRGB">
-        <feGaussianBlur in="SourceAlpha" stdDeviation="3.52" result="b1"/>
-        <feOffset in="b1" dy="3.52" result="o1"/>
-        <feComposite in="SourceAlpha" in2="o1" operator="out" result="m1"/>
-        <feFlood flood-color="#000" flood-opacity="1" result="c1"/>
-        <feComposite in="c1" in2="m1" operator="in" result="s1"/>
-
-        <feOffset in="b1" dy="-3.52" result="o2"/>
-        <feComposite in="SourceAlpha" in2="o2" operator="out" result="m2"/>
-        <feFlood flood-color="#fff" flood-opacity="0.25" result="c2"/>
-        <feComposite in="c2" in2="m2" operator="in" result="s2"/>
-
-        <feGaussianBlur in="SourceAlpha" stdDeviation="12.5" result="b3"/>
-        <feOffset in="b3" dy="16.67" result="o3"/>
-        <feComposite in="SourceAlpha" in2="o3" operator="out" result="m3"/>
-        <feFlood flood-color="#000" flood-opacity="0.48" result="c3"/>
-        <feComposite in="c3" in2="m3" operator="in" result="s3"/>
-
-        <feMerge>
-          <feMergeNode in="SourceGraphic"/>
-          <feMergeNode in="s1"/>
-          <feMergeNode in="s2"/>
-          <feMergeNode in="s3"/>
-        </feMerge>
-      </filter>
-    </defs>
-  </svg>
+  <div class="gw-slider">
+    <output class="gw-slider-out" id="gw-out">2×</output>
+    <input class="gw-slider-range" id="gw-range" type="range" min="1" max="8" step="any" value="2"
+           aria-label="Glow headroom, 1 to 8 times SDR white">
+  </div>
 </div>

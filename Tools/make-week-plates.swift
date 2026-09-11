@@ -2,8 +2,9 @@
 //
 // Renders the emitting-tier plates for the "This Week" hero on the project
 // page: the open ring (one to seven columns wide), the weekday letters, the
-// eight default habit names and their icons — each as one PQ-encoded AVIF
-// whose halo is baked in, per responsive tier and device density.
+// eight default habit names and their SF Symbols — each as a PQ-encoded AVIF
+// per headroom step, per responsive tier and device density, plus an alpha
+// mask PNG per symbol for the page's lit tier.
 //
 // It is make-glow-word.swift generalised. Everything that script learned
 // still applies and is not repeated here; read docs/glow.md ("The same
@@ -25,14 +26,15 @@
 // Usage:
 //   swift Tools/make-week-plates.swift --out Website/week-widget/assets \
 //       --font-file path/to/Inter-Regular.otf --icons Website/week-widget/icons \
-//       [--gain 2] [--sets desktop@1,desktop@2,tablet@2,mobile@3]
+//       [--gains 2,3,4,5,6,7,8] [--sets desktop@2,tablet@2,mobile@3]
 //       [--only ring|day|name|icon] [--suffix -test]
 //       [--halo-radius 0.155] [--halo-strength 0.085]
-//       [--grain-depth 0.22] [--grain-softness 1.6] [--icon-box 15]
+//       [--grain-depth 0.22] [--grain-softness 1.6]
 //       [--pad 0.34] [--surround 000000]
 
 import AppKit
 import CoreGraphics
+import SwiftUI
 import CoreImage
 import CoreText
 import Foundation
@@ -53,10 +55,17 @@ func number(_ name: String, _ fallback: Double) -> CGFloat {
 let outRoot = URL(fileURLWithPath: arg("out", "./out"), isDirectory: true)
 let fontFile = arg("font-file", "")
 let iconDir = URL(fileURLWithPath: arg("icons", "./icons"), isDirectory: true)
-let gain = number("gain", 2)
+/// One plate per headroom step, for the page's slider: the same shape at 1x
+/// … 8x SDR white (GlowSettings.range). 1x is written as Display P3 rather
+/// than PQ, so it is exactly SDR white; it exists so the slider never mixes a
+/// plate with the live CSS twin, which is rasterised differently.
+let gains: [CGFloat] = arg("gains", "1,2,3,4,5,6,7,8").split(separator: ",")
+    .compactMap { Double($0) }.map { CGFloat($0) }
 let only = arg("only", "")
 let suffix = arg("suffix", "")
-let setNames = arg("sets", "desktop@1,desktop@2,tablet@2,mobile@3")
+// desktop@1 is not cut: a 1x screen with headroom is rare, and a 2x plate
+// scaled to half is a downscale the word slider already found acceptable.
+let setNames = arg("sets", "desktop@2,tablet@2,mobile@3")
     .split(separator: ",").map(String.init)
 
 // The halo, as measured for the word slider. Those numbers were tuned on
@@ -74,9 +83,6 @@ let padRatio = number("pad", 0.34)
 /// card the plate sits on — a PQ AVIF carries no alpha — so a card that is not
 /// black needs plates cut with its colour here (#202020 for the widget grey).
 let surroundHex = arg("surround", "000000")
-/// The square the icon glyph is drawn into, in reference points (a 24pt cell).
-/// SF Symbols at 12pt ink about 12–14pt; Phosphor glyphs ink ~80% of their box.
-let iconBoxRef = number("icon-box", 15)
 
 /// Below this the plate is not HDR at all and is written as Display P3.
 let sdrThreshold: CGFloat = 1.05
@@ -128,14 +134,15 @@ let sets: [RenderSet] = setNames.map { spec in
 
 let weekdayLetters = ["M", "T", "W", "F", "S"]   // T and S repeat; one plate each
 let habits: [(slug: String, name: String, icon: String)] = [
+    // DefaultHabits.all, icon = the SF Symbol name
     ("gratitude", "Gratitude", "pencil"),
-    ("stretch", "Stretch", "yoga"),
+    ("stretch", "Stretch", "figure.yoga"),
     ("read-book", "Read Book", "book"),
     ("workout", "Workout", "dumbbell"),
-    ("vo2-max", "VO2 Max", "run"),
-    ("tutorial", "Tutorial", "play-rectangle"),
+    ("vo2-max", "VO2 Max", "figure.run"),
+    ("tutorial", "Tutorial", "play.rectangle"),
     ("sunset", "Sunset", "sunset"),
-    ("early-night", "Early night", "bed"),
+    ("early-night", "Early night", "bed.double"),
 ]
 
 // MARK: - Colour spaces and font
@@ -261,199 +268,159 @@ func textPlate(set: RenderSet, text: String) -> (Plate, ascent: CGFloat, descent
     ), ascent, descent)
 }
 
-/// An icon SVG (Phosphor, one or more `<path d>` in a 256-unit box) drawn white
-/// into a square box. The path data is parsed here rather than handed to
-/// NSImage: NSImage's SVG support trapped when drawn into a grey mask context,
-/// and a parser also guarantees the plate and the page's inline SVG are the
-/// same outline — the page uses the same `d` string for the lit tier.
-func iconPlate(set: RenderSet, icon: String) -> Plate {
-    let s = set.tier.scale
-    let box = set.px(iconBoxRef * s)
-    let pad = max(2, (box * padRatio).rounded())
-    let width = evened(box + pad * 2), height = evened(box + pad * 2)
-    let ctx = maskContext(width: width, height: height)
-
-    let url = iconDir.appendingPathComponent("\(icon).svg")
-    guard let svg = try? String(contentsOf: url, encoding: .utf8) else {
-        fatalError("missing icon \(url.path)")
-    }
-    let viewBox = SVG.viewBox(of: svg)
-    // SVG y grows downward; the mask context's y grows upward. Map the view box
-    // onto the box, flipped.
-    let scale = box / max(viewBox.width, viewBox.height)
-    ctx.saveGState()
-    ctx.translateBy(x: pad, y: pad + box)
-    ctx.scaleBy(x: scale, y: -scale)
-    ctx.translateBy(x: -viewBox.minX, y: -viewBox.minY)
-    ctx.setFillColor(gray: 1, alpha: 1)
-    for (d, evenOdd) in SVG.paths(of: svg) {
-        ctx.addPath(SVG.path(from: d))
-        if evenOdd { ctx.fillPath(using: .evenOdd) } else { ctx.fillPath() }
-    }
-    ctx.restoreGState()
-
-    guard let cg = ctx.makeImage() else { fatalError("icon mask failed") }
-    return Plate(
-        mask: CIImage(cgImage: cg), width: width, height: height,
-        contentLeft: pad, contentTop: CGFloat(height) - pad - box,
-        contentWidth: box, contentHeight: box
-    )
+/// The habit's SF Symbol, exactly as the app draws it: `Image(systemName:)` at
+/// `WidgetMetrics.iconSize` (12pt) in regular weight, rasterised by AppKit at
+/// twice the plate's density and drawn down into the mask. The symbol's own
+/// bounding box is the content box, so each icon's plate is its own size, as
+/// the symbol is on the phone.
+///
+/// Alongside the emitting plate, the same mask goes out as a PNG with alpha:
+/// the page paints the lit tier through it (CSS mask-image, background
+/// #D9D9D9) so the two tiers are one outline. A PQ AVIF cannot carry alpha,
+/// an SDR PNG can.
+func symbolImage(_ name: String, pointSize: CGFloat) -> CGImage {
+    let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .regular)
+    guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+        .withSymbolConfiguration(config)
+    else { fatalError("no SF Symbol named \(name)") }
+    var rect = CGRect(origin: .zero, size: image.size)
+    guard let cg = image.cgImage(forProposedRect: &rect, context: nil, hints: nil)
+    else { fatalError("could not rasterise \(name)") }
+    return cg
 }
 
-/// Just enough SVG to read Phosphor's icons: a `viewBox`, `<path d>` elements
-/// with an optional `fill-rule="evenodd"`, and the path commands
-/// M L H V C S Q T A Z in both cases. Nothing else is needed and nothing else
-/// is parsed.
-enum SVG {
-    static func viewBox(of svg: String) -> CGRect {
-        guard let match = svg.range(of: #"viewBox="([^"]+)""#, options: .regularExpression) else {
-            return CGRect(x: 0, y: 0, width: 256, height: 256)
-        }
-        let numbers = svg[match].split(whereSeparator: { !"0123456789.-".contains($0) })
-            .compactMap { Double($0) }
-        guard numbers.count == 4 else { return CGRect(x: 0, y: 0, width: 256, height: 256) }
-        return CGRect(x: numbers[0], y: numbers[1], width: numbers[2], height: numbers[3])
+func iconPlate(set: RenderSet, icon: String) -> (Plate, maskPNG: Data) {
+    let s = set.tier.scale
+    // AppKit sizes the symbol in points; ask for the plate's pixel size as
+    // points and it comes back at twice that, which is the supersample.
+    let pointSize = set.px(Reference.text * s)   // WidgetMetrics.iconSize == textSize
+    let cg = symbolImage(icon, pointSize: pointSize)
+    let boxW = CGFloat(cg.width) / 2, boxH = CGFloat(cg.height) / 2
+    let pad = max(2, (max(boxW, boxH) * padRatio).rounded())
+    let width = evened(boxW + pad * 2), height = evened(boxH + pad * 2)
+    let rect = CGRect(x: pad, y: pad, width: boxW, height: boxH)
+
+    let ctx = maskContext(width: width, height: height)
+    ctx.saveGState()
+    ctx.clip(to: rect, mask: cg)          // the symbol's alpha is the shape
+    ctx.setFillColor(gray: 1, alpha: 1)
+    ctx.fill(rect)
+    ctx.restoreGState()
+    guard let mask = ctx.makeImage() else { fatalError("icon mask failed") }
+
+    // The same shape as white-on-transparent, for the page's lit tier.
+    guard let rgba = CGContext(
+        data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpace(name: CGColorSpace.sRGB)!,
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    ) else { fatalError("mask png context") }
+    rgba.clip(to: rect, mask: cg)
+    rgba.setFillColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1))
+    rgba.fill(rect)
+    guard let maskImage = rgba.makeImage() else { fatalError("mask png") }
+    let data = NSMutableData()
+    guard let dest = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)
+    else { fatalError("png destination") }
+    CGImageDestinationAddImage(dest, maskImage, nil)
+    CGImageDestinationFinalize(dest)
+
+    return (Plate(
+        mask: CIImage(cgImage: mask), width: width, height: height,
+        contentLeft: pad, contentTop: CGFloat(height) - pad - boxH,
+        contentWidth: boxW, contentHeight: boxH
+    ), data as Data)
+}
+
+// MARK: - The missed mark, as the app draws it
+
+// `CrossShape`, `InnerShadow` and the missed mark's layer stack, copied from
+// Glow/Views/SlotMarkView.swift and GlowShape. An SVG filter rebuild of the
+// three inner shadows came out flat and soft next to the real thing; rendering
+// the app's own view through ImageRenderer is what makes the web mark the
+// app's mark. It is SDR, so it goes out as a PNG with alpha and sits on any
+// card colour. Keep these in step with SlotMarkView when that changes.
+enum MissedMark {
+    static let span: CGFloat = 11.0 / 12.0        // GlowShape.missedSpan
+    static let thickness: CGFloat = 9.0 / 32.0    // GlowShape.missedThickness
+    static let corner: CGFloat = 0.0352           // GlowShape.missedCorner
+    static let wellOffset: CGFloat = 1.0 / 6.0    // GlowShape.missedWellOffset
+    static let wellBlur: CGFloat = 1.0 / 8.0      // GlowShape.missedWellBlur
+    static let socketFill: Double = 0.15          // SlotMarkView.socketFill
+}
+
+struct InnerShadow: View {
+    let shape: AnyShape
+    let color: Color
+    let radius: CGFloat
+    var x: CGFloat = 0
+    var y: CGFloat = 0
+    var body: some View {
+        color
+            .mask {
+                shape.fill(.black)
+                    .overlay {
+                        shape.fill(.black).offset(x: x, y: y).blur(radius: radius).blendMode(.destinationOut)
+                    }
+                    .compositingGroup()
+            }
+            .clipShape(shape)
     }
+}
 
-    static func paths(of svg: String) -> [(String, Bool)] {
-        var result: [(String, Bool)] = []
-        let regex = try! NSRegularExpression(pattern: #"<path\b[^>]*>"#)
-        let whole = NSRange(svg.startIndex..., in: svg)
-        for match in regex.matches(in: svg, range: whole) {
-            guard let range = Range(match.range, in: svg) else { continue }
-            let tag = String(svg[range])
-            guard let d = tag.range(of: #"\bd="([^"]*)""#, options: .regularExpression) else { continue }
-            let data = String(tag[d]).dropFirst(3).dropLast()
-            result.append((String(data), tag.contains("evenodd")))
-        }
-        return result
-    }
-
-    static func path(from d: String) -> CGPath {
-        let path = CGMutablePath()
-        var tokens: [String] = []
-        var current = ""
-        for ch in d {
-            if ch.isLetter && ch != "e" && ch != "E" {
-                if !current.isEmpty { tokens.append(current); current = "" }
-                tokens.append(String(ch))
-            } else if ch == "," || ch == " " || ch == "\n" || ch == "\t" {
-                if !current.isEmpty { tokens.append(current); current = "" }
-            } else if ch == "-" && !current.isEmpty && !current.hasSuffix("e") && !current.hasSuffix("E") {
-                tokens.append(current); current = "-"
-            } else if ch == "." && current.contains(".") && !current.contains("e") {
-                tokens.append(current); current = "."
-            } else {
-                current.append(ch)
-            }
-        }
-        if !current.isEmpty { tokens.append(current) }
-
-        var i = 0
-        var command: Character = "M"
-        var point = CGPoint.zero, start = CGPoint.zero, control = CGPoint.zero
-        func next() -> CGFloat { defer { i += 1 }; return CGFloat(Double(tokens[i]) ?? 0) }
-        func isNumber(_ t: String) -> Bool { Double(t) != nil }
-
-        while i < tokens.count {
-            if !isNumber(tokens[i]) { command = tokens[i].first!; i += 1 }
-            let relative = command.isLowercase
-            func abs(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-                relative ? CGPoint(x: point.x + x, y: point.y + y) : CGPoint(x: x, y: y)
-            }
-            switch command.uppercased() {
-            case "M":
-                point = abs(next(), next()); start = point; path.move(to: point)
-                command = relative ? "l" : "L"
-            case "L":
-                point = abs(next(), next()); path.addLine(to: point)
-            case "H":
-                let x = next(); point.x = relative ? point.x + x : x; path.addLine(to: point)
-            case "V":
-                let y = next(); point.y = relative ? point.y + y : y; path.addLine(to: point)
-            case "C":
-                let c1 = abs(next(), next()), c2 = abs(next(), next()), p = abs(next(), next())
-                path.addCurve(to: p, control1: c1, control2: c2); control = c2; point = p
-            case "S":
-                let c1 = CGPoint(x: 2 * point.x - control.x, y: 2 * point.y - control.y)
-                let c2 = abs(next(), next()), p = abs(next(), next())
-                path.addCurve(to: p, control1: c1, control2: c2); control = c2; point = p
-            case "Q":
-                let c = abs(next(), next()), p = abs(next(), next())
-                path.addQuadCurve(to: p, control: c); control = c; point = p
-            case "T":
-                let c = CGPoint(x: 2 * point.x - control.x, y: 2 * point.y - control.y)
-                let p = abs(next(), next())
-                path.addQuadCurve(to: p, control: c); control = c; point = p
-            case "A":
-                let rx = next(), ry = next(), rotation = next(), large = next() != 0, sweep = next() != 0
-                let p = abs(next(), next())
-                arc(path, from: point, to: p, rx: rx, ry: ry, rotation: rotation, large: large, sweep: sweep)
-                point = p
-            case "Z":
-                path.closeSubpath(); point = start
-            default:
-                fatalError("unsupported SVG path command \(command)")
-            }
-            if command.uppercased() != "C" && command.uppercased() != "S"
-                && command.uppercased() != "Q" && command.uppercased() != "T" {
-                control = point
-            }
+struct CrossShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let side = min(rect.width, rect.height)
+        let thickness = side * MissedMark.thickness
+        let corner = side * MissedMark.corner
+        let halfSpan = side * MissedMark.span / 2
+        let length = 2 * (halfSpan - corner) * CGFloat(2).squareRoot() - thickness + 4 * corner
+        var path = Path()
+        for degrees in [45.0, -45.0] {
+            var bar = Path()
+            bar.addRoundedRect(
+                in: CGRect(x: -length / 2, y: -thickness / 2, width: length, height: thickness),
+                cornerSize: CGSize(width: corner, height: corner)
+            )
+            path.addPath(bar, transform: CGAffineTransform(rotationAngle: degrees * .pi / 180)
+                .concatenating(CGAffineTransform(translationX: rect.midX, y: rect.midY)))
         }
         return path
     }
+}
 
-    /// SVG elliptical arc to cubic Béziers (the W3C implementation notes, F.6.5).
-    static func arc(_ path: CGMutablePath, from p0: CGPoint, to p1: CGPoint,
-                    rx: CGFloat, ry: CGFloat, rotation: CGFloat, large: Bool, sweep: Bool) {
-        guard rx > 0, ry > 0, p0 != p1 else { path.addLine(to: p1); return }
-        let phi = rotation * .pi / 180
-        let cosPhi = cos(phi), sinPhi = sin(phi)
-        let dx = (p0.x - p1.x) / 2, dy = (p0.y - p1.y) / 2
-        let x1 = cosPhi * dx + sinPhi * dy, y1 = -sinPhi * dx + cosPhi * dy
-        var rx = rx, ry = ry
-        let lambda = (x1 * x1) / (rx * rx) + (y1 * y1) / (ry * ry)
-        if lambda > 1 { rx *= lambda.squareRoot(); ry *= lambda.squareRoot() }
-        let num = max(0, rx * rx * ry * ry - rx * rx * y1 * y1 - ry * ry * x1 * x1)
-        let den = rx * rx * y1 * y1 + ry * ry * x1 * x1
-        var coef = (num / den).squareRoot()
-        if large == sweep { coef = -coef }
-        let cx1 = coef * rx * y1 / ry, cy1 = -coef * ry * x1 / rx
-        let cx = cosPhi * cx1 - sinPhi * cy1 + (p0.x + p1.x) / 2
-        let cy = sinPhi * cx1 + cosPhi * cy1 + (p0.y + p1.y) / 2
-        func angle(_ ux: CGFloat, _ uy: CGFloat, _ vx: CGFloat, _ vy: CGFloat) -> CGFloat {
-            let dot = ux * vx + uy * vy
-            let len = (ux * ux + uy * uy).squareRoot() * (vx * vx + vy * vy).squareRoot()
-            var a = acos(max(-1, min(1, dot / len)))
-            if ux * vy - uy * vx < 0 { a = -a }
-            return a
+struct MissedView: View {
+    let side: CGFloat
+    var body: some View {
+        let shape = AnyShape(CrossShape())
+        let bevel = side * MissedMark.corner
+        ZStack {
+            shape.fill(.black.opacity(MissedMark.socketFill))
+            InnerShadow(shape: shape, color: .black, radius: bevel, y: bevel)
+            InnerShadow(shape: shape, color: .white.opacity(0.25), radius: bevel, y: -bevel)
+            InnerShadow(shape: shape, color: .black.opacity(0.48),
+                        radius: side * MissedMark.wellBlur, y: side * MissedMark.wellOffset)
         }
-        let theta1 = angle(1, 0, (x1 - cx1) / rx, (y1 - cy1) / ry)
-        var delta = angle((x1 - cx1) / rx, (y1 - cy1) / ry, (-x1 - cx1) / rx, (-y1 - cy1) / ry)
-        if !sweep && delta > 0 { delta -= 2 * .pi }
-        if sweep && delta < 0 { delta += 2 * .pi }
-
-        let segments = Int(ceil(Swift.abs(delta) / (.pi / 2)))
-        let step = delta / CGFloat(segments)
-        let t = 4 / 3 * tan(step / 4)
-        var a = theta1
-        for _ in 0..<segments {
-            let b = a + step
-            let e1 = CGPoint(x: cos(a), y: sin(a)), e2 = CGPoint(x: cos(b), y: sin(b))
-            func map(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-                CGPoint(x: cosPhi * rx * x - sinPhi * ry * y + cx, y: sinPhi * rx * x + cosPhi * ry * y + cy)
-            }
-            let c1 = map(e1.x - t * e1.y, e1.y + t * e1.x)
-            let c2 = map(e2.x + t * e2.y, e2.y - t * e2.x)
-            path.addCurve(to: map(e2.x, e2.y), control1: c1, control2: c2)
-            a = b
-        }
+        .frame(width: side, height: side)
     }
+}
+
+@MainActor
+func missedPNG(set: RenderSet) -> (Data, width: Int, height: Int) {
+    let renderer = ImageRenderer(content: MissedView(side: set.tier.cell))
+    renderer.scale = set.dpr
+    renderer.isOpaque = false
+    guard let cg = renderer.cgImage else { fatalError("missed mark render") }
+    let data = NSMutableData()
+    guard let dest = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)
+    else { fatalError("png destination") }
+    CGImageDestinationAddImage(dest, cg, nil)
+    CGImageDestinationFinalize(dest)
+    return (data as Data, cg.width, cg.height)
 }
 
 // MARK: - Halo and encode (the word slider's pipeline, parameterised)
 
-func lit(_ plate: Plate, haloRadius: CGFloat) -> CIImage {
+func lit(_ plate: Plate, haloRadius: CGFloat, gain: CGFloat) -> CIImage {
     let bounds = plate.bounds
     let mask = plate.mask
 
@@ -506,7 +473,29 @@ func lit(_ plate: Plate, haloRadius: CGFloat) -> CIImage {
     return out.cropped(to: bounds)
 }
 
-func write(_ image: CIImage, bounds: CGRect, to url: URL) throws {
+/// The plate's own shape as a PNG with alpha, at the plate's exact pixel size.
+/// The page clips every plate to it with mask-image, so the plate's opaque
+/// surround never reaches the screen — which is what lets the card be any
+/// colour or texture, and what stops a tone-mapped surround from showing as
+/// a rectangle on a screen without headroom.
+func writeMask(_ plate: Plate, to url: URL) throws {
+    guard let mask = ciContext.createCGImage(plate.mask, from: plate.bounds) else { throw NSError(domain: "weekplates", code: 4) }
+    guard let ctx = CGContext(
+        data: nil, width: plate.width, height: plate.height, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    ) else { throw NSError(domain: "weekplates", code: 5) }
+    // The grey mask becomes alpha: white where the shape is, transparent elsewhere.
+    ctx.clip(to: plate.bounds, mask: mask)   // a gray image without alpha clips by luminance
+    ctx.setFillColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1))
+    ctx.fill(plate.bounds)
+    guard let out = ctx.makeImage(),
+          let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
+    else { throw NSError(domain: "weekplates", code: 6) }
+    CGImageDestinationAddImage(dest, out, nil)
+    guard CGImageDestinationFinalize(dest) else { throw NSError(domain: "weekplates", code: 7) }
+}
+
+func write(_ image: CIImage, bounds: CGRect, gain: CGFloat, to url: URL) throws {
     let space = gain <= sdrThreshold ? sdrSpace : pqSpace
     guard let cg = ciContext.createCGImage(image, from: bounds, format: .RGBA16, colorSpace: space)
     else { throw NSError(domain: "weekplates", code: 1) }
@@ -540,21 +529,30 @@ for set in sets {
 
     func emit(_ key: String, _ plate: Plate, haloRadius: CGFloat, extra: [String: Any] = [:]) {
         // Globally unique, because Webflow's asset manager keys uploads by
-        // original file name and four tiers share every plate name.
-        let file = "gw-\(set.tier.name)-\(Int(set.dpr))x-\(key)\(suffix).avif"
-        let url = dir.appendingPathComponent(file)
-        do {
-            try write(lit(plate, haloRadius: haloRadius), bounds: plate.bounds, to: url)
-        } catch {
-            print("  \(file) FAILED: \(error)")
-            return
+        // original file name and every set shares every plate name.
+        var files: [String: String] = [:]
+        var lines: [String] = []
+        for gain in gains {
+            let file = "gw-\(set.tier.name)-\(Int(set.dpr))x-g\(Int(gain))-\(key)\(suffix).avif"
+            let url = dir.appendingPathComponent(file)
+            do {
+                try write(lit(plate, haloRadius: haloRadius, gain: gain), bounds: plate.bounds, gain: gain, to: url)
+            } catch {
+                print("  \(file) FAILED: \(error)")
+                return
+            }
+            totalBytes += (try? Data(contentsOf: url).count) ?? 0
+            files[String(Int(gain))] = file
+            if gain == gains.first || gain == gains.last { lines.append("\(Int(gain))x \(describe(url))") }
         }
-        let bytes = (try? Data(contentsOf: url).count) ?? 0
-        totalBytes += bytes
-        print("  \(file)  \(plate.width)x\(plate.height)  \(describe(url))")
+        let maskFile = "gw-\(set.tier.name)-\(Int(set.dpr))x-\(key)-mask\(suffix).png"
+        do { try writeMask(plate, to: dir.appendingPathComponent(maskFile)) } catch { print("  \(maskFile) FAILED: \(error)"); return }
+        totalBytes += (try? Data(contentsOf: dir.appendingPathComponent(maskFile)).count) ?? 0
+        print("  \(key)  \(plate.width)x\(plate.height)  \(lines.joined(separator: "; "))")
         // Everything in CSS pixels, so the page divides by nothing.
         var entry: [String: Any] = [
-            "file": file,
+            "files": files,
+            "mask": maskFile,
             "pixelWidth": plate.width,
             "pixelHeight": plate.height,
             "cssWidth": Double(CGFloat(plate.width) / set.dpr),
@@ -592,24 +590,49 @@ for set in sets {
             ])
         }
     }
+    var masks: [String: Any] = [:]
     if only.isEmpty || only == "icon" {
         for habit in habits {
-            emit("icon-\(habit.slug)", iconPlate(set: set, icon: habit.icon),
-                 haloRadius: haloRadiusRatio * set.px(iconBoxRef * s))
+            let (plate, png) = iconPlate(set: set, icon: habit.icon)
+            emit("icon-\(habit.slug)", plate, haloRadius: haloRadiusRatio * plate.contentWidth,
+                 extra: ["symbol": habit.icon])
+            let file = "gw-\(set.tier.name)-\(Int(set.dpr))x-icon-\(habit.slug)-mask\(suffix).png"
+            try png.write(to: dir.appendingPathComponent(file))
+            totalBytes += png.count
+            masks[habit.slug] = [
+                "file": file,
+                "cssWidth": Double(plate.contentWidth / set.dpr),
+                "cssHeight": Double(plate.contentHeight / set.dpr),
+                "pixelWidth": plate.width, "pixelHeight": plate.height,
+                "offsetLeft": Double(-plate.contentLeft / set.dpr),
+                "offsetTop": Double(-plate.contentTop / set.dpr),
+            ]
         }
+    }
+
+    var missed: [String: Any] = [:]
+    if only.isEmpty || only == "icon" {
+        let (png, w, h) = MainActor.assumeIsolated { missedPNG(set: set) }
+        let file = "gw-\(set.tier.name)-\(Int(set.dpr))x-missed\(suffix).png"
+        try png.write(to: dir.appendingPathComponent(file))
+        totalBytes += png.count
+        missed = ["file": file, "pixelWidth": w, "pixelHeight": h,
+                  "cssWidth": Double(CGFloat(w) / set.dpr), "cssHeight": Double(CGFloat(h) / set.dpr)]
+        print("  missed  \(w)x\(h) png, \(png.count) B")
     }
 
     let manifest: [String: Any] = [
         "set": set.name,
+        "missed": missed,
         "tier": set.tier.name,
         "dpr": Double(set.dpr),
         "cell": Double(set.tier.cell),
         "scale": Double(s),
         "gap": Double(Reference.gap * s),
         "textSize": Double(Reference.text * s),
-        "iconBox": Double(iconBoxRef * s),
         "font": fontPostScriptName,
-        "gain": Double(gain),
+        "gains": gains.map { Double($0) },
+        "masks": masks,
         "surround": "#" + surroundHex.replacingOccurrences(of: "#", with: ""),
         "padRatio": Double(padRatio),
         "halo": [

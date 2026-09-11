@@ -7,7 +7,6 @@
 --text: calc(12px * var(--s));
 --icon-w: calc(24px * var(--s));
 --icon-gap: calc(2.25px * var(--s));
---icon-box: calc(15px * var(--s));
 --label-w: calc(98px * var(--s));
 --label-gap: calc(4px * var(--s));
 --header-h: calc(14px * var(--s));
@@ -26,7 +25,8 @@
 --resting: rgba(217, 217, 217, 0.5);
 --emitting-sdr: #FFFFFF;
 --tilt-x: 0deg; --tilt-y: 0deg; --shadow-x: 0px; --shadow-y: 0px;
-display: flex; justify-content: center;
+display: flex; flex-direction: column; align-items: center;
+gap: calc(28px * var(--s));
 padding: calc(40px * var(--s)) 0;
 perspective: calc(900px * var(--s));
 font-family: 'GW Inter', 'Inter', system-ui, -apple-system, sans-serif;
@@ -38,7 +38,7 @@ user-select: none; -webkit-user-select: none;
 .gw img { max-width: none; }
 .gw-card {
 position: relative;
-background: var(--card);
+background: var(--card) center / cover no-repeat;
 border-radius: var(--radius);
 padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
 transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
@@ -75,14 +75,18 @@ color: var(--lit);
 }
 .gw-t.is-emitting { color: var(--emitting-sdr); }
 .gw-i {
-position: relative; display: block; width: var(--icon-box); height: var(--icon-box);
-color: var(--lit);
+position: relative; display: block; color: var(--lit);
 }
 .gw-i.is-emitting { color: var(--emitting-sdr); }
-.gw-i > svg { display: block; width: 100%; height: 100%; }
+.gw-i > .gw-live {
+display: block; width: 100%; height: 100%; background: currentColor;
+-webkit-mask: var(--mask) center / 100% 100% no-repeat; mask: var(--mask) center / 100% 100% no-repeat;
+}
 .gw-live { display: inline; }
-.gw-plate { position: absolute; display: none; pointer-events: none; }
-.gw-hdr .is-emitting.has-plate > .gw-plate.is-ready { display: block; }
+.gw-plate {
+position: absolute; display: none; pointer-events: none;
+-webkit-mask: var(--mask) 0 0 / 100% 100% no-repeat; mask: var(--mask) 0 0 / 100% 100% no-repeat;
+}
 .gw-hdr .is-emitting.has-plate > .gw-live { visibility: hidden; }
 .gw-track {
 position: relative; flex: none;
@@ -95,10 +99,7 @@ width: calc(var(--n) * var(--cell) + (var(--n) - 1) * var(--gap));
 margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit;
 -webkit-appearance: none; appearance: none;
 }
-.gw-span.is-open { z-index: 0; }
-.gw-span:not(.is-open) { z-index: 1; }
-.gw-icon-col { position: relative; z-index: 2; }
-.gw-t.gw-name { z-index: 1; }
+.gw-icon-col { position: relative; }
 button.gw-span { cursor: pointer; }
 button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2px; border-radius: 999px; }
 .gw-socket {
@@ -120,7 +121,29 @@ inset 0 var(--inset) calc(2 * var(--inset)) #fff;
 position: absolute; inset: var(--inset); border-radius: 999px;
 border: var(--ring) solid var(--emitting-sdr);
 }
-.gw-cross { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.gw-cross { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
+.gw-slider {
+display: none; align-items: center; justify-content: center;
+width: calc(7 * var(--cell) + 6 * var(--gap)); max-width: 100%;
+column-gap: calc(8px * var(--s));
+}
+.gw-hdr .gw-slider { display: flex; }
+.gw-slider-out {
+flex: 0 0 auto; min-width: 2.6em; text-align: right;
+font-size: calc(7.5px * var(--s)); color: #fff; font-variant-numeric: tabular-nums;
+}
+.gw-slider-range {
+-webkit-appearance: none; appearance: none; flex: 1 1 auto; margin: 0;
+height: calc(1px * var(--s)); border-radius: 2px; background: rgba(255, 255, 255, 0.3); outline: none;
+}
+.gw-slider-range::-webkit-slider-thumb {
+-webkit-appearance: none; width: calc(11px * var(--s)); height: calc(11px * var(--s));
+border-radius: 50%; background: #fff; cursor: pointer;
+}
+.gw-slider-range::-moz-range-thumb {
+width: calc(11px * var(--s)); height: calc(11px * var(--s)); border: 0; border-radius: 50%; background: #fff; cursor: pointer;
+}
+.gw-slider-range:focus-visible { outline: 2px solid #fff; outline-offset: 6px; }
 .gw-card { transition: none; }
 @media (prefers-reduced-motion: reduce) {
 .gw-card { transform: none !important; }

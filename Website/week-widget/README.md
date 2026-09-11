@@ -18,12 +18,12 @@ of the day goes so does the weekday letter. Nothing is stored or sent.
 | `embed.html` | **The deliverable.** One block of CSS + HTML + JS for a Webflow Custom Code embed. Built; do not edit. |
 | `embed.template.html` | The source of the above. Edit this, then rebuild. |
 | `build-embed.py` | Inlines the plate manifests and icon outlines into the template. |
-| `assets/<tier>@<dpr>x/*.avif` | The plates. 112 files, ~200 KB. Upload these. |
+| `assets/<tier>@<dpr>x/*` | The plates, one per headroom step, with a shape mask each; the icon masks; the missed mark. 780 files, 1.2 MB. Upload these. |
 | `assets/<set>/manifest.json` | Every plate's size and offset in CSS pixels, from the renderer. |
 | `fonts/Inter-Regular.{otf,woff2}` | The one font (Inter 4.1, OFL). The plates were cut with the `.otf`; the page loads the `.woff2`. |
-| `icons/*.svg` | Phosphor (MIT) outlines, plus a hand-drawn `play-rectangle`. Used by the renderer and inlined into the page. |
+| `icons/*.svg` | The first cut's Phosphor outlines; no longer used, kept for the record. The icons are now SF Symbols rendered by the generator. |
 | `preview.html` | The embed on a plain page for a local server, with test hooks (below). |
-| `tuning.html`, `tuning/` | The open ring cut at six halo settings, for a decision on an HDR screen. |
+| `tuning.html`, `tuning/` | The first cut's halo variants; history. |
 | `webflow-asset-map.py` | Maps plate file names to the hashed URLs Webflow serves them from. |
 
 The renderer and the verifier live with the app's other tools:
@@ -41,7 +41,7 @@ every custom-code block at 10,000 characters and the one-block embed is 44 KB:
 | An HTML Embed element in the section | `webflow/embed.html` — the markup, with `data-manifest` naming the JSON asset | 1.9 K |
 | **Site** settings → footer code | `webflow/footer.html` — the script, comments stripped | 13.4 K |
 | Asset `gw-manifest.json` | `webflow/gw-manifest.json` — manifests, icon outlines and the name→URL map, fetched once at load | 32 K |
-| 112 assets `gw-*.avif` | the plates, byte-identical on the CDN (spot-checked), served `image/avif` | 199 K |
+| 780 assets `gw-*` | the plates at every step, their masks, the missed mark, the glass; byte-identical on the CDN (spot-checked) | 1.2 M |
 | Custom font `Inter` | `fonts/Inter-Regular.woff2`, family name `Inter` | 111 K |
 
 The script is site-wide only because the page-level footer is also capped at
@@ -137,20 +137,48 @@ Two things follow the brief rather than the app: the eight rows have no spacer
 rows between groups (the app's seed list has two), and the week starts on
 Monday, where the app makes it a setting.
 
-## No halo, and a grey card (2026-09-11, second cut)
+## The third cut (2026-09-11): SF Symbols, masks, a slider, the glass
 
-The first cut carried the word slider's halo and sat on a `#000000` card. Both
-went on review: the halo read as a drop shadow on every emitting mark and
-letter, and a black card looked nothing like the widget in the screenshots
-beside it. The plates are now cut with `--halo-strength 0 --grain-depth 0
---pad 0.08` — the shape and a two-pixel antialiased edge, nothing else — and
-the card is `#202020`, the mode of the widget's material over a dark
-wallpaper measured on the App Store frame (28–32). A PQ plate carries no
-alpha, so the plates are cut with that same grey as their surround
-(`--surround 202020`); decoded through libavif the surround comes back at
-2.93 nits, which is exactly sRGB 32 at 203-nit white, so the browser lands it
-on the card's own colour. The card must never change colour without the
-plates being re-cut, and `tuning.html` (the halo variants) is now history.
+On review after the second cut, four more things changed, and one of them
+changed the shape of every plate.
+
+- **Every plate is clipped to its own shape with a CSS mask.** A PQ file has to
+  carry an opaque surround, and the second cut relied on that surround being
+  the card's exact grey. It is, on a screen with headroom — and on a screen
+  without one the browser tone-maps the PQ grey to something darker, so every
+  emitting mark and word wore a darker rectangle. The generator now writes an
+  alpha PNG of each plate's shape at the plate's exact pixel size, and the
+  page applies it with `mask-image`, so the surround never reaches the screen
+  on any display. That also freed the card to carry a texture.
+- **1x is a plate too.** Sliding between 1x and 2x used to cross-fade the 2x
+  plate over the live CSS text, and the two are rasterised differently (the
+  browser and CoreText), so the letters appeared to move. Every headroom step
+  from 1x to 8x is now a plate — the 1x one written as Display P3, exactly SDR
+  white — and the live text never mixes in on a screen with headroom.
+- **The icons are the app's SF Symbols**, rasterised by AppKit from the same
+  symbol names as `DefaultHabits`, at `WidgetMetrics.iconSize`. The lit tier
+  is an alpha mask of the symbol painted through `mask-image`, so both tiers
+  share one outline. SF Symbols are licensed for Apple platforms; putting them
+  on the web was asked for and is the owner's call.
+- **The ✕ is the app's own.** An SVG-filter rebuild of `CrossShape`'s three
+  inner shadows came out flat and soft next to the real thing, so the
+  generator renders the app's SwiftUI code (copied into it, with a pointer to
+  `SlotMarkView`) through `ImageRenderer` into a PNG with alpha, per tier.
+- **The slider.** Below the card, 1x to 8x (`GlowSettings.range`), default 2x.
+  Between two steps the upper plate fades in over the lower; both are masked to
+  the same shape, so nothing else changes. Hidden on a screen without headroom,
+  where there is nothing to slide.
+- **The glass.** The card's background is the widget's material over the
+  wallpaper, lifted from the App Store frame: the pixels between rows, in the
+  spacer rows and the margins are the material; everything else is inpainted
+  from them (`Website/week-widget/assets/gw-card-glass.jpg`, from the
+  reconstruction in this session's history — a smooth gradient, 61 at the top
+  to 40 at the bottom with a faint blue cast top-right). `--card: #202020`
+  stays beneath it as the fallback.
+
+Plates: 3 sets × 8 steps × 28 = 672 AVIF, plus 84 shape masks, 24 icon masks
+and 3 missed marks; 1.2 MB in total, fetched lazily as the slider asks for a
+step. `Tools/check-week-plates.swift` accepts the 1x floor as SDR by design.
 
 ## Verified, 2026-09-11
 

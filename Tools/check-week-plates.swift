@@ -93,6 +93,15 @@ func check(_ file: URL, gain: Double, preview: URL?) throws -> String {
     }
     guard field("Bit Depth") == "10" else { throw Failure(description: "bit depth \(field("Bit Depth") ?? "?"), expected 10") }
     guard field("Alpha") == "Absent" else { throw Failure(description: "carries an alpha plane") }
+    // A 1x plate is deliberately not HDR: it is the slider's floor, written
+    // as Display P3 so that "off" is exactly SDR white. It has to decode and
+    // be even-sized like the others; the PQ tags and the peak are not asked of it.
+    if gain <= 1.05 {
+        let bytes = (try? Data(contentsOf: file).count) ?? 0
+        let decode = run(avifdec, ["-d", "16", file.path, FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png").path])
+        guard decode.status == 0 else { throw Failure(description: "avifdec could not decode the pixels") }
+        return String(format: "%dx%d  10-bit SDR (1x floor)  %d B", width, height, bytes)
+    }
     guard field("Color Primaries") == "9" else { throw Failure(description: "primaries \(field("Color Primaries") ?? "?"), expected 9 (BT.2020)") }
     guard field("Transfer Char.") == "16" else { throw Failure(description: "transfer \(field("Transfer Char.") ?? "?"), expected 16 (PQ)") }
 
@@ -161,21 +170,40 @@ for set in sets.filter({ $0.hasDirectoryPath }).sorted(by: { $0.path < $1.path }
           let manifest = try? JSONSerialization.jsonObject(with: manifestData) as? [String: Any],
           let plates = manifest["plates"] as? [String: [String: Any]]
     else { print("\(set.lastPathComponent): no manifest.json"); failures += 1; continue }
-    let gain = manifest["gain"] as? Double ?? 2
+    let gain = manifest["gain"] as? Double ?? (manifest["gains"] as? [Double])?.first ?? 2
     print("\(set.lastPathComponent)  (\(plates.count) plates, gain \(gain)x)")
     let preview: URL? = previewDir.isEmpty ? nil : URL(fileURLWithPath: previewDir).appendingPathComponent(set.lastPathComponent)
     if let preview { try? FileManager.default.createDirectory(at: preview, withIntermediateDirectories: true) }
     for key in plates.keys.sorted() {
-        guard let file = plates[key]?["file"] as? String else { continue }
-        let url = set.appendingPathComponent(file)
-        checked += 1
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            print("  \(file)  MISSING"); failures += 1; continue
+        // One plate per headroom step since the slider; a single `file` is the
+        // older manifest shape and still accepted.
+        var files: [(String, Double)] = []
+        if let byGain = plates[key]?["files"] as? [String: String] {
+            files = byGain.map { ($0.value, Double($0.key) ?? gain) }.sorted { $0.1 < $1.1 }
+        } else if let file = plates[key]?["file"] as? String {
+            files = [(file, gain)]
         }
-        do {
-            print("  \(file)  \(try check(url, gain: gain, preview: preview))")
-        } catch {
-            print("  \(file)  FAIL: \(error)"); failures += 1
+        for (file, plateGain) in files {
+            let url = set.appendingPathComponent(file)
+            checked += 1
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                print("  \(file)  MISSING"); failures += 1; continue
+            }
+            do {
+                let verdict = try check(url, gain: plateGain, preview: preview)
+                if plateGain == files.first?.1 || plateGain == files.last?.1 { print("  \(file)  \(verdict)") }
+            } catch {
+                print("  \(file)  FAIL: \(error)"); failures += 1
+            }
+        }
+    }
+    for (slug, mask) in (manifest["masks"] as? [String: [String: Any]] ?? [:]) {
+        guard let file = mask["file"] as? String else { continue }
+        checked += 1
+        let url = set.appendingPathComponent(file)
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let img = CGImageSourceCreateImageAtIndex(src, 0, nil), img.alphaInfo != .none else {
+            print("  \(file)  FAIL: mask PNG unreadable or without alpha (\(slug))"); failures += 1; continue
         }
     }
 }

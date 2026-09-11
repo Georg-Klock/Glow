@@ -15,7 +15,6 @@
   --text: calc(12px * var(--s));         /* WidgetMetrics.textSize */
   --icon-w: calc(24px * var(--s));       /* WidgetMetrics.iconWidth */
   --icon-gap: calc(2.25px * var(--s));   /* WidgetMetrics.iconGap */
-  --icon-box: calc(15px * var(--s));     /* the glyph's square; see make-week-plates --icon-box */
   --label-w: calc(98px * var(--s));      /* WidgetMetrics.labelWidth */
   --label-gap: calc(4px * var(--s));     /* WidgetMetrics.labelGap */
   --header-h: calc(14px * var(--s));     /* WidgetMetrics.headerHeight */
@@ -37,7 +36,8 @@
   --emitting-sdr: #FFFFFF;               /* what emitting means on a screen without headroom */
   --tilt-x: 0deg; --tilt-y: 0deg; --shadow-x: 0px; --shadow-y: 0px;
 
-  display: flex; justify-content: center;
+  display: flex; flex-direction: column; align-items: center;
+  gap: calc(28px * var(--s));
   padding: calc(40px * var(--s)) 0;
   perspective: calc(900px * var(--s));
   font-family: 'GW Inter', 'Inter', system-ui, -apple-system, sans-serif;
@@ -51,7 +51,7 @@
 /* ─── The card ─────────────────────────────────────────────────────────── */
 .gw-card {
   position: relative;
-  background: var(--card);               /* the colour every plate was cut against */
+  background: var(--card) center / cover no-repeat;   /* the JS adds the glass texture over it */
   border-radius: var(--radius);
   padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
   transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
@@ -96,20 +96,34 @@
   color: var(--lit);
 }
 .gw-t.is-emitting { color: var(--emitting-sdr); }
+/* The icon is the habit's SF Symbol. The lit tier is a PNG alpha mask of the
+   symbol, painted in the current colour through mask-image, so the two tiers
+   share one outline; the emitting tier is the plate over it. Size and mask
+   come from the manifest, per icon, because a symbol is its own size. */
 .gw-i {
-  position: relative; display: block; width: var(--icon-box); height: var(--icon-box);
-  color: var(--lit);
+  position: relative; display: block; color: var(--lit);
 }
 .gw-i.is-emitting { color: var(--emitting-sdr); }
-.gw-i > svg { display: block; width: 100%; height: 100%; }
+.gw-i > .gw-live {
+  display: block; width: 100%; height: 100%; background: currentColor;
+  -webkit-mask: var(--mask) center / 100% 100% no-repeat; mask: var(--mask) center / 100% 100% no-repeat;
+}
 .gw-live { display: inline; }
 
-/* The plate: hidden until it has decoded, and only ever shown on a screen
-   with headroom, over an element that is emitting. It is opaque black, so it
-   covers its live twin completely; the twin is also hidden so nothing bleeds
-   at the plate's edge. */
-.gw-plate { position: absolute; display: none; pointer-events: none; }
-.gw-hdr .is-emitting.has-plate > .gw-plate.is-ready { display: block; }
+/* The plates: one per headroom step from 1x, shown only on a screen with
+   headroom, over an element that is emitting. The script sets each one's
+   display and opacity from the slider; between two steps the upper plate
+   fades in over the lower one. The live CSS twin never takes part: it is
+   rasterised by the browser and the plates by CoreText, and a cross-fade
+   between the two reads as the letters moving. */
+.gw-plate {
+  position: absolute; display: none; pointer-events: none;
+  /* Clipped to its own shape, so the opaque surround a PQ file has to carry
+     never reaches the screen — not as a seam on a card of another colour, and
+     not as the darker rectangle a tone-mapped surround makes on a screen
+     without headroom. */
+  -webkit-mask: var(--mask) 0 0 / 100% 100% no-repeat; mask: var(--mask) 0 0 / 100% 100% no-repeat;
+}
 .gw-hdr .is-emitting.has-plate > .gw-live { visibility: hidden; }
 
 /* ─── Marks ────────────────────────────────────────────────────────────── */
@@ -124,18 +138,7 @@
   margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit;
   -webkit-appearance: none; appearance: none;
 }
-/* Paint order. A plate is opaque black out to its halo padding, which is wider
-   than half a gap, so an open ring's plate would cover the sockets beside it
-   and the rows above and below. Everything that is not a plate paints on top
-   instead: the card and the plate are the same #000, so a socket drawn over a
-   plate's surround is indistinguishable from one drawn over the card, and only
-   the halo goes behind the neighbour — which is where spilled light belongs.
-   Nothing between here and .gw-card may open a stacking context, or rows stop
-   sharing one order. */
-.gw-span.is-open { z-index: 0; }
-.gw-span:not(.is-open) { z-index: 1; }
-.gw-icon-col { position: relative; z-index: 2; }   /* above the name plate's left padding */
-.gw-t.gw-name { z-index: 1; }
+.gw-icon-col { position: relative; }
 button.gw-span { cursor: pointer; }
 button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2px; border-radius: 999px; }
 
@@ -164,8 +167,34 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   position: absolute; inset: var(--inset); border-radius: 999px;
   border: var(--ring) solid var(--emitting-sdr);
 }
-/* Missed: CrossShape in its own well. No socket underneath. */
-.gw-cross { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+/* Missed: the app's own CrossShape and its three inner shadows, rendered by
+   the app's SwiftUI code into a PNG with alpha (make-week-plates.swift). An
+   SVG-filter rebuild came out flat beside it. No socket underneath. */
+.gw-cross { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
+
+/* ─── The slider: headroom from 1x (the live CSS twins) to 8x ──────────── */
+.gw-slider {
+  display: none; align-items: center; justify-content: center;
+  width: calc(7 * var(--cell) + 6 * var(--gap)); max-width: 100%;
+  column-gap: calc(8px * var(--s));
+}
+.gw-hdr .gw-slider { display: flex; }   /* on a screen without headroom there is nothing to slide */
+.gw-slider-out {
+  flex: 0 0 auto; min-width: 2.6em; text-align: right;
+  font-size: calc(7.5px * var(--s)); color: #fff; font-variant-numeric: tabular-nums;
+}
+.gw-slider-range {
+  -webkit-appearance: none; appearance: none; flex: 1 1 auto; margin: 0;
+  height: calc(1px * var(--s)); border-radius: 2px; background: rgba(255, 255, 255, 0.3); outline: none;
+}
+.gw-slider-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: calc(11px * var(--s)); height: calc(11px * var(--s));
+  border-radius: 50%; background: #fff; cursor: pointer;
+}
+.gw-slider-range::-moz-range-thumb {
+  width: calc(11px * var(--s)); height: calc(11px * var(--s)); border: 0; border-radius: 50%; background: #fff; cursor: pointer;
+}
+.gw-slider-range:focus-visible { outline: 2px solid #fff; outline-offset: 6px; }
 
 /* ─── Motion ───────────────────────────────────────────────────────────── */
 .gw-card { transition: none; }
@@ -179,39 +208,11 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     <div class="gw-header" id="gw-header"></div>
     <div class="gw-rows" id="gw-rows"></div>
   </div>
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <defs>
-      <!-- CrossShape's three inner shadows (SlotMarkView.missedMark), in a
-           100-unit box: corner 3.52, well blur 12.5, well offset 16.67. -->
-      <filter id="gw-cross-well" x="-30%" y="-30%" width="160%" height="160%"
-              filterUnits="objectBoundingBox" primitiveUnits="userSpaceOnUse"
-              color-interpolation-filters="sRGB">
-        <feGaussianBlur in="SourceAlpha" stdDeviation="3.52" result="b1"/>
-        <feOffset in="b1" dy="3.52" result="o1"/>
-        <feComposite in="SourceAlpha" in2="o1" operator="out" result="m1"/>
-        <feFlood flood-color="#000" flood-opacity="1" result="c1"/>
-        <feComposite in="c1" in2="m1" operator="in" result="s1"/>
-
-        <feOffset in="b1" dy="-3.52" result="o2"/>
-        <feComposite in="SourceAlpha" in2="o2" operator="out" result="m2"/>
-        <feFlood flood-color="#fff" flood-opacity="0.25" result="c2"/>
-        <feComposite in="c2" in2="m2" operator="in" result="s2"/>
-
-        <feGaussianBlur in="SourceAlpha" stdDeviation="12.5" result="b3"/>
-        <feOffset in="b3" dy="16.67" result="o3"/>
-        <feComposite in="SourceAlpha" in2="o3" operator="out" result="m3"/>
-        <feFlood flood-color="#000" flood-opacity="0.48" result="c3"/>
-        <feComposite in="c3" in2="m3" operator="in" result="s3"/>
-
-        <feMerge>
-          <feMergeNode in="SourceGraphic"/>
-          <feMergeNode in="s1"/>
-          <feMergeNode in="s2"/>
-          <feMergeNode in="s3"/>
-        </feMerge>
-      </filter>
-    </defs>
-  </svg>
+  <div class="gw-slider">
+    <output class="gw-slider-out" id="gw-out">2×</output>
+    <input class="gw-slider-range" id="gw-range" type="range" min="1" max="8" step="any" value="2"
+           aria-label="Glow headroom, 1 to 8 times SDR white">
+  </div>
 </div>
 
 <script>
@@ -219,22 +220,21 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   'use strict';
 
   // ─── Assets ────────────────────────────────────────────────────────────
-  // Every plate, per tier and density, as make-week-plates.swift wrote it,
-  // with sizes and offsets in CSS pixels relative to the element the plate
-  // sits over; the icon outlines; and where the files live. build-embed.py
-  // either inlines all of it here or, for Webflow's 10,000-character code
-  // blocks, writes it to one JSON asset named on the root element's
-  // data-manifest attribute and inlines null.
+  // Every plate, per tier, density and headroom step, as make-week-plates.swift
+  // wrote it, with sizes and offsets in CSS pixels relative to the element the
+  // plate sits over; the icon masks; the missed mark; and where the files
+  // live. build-embed.py either inlines all of it here or, for Webflow's
+  // 10,000-character code blocks, writes it to one JSON asset named on the
+  // root element's data-manifest attribute and inlines null.
   var INLINE = __INLINE__;
-  var MANIFESTS, ASSET_MAP, ASSET_BASE, ICONS;
+  var MANIFESTS, ASSET_MAP, ASSET_BASE;
   function useData(data) {
-    MANIFESTS = data.manifests;
+    MANIFESTS = data.manifests || {};
     // File name → URL. Webflow prefixes every upload with a hash, so the page
-    // cannot guess a plate's address from its name. Empty means
+    // cannot guess a file's address from its name. Empty means
     // ASSET_BASE/<set>/<file>, the layout of the repository's assets/.
     ASSET_MAP = window.GLOW_WEEK_ASSET_MAP || data.assetMap || {};
     ASSET_BASE = window.GLOW_WEEK_ASSET_BASE || data.assetBase || '';
-    ICONS = data.icons;   // slug → SVG path data (Phosphor, MIT; play-rectangle drawn by hand)
   }
 
   // ─── Content ───────────────────────────────────────────────────────────
@@ -255,6 +255,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   ];
   var LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];   // Monday start, hardcoded for the demo
   var LAST = 6;
+  var MIN_GAIN = 1, MAX_GAIN = 8;                        // GlowSettings.range
 
   // ─── Placement: WeekSpans.dividedWithoutRestDay + assignColumns, ported ─
   // A habit due N times draws N marks against seven columns. Completions
@@ -319,8 +320,11 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   var card = document.getElementById('gw-card');
   var headerEl = document.getElementById('gw-header');
   var rowsEl = document.getElementById('gw-rows');
+  var rangeEl = document.getElementById('gw-range');
+  var outEl = document.getElementById('gw-out');
   var today = todayIndex();
   var rows = [];
+  var gainValue = 2;                                     // GlowSettings.defaultValue
 
   function todayIndex() { return (new Date().getDay() + 6) % 7; }
 
@@ -337,7 +341,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     });
   }
 
-  // ─── Plates ────────────────────────────────────────────────────────────
+  // ─── Sets and files ────────────────────────────────────────────────────
   var hdrQuery = window.matchMedia('(dynamic-range: high)');
   var tierQueries = {
     mobile: window.matchMedia('(max-width: 599px)'),
@@ -361,55 +365,103 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   function assetURL(file) {
     return ASSET_MAP[file] || (ASSET_BASE + currentSet + '/' + file);
   }
-  // Every plate <img> on the page, keyed so a tier change can re-point them.
+
+  // ─── Plates ────────────────────────────────────────────────────────────
+  // Every emitting host on the page: its key into the manifest and one <img>
+  // per headroom step it has needed so far. Nothing is fetched until the
+  // slider (or the default 2x) asks for that step, on a screen with headroom.
   var plates = [];
   function plate(host, key) {
+    var p = { host: host, key: key, imgs: {} };
+    plates.push(p);
+    return p;
+  }
+  function plateImage(p, gain) {
+    if (p.imgs[gain]) return p.imgs[gain];
+    var entry = MANIFESTS[currentSet] && MANIFESTS[currentSet].plates[p.key];
+    if (!entry || !entry.files[gain]) return null;
     var img = document.createElement('img');
     img.className = 'gw-plate'; img.alt = ''; img.setAttribute('aria-hidden', 'true');
     img.decoding = 'async'; img.draggable = false;
-    host.appendChild(img);
-    plates.push({ img: img, key: key, host: host });
+    img.style.width = entry.cssWidth + 'px'; img.style.height = entry.cssHeight + 'px';
+    img.style.left = entry.offsetLeft + 'px'; img.style.top = entry.offsetTop + 'px';
+    img.style.setProperty('--mask', 'url("' + assetURL(entry.mask) + '")');
+    var url = assetURL(entry.files[gain]);
+    // A file the server happily sends but the decoder refuses (the odd-grid
+    // AVIF in docs/glow.md) arrives as `error`, not as a 404, and a file that
+    // loads but has no pixels reports naturalWidth 0. Both keep the live
+    // element and never show a broken-image icon.
+    img.onerror = function () { img.dataset.state = 'broken'; applyGain(p); };
+    img.onload = function () { img.dataset.state = img.naturalWidth ? 'ready' : 'broken'; applyGain(p); };
+    img.src = url;
+    p.host.appendChild(img);
+    p.imgs[gain] = img;
     return img;
   }
+  function ready(img) { return !!img && img.dataset.state === 'ready'; }
+
+  /// The slider's value as the two plates that show it: `lower` at full
+  /// opacity, `upper` faded in by `f`. 1x is a plate like the others.
+  function steps() {
+    var v = Math.max(MIN_GAIN, Math.min(MAX_GAIN, gainValue));
+    var lower = Math.floor(v), upper = Math.min(MAX_GAIN, Math.ceil(v));
+    return { lower: lower, upper: upper, f: v - lower };
+  }
+  function applyGain(p) {
+    var wantHDR = hdrQuery.matches && currentSet;
+    var st = steps();
+    var lower = wantHDR ? plateImage(p, st.lower) : null;
+    var upper = wantHDR && st.upper !== st.lower ? plateImage(p, st.upper) : null;
+    var covered = ready(lower);
+    Object.keys(p.imgs).forEach(function (g) {
+      var img = p.imgs[g];
+      var on = wantHDR && ((img === lower && covered) || (img === upper && ready(upper) && st.f > 0));
+      img.style.display = on ? 'block' : 'none';
+      img.style.opacity = img === upper ? String(st.f) : '1';
+    });
+    p.host.classList.toggle('has-plate', !!covered);
+  }
+  function applyGainAll() { plates.forEach(applyGain); }
+
   function loadPlates() {
     var wantHDR = hdrQuery.matches;
     root.classList.toggle('gw-hdr', wantHDR);
-    if (!wantHDR) return;                       // an SDR screen never fetches a plate
     var set = chooseSet();
-    if (!set) return;
-    var manifest = MANIFESTS[set];
-    var changed = set !== currentSet;
-    currentSet = set;
-    plates.forEach(function (p) {
-      var entry = manifest.plates[p.key];
-      if (!entry) return;
-      p.img.style.width = entry.cssWidth + 'px';
-      p.img.style.height = entry.cssHeight + 'px';
-      p.img.style.left = entry.offsetLeft + 'px';
-      p.img.style.top = entry.offsetTop + 'px';
-      if (!changed && p.img.getAttribute('src')) return;
-      p.img.classList.remove('is-ready', 'is-broken');
-      p.host.classList.remove('has-plate');
-      var url = assetURL(entry.file);
-      // A file the server happily sends but the decoder refuses (the odd-grid
-      // AVIF in docs/glow.md) arrives as `error`, not as a 404, and a file that
-      // loads but has no pixels reports naturalWidth 0. Both keep the live
-      // element and never show a broken-image icon. decode() is only a warm-up
-      // here — Chromium rejects it spuriously for an image that is display:none
-      // while still going on to paint it.
-      p.img.onerror = function () { if (p.img.getAttribute('src') === url) fail(p); };
-      p.img.onload = function () {
-        if (p.img.getAttribute('src') !== url) return;
-        if (!p.img.naturalWidth) { fail(p); return; }
-        p.img.classList.add('is-ready'); p.host.classList.add('has-plate');
-      };
-      p.img.src = url;
-      if (p.img.decode) p.img.decode().catch(function () {});
+    if (set !== currentSet) {
+      currentSet = set;
+      plates.forEach(function (p) {
+        Object.keys(p.imgs).forEach(function (g) { p.imgs[g].remove(); });
+        p.imgs = {};
+      });
+      applyMasks();
+      applyCard();
+    }
+    applyGainAll();
+  }
+
+  // ─── Icons and the missed mark: SDR files, needed on every screen ──────
+  var iconHosts = [], missedImgs = [];
+  function applyMasks() {
+    var m = MANIFESTS[currentSet];
+    iconHosts.forEach(function (h) {
+      var mask = m && m.masks && m.masks[h.dataset.slug];
+      if (!mask) { h.style.removeProperty('--mask'); return; }
+      h.style.width = mask.cssWidth + 'px'; h.style.height = mask.cssHeight + 'px';
+      h.style.setProperty('--mask', 'url("' + assetURL(mask.file) + '")');
+    });
+    missedImgs.forEach(function (img) {
+      if (m && m.missed && m.missed.file) img.src = assetURL(m.missed.file);
     });
   }
-  function fail(p) {
-    p.img.classList.remove('is-ready'); p.img.classList.add('is-broken');
-    p.host.classList.remove('has-plate');  // the live element takes over, no broken-image icon
+
+  // The card's glass: the widget's material over the wallpaper, lifted from
+  // the App Store frame and inpainted where marks and text stood. One image
+  // for every tier; the corner radius and the marks are drawn on top.
+  function applyCard() {
+    var m = MANIFESTS[currentSet];
+    if (m && m.card && m.card.file) {
+      card.style.backgroundImage = 'url("' + (ASSET_MAP[m.card.file] || (ASSET_BASE + m.card.file)) + '")';
+    }
   }
 
   // ─── Render ────────────────────────────────────────────────────────────
@@ -423,24 +475,19 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   }
   function iconNode(slug) {
     var host = document.createElement('span');
-    host.className = 'gw-i';
-    var live = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    live.setAttribute('viewBox', '0 0 256 256'); live.setAttribute('fill', 'currentColor');
-    live.classList.add('gw-live');
-    live.innerHTML = ICONS[slug] || '';
+    host.className = 'gw-i'; host.dataset.slug = slug;
+    var live = document.createElement('span'); live.className = 'gw-live';
     host.appendChild(live);
+    iconHosts.push(host);
     plate(host, 'icon-' + slug);
     return host;
   }
-  var CROSS = (function () {
-    // CrossShape in a 100-unit box: span 11/12, thickness 9/32, corner 0.0352.
-    var side = 100, t = side * 9 / 32, r = side * 0.0352, half = side * 11 / 12 / 2;
-    var len = 2 * (half - r) * Math.SQRT2 - t + 4 * r;
-    var bar = '<rect x="' + (-len / 2) + '" y="' + (-t / 2) + '" width="' + len + '" height="' + t + '" rx="' + r + '" ry="' + r + '"/>';
-    return '<svg class="gw-cross" viewBox="0 0 100 100" aria-hidden="true">' +
-      '<g transform="translate(50 50)" fill="rgba(0,0,0,0.15)" filter="url(#gw-cross-well)">' +
-      '<g transform="rotate(45)">' + bar + '</g><g transform="rotate(-45)">' + bar + '</g></g></svg>';
-  })();
+  function missedNode() {
+    var img = document.createElement('img');
+    img.className = 'gw-cross'; img.alt = ''; img.setAttribute('aria-hidden', 'true'); img.draggable = false;
+    missedImgs.push(img);
+    return img;
+  }
 
   function buildHeader() {
     headerEl.innerHTML = '';
@@ -458,6 +505,8 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
 
   function buildRows() {
     rowsEl.innerHTML = '';
+    iconHosts = []; missedImgs = [];
+    plates = plates.filter(function (p) { return headerEl.contains(p.host); });
     rows.forEach(function (row, index) {
       var el = document.createElement('div'); el.className = 'gw-row';
       var label = document.createElement('div'); label.className = 'gw-label';
@@ -480,6 +529,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     var row = rows[index];
     row.spans = rowSpans(row.habit.target, row.completed, today);
     row.track.innerHTML = '';
+    missedImgs = missedImgs.filter(function (img) { return document.contains(img); });
     row.spans.forEach(function (span) {
       var n = span.last - span.first + 1;
       var tappable = span.state === 'open' || (span.state === 'done' && span.first <= today && today <= span.last && row.completed[today]);
@@ -493,7 +543,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
         el.addEventListener('click', function () { toggleToday(index); });
       }
       if (span.state === 'missed') {
-        el.innerHTML = CROSS;
+        el.appendChild(missedNode());
       } else {
         var socket = document.createElement('div'); socket.className = 'gw-socket'; el.appendChild(socket);
         if (span.state === 'done') {
@@ -513,9 +563,10 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     if (row.completed[today]) delete row.completed[today]; else row.completed[today] = true;
     // Invariant 7: completing today changes the open window to filled without
     // moving the remaining future windows, so the row can simply be redrawn.
-    plates = plates.filter(function (p) { return !row.track.contains(p.img); });
+    plates = plates.filter(function (p) { return !row.track.contains(p.host); });
     renderRow(index);
-    loadPlates();
+    applyMasks();
+    applyGainAll();
     updateTiers();
   }
 
@@ -534,6 +585,14 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
       letters[i].classList.toggle('is-emitting', i === today && anyOpen);
     }
   }
+
+  // ─── The slider ────────────────────────────────────────────────────────
+  function setGain(v) {
+    gainValue = Math.max(MIN_GAIN, Math.min(MAX_GAIN, v));
+    outEl.textContent = (Math.round(gainValue * 10) / 10).toString().replace(/\.0$/, '') + '×';
+    applyGainAll();
+  }
+  rangeEl.addEventListener('input', function () { setGain(parseFloat(rangeEl.value)); });
 
   // ─── Tilt ──────────────────────────────────────────────────────────────
   // A slow, weighty float under a fine pointer. Nothing on touch, nothing
@@ -571,6 +630,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   function boot(data) {
     useData(data);
     seed(); buildHeader(); buildRows();
+    setGain(parseFloat(rangeEl.value) || 2);
 
     hdrQuery.addEventListener('change', loadPlates);                 // moved to another screen
     Object.keys(tierQueries).forEach(function (k) { tierQueries[k].addEventListener('change', loadPlates); });
@@ -579,7 +639,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     // A day boundary re-seeds: "today" is the visitor's date, not the load time.
     (function scheduleMidnight() {
       var now = new Date(), next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
-      setTimeout(function () { plates = plates.filter(function (p) { return !rowsEl.contains(p.img); }); seed(); buildRows(); scheduleMidnight(); }, next - now);
+      setTimeout(function () { seed(); buildRows(); scheduleMidnight(); }, next - now);
     })();
   }
   if (INLINE) {
@@ -589,10 +649,15 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     // card still draws — every tier as live CSS, no plates, as on an SDR screen.
     fetch(root.dataset.manifest, { credentials: 'omit' })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(boot, function () { boot({ manifests: {}, icons: {} }); });
+      .then(boot, function () { boot({ manifests: {} }); });
   }
 
   // For the page's own checks (and nothing else): what the card decided.
-  window.GlowWeek = { get set() { return currentSet; }, get hdr() { return hdrQuery.matches; }, get today() { return today; }, rows: function () { return rows.map(function (r) { return { name: r.habit.name, spans: r.spans }; }); } };
+  window.GlowWeek = {
+    get set() { return currentSet; }, get hdr() { return hdrQuery.matches; }, get today() { return today; },
+    get gain() { return gainValue; }, set gain(v) { rangeEl.value = v; setGain(v); },
+    plates: function () { return plates.map(function (p) { return { key: p.key, imgs: Object.keys(p.imgs).map(function (g) { return g + ':' + (p.imgs[g].dataset.state || 'loading') + ':' + p.imgs[g].style.display + '@' + p.imgs[g].style.opacity; }) }; }); },
+    rows: function () { return rows.map(function (r) { return { name: r.habit.name, spans: r.spans }; }); }
+  };
 })();
 </script>
