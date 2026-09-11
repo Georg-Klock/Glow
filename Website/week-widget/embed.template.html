@@ -172,7 +172,24 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
    SVG-filter rebuild came out flat beside it. No socket underneath. */
 .gw-cross { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
 
-/* ─── The slider: headroom from 1x (the live CSS twins) to 8x ──────────── */
+/* ─── The sentence: the site's word images, 12 headroom steps of one line ──
+   One <img> per step, the first in flow and the rest stacked over it; the
+   slider fades between neighbours exactly as it does for the plates. Sized
+   like the site's "Larger Text" style (32 / 26 / 17px / 3.65vw): the images
+   were rendered at 144pt into 2690px, so width = 18.68 × the font size. */
+.gw-sentence {
+  position: relative; width: 598px; max-width: 100%; margin-top: calc(6px * var(--s));
+}
+@media (max-width: 991px) { .gw-sentence { width: 486px; } }
+@media (max-width: 767px) { .gw-sentence { width: 318px; } }
+@media (max-width: 479px) { .gw-sentence { width: 68.2vw; } }
+.gw-sentence > img {
+  display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none;
+}
+.gw-sentence > img + img { position: absolute; inset: 0; opacity: 0; }
+.gw:not(.gw-hdr) .gw-sentence > img + img { display: none; }   /* SDR: the 1x image alone */
+
+/* ─── The slider: headroom from 1x to 12x, shared by card and sentence ──── */
 .gw-slider {
   display: none; align-items: center; justify-content: center;
   width: calc(7 * var(--cell) + 6 * var(--gap)); max-width: 100%;
@@ -208,10 +225,11 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     <div class="gw-header" id="gw-header"></div>
     <div class="gw-rows" id="gw-rows"></div>
   </div>
+  <div class="gw-sentence" id="gw-sentence"></div>
   <div class="gw-slider">
-    <output class="gw-slider-out" id="gw-out">2×</output>
-    <input class="gw-slider-range" id="gw-range" type="range" min="1" max="8" step="any" value="2"
-           aria-label="Glow headroom, 1 to 8 times SDR white">
+    <output class="gw-slider-out" id="gw-out">1×</output>
+    <input class="gw-slider-range" id="gw-range" type="range" min="1" max="12" step="any" value="1"
+           aria-label="Glow headroom, 1 to 12 times SDR white">
   </div>
 </div>
 
@@ -255,7 +273,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   ];
   var LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];   // Monday start, hardcoded for the demo
   var LAST = 6;
-  var MIN_GAIN = 1, MAX_GAIN = 8;                        // GlowSettings.range
+  var MIN_GAIN = 1, MAX_GAIN = 12;                       // the slider's range; plates exist for every whole step
 
   // ─── Placement: WeekSpans.dividedWithoutRestDay + assignColumns, ported ─
   // A habit due N times draws N marks against seven columns. Completions
@@ -324,7 +342,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   var outEl = document.getElementById('gw-out');
   var today = todayIndex();
   var rows = [];
-  var gainValue = 2;                                     // GlowSettings.defaultValue
+  var gainValue = 1;                                     // the floor; the sweep takes it up from here
 
   function todayIndex() { return (new Date().getDay() + 6) % 7; }
 
@@ -436,7 +454,11 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
       applyMasks();
       applyCard();
     }
+    if (wantHDR && set) {
+      plates.forEach(function (p) { for (var g = MIN_GAIN; g <= MAX_GAIN; g++) plateImage(p, g); });
+    }
     applyGainAll();
+    applySentence();
   }
 
   // ─── Icons and the missed mark: SDR files, needed on every screen ──────
@@ -586,13 +608,97 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     }
   }
 
+  // ─── The sentence ──────────────────────────────────────────────────────
+  // The page's word images (Tools/make-glow-word.swift): one file per whole
+  // step, 1x written as Display P3 so that "off" is SDR white, like the plates.
+  var sentenceEl = document.getElementById('gw-sentence');
+  var SENTENCE_BASE = 'https://cdn.prod.website-files.com/620d05babdddc967daa0780a/';
+  var SENTENCE_FILES = [
+    '6a89017bcb0222b8afc24bac_gf-1.avif', '6a89017cbf29fd074c0e80e1_gf-2.avif',
+    '6a89017c5a6720774a951823_gf-3.avif', '6a89017c2b38c1350190ae20_gf-4.avif',
+    '6a89017c0005866f610c71c8_gf-5.avif', '6a89017c0005866f610c71dd_gf-6.avif',
+    '6a89db35f80c349f2727615c_gf-7.avif', '6a89db35f6406592c904ddef_gf-8.avif',
+    '6a89dcd4e1fc7cdb75941287_gf-9.avif', '6a89dcd48520ca68809ab080_gf-10.avif',
+    '6a89dcd4590d28ae791f1c52_gf-11.avif', '6a89dcd57eb5ddf9e5a8d6bd_gf-12.avif'
+  ];
+  var sentenceImgs = [];
+  function buildSentence() {
+    SENTENCE_FILES.forEach(function (file, i) {
+      var img = document.createElement('img');
+      img.decoding = 'async'; img.draggable = false;
+      img.alt = i === 0 ? 'An HDR image can be brighter than white.' : '';
+      if (i > 0) img.setAttribute('aria-hidden', 'true');
+      img.width = 2690; img.height = 242;   // the ratio, before the file arrives
+      // Only the 1x file is fetched on a screen without headroom (the CSS
+      // hides the others; the src is set when the HDR path opens).
+      if (i === 0 || hdrQuery.matches) img.src = SENTENCE_BASE + file;
+      sentenceEl.appendChild(img);
+      sentenceImgs.push(img);
+    });
+  }
+  function applySentence() {
+    var hdr = hdrQuery.matches;
+    var st = steps();
+    sentenceImgs.forEach(function (img, i) {
+      var step = i + 1;
+      if (i > 0 && hdr && !img.src) img.src = SENTENCE_BASE + SENTENCE_FILES[i];
+      // Every step at or below the floor stays opaque underneath, so a
+      // neighbour still decoding never shows a gap; the one above fades in.
+      img.style.opacity = i === 0 ? '1' : step <= st.lower ? '1' : step === st.upper ? String(st.f) : '0';
+    });
+  }
+
   // ─── The slider ────────────────────────────────────────────────────────
   function setGain(v) {
     gainValue = Math.max(MIN_GAIN, Math.min(MAX_GAIN, v));
     outEl.textContent = (Math.round(gainValue * 10) / 10).toString().replace(/\.0$/, '') + '×';
     applyGainAll();
+    applySentence();
   }
-  rangeEl.addEventListener('input', function () { setGain(parseFloat(rangeEl.value)); });
+
+  // The sweep: 1x up to 12x and back, on a loop, eased at both ends. A drag
+  // takes over and the loop resumes from where the visitor left it once
+  // they have let go for a while. Under reduced motion it holds at the top.
+  var SWEEP_MS = 5200, SWEEP_RESUME_MS = 4000;
+  var sweep = { raf: 0, timer: 0, dir: 1 };
+  function sweepPass() {
+    var from = gainValue, to = sweep.dir > 0 ? MAX_GAIN : MIN_GAIN;
+    var span = Math.abs(to - from);
+    if (span < 0.01) { sweep.dir = -sweep.dir; to = sweep.dir > 0 ? MAX_GAIN : MIN_GAIN; span = Math.abs(to - from); }
+    var duration = SWEEP_MS * span / (MAX_GAIN - MIN_GAIN);
+    var t0 = performance.now();
+    function frame(now) {
+      var p = Math.min(1, (now - t0) / duration);
+      var e = 0.5 - Math.cos(Math.PI * p) / 2;
+      var v = from + (to - from) * e;
+      rangeEl.value = v; setGain(v);
+      if (p < 1) { sweep.raf = requestAnimationFrame(frame); return; }
+      sweep.dir = -sweep.dir;
+      sweep.raf = requestAnimationFrame(function () { sweepPass(); });
+    }
+    sweep.raf = requestAnimationFrame(frame);
+  }
+  function sweepStop() {
+    if (sweep.raf) cancelAnimationFrame(sweep.raf);
+    if (sweep.timer) clearTimeout(sweep.timer);
+    sweep.raf = sweep.timer = 0;
+  }
+  function sweepStart() {
+    sweepStop();
+    if (!hdrQuery.matches) return;                      // nothing to sweep on an SDR screen
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      rangeEl.value = MAX_GAIN; setGain(MAX_GAIN); return;
+    }
+    sweepPass();
+  }
+  rangeEl.addEventListener('input', function () {
+    sweepStop();
+    setGain(parseFloat(rangeEl.value));
+    sweep.timer = setTimeout(sweepStart, SWEEP_RESUME_MS);
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) sweepStop(); else if (!sweep.timer) sweepStart();
+  });
 
   // ─── Tilt ──────────────────────────────────────────────────────────────
   // A slow, weighty float under a fine pointer. Nothing on touch, nothing
@@ -629,10 +735,11 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   // ─── Boot ──────────────────────────────────────────────────────────────
   function boot(data) {
     useData(data);
-    seed(); buildHeader(); buildRows();
-    setGain(parseFloat(rangeEl.value) || 2);
+    seed(); buildHeader(); buildRows(); buildSentence();
+    setGain(parseFloat(rangeEl.value) || MIN_GAIN);
+    sweepStart();
 
-    hdrQuery.addEventListener('change', loadPlates);                 // moved to another screen
+    hdrQuery.addEventListener('change', function () { loadPlates(); sweepStart(); });   // moved to another screen
     Object.keys(tierQueries).forEach(function (k) { tierQueries[k].addEventListener('change', loadPlates); });
     window.addEventListener('resize', loadPlates);                   // devicePixelRatio has no event of its own
 
@@ -655,7 +762,9 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   // For the page's own checks (and nothing else): what the card decided.
   window.GlowWeek = {
     get set() { return currentSet; }, get hdr() { return hdrQuery.matches; }, get today() { return today; },
-    get gain() { return gainValue; }, set gain(v) { rangeEl.value = v; setGain(v); },
+    get gain() { return gainValue; }, set gain(v) { sweepStop(); rangeEl.value = v; setGain(v); },
+    get sweeping() { return !!sweep.raf; }, sweep: function (on) { if (on) sweepStart(); else sweepStop(); },
+    sentence: function () { return sentenceImgs.map(function (i) { return (i.src ? 'src' : '-') + '@' + i.style.opacity; }); },
     plates: function () { return plates.map(function (p) { return { key: p.key, imgs: Object.keys(p.imgs).map(function (g) { return g + ':' + (p.imgs[g].dataset.state || 'loading') + ':' + p.imgs[g].style.display + '@' + p.imgs[g].style.opacity; }) }; }); },
     rows: function () { return rows.map(function (r) { return { name: r.habit.name, spans: r.spans }; }); }
   };

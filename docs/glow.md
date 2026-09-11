@@ -845,6 +845,11 @@ Two things the grid taught that the word did not:
   indistinguishable from one over the card, and only the halo goes behind the
   neighbour, which is where spilled light belongs.
 
+The word slider and the grid share one control now. The sentence's twelve
+files sit under the card as stacked layers, and one range from 1x to 12x —
+the plates were re-cut to twelve steps to match — drives both, sweeping on a
+loop until a visitor drags it. `Website/week-widget/README.md` has the cut.
+
 The halo numbers are the word slider's and were judged on letterforms. The
 ring is a far thinner shape, and `Website/week-widget/tuning.html` shows it cut
 at several radii and strengths for a decision on a screen with headroom; the

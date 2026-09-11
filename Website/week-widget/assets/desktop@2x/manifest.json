@@ -10,7 +10,11 @@
     5,
     6,
     7,
-    8
+    8,
+    9,
+    10,
+    11,
+    12
   ],
   "gap" : 16,
   "halo" : {
@@ -117,7 +121,11 @@
         "5" : "gw-desktop-2x-g5-day-F.avif",
         "6" : "gw-desktop-2x-g6-day-F.avif",
         "7" : "gw-desktop-2x-g7-day-F.avif",
-        "8" : "gw-desktop-2x-g8-day-F.avif"
+        "8" : "gw-desktop-2x-g8-day-F.avif",
+        "9" : "gw-desktop-2x-g9-day-F.avif",
+        "10" : "gw-desktop-2x-g10-day-F.avif",
+        "11" : "gw-desktop-2x-g11-day-F.avif",
+        "12" : "gw-desktop-2x-g12-day-F.avif"
       },
       "mask" : "gw-desktop-2x-day-F-mask.png",
       "offsetLeft" : -2,
@@ -140,7 +148,11 @@
         "5" : "gw-desktop-2x-g5-day-M.avif",
         "6" : "gw-desktop-2x-g6-day-M.avif",
         "7" : "gw-desktop-2x-g7-day-M.avif",
-        "8" : "gw-desktop-2x-g8-day-M.avif"
+        "8" : "gw-desktop-2x-g8-day-M.avif",
+        "9" : "gw-desktop-2x-g9-day-M.avif",
+        "10" : "gw-desktop-2x-g10-day-M.avif",
+        "11" : "gw-desktop-2x-g11-day-M.avif",
+        "12" : "gw-desktop-2x-g12-day-M.avif"
       },
       "mask" : "gw-desktop-2x-day-M-mask.png",
       "offsetLeft" : -2,
@@ -163,7 +175,11 @@
         "5" : "gw-desktop-2x-g5-day-S.avif",
         "6" : "gw-desktop-2x-g6-day-S.avif",
         "7" : "gw-desktop-2x-g7-day-S.avif",
-        "8" : "gw-desktop-2x-g8-day-S.avif"
+        "8" : "gw-desktop-2x-g8-day-S.avif",
+        "9" : "gw-desktop-2x-g9-day-S.avif",
+        "10" : "gw-desktop-2x-g10-day-S.avif",
+        "11" : "gw-desktop-2x-g11-day-S.avif",
+        "12" : "gw-desktop-2x-g12-day-S.avif"
       },
       "mask" : "gw-desktop-2x-day-S-mask.png",
       "offsetLeft" : -2,
@@ -186,7 +202,11 @@
         "5" : "gw-desktop-2x-g5-day-T.avif",
         "6" : "gw-desktop-2x-g6-day-T.avif",
         "7" : "gw-desktop-2x-g7-day-T.avif",
-        "8" : "gw-desktop-2x-g8-day-T.avif"
+        "8" : "gw-desktop-2x-g8-day-T.avif",
+        "9" : "gw-desktop-2x-g9-day-T.avif",
+        "10" : "gw-desktop-2x-g10-day-T.avif",
+        "11" : "gw-desktop-2x-g11-day-T.avif",
+        "12" : "gw-desktop-2x-g12-day-T.avif"
       },
       "mask" : "gw-desktop-2x-day-T-mask.png",
       "offsetLeft" : -2,
@@ -209,7 +229,11 @@
         "5" : "gw-desktop-2x-g5-day-W.avif",
         "6" : "gw-desktop-2x-g6-day-W.avif",
         "7" : "gw-desktop-2x-g7-day-W.avif",
-        "8" : "gw-desktop-2x-g8-day-W.avif"
+        "8" : "gw-desktop-2x-g8-day-W.avif",
+        "9" : "gw-desktop-2x-g9-day-W.avif",
+        "10" : "gw-desktop-2x-g10-day-W.avif",
+        "11" : "gw-desktop-2x-g11-day-W.avif",
+        "12" : "gw-desktop-2x-g12-day-W.avif"
       },
       "mask" : "gw-desktop-2x-day-W-mask.png",
       "offsetLeft" : -2,
@@ -230,7 +254,11 @@
         "5" : "gw-desktop-2x-g5-icon-early-night.avif",
         "6" : "gw-desktop-2x-g6-icon-early-night.avif",
         "7" : "gw-desktop-2x-g7-icon-early-night.avif",
-        "8" : "gw-desktop-2x-g8-icon-early-night.avif"
+        "8" : "gw-desktop-2x-g8-icon-early-night.avif",
+        "9" : "gw-desktop-2x-g9-icon-early-night.avif",
+        "10" : "gw-desktop-2x-g10-icon-early-night.avif",
+        "11" : "gw-desktop-2x-g11-icon-early-night.avif",
+        "12" : "gw-desktop-2x-g12-icon-early-night.avif"
       },
       "mask" : "gw-desktop-2x-icon-early-night-mask.png",
       "offsetLeft" : -3,
@@ -252,7 +280,11 @@
         "5" : "gw-desktop-2x-g5-icon-gratitude.avif",
         "6" : "gw-desktop-2x-g6-icon-gratitude.avif",
         "7" : "gw-desktop-2x-g7-icon-gratitude.avif",
-        "8" : "gw-desktop-2x-g8-icon-gratitude.avif"
+        "8" : "gw-desktop-2x-g8-icon-gratitude.avif",
+        "9" : "gw-desktop-2x-g9-icon-gratitude.avif",
+        "10" : "gw-desktop-2x-g10-icon-gratitude.avif",
+        "11" : "gw-desktop-2x-g11-icon-gratitude.avif",
+        "12" : "gw-desktop-2x-g12-icon-gratitude.avif"
       },
       "mask" : "gw-desktop-2x-icon-gratitude-mask.png",
       "offsetLeft" : -2,
@@ -274,7 +306,11 @@
         "5" : "gw-desktop-2x-g5-icon-read-book.avif",
         "6" : "gw-desktop-2x-g6-icon-read-book.avif",
         "7" : "gw-desktop-2x-g7-icon-read-book.avif",
-        "8" : "gw-desktop-2x-g8-icon-read-book.avif"
+        "8" : "gw-desktop-2x-g8-icon-read-book.avif",
+        "9" : "gw-desktop-2x-g9-icon-read-book.avif",
+        "10" : "gw-desktop-2x-g10-icon-read-book.avif",
+        "11" : "gw-desktop-2x-g11-icon-read-book.avif",
+        "12" : "gw-desktop-2x-g12-icon-read-book.avif"
       },
       "mask" : "gw-desktop-2x-icon-read-book-mask.png",
       "offsetLeft" : -2.5,
@@ -296,7 +332,11 @@
         "5" : "gw-desktop-2x-g5-icon-stretch.avif",
         "6" : "gw-desktop-2x-g6-icon-stretch.avif",
         "7" : "gw-desktop-2x-g7-icon-stretch.avif",
-        "8" : "gw-desktop-2x-g8-icon-stretch.avif"
+        "8" : "gw-desktop-2x-g8-icon-stretch.avif",
+        "9" : "gw-desktop-2x-g9-icon-stretch.avif",
+        "10" : "gw-desktop-2x-g10-icon-stretch.avif",
+        "11" : "gw-desktop-2x-g11-icon-stretch.avif",
+        "12" : "gw-desktop-2x-g12-icon-stretch.avif"
       },
       "mask" : "gw-desktop-2x-icon-stretch-mask.png",
       "offsetLeft" : -2.5,
@@ -318,7 +358,11 @@
         "5" : "gw-desktop-2x-g5-icon-sunset.avif",
         "6" : "gw-desktop-2x-g6-icon-sunset.avif",
         "7" : "gw-desktop-2x-g7-icon-sunset.avif",
-        "8" : "gw-desktop-2x-g8-icon-sunset.avif"
+        "8" : "gw-desktop-2x-g8-icon-sunset.avif",
+        "9" : "gw-desktop-2x-g9-icon-sunset.avif",
+        "10" : "gw-desktop-2x-g10-icon-sunset.avif",
+        "11" : "gw-desktop-2x-g11-icon-sunset.avif",
+        "12" : "gw-desktop-2x-g12-icon-sunset.avif"
       },
       "mask" : "gw-desktop-2x-icon-sunset-mask.png",
       "offsetLeft" : -3,
@@ -340,7 +384,11 @@
         "5" : "gw-desktop-2x-g5-icon-tutorial.avif",
         "6" : "gw-desktop-2x-g6-icon-tutorial.avif",
         "7" : "gw-desktop-2x-g7-icon-tutorial.avif",
-        "8" : "gw-desktop-2x-g8-icon-tutorial.avif"
+        "8" : "gw-desktop-2x-g8-icon-tutorial.avif",
+        "9" : "gw-desktop-2x-g9-icon-tutorial.avif",
+        "10" : "gw-desktop-2x-g10-icon-tutorial.avif",
+        "11" : "gw-desktop-2x-g11-icon-tutorial.avif",
+        "12" : "gw-desktop-2x-g12-icon-tutorial.avif"
       },
       "mask" : "gw-desktop-2x-icon-tutorial-mask.png",
       "offsetLeft" : -2.5,
@@ -362,7 +410,11 @@
         "5" : "gw-desktop-2x-g5-icon-vo2-max.avif",
         "6" : "gw-desktop-2x-g6-icon-vo2-max.avif",
         "7" : "gw-desktop-2x-g7-icon-vo2-max.avif",
-        "8" : "gw-desktop-2x-g8-icon-vo2-max.avif"
+        "8" : "gw-desktop-2x-g8-icon-vo2-max.avif",
+        "9" : "gw-desktop-2x-g9-icon-vo2-max.avif",
+        "10" : "gw-desktop-2x-g10-icon-vo2-max.avif",
+        "11" : "gw-desktop-2x-g11-icon-vo2-max.avif",
+        "12" : "gw-desktop-2x-g12-icon-vo2-max.avif"
       },
       "mask" : "gw-desktop-2x-icon-vo2-max-mask.png",
       "offsetLeft" : -2.5,
@@ -384,7 +436,11 @@
         "5" : "gw-desktop-2x-g5-icon-workout.avif",
         "6" : "gw-desktop-2x-g6-icon-workout.avif",
         "7" : "gw-desktop-2x-g7-icon-workout.avif",
-        "8" : "gw-desktop-2x-g8-icon-workout.avif"
+        "8" : "gw-desktop-2x-g8-icon-workout.avif",
+        "9" : "gw-desktop-2x-g9-icon-workout.avif",
+        "10" : "gw-desktop-2x-g10-icon-workout.avif",
+        "11" : "gw-desktop-2x-g11-icon-workout.avif",
+        "12" : "gw-desktop-2x-g12-icon-workout.avif"
       },
       "mask" : "gw-desktop-2x-icon-workout-mask.png",
       "offsetLeft" : -3,
@@ -408,7 +464,11 @@
         "5" : "gw-desktop-2x-g5-name-early-night.avif",
         "6" : "gw-desktop-2x-g6-name-early-night.avif",
         "7" : "gw-desktop-2x-g7-name-early-night.avif",
-        "8" : "gw-desktop-2x-g8-name-early-night.avif"
+        "8" : "gw-desktop-2x-g8-name-early-night.avif",
+        "9" : "gw-desktop-2x-g9-name-early-night.avif",
+        "10" : "gw-desktop-2x-g10-name-early-night.avif",
+        "11" : "gw-desktop-2x-g11-name-early-night.avif",
+        "12" : "gw-desktop-2x-g12-name-early-night.avif"
       },
       "mask" : "gw-desktop-2x-name-early-night-mask.png",
       "offsetLeft" : -2,
@@ -431,7 +491,11 @@
         "5" : "gw-desktop-2x-g5-name-gratitude.avif",
         "6" : "gw-desktop-2x-g6-name-gratitude.avif",
         "7" : "gw-desktop-2x-g7-name-gratitude.avif",
-        "8" : "gw-desktop-2x-g8-name-gratitude.avif"
+        "8" : "gw-desktop-2x-g8-name-gratitude.avif",
+        "9" : "gw-desktop-2x-g9-name-gratitude.avif",
+        "10" : "gw-desktop-2x-g10-name-gratitude.avif",
+        "11" : "gw-desktop-2x-g11-name-gratitude.avif",
+        "12" : "gw-desktop-2x-g12-name-gratitude.avif"
       },
       "mask" : "gw-desktop-2x-name-gratitude-mask.png",
       "offsetLeft" : -2,
@@ -454,7 +518,11 @@
         "5" : "gw-desktop-2x-g5-name-read-book.avif",
         "6" : "gw-desktop-2x-g6-name-read-book.avif",
         "7" : "gw-desktop-2x-g7-name-read-book.avif",
-        "8" : "gw-desktop-2x-g8-name-read-book.avif"
+        "8" : "gw-desktop-2x-g8-name-read-book.avif",
+        "9" : "gw-desktop-2x-g9-name-read-book.avif",
+        "10" : "gw-desktop-2x-g10-name-read-book.avif",
+        "11" : "gw-desktop-2x-g11-name-read-book.avif",
+        "12" : "gw-desktop-2x-g12-name-read-book.avif"
       },
       "mask" : "gw-desktop-2x-name-read-book-mask.png",
       "offsetLeft" : -2,
@@ -477,7 +545,11 @@
         "5" : "gw-desktop-2x-g5-name-stretch.avif",
         "6" : "gw-desktop-2x-g6-name-stretch.avif",
         "7" : "gw-desktop-2x-g7-name-stretch.avif",
-        "8" : "gw-desktop-2x-g8-name-stretch.avif"
+        "8" : "gw-desktop-2x-g8-name-stretch.avif",
+        "9" : "gw-desktop-2x-g9-name-stretch.avif",
+        "10" : "gw-desktop-2x-g10-name-stretch.avif",
+        "11" : "gw-desktop-2x-g11-name-stretch.avif",
+        "12" : "gw-desktop-2x-g12-name-stretch.avif"
       },
       "mask" : "gw-desktop-2x-name-stretch-mask.png",
       "offsetLeft" : -2,
@@ -500,7 +572,11 @@
         "5" : "gw-desktop-2x-g5-name-sunset.avif",
         "6" : "gw-desktop-2x-g6-name-sunset.avif",
         "7" : "gw-desktop-2x-g7-name-sunset.avif",
-        "8" : "gw-desktop-2x-g8-name-sunset.avif"
+        "8" : "gw-desktop-2x-g8-name-sunset.avif",
+        "9" : "gw-desktop-2x-g9-name-sunset.avif",
+        "10" : "gw-desktop-2x-g10-name-sunset.avif",
+        "11" : "gw-desktop-2x-g11-name-sunset.avif",
+        "12" : "gw-desktop-2x-g12-name-sunset.avif"
       },
       "mask" : "gw-desktop-2x-name-sunset-mask.png",
       "offsetLeft" : -2,
@@ -523,7 +599,11 @@
         "5" : "gw-desktop-2x-g5-name-tutorial.avif",
         "6" : "gw-desktop-2x-g6-name-tutorial.avif",
         "7" : "gw-desktop-2x-g7-name-tutorial.avif",
-        "8" : "gw-desktop-2x-g8-name-tutorial.avif"
+        "8" : "gw-desktop-2x-g8-name-tutorial.avif",
+        "9" : "gw-desktop-2x-g9-name-tutorial.avif",
+        "10" : "gw-desktop-2x-g10-name-tutorial.avif",
+        "11" : "gw-desktop-2x-g11-name-tutorial.avif",
+        "12" : "gw-desktop-2x-g12-name-tutorial.avif"
       },
       "mask" : "gw-desktop-2x-name-tutorial-mask.png",
       "offsetLeft" : -2,
@@ -546,7 +626,11 @@
         "5" : "gw-desktop-2x-g5-name-vo2-max.avif",
         "6" : "gw-desktop-2x-g6-name-vo2-max.avif",
         "7" : "gw-desktop-2x-g7-name-vo2-max.avif",
-        "8" : "gw-desktop-2x-g8-name-vo2-max.avif"
+        "8" : "gw-desktop-2x-g8-name-vo2-max.avif",
+        "9" : "gw-desktop-2x-g9-name-vo2-max.avif",
+        "10" : "gw-desktop-2x-g10-name-vo2-max.avif",
+        "11" : "gw-desktop-2x-g11-name-vo2-max.avif",
+        "12" : "gw-desktop-2x-g12-name-vo2-max.avif"
       },
       "mask" : "gw-desktop-2x-name-vo2-max-mask.png",
       "offsetLeft" : -2,
@@ -569,7 +653,11 @@
         "5" : "gw-desktop-2x-g5-name-workout.avif",
         "6" : "gw-desktop-2x-g6-name-workout.avif",
         "7" : "gw-desktop-2x-g7-name-workout.avif",
-        "8" : "gw-desktop-2x-g8-name-workout.avif"
+        "8" : "gw-desktop-2x-g8-name-workout.avif",
+        "9" : "gw-desktop-2x-g9-name-workout.avif",
+        "10" : "gw-desktop-2x-g10-name-workout.avif",
+        "11" : "gw-desktop-2x-g11-name-workout.avif",
+        "12" : "gw-desktop-2x-g12-name-workout.avif"
       },
       "mask" : "gw-desktop-2x-name-workout-mask.png",
       "offsetLeft" : -2,
@@ -590,7 +678,11 @@
         "5" : "gw-desktop-2x-g5-ring-1.avif",
         "6" : "gw-desktop-2x-g6-ring-1.avif",
         "7" : "gw-desktop-2x-g7-ring-1.avif",
-        "8" : "gw-desktop-2x-g8-ring-1.avif"
+        "8" : "gw-desktop-2x-g8-ring-1.avif",
+        "9" : "gw-desktop-2x-g9-ring-1.avif",
+        "10" : "gw-desktop-2x-g10-ring-1.avif",
+        "11" : "gw-desktop-2x-g11-ring-1.avif",
+        "12" : "gw-desktop-2x-g12-ring-1.avif"
       },
       "mask" : "gw-desktop-2x-ring-1-mask.png",
       "offsetLeft" : -4,
@@ -611,7 +703,11 @@
         "5" : "gw-desktop-2x-g5-ring-2.avif",
         "6" : "gw-desktop-2x-g6-ring-2.avif",
         "7" : "gw-desktop-2x-g7-ring-2.avif",
-        "8" : "gw-desktop-2x-g8-ring-2.avif"
+        "8" : "gw-desktop-2x-g8-ring-2.avif",
+        "9" : "gw-desktop-2x-g9-ring-2.avif",
+        "10" : "gw-desktop-2x-g10-ring-2.avif",
+        "11" : "gw-desktop-2x-g11-ring-2.avif",
+        "12" : "gw-desktop-2x-g12-ring-2.avif"
       },
       "mask" : "gw-desktop-2x-ring-2-mask.png",
       "offsetLeft" : -4,
@@ -632,7 +728,11 @@
         "5" : "gw-desktop-2x-g5-ring-3.avif",
         "6" : "gw-desktop-2x-g6-ring-3.avif",
         "7" : "gw-desktop-2x-g7-ring-3.avif",
-        "8" : "gw-desktop-2x-g8-ring-3.avif"
+        "8" : "gw-desktop-2x-g8-ring-3.avif",
+        "9" : "gw-desktop-2x-g9-ring-3.avif",
+        "10" : "gw-desktop-2x-g10-ring-3.avif",
+        "11" : "gw-desktop-2x-g11-ring-3.avif",
+        "12" : "gw-desktop-2x-g12-ring-3.avif"
       },
       "mask" : "gw-desktop-2x-ring-3-mask.png",
       "offsetLeft" : -4,
@@ -653,7 +753,11 @@
         "5" : "gw-desktop-2x-g5-ring-4.avif",
         "6" : "gw-desktop-2x-g6-ring-4.avif",
         "7" : "gw-desktop-2x-g7-ring-4.avif",
-        "8" : "gw-desktop-2x-g8-ring-4.avif"
+        "8" : "gw-desktop-2x-g8-ring-4.avif",
+        "9" : "gw-desktop-2x-g9-ring-4.avif",
+        "10" : "gw-desktop-2x-g10-ring-4.avif",
+        "11" : "gw-desktop-2x-g11-ring-4.avif",
+        "12" : "gw-desktop-2x-g12-ring-4.avif"
       },
       "mask" : "gw-desktop-2x-ring-4-mask.png",
       "offsetLeft" : -4,
@@ -674,7 +778,11 @@
         "5" : "gw-desktop-2x-g5-ring-5.avif",
         "6" : "gw-desktop-2x-g6-ring-5.avif",
         "7" : "gw-desktop-2x-g7-ring-5.avif",
-        "8" : "gw-desktop-2x-g8-ring-5.avif"
+        "8" : "gw-desktop-2x-g8-ring-5.avif",
+        "9" : "gw-desktop-2x-g9-ring-5.avif",
+        "10" : "gw-desktop-2x-g10-ring-5.avif",
+        "11" : "gw-desktop-2x-g11-ring-5.avif",
+        "12" : "gw-desktop-2x-g12-ring-5.avif"
       },
       "mask" : "gw-desktop-2x-ring-5-mask.png",
       "offsetLeft" : -4,
@@ -695,7 +803,11 @@
         "5" : "gw-desktop-2x-g5-ring-6.avif",
         "6" : "gw-desktop-2x-g6-ring-6.avif",
         "7" : "gw-desktop-2x-g7-ring-6.avif",
-        "8" : "gw-desktop-2x-g8-ring-6.avif"
+        "8" : "gw-desktop-2x-g8-ring-6.avif",
+        "9" : "gw-desktop-2x-g9-ring-6.avif",
+        "10" : "gw-desktop-2x-g10-ring-6.avif",
+        "11" : "gw-desktop-2x-g11-ring-6.avif",
+        "12" : "gw-desktop-2x-g12-ring-6.avif"
       },
       "mask" : "gw-desktop-2x-ring-6-mask.png",
       "offsetLeft" : -4,
@@ -716,7 +828,11 @@
         "5" : "gw-desktop-2x-g5-ring-7.avif",
         "6" : "gw-desktop-2x-g6-ring-7.avif",
         "7" : "gw-desktop-2x-g7-ring-7.avif",
-        "8" : "gw-desktop-2x-g8-ring-7.avif"
+        "8" : "gw-desktop-2x-g8-ring-7.avif",
+        "9" : "gw-desktop-2x-g9-ring-7.avif",
+        "10" : "gw-desktop-2x-g10-ring-7.avif",
+        "11" : "gw-desktop-2x-g11-ring-7.avif",
+        "12" : "gw-desktop-2x-g12-ring-7.avif"
       },
       "mask" : "gw-desktop-2x-ring-7-mask.png",
       "offsetLeft" : -4,

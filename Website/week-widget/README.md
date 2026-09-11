@@ -18,7 +18,7 @@ of the day goes so does the weekday letter. Nothing is stored or sent.
 | `embed.html` | **The deliverable.** One block of CSS + HTML + JS for a Webflow Custom Code embed. Built; do not edit. |
 | `embed.template.html` | The source of the above. Edit this, then rebuild. |
 | `build-embed.py` | Inlines the plate manifests and icon outlines into the template. |
-| `assets/<tier>@<dpr>x/*` | The plates, one per headroom step, with a shape mask each; the icon masks; the missed mark. 780 files, 1.2 MB. Upload these. |
+| `assets/<tier>@<dpr>x/*` | The plates, one per headroom step, with a shape mask each; the icon masks; the missed mark. 1095 files, 1.6 MB. Upload these. |
 | `assets/<set>/manifest.json` | Every plate's size and offset in CSS pixels, from the renderer. |
 | `fonts/Inter-Regular.{otf,woff2}` | The one font (Inter 4.1, OFL). The plates were cut with the `.otf`; the page loads the `.woff2`. |
 | `icons/*.svg` | The first cut's Phosphor outlines; no longer used, kept for the record. The icons are now SF Symbols rendered by the generator. |
@@ -37,11 +37,11 @@ every custom-code block at 10,000 characters and the one-block embed is 44 KB:
 
 | Where | What | Size |
 | --- | --- | --- |
-| Page settings → head code | `webflow/head.html` — the CSS and the `@font-face` | 5.0 K |
-| An HTML Embed element in the section | `webflow/embed.html` — the markup, with `data-manifest` naming the JSON asset | 1.9 K |
-| **Site** settings → footer code | `webflow/footer.html` — the script, comments stripped | 13.4 K |
-| Asset `gw-manifest.json` | `webflow/gw-manifest.json` — manifests, icon outlines and the name→URL map, fetched once at load | 32 K |
-| 780 assets `gw-*` | the plates at every step, their masks, the missed mark, the glass; byte-identical on the CDN (spot-checked) | 1.2 M |
+| Page settings → head code | `webflow/head.html` — the CSS and the `@font-face` | 6.6 K |
+| An HTML Embed element in the section | `webflow/embed.html` — the markup, with `data-manifest` naming the JSON asset | 0.5 K |
+| **Site** settings → footer code | `webflow/footer.html` — the script, comments stripped | 18.6 K |
+| Asset `gw-manifest.json` | `webflow/gw-manifest.json` — manifests, icon outlines and the name→URL map, fetched once at load | 216 K |
+| 1096 assets `gw-*` | the plates at every step, their masks, the missed mark, the glass; byte-identical on the CDN (spot-checked) | 1.6 M |
 | Custom font `Inter` | `fonts/Inter-Regular.woff2`, family name `Inter` | 111 K |
 
 The script is site-wide only because the page-level footer is also capped at
@@ -180,7 +180,42 @@ Plates: 3 sets × 8 steps × 28 = 672 AVIF, plus 84 shape masks, 24 icon masks
 and 3 missed marks; 1.2 MB in total, fetched lazily as the slider asks for a
 step. `Tools/check-week-plates.swift` accepts the 1x floor as SDR by design.
 
-## Verified, 2026-09-11
+## The fourth cut (2026-09-11): one slider for the card and the sentence
+
+The page used to carry two demonstrations of the same trick, each with its
+own control: the word slider ("An HDR image can be brighter than white.",
+`Tools/make-glow-word.swift`, twelve steps) in the centered section, and the
+hero with its own eight-step slider in a section of its own. They are one
+thing now.
+
+- **The sentence sits under the card**, inside the hero, as twelve stacked
+  `<img>` layers of the page's existing word files (the hashed CDN names are
+  in the script, `SENTENCE_FILES`; nothing was re-rendered or re-uploaded).
+  It is sized like the site's "Larger Text" style — the images were rendered
+  at 144pt into 2690px, so 32px of type is a 598px stage, 486 / 318px on the
+  tablet and phone breakpoints and 68.2vw below 479px — smaller than the old
+  960px stage, still the largest type on the page after the headline.
+- **One range, 1x to 12x.** The plates were re-cut for the four steps above
+  8x (`--gains 1,…,12`; 336 new files, verified with libavif like the rest),
+  so the card and the sentence answer the same value. Between two whole steps
+  the upper plate and the upper sentence layer fade in over the lower.
+- **It sweeps on a loop.** 1x up to 12x and back, 5.2 s a pass, eased at both
+  ends (the word slider's timing). A drag takes over; the loop resumes from
+  where the visitor left it after four seconds without input. It stops while
+  the tab is hidden, holds at 12x under reduced motion, and never starts on a
+  screen without headroom, where the slider is hidden and only the 1x sentence
+  file is fetched.
+- **Every step is fetched up front** once the plate path opens, so the first
+  pass never meets a plate mid-load and shows the live twin for a frame. One
+  tier at one density is about 550 KB across 12 steps.
+- **The page tree.** The hero embed moved into the centered section in place
+  of the old word-slider embed, ahead of the "if the text above doesn't glow"
+  note; the empty section and paragraph went. The Dynamic Island video moved
+  into the two-frame row beside the open-close video and the widgets shot
+  (`.project-image.shot-widgets` is the same flex row as the three-frame
+  setup row below it), and its own section went.
+
+## Verified, 2026-09-11 (third cut)
 
 | Check | Result |
 | --- | --- |

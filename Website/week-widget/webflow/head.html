@@ -122,6 +122,17 @@ position: absolute; inset: var(--inset); border-radius: 999px;
 border: var(--ring) solid var(--emitting-sdr);
 }
 .gw-cross { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
+.gw-sentence {
+position: relative; width: 598px; max-width: 100%; margin-top: calc(6px * var(--s));
+}
+@media (max-width: 991px) { .gw-sentence { width: 486px; } }
+@media (max-width: 767px) { .gw-sentence { width: 318px; } }
+@media (max-width: 479px) { .gw-sentence { width: 68.2vw; } }
+.gw-sentence > img {
+display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none;
+}
+.gw-sentence > img + img { position: absolute; inset: 0; opacity: 0; }
+.gw:not(.gw-hdr) .gw-sentence > img + img { display: none; }
 .gw-slider {
 display: none; align-items: center; justify-content: center;
 width: calc(7 * var(--cell) + 6 * var(--gap)); max-width: 100%;
