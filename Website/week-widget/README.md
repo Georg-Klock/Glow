@@ -235,6 +235,11 @@ thing now.
   headroom the plate carries the difference and lit stays the app's grey.
   The six weekday letters that are not today are `#A0A0A0` on every screen
   (`--off-day`).
+- **The note is the glow text now** (on review). The sentence above the
+  card is gone; the page's own "If this text doesn't glow…" note, three
+  lines, sits under the slider as HDR word images — one file per line and
+  step, `Website/glow-note/` — and the plain-text paragraph came off the
+  page. Same stacking and fading as the plates; SDR shows the 1x file alone.
 - **The page tree.** The hero embed moved into the centered section in place
   of the old word-slider embed, ahead of the "if the text above doesn't glow"
   note; the empty section and paragraph went. The Dynamic Island video moved

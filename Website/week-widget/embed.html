@@ -39,7 +39,7 @@
   --tilt-x: 0deg; --tilt-y: 0deg; --shadow-x: 0px; --shadow-y: 0px;
 
   display: flex; flex-direction: column; align-items: center;
-  gap: calc(14px * var(--s));                       /* sentence → card → slider */
+  gap: calc(14px * var(--s));                       /* card → slider → note */
   padding: calc(40px * var(--s)) 0 calc(12px * var(--s));
   perspective: calc(900px * var(--s));
   font-family: 'GW Inter', 'Inter', system-ui, -apple-system, sans-serif;
@@ -182,24 +182,21 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
    SVG-filter rebuild came out flat beside it. No socket underneath. */
 .gw-cross { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
 
-/* ─── The sentence: the site's word images, 12 headroom steps of one line ──
-   One <img> per step, the first in flow and the rest stacked over it; the
-   slider fades between neighbours exactly as it does for the plates. Sized
-   like the site's "Larger Text" style (32 / 26 / 17px / 3.65vw): the images
-   were rendered at 144pt into 2690px, so width = 18.68 × the font size. */
-.gw-sentence {
-  position: relative; width: 598px; max-width: 100%;
-}
-@media (max-width: 991px) { .gw-sentence { width: 486px; } }
-@media (max-width: 767px) { .gw-sentence { width: 318px; } }
-@media (max-width: 479px) { .gw-sentence { width: 68.2vw; } }
-.gw-sentence > img {
-  display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none;
-}
-.gw-sentence > img + img { position: absolute; inset: 0; opacity: 0; }
-.gw:not(.gw-hdr) .gw-sentence > img + img { display: none; }   /* SDR: the 1x image alone */
+/* ─── The note: three lines of the page's own copy, as HDR word images ──
+   Tools/make-glow-word.swift renders each line once per headroom step (Söhne
+   Buch at 68pt, the site's body face at 4x the 17px it is set in); the lines
+   are stacked <img> layers like the plates, and the slider fades between
+   neighbours. Widths are the render's pixel widths at 17px; the stage shrinks
+   with the viewport and the three lines shrink together. The render carries
+   0.32em of vertical air, pulled back with a negative margin so the lines
+   sit on the body's 26px pitch. */
+.gw-note { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 521px; }
+.gw-note-line { position: relative; margin: -1.15% 0; }
+.gw-note-line > img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; }
+.gw-note-line > img + img { position: absolute; inset: 0; opacity: 0; }
+.gw:not(.gw-hdr) .gw-note-line > img + img { display: none; }   /* SDR: the 1x image alone */
 
-/* ─── The slider: headroom from 1x to 12x, shared by card and sentence ──── */
+/* ─── The slider: headroom from 1x to 12x, shared by card and note ──────── */
 .gw-slider {
   display: none; align-items: center; justify-content: center;
   width: calc(7 * var(--cell) + 6 * var(--gap)); max-width: 100%;
@@ -230,7 +227,6 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
 }
 </style>
 <div class="gw" id="gw">
-  <div class="gw-sentence" id="gw-sentence"></div>
   <div class="gw-card" id="gw-card">
     <div class="gw-header" id="gw-header"></div>
     <div class="gw-rows" id="gw-rows"></div>
@@ -240,6 +236,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     <input class="gw-slider-range" id="gw-range" type="range" min="1" max="12" step="any" value="1"
            aria-label="Glow headroom, 1 to 12 times SDR white">
   </div>
+  <div class="gw-note" id="gw-note"></div>
 </div>
 <script>
 (function () {
@@ -471,7 +468,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
       plates.forEach(function (p) { for (var g = MIN_GAIN; g <= MAX_GAIN; g++) plateImage(p, g); });
     }
     applyGainAll();
-    applySentence();
+    applyNote();
   }
 
   // ─── Icons and the missed mark: SDR files, needed on every screen ──────
@@ -621,43 +618,48 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     applyGainAll();
   }
 
-  // ─── The sentence ──────────────────────────────────────────────────────
-  // The page's word images (Tools/make-glow-word.swift): one file per whole
-  // step, 1x written as Display P3 so that "off" is SDR white, like the plates.
-  var sentenceEl = document.getElementById('gw-sentence');
-  var SENTENCE_BASE = 'https://cdn.prod.website-files.com/620d05babdddc967daa0780a/';
-  var SENTENCE_FILES = [
-    '6a89017bcb0222b8afc24bac_gf-1.avif', '6a89017cbf29fd074c0e80e1_gf-2.avif',
-    '6a89017c5a6720774a951823_gf-3.avif', '6a89017c2b38c1350190ae20_gf-4.avif',
-    '6a89017c0005866f610c71c8_gf-5.avif', '6a89017c0005866f610c71dd_gf-6.avif',
-    '6a89db35f80c349f2727615c_gf-7.avif', '6a89db35f6406592c904ddef_gf-8.avif',
-    '6a89dcd4e1fc7cdb75941287_gf-9.avif', '6a89dcd48520ca68809ab080_gf-10.avif',
-    '6a89dcd4590d28ae791f1c52_gf-11.avif', '6a89dcd57eb5ddf9e5a8d6bd_gf-12.avif'
+  // ─── The note ──────────────────────────────────────────────────────────
+  // The page's own copy, one HDR word image per line and headroom step
+  // (Tools/make-glow-word.swift; 1x written as Display P3, the rest PQ).
+  // Widths are the render's pixels; each line is set at 17px, the body size.
+  var noteEl = document.getElementById('gw-note');
+  var NOTE_BASE = 'https://cdn.prod.website-files.com/620d05babdddc967daa0780a/';
+  var NOTE_PT = 68, NOTE_PX = 17, NOTE_H = 154;
+  var NOTE_LINES = [
+    { text: 'If this text doesn’t glow significantly brighter on your current screen,', width: 2082, files: ['6aa49456993a9a6b0fbda68c_gu-note-l1-01.avif', '6aa49457993a9a6b0fbda6b6_gu-note-l1-02.avif', '6aa49457993a9a6b0fbda70f_gu-note-l1-03.avif', '6aa4945748ea33ad49914040_gu-note-l1-04.avif', '6aa49457b4f49881c543b0b9_gu-note-l1-05.avif', '6aa49457a4242aef36ee1b27_gu-note-l1-06.avif', '6aa494575624023334f8dc59_gu-note-l1-07.avif', '6aa494575624023334f8dc8e_gu-note-l1-08.avif', '6aa49458afc1abf295d4a819_gu-note-l1-09.avif', '6aa49458afc1abf295d4a83f_gu-note-l1-10.avif', '6aa494584df93e64c4b16308_gu-note-l1-11.avif', '6aa494585624023334f8dd33_gu-note-l1-12.avif'] },
+    { text: 'please come back on iPhone 12 Pro or newer, MacBook Pro', width: 1808, files: ['6aa494585624023334f8dd59_gu-note-l2-01.avif', '6aa49458afc1abf295d4a8b3_gu-note-l2-02.avif', '6aa49458afc1abf295d4a8dd_gu-note-l2-03.avif', '6aa49459f7bd3eba24e8f702_gu-note-l2-04.avif', '6aa494594df93e64c4b16395_gu-note-l2-05.avif', '6aa4945997ac49d00e319ace_gu-note-l2-06.avif', '6aa49459fe51df7ce929c515_gu-note-l2-07.avif', '6aa49459ad883641884c82bf_gu-note-l2-08.avif', '6aa49459f59d5c30e111db8b_gu-note-l2-09.avif', '6aa4945944fb1ee0978c91d3_gu-note-l2-10.avif', '6aa4945944fb1ee0978c91e8_gu-note-l2-11.avif', '6aa49459afc1abf295d4a951_gu-note-l2-12.avif'] },
+    { text: 'or other HDR capable screens to see the effect.', width: 1464, files: ['6aa49459a4242aef36ee1c14_gu-note-l3-01.avif', '6aa4945948ea33ad4991416d_gu-note-l3-02.avif', '6aa4945a48ea33ad499141a5_gu-note-l3-03.avif', '6aa4945a48ea33ad499141df_gu-note-l3-04.avif', '6aa4945a5624023334f8de98_gu-note-l3-05.avif', '6aa4945a4df93e64c4b163e9_gu-note-l3-06.avif', '6aa4945a97ac49d00e319bcc_gu-note-l3-07.avif', '6aa4945afe51df7ce929c55c_gu-note-l3-08.avif', '6aa4945c48ea33ad49914280_gu-note-l3-09.avif', '6aa4945cc5edb4f69a1f4b81_gu-note-l3-10.avif', '6aa4945c44fb1ee0978c932e_gu-note-l3-11.avif', '6aa4945c3e1276c9eb2b5959_gu-note-l3-12.avif'] }
   ];
-  var sentenceImgs = [];
-  function buildSentence() {
-    SENTENCE_FILES.forEach(function (file, i) {
-      var img = document.createElement('img');
-      img.decoding = 'async'; img.draggable = false;
-      img.alt = i === 0 ? 'An HDR image can be brighter than white.' : '';
-      if (i > 0) img.setAttribute('aria-hidden', 'true');
-      img.width = 2690; img.height = 242;   // the ratio, before the file arrives
-      // Only the 1x file is fetched on a screen without headroom (the CSS
-      // hides the others; the src is set when the HDR path opens).
-      if (i === 0 || hdrQuery.matches) img.src = SENTENCE_BASE + file;
-      sentenceEl.appendChild(img);
-      sentenceImgs.push(img);
+  var noteImgs = [];   // [line][step]
+  function buildNote() {
+    var widest = Math.max.apply(null, NOTE_LINES.map(function (l) { return l.width; }));
+    NOTE_LINES.forEach(function (line, li) {
+      var host = document.createElement('div');
+      host.className = 'gw-note-line';
+      host.style.width = (100 * line.width / widest).toFixed(3) + '%';
+      var imgs = [];
+      line.files.forEach(function (file, i) {
+        var img = document.createElement('img');
+        img.decoding = 'async'; img.draggable = false;
+        img.alt = i === 0 ? line.text : '';
+        if (i > 0) img.setAttribute('aria-hidden', 'true');
+        img.width = line.width; img.height = NOTE_H;
+        if (i === 0 || hdrQuery.matches) img.src = NOTE_BASE + file;
+        host.appendChild(img); imgs.push(img);
+      });
+      noteEl.appendChild(host); noteImgs.push(imgs);
     });
+    noteEl.style.maxWidth = (widest * NOTE_PX / NOTE_PT).toFixed(1) + 'px';
   }
-  function applySentence() {
+  function applyNote() {
     var hdr = hdrQuery.matches;
     var st = steps();
-    sentenceImgs.forEach(function (img, i) {
-      var step = i + 1;
-      if (i > 0 && hdr && !img.src) img.src = SENTENCE_BASE + SENTENCE_FILES[i];
-      // Every step at or below the floor stays opaque underneath, so a
-      // neighbour still decoding never shows a gap; the one above fades in.
-      img.style.opacity = i === 0 ? '1' : step <= st.lower ? '1' : step === st.upper ? String(st.f) : '0';
+    noteImgs.forEach(function (imgs, li) {
+      imgs.forEach(function (img, i) {
+        var step = i + 1;
+        if (i > 0 && hdr && !img.src) img.src = NOTE_BASE + NOTE_LINES[li].files[i];
+        img.style.opacity = i === 0 ? '1' : step <= st.lower ? '1' : step === st.upper ? String(st.f) : '0';
+      });
     });
   }
 
@@ -666,7 +668,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     gainValue = Math.max(MIN_GAIN, Math.min(MAX_GAIN, v));
     outEl.textContent = (Math.round(gainValue * 10) / 10).toString().replace(/\.0$/, '') + '×';
     applyGainAll();
-    applySentence();
+    applyNote();
   }
 
   // The sweep: 1x up to 12x and back, on a loop, eased at both ends. A drag
@@ -748,7 +750,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
   // ─── Boot ──────────────────────────────────────────────────────────────
   function boot(data) {
     useData(data);
-    seed(); buildHeader(); buildRows(); buildSentence();
+    seed(); buildHeader(); buildRows(); buildNote();
     setGain(parseFloat(rangeEl.value) || MIN_GAIN);
     sweepStart();
 
@@ -771,7 +773,7 @@ button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2p
     get set() { return currentSet; }, get hdr() { return hdrQuery.matches; }, get today() { return today; },
     get gain() { return gainValue; }, set gain(v) { sweepStop(); rangeEl.value = v; setGain(v); },
     get sweeping() { return !!sweep.raf; }, sweep: function (on) { if (on) sweepStart(); else sweepStop(); },
-    sentence: function () { return sentenceImgs.map(function (i) { return (i.src ? 'src' : '-') + '@' + i.style.opacity; }); },
+    note: function () { return noteImgs.map(function (imgs) { return imgs.map(function (i) { return (i.src ? 'src' : '-') + '@' + i.style.opacity; }); }); },
     plates: function () { return plates.map(function (p) { return { key: p.key, imgs: Object.keys(p.imgs).map(function (g) { return g + ':' + (p.imgs[g].dataset.state || 'loading') + ':' + p.imgs[g].style.display + '@' + p.imgs[g].style.opacity; }) }; }); },
     rows: function () { return rows.map(function (r) { return { name: r.habit.name, spans: r.spans }; }); }
   };
