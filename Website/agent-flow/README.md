@@ -129,6 +129,29 @@ Assets in use, under
 SF Symbols keep their own aspect ratio, so each is drawn at the ratio of the
 pixels that came out of the renderer; giving them a square box distorts them.
 
+## The Figma source
+
+`https://www.figma.com/design/2f1FOh6vW6BT04slOANEA3` — "Glow Up — agent
+workflow map", in the ME team's drafts. The frame is 940 × 720 and rebuilds the
+embed one to one: same coordinates, same two type sizes, the real marks as
+image fills. Each of the three containers holds its own tiles, so a container
+drags as one unit; the arrows are plain vectors rather than connectors, so a
+tile that moves leaves its arrows behind. A Spec frame beside the map carries
+the width, type and colour notes.
+
+It is a scratchpad for trying arrangements, not the source of truth — this
+directory still is. A change made in Figma has to be written back into
+`embed.html` by hand.
+
+## The width ceiling is 940px
+
+Measured on the published page, not assumed. The embed's own `max-width` of
+960px never applies: the Webflow wrapper it sits in (`.faq`) is 980px wide with
+20px of padding on each side, so the column resolves to exactly 940. That is
+also why the SVG's viewBox is 940 wide — at any other number the 17px and 15px
+type stops being 17 and 15. Widening the map means widening that wrapper, which
+moves every other block on the page with it.
+
 ## Below 768px
 
 The SVG is hidden and a visually-hidden prose stack takes over, which is also
