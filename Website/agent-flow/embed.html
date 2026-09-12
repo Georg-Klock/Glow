@@ -14,8 +14,6 @@
 .af-map .m { text-anchor:middle; }
 .af-map .e { text-anchor:end; }
 .af-map .l { fill:none; stroke:#fff; stroke-width:2; }
-.af-cap { max-width:640px; margin:26px auto 0; color:rgba(255,255,255,0.55); font-size:15px; line-height:1.5; text-align:center; }
-.af-cap b { color:#fff; font-weight:400; }
 .af-stack { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 .af-grp { border:1px solid var(--line); border-radius:16px; padding:16px 18px; margin:0 0 12px; background:var(--card); }
 .af-h { margin:0 0 10px; font-size:17px; color:#fff; }
@@ -39,14 +37,15 @@
 <rect class="grp" x="356" y="151" width="160" height="467" rx="22"/>
 <rect class="grp" x="0" y="222" width="315" height="247" rx="22"/>
 
-<path class="l" marker-end="url(#afa)" d="M233 213 L233 54 L782 54 L782 108"/>
-<path class="l" marker-end="url(#afa)" d="M439 54 L439 109"/>
+<path class="l" d="M233 213 L233 69 A15 15 0 0 1 248 54 L767 54 A15 15 0 0 1 782 69"/>
+<path class="l" marker-end="url(#afa)" d="M782 69 L782 108"/>
+<path class="l" marker-end="url(#afa)" d="M424 54 A15 15 0 0 1 439 69 L439 109"/>
 <path class="l" marker-end="url(#afa)" d="M437 389 L437 409"/>
 <path class="l" marker-end="url(#afa)" d="M524 221 L614 221"/>
 <path class="l" marker-end="url(#afa)" d="M619 351 L524 351"/>
 <path class="l" marker-end="url(#afa)" d="M771 297 L771 373"/>
 <path class="l" marker-end="url(#afa)" d="M795 373 L795 297"/>
-<path class="l" marker-end="url(#afa)" d="M439 632 L439 666 L157 666 L157 486"/>
+<path class="l" marker-end="url(#afa)" d="M439 632 L439 651 A15 15 0 0 1 424 666 L172 666 A15 15 0 0 1 157 651 L157 486"/>
 
 <text class="n" x="299" y="42">writes issues</text>
 <text class="g" x="560" y="42">prompts the agents</text>
@@ -75,7 +74,7 @@
 <rect class="b" x="5" y="348" width="305" height="116" rx="18"/>
 <image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5bc845f5e745c5ce6e8fd_gu-sym-iphone.png" x="146.5" y="363" width="22" height="26"/>
 <text class="n m" x="157.5" y="410">TestFlight on my iPhone</text>
-<text class="s m" x="157.5" y="431">I interact with the latest build<tspan x="157.5" y="446">on real hardware</tspan></text>
+<text class="s m" x="157.5" y="431">I interact with the latest build on real hardware<tspan x="157.5" y="446">45 mins before work and again in the evening</tspan></text>
 
 <rect class="b" x="361" y="156" width="151" height="96" rx="18"/>
 <text class="n m" x="436.5" y="199">Issues</text>
@@ -126,9 +125,9 @@
   </div>
   <p class="af-cross">The glow leaves the machines here, because no gate can judge it.</p>
   <div class="af-grp">
-    <p class="af-h">A human reacts <span>the large loop, the one I am in</span></p>
+    <p class="af-h">A human reacts <span>twice a day, 45 minutes — the large loop, the one I am in</span></p>
     <ol>
-      <li>The latest build <b>ships to my phone each morning</b>. <b>TestFlight on my iPhone</b> is where I interact with it on real hardware.</li>
+      <li>The latest build <b>ships to my phone each morning</b>. <b>TestFlight on my iPhone</b> is where I interact with it on real hardware, 45 minutes before work and again in the evening.</li>
       <li><b>Georg</b>, the only human in the loop, reacts to what it is actually like.</li>
       <li><b>Claude</b> interviews me with the lower models, then <b>writes the issues</b> and the <b>prompts the agents</b> run.</li>
     </ol>
@@ -136,5 +135,4 @@
   </div>
 </div>
 
-<p class="af-cap"><b>One loop with a person in it.</b> The agents work all night and close their own loops: build, test, gate, merge. The one thing they cannot close is the glow, so the latest build is on my phone every morning.</p>
 </div>

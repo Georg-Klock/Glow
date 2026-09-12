@@ -77,6 +77,16 @@ Drawing rules, after several rounds of review:
 - **No crossings.** The layout is chosen so that no two edges cross.
 - **One arrowhead shape**, an open chevron, drawn as a single SVG marker at
   `markerUnits="userSpaceOnUse"` so it does not scale with the 2px stroke.
+- **Elbows are rounded to 15px**, the per-vertex corner radius set on the
+  Figma vectors. SVG has no corner-radius on a polyline, so each turn is a
+  quarter-arc written into the path — `L233 69 A15 15 0 0 1 248 54`. Every
+  turn on this map is clockwise on screen, so the sweep flag is 1 throughout.
+  The two paths Figma overlaps on the shared top rail are merged into one
+  rail plus a branch that peels off it with its own arc, which draws the
+  same picture in fewer characters.
+- **Nothing below the map.** The explanatory caption that used to sit under
+  it is gone; the picture carries its own labels and the paragraph beneath
+  the embed says the rest.
 
 ## The 10,000-character cap
 
