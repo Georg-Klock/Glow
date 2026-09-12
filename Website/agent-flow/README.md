@@ -134,6 +134,27 @@ also why the SVG's viewBox is 940 wide — at any other number the 17px and 15px
 type stops being 17 and 15. Widening the map means widening that wrapper, which
 moves every other block on the page with it.
 
+## The copy under the map has to agree with it
+
+The "Agentically built" block below the embed is separate Webflow copy, and it
+drifted the moment the map changed: it still named Sonnet after the map had
+moved to vendor-level names, and it still said morning *and* evening after the
+map said each morning. Neither is visible from inside the embed, so nothing
+catches it.
+
+The elements, so the next pass does not have to hunt for them. The body is one
+`Body Copy` paragraph, `03864b86-…`, whose lines are separate String children
+separated by breaks — `set_text` on the paragraph itself would flatten those,
+so write each String child instead. Its lines are `3a716e4a-…` (the setup),
+`f744b55c-…43` (the morning slot) and `c5a47560-…aa` (how a change travels).
+The kicker beside the heading is `19b9d9c5-…36`, inside span `7349ee17-…`.
+The two contact lines after them are not ours to touch.
+
+**Match the vocabulary, not just the facts.** The map says Claude and Codex,
+Issues one per change, one branch per change, the suite and CI, merges when
+green. The paragraph now uses those same words, so a reader moving from the
+picture to the prose is not asked to learn two names for one thing.
+
 ## Below 768px
 
 The SVG is hidden and a visually-hidden prose stack takes over, which is also
