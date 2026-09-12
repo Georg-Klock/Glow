@@ -25,31 +25,36 @@ why the emphasised edge runs from My iPhone up to Georg, and why the debug
 phone only sends traces. The debug phone verifies what can be measured; the
 glow is not one of those things.
 
-Drawing rules, after a round of review:
+**GitHub is a place, not a step.** The code lives there, so it is the tallest
+element on the map: a container holding Issues, the pull request, the gates
+and `main`. Work leaves it for the agents and comes back. Fable's plan lands
+in the issue's comments, which is why its tile says so.
 
-- **Straight lines only.** Every connector is a single horizontal or vertical
-  run, or one right-angled elbow for the red return. No curves.
-- **Two type sizes.** 16px for a node's name, 12px for everything else,
-  including edge labels, the loop names and the caption.
+**Sonnet writes twice.** It interviews Georg and then produces both the GitHub
+issues and the prompts the agents run, so it has an edge into GitHub and a
+second one, along the top, into the agent cluster.
+
+Drawing rules, after several rounds of review:
+
+- **Straight lines only**, single horizontal or vertical runs with one elbow
+  where a column change is unavoidable.
+- **The site's own type sizes, nothing invented.** 17px for a node's name and
+  15px for everything else, both taken from `Body Copy` and the site's
+  caption and nav styles. For those numbers to be literal, the SVG is drawn
+  one to one with the column it sits in: the viewBox is `10 0 940 680`,
+  cropping 10px of slack from each side of a 960-wide coordinate space so the
+  drawing renders at exactly 940. If the column width ever changes, change
+  the viewBox width to match or the type will no longer be 17 and 15.
+- **Two type sizes is also the limit of the columns.** At 17 and 15 in a 940px
+  column there is room for four columns, not six: the left pair, Sonnet,
+  GitHub, and the agents. More columns would mean smaller type.
 - **The loops are named** at the foot of each half: the review loop and the
   build loop, each with its cadence.
-- **Icons are SF Symbols**, rasterised white on transparent by AppKit and
-  uploaded as assets: `waveform`, `person.crop.circle`, `iphone`,
-  `laptopcomputer.and.iphone`, `checkmark.seal`, `arrow.triangle.branch`. The
-  renderer is in the session scratchpad; it draws the template image and fills
-  it through `.sourceIn`. The GitHub mark stays, since it is a brand mark
-  rather than an emoji. SF Symbols on the web sits outside Apple's licence for
-  them, the same call that was made for the widget's icons.
-- **Few labels.** Only the ones that carry a condition or a cadence survive:
-  green, red, pull request, debug build, traces, TestFlight, reactions, the
-  glow by eye.
-
-`embed.html` is the whole thing: an inline `<style>`, one SVG, and a text
-stack. No script, no network calls, under Webflow's 10,000-character cap with
-about 500 to spare, so keep new copy short. The SVG is `aria-hidden`; the text
-stack is the screen-reader copy on a wide screen and becomes the whole picture
-below 768px, so the wording only exists once.
-
-Element id on the page: `61c6d399-3896-ca66-3115-2090fd04df8f`, the embed's
-`code` setting. Paste the file's contents there after a change, minus the
-leading HTML comment.
+- **Marks, not emoji**, except for Georg, who is an emoji by request. Sonnet
+  and Fable carry the Claude mark, Codex the OpenAI mark, and the container
+  the GitHub mark. The GitHub path is inline; the other two were rasterised
+  white from their official SVGs and uploaded as assets, because inlining all
+  three would have blown the 10,000-character cap. The two device icons are
+  SF Symbols, `iphone` and `laptopcomputer.and.iphone`, which sits outside
+  Apple's licence for them, the same call made for the widget's icons.
+- **Few labels.** Only the ones carrying a condition or a cadence survive.
