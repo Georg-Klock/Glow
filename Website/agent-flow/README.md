@@ -20,8 +20,29 @@ tethered to the laptop, where agents install debug builds and read the widget
 trace; it sits inside the machine loop. **My iPhone** runs TestFlight and is
 where the app is actually lived with; it sits inside the human loop.
 
-Edges carry a condition or a cadence rather than nothing: green, red, picked
-up, pull request, TestFlight, twice a day.
+**The glow is judged on Georg's own phone, never on the debug phone.** That is
+why the emphasised edge runs from My iPhone up to Georg, and why the debug
+phone only sends traces. The debug phone verifies what can be measured; the
+glow is not one of those things.
+
+Drawing rules, after a round of review:
+
+- **Straight lines only.** Every connector is a single horizontal or vertical
+  run, or one right-angled elbow for the red return. No curves.
+- **Two type sizes.** 16px for a node's name, 12px for everything else,
+  including edge labels, the loop names and the caption.
+- **The loops are named** at the foot of each half: the review loop and the
+  build loop, each with its cadence.
+- **Icons are SF Symbols**, rasterised white on transparent by AppKit and
+  uploaded as assets: `waveform`, `person.crop.circle`, `iphone`,
+  `laptopcomputer.and.iphone`, `checkmark.seal`, `arrow.triangle.branch`. The
+  renderer is in the session scratchpad; it draws the template image and fills
+  it through `.sourceIn`. The GitHub mark stays, since it is a brand mark
+  rather than an emoji. SF Symbols on the web sits outside Apple's licence for
+  them, the same call that was made for the widget's icons.
+- **Few labels.** Only the ones that carry a condition or a cadence survive:
+  green, red, pull request, debug build, traces, TestFlight, reactions, the
+  glow by eye.
 
 `embed.html` is the whole thing: an inline `<style>`, one SVG, and a text
 stack. No script, no network calls, under Webflow's 10,000-character cap with

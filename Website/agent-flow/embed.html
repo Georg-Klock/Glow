@@ -1,150 +1,139 @@
-<!-- Glow Up · how it was built. Two loops, not a line: a machine loop that closes
-     without a person, and a human loop twice a day. One embed, no script, no
-     network calls, under Webflow's 10,000-character cap. -->
+<!-- Glow Up · how it was built. Two named loops on straight lines, SF Symbols,
+     one embed, no script, no network calls beyond the symbol images. -->
 <style>
-.af { --ink:#d9d9d9; --dim:#8a8a8a; --line:rgba(255,255,255,.14); --card:#161616;
-  width:100%; max-width:960px; margin:0 auto; color:var(--ink);
+.af { --ink:#d9d9d9; --dim:#8f8f8f; --line:rgba(255,255,255,.13); --card:#151515;
+  width:100%; max-width:960px; margin:0 auto; padding:8px 0 0; color:var(--ink);
   font-family:'GW Inter','Inter',system-ui,-apple-system,sans-serif; -webkit-font-smoothing:antialiased; }
 .af-map { display:block; width:100%; height:auto; }
 .af-map .b { fill:var(--card); stroke:var(--line); }
-.af-map .b.you { stroke:rgba(255,255,255,.34); }
-.af-map .grp { fill:none; stroke:rgba(255,255,255,.10); }
-.af-map .chip { fill:#1c1c1c; stroke:var(--line); }
-.af-map .t { font-size:15px; font-weight:500; fill:#fff; }
-.af-map .s { font-size:11px; fill:var(--dim); }
-.af-map .e { font-size:10px; fill:var(--dim); }
-.af-map .em { font-size:21px; }
-.af-map .lp { font-size:10.5px; fill:var(--dim); }
-.af-map .f { fill:none; stroke:#c8c8c8; stroke-width:1.4; }
-.af-map .g { fill:none; stroke:#6f6f6f; stroke-width:1.2; }
-.af-map .d { fill:none; stroke:#8a8a8a; stroke-width:1.2; stroke-dasharray:5 4; }
-.af-cap { margin:16px auto 0; max-width:640px; text-align:center; font-size:13px; line-height:1.5; color:var(--dim); }
-.af-cap b { color:#fff; font-weight:500; }
-/* The stack is the screen-reader copy on a wide screen and the whole picture on a narrow one. */
+.af-map .b.you { stroke:rgba(255,255,255,.3); }
+.af-map .grp { fill:none; stroke:rgba(255,255,255,.09); }
+.af-map .chip { fill:#1b1b1b; stroke:var(--line); }
+.af-map .t { font-size:16px; fill:#fff; }
+.af-map .s { font-size:12px; fill:var(--dim); }
+.af-map .w { fill:#fff; }
+.af-map .l { fill:none; stroke:#8f8f8f; stroke-width:1.3; }
+.af-map .l.hi { stroke:#e8e8e8; }
+.af-cap { margin:22px auto 0; max-width:560px; text-align:center; font-size:12px; line-height:1.6; color:var(--dim); }
+.af-cap b { color:#fff; font-weight:400; }
 .af-stack { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
-.af-grp { border:1px solid var(--line); border-radius:16px; padding:14px 16px; margin:0 0 10px; background:var(--card); }
-.af-h { margin:0 0 8px; font-size:14px; color:#fff; }
-.af-h span { display:block; font-size:11px; color:var(--dim); }
-.af-grp ol { margin:0; padding-left:18px; font-size:12.5px; line-height:1.55; color:var(--dim); }
-.af-grp li b { color:#fff; font-weight:500; }
-.af-rep { margin:8px 0 0; font-size:11.5px; color:var(--dim); }
-.af-cross { margin:0 0 10px; font-size:12px; color:var(--dim); text-align:center; }
+.af-grp { border:1px solid var(--line); border-radius:16px; padding:16px 18px; margin:0 0 12px; background:var(--card); }
+.af-h { margin:0 0 10px; font-size:16px; color:#fff; }
+.af-h span { display:block; font-size:12px; color:var(--dim); }
+.af-grp ol { margin:0; padding-left:18px; font-size:12px; line-height:1.6; color:var(--dim); }
+.af-grp li b { color:#fff; font-weight:400; }
+.af-rep { margin:10px 0 0; font-size:12px; color:var(--dim); }
+.af-cross { margin:0 0 12px; font-size:12px; color:var(--dim); text-align:center; }
 @media (max-width:767px) {
   .af-map { display:none; }
   .af-stack { position:static; width:auto; height:auto; overflow:visible; clip-path:none; }
 }
 </style>
 <div class="af">
-<svg class="af-map" viewBox="0 0 940 444" aria-hidden="true">
-<defs>
-<marker id="afa" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 .6 L7.5 4 L0 7.4 z" fill="#c8c8c8"/></marker>
-<marker id="afb" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 .6 L7.5 4 L0 7.4 z" fill="#6f6f6f"/></marker>
-<marker id="afc" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 .6 L7.5 4 L0 7.4 z" fill="#8a8a8a"/></marker>
-</defs>
+<svg class="af-map" viewBox="0 0 960 670" aria-hidden="true">
+<defs><marker id="afa" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 .6 L7.5 4 L0 7.4 z" fill="#8f8f8f"/></marker>
+<marker id="afh" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 .6 L7.5 4 L0 7.4 z" fill="#e8e8e8"/></marker></defs>
 
-<path class="f" marker-end="url(#afa)" d="M206 344 C150 334 112 306 104 280"/>
-<path class="f" marker-end="url(#afa)" d="M104 164 C104 112 142 88 188 87"/>
-<path class="f" marker-end="url(#afa)" d="M370 86 L396 86"/>
-<path class="f" marker-end="url(#afa)" d="M556 86 L612 86"/>
-<path class="f" marker-end="url(#afa)" d="M616 356 L394 353"/>
-<path class="g" marker-end="url(#afb)" d="M884 162 L868 178"/>
-<path class="g" marker-end="url(#afb)" d="M862 296 L862 316"/>
-<path class="g" marker-end="url(#afb)" d="M918 240 C936 214 934 178 920 158"/>
-<path class="g" marker-end="url(#afb)" d="M668 322 L668 296"/>
-<path class="g" marker-end="url(#afb)" d="M700 186 L700 166"/>
-<path class="g" marker-end="url(#afb)" d="M762 97 L776 97"/>
-<path class="d" marker-end="url(#afc)" d="M616 230 L186 226"/>
+<path class="l hi" marker-end="url(#afh)" d="M170 480 L170 400"/>
+<path class="l" marker-end="url(#afa)" d="M170 264 L170 176"/>
+<path class="l" marker-end="url(#afa)" d="M304 108 L352 108"/>
+<path class="l" marker-end="url(#afa)" d="M560 108 L592 108"/>
+<path class="l" marker-end="url(#afa)" d="M592 548 L304 548"/>
+<path class="l" marker-end="url(#afa)" d="M867 212 L867 264"/>
+<path class="l" marker-end="url(#afa)" d="M867 400 L867 480"/>
+<path class="l" marker-end="url(#afa)" d="M661 480 L661 400"/>
+<path class="l" marker-end="url(#afa)" d="M661 264 L661 212"/>
+<path class="l" marker-end="url(#afa)" d="M932 300 L948 300 L948 186 L938 186"/>
+<path class="l" marker-end="url(#afa)" d="M750 126 L776 126"/>
 
-<text class="e" x="116" y="120">reactions</text>
-<text class="e" x="190" y="298" text-anchor="end">twice a day</text>
-<text class="e" x="383" y="76" text-anchor="middle">writes</text>
-<text class="e" x="584" y="76" text-anchor="middle">picked up</text>
-<text class="e" x="505" y="344" text-anchor="middle">TestFlight</text>
-<text class="e" x="852" y="176" text-anchor="end">pull request</text>
-<text class="e" x="872" y="312">green</text>
-<text class="e" x="906" y="196" text-anchor="end">red</text>
-<text class="e" x="658" y="310" text-anchor="end">debug build</text>
-<text class="e" x="690" y="178" text-anchor="end">trace, screenshots</text>
-<text class="e" x="402" y="217" text-anchor="middle">the glow, by eye</text>
+<text class="s" x="186" y="226">reactions</text>
+<text class="s" x="186" y="444">the glow, by eye</text>
+<text class="s" x="448" y="536" text-anchor="middle">TestFlight</text>
+<text class="s" x="653" y="242" text-anchor="end">traces</text>
+<text class="s" x="859" y="242" text-anchor="end">pull request</text>
+<text class="s" x="653" y="446" text-anchor="end">debug build</text>
+<text class="s" x="859" y="446" text-anchor="end">green</text>
+<text class="s" x="940" y="248" text-anchor="end">red</text>
 
-<rect class="b you" x="24" y="168" width="156" height="106" rx="20"/>
-<text class="em" x="102" y="202" text-anchor="middle">🧑‍🎨</text>
-<text class="t" x="102" y="230" text-anchor="middle">Georg</text>
-<text class="s" x="102" y="248" text-anchor="middle">designer, the only</text>
-<text class="s" x="102" y="263" text-anchor="middle">person in the loop</text>
+<rect class="b" x="40" y="44" width="260" height="128" rx="20"/>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5bc8203fdb721de4ca395_gu-sym-waveform.png" x="155" y="64" width="30" height="30"/>
+<text class="t" x="170" y="124" text-anchor="middle">Sonnet</text>
+<text class="s" x="170" y="145" text-anchor="middle">interviews me,</text>
+<text class="s" x="170" y="162" text-anchor="middle">writes the issues</text>
 
-<rect class="b" x="196" y="36" width="174" height="100" rx="20"/>
-<text class="em" x="283" y="68" text-anchor="middle">🎙️</text>
-<text class="t" x="283" y="94" text-anchor="middle">Sonnet</text>
-<text class="s" x="283" y="112" text-anchor="middle">interviews me,</text>
-<text class="s" x="283" y="127" text-anchor="middle">writes the issues</text>
+<rect class="b you" x="40" y="268" width="260" height="128" rx="20"/>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5bc8452ac9a6ac3eb49bd_gu-sym-person-crop-circle.png" x="154" y="288" width="31" height="30"/>
+<text class="t" x="170" y="348" text-anchor="middle">Georg</text>
+<text class="s" x="170" y="369" text-anchor="middle">designer, the only</text>
+<text class="s" x="170" y="386" text-anchor="middle">person in the loop</text>
 
-<rect class="b" x="402" y="36" width="152" height="100" rx="20"/>
-<g transform="translate(466,48) scale(1.5)"><path fill="#fff" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></g>
-<text class="t" x="478" y="98" text-anchor="middle">Issues</text>
-<text class="s" x="478" y="116" text-anchor="middle">one per change</text>
+<rect class="b" x="40" y="484" width="260" height="128" rx="20"/>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5bc845f5e745c5ce6e8fd_gu-sym-iphone.png" x="157" y="504" width="26" height="30"/>
+<text class="t" x="170" y="564" text-anchor="middle">My iPhone</text>
+<text class="s" x="170" y="585" text-anchor="middle">TestFlight, where I</text>
+<text class="s" x="170" y="602" text-anchor="middle">judge the glow</text>
 
-<rect class="b" x="196" y="300" width="174" height="106" rx="20"/>
-<text class="em" x="283" y="334" text-anchor="middle">📱</text>
-<text class="t" x="283" y="362" text-anchor="middle">My iPhone</text>
-<text class="s" x="283" y="380" text-anchor="middle">TestFlight, where I</text>
-<text class="s" x="283" y="395" text-anchor="middle">live with the app</text>
+<rect class="b" x="356" y="44" width="200" height="128" rx="20"/>
+<g transform="translate(441,64) scale(1.9)"><path fill="#fff" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></g>
+<text class="t" x="456" y="124" text-anchor="middle">Issues</text>
+<text class="s" x="456" y="145" text-anchor="middle">one per change</text>
 
-<rect class="grp" x="620" y="28" width="296" height="136" rx="22"/>
-<text class="e" x="634" y="48">several agents at once</text>
-<rect class="chip" x="634" y="58" width="128" height="78" rx="14"/>
-<text class="t" x="698" y="88" text-anchor="middle">Fable</text>
-<text class="s" x="698" y="106" text-anchor="middle">reads the issue,</text>
-<text class="s" x="698" y="121" text-anchor="middle">plans the change</text>
-<rect class="chip" x="776" y="58" width="126" height="78" rx="14"/>
-<text class="t" x="839" y="88" text-anchor="middle">Codex</text>
-<text class="s" x="839" y="106" text-anchor="middle">the heavy</text>
-<text class="s" x="839" y="121" text-anchor="middle">implementation</text>
-<text class="e" x="769" y="154" text-anchor="middle">when it is heavy</text>
+<rect class="grp" x="596" y="36" width="336" height="172" rx="22"/>
+<text class="s" x="612" y="60">several agents at once</text>
+<rect class="chip" x="612" y="76" width="134" height="100" rx="16"/>
+<text class="t" x="679" y="116" text-anchor="middle">Fable</text>
+<text class="s" x="679" y="137" text-anchor="middle">reads the issue,</text>
+<text class="s" x="679" y="154" text-anchor="middle">plans the change</text>
+<rect class="chip" x="782" y="76" width="134" height="100" rx="16"/>
+<text class="t" x="849" y="116" text-anchor="middle">Codex</text>
+<text class="s" x="849" y="137" text-anchor="middle">the heavy</text>
+<text class="s" x="849" y="154" text-anchor="middle">implementation</text>
+<text class="s" x="764" y="198" text-anchor="middle">when it is heavy</text>
 
-<path class="b" d="M862 184 L918 240 L862 296 L806 240 z"/>
-<text class="em" x="862" y="230" text-anchor="middle" style="font-size:16px">✅</text>
-<text class="t" x="862" y="250" text-anchor="middle" style="font-size:13px">gates</text>
-<text class="s" x="862" y="265" text-anchor="middle" style="font-size:9.5px">suite, CI</text>
+<rect class="b" x="596" y="268" width="130" height="128" rx="20"/>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5bc84d2239e4e497dd198_gu-sym-laptopcomputer-and-iphone.png" x="640" y="290" width="42" height="26"/>
+<text class="t" x="661" y="348" text-anchor="middle">Debug phone</text>
+<text class="s" x="661" y="369" text-anchor="middle">old, tethered</text>
+<text class="s" x="661" y="386" text-anchor="middle">to the laptop</text>
 
-<rect class="b" x="620" y="186" width="160" height="106" rx="20"/>
-<text class="em" x="700" y="218" text-anchor="middle">📱</text>
-<text class="t" x="700" y="244" text-anchor="middle">Debug phone</text>
-<text class="s" x="700" y="262" text-anchor="middle">old, tethered</text>
-<text class="s" x="700" y="277" text-anchor="middle">to the laptop</text>
+<rect class="b" x="802" y="268" width="130" height="128" rx="20"/>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5bc841570e5cd50dceb22_gu-sym-checkmark-seal.png" x="852" y="288" width="30" height="30"/>
+<text class="t" x="867" y="348" text-anchor="middle">Gates</text>
+<text class="s" x="867" y="369" text-anchor="middle">the suite and CI</text>
 
-<rect class="b" x="620" y="322" width="296" height="88" rx="20"/>
-<text class="t" x="768" y="354" text-anchor="middle">main</text>
-<text class="s" x="768" y="374" text-anchor="middle">protected, auto-merge when green</text>
-<text class="s" x="768" y="390" text-anchor="middle">releases go on to the App Store</text>
+<rect class="b" x="596" y="484" width="336" height="128" rx="20"/>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5bc851570e5cd50dceb41_gu-sym-arrow-triangle-branch.png" x="749" y="506" width="31" height="28"/>
+<text class="t" x="764" y="564" text-anchor="middle">main</text>
+<text class="s" x="764" y="585" text-anchor="middle">protected, auto-merge when green</text>
+<text class="s" x="764" y="602" text-anchor="middle">releases go on to the App Store</text>
 
-<text class="lp" x="283" y="436" text-anchor="middle">the human loop · twice a day, 45 minutes</text>
-<text class="lp" x="768" y="436" text-anchor="middle">the machine loop · minutes, around the clock</text>
+<text class="s" x="170" y="648" text-anchor="middle"><tspan class="w">The review loop</tspan> · twice a day, 45 minutes</text>
+<text class="s" x="764" y="648" text-anchor="middle"><tspan class="w">The build loop</tspan> · minutes, around the clock</text>
 </svg>
 
 <div class="af-stack">
   <div class="af-grp">
-    <p class="af-h">The machine loop <span>minutes, around the clock, no person in it</span></p>
+    <p class="af-h">The build loop <span>minutes, around the clock, no person in it</span></p>
     <ol>
       <li><b>Issues</b>, one per change.</li>
       <li><b>Fable</b> reads one and plans it; <b>Codex</b> takes the heavy implementation when it is heavy.</li>
       <li><b>Gates</b>, the Xcode suite and CI. Red sends it straight back to the agents.</li>
       <li><b>main</b>, protected, auto-merge when green. Releases go on to the App Store.</li>
-      <li><b>Debug phone</b>, an old iPhone tethered to the laptop. Debug builds land there and its traces and screenshots go back to the agents.</li>
+      <li><b>Debug phone</b>, an old iPhone tethered to the laptop. Debug builds land there and its traces go back to the agents.</li>
     </ol>
     <p class="af-rep">Then round again, without me.</p>
   </div>
-  <p class="af-cross">The glow is the one thing no gate can judge, because a simulator has no headroom. That question crosses to me, by eye.</p>
+  <p class="af-cross">The glow is judged in the other loop, on my own phone, by eye.</p>
   <div class="af-grp">
-    <p class="af-h">The human loop <span>twice a day, 45 minutes before and after work</span></p>
+    <p class="af-h">The review loop <span>twice a day, 45 minutes before and after work</span></p>
     <ol>
-      <li><b>TestFlight</b> puts the build on <b>my iPhone</b>, where I live with the app.</li>
+      <li><b>TestFlight</b> puts the build on <b>my iPhone</b>, the only place I judge the glow.</li>
       <li><b>I react</b> to what it is actually like.</li>
-      <li><b>Sonnet</b> interviews me and writes the issues, which start the loop above.</li>
+      <li><b>Sonnet</b> interviews me and writes the issues, which start the build loop.</li>
     </ol>
-    <p class="af-rep">Back into the machine loop.</p>
+    <p class="af-rep">Back into the build loop.</p>
   </div>
 </div>
 
-<p class="af-cap"><b>Two loops at different speeds.</b> The fast one closes without me. The glow is the one thing it cannot judge, so that crosses the middle and comes to my eye.</p>
+<p class="af-cap"><b>Two loops.</b> The build loop closes without me. The glow is judged only on my own phone, by eye, which is the one thing no gate can do.</p>
 </div>
