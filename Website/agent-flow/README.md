@@ -1,102 +1,82 @@
 # The agent-workflow map
 
 One HTML Embed on georgklock.com/glow-up, above the "Agentically built" item
-(page `6a88c6481cb44deb7e573ab2`, element `61c6d399-…`). It replaced a linear
-strip of six cards, which drew the process as a waterfall with a loop caption.
-The system is not a line, so the map draws what it is:
+(page `6a88c6481cb44deb7e573ab2`, element `61c6d399-…`). The current drawing was
+laid out by Georg in Figma (node 4:2 of the file below) and implemented from
+there; the coordinates in `embed.html` are that node's coordinates, so the two
+can be diffed.
+
+**Four panels, read anticlockwise.** *Human reacts* on the left, *GitHub* in the
+middle, *Agents work all Night* on the right with a nested *Swift Code* group
+holding the two test machines. Work leaves GitHub for the agents, comes back as
+a tested pull request, passes the gates, merges to main, and ships to the phone
+each morning — which closes the one loop a person is in.
+
+**The type scale here is 15 and 12**, not the site's 17 and 15. The tiles are
+150px wide in this layout and the site's sizes do not fit them. 12px is not on
+the site's scale, so it is a deliberate exception rather than a number to copy
+elsewhere; grey #8f8f8f on the #151515 tile measures 5.65:1, which clears AA.
 
 **The edges are the subject, not the tiles.** Every arrow carries the name of
-the interaction it stands for — *writes it up*, *picks it up*, *opens a PR*,
-*checks run*, *red, again*, *green, merged*, *builds and runs*, *results,
-traces*, *TestFlight*, *the glow, by eye*, *reactions*, *prompts the agents*.
-An unnamed arrow says two things are connected; a named one says how. The map
-is read by following them, so nothing on it is joined without a word.
+the interaction it stands for — *writes issues*, *prompts the agents*, *pulls in
+the issue backlog*, *tested builds, PR to main*, *Agents tests as they build*,
+*ships the latest build to my phone each morning*. An unnamed arrow says two
+things are connected; a named one says how.
 
-Three loops, two of them small and one of them large:
-
-- **The test loop.** The agents build and run the change on two kinds of
-  machine and read what comes back. Two arrows, *builds and runs* down and
-  *results, traces* up, minutes at a time.
-- **The gate loop.** The pull request and the gates, *checks run* down and
-  *red, again* up, until it is green. Both of these close inside the machine
-  half of the picture and neither of them needs a person.
-- **The feedback loop**, the large one, twice a day and 45 minutes long. `main`
-  to TestFlight to **my iPhone**, then Georg, then Claude, then back into the
-  issues. Its four edges are drawn brighter and heavier than everything else,
-  because it is the loop that a person is standing in.
-
-**The crossing.** A simulator has no headroom, so no gate can judge the glow.
-That question leaves the machines and goes to a person — the brightened edge
-from My iPhone to Georg.
-
-Two phones, deliberately distinct. The **debug phone** is an old iPhone
-tethered to the laptop, where agents install debug builds and read the widget
-trace; it sits inside the test loop. **My iPhone** runs TestFlight and is
-where the app is actually lived with; it sits inside the feedback loop.
-
-**The glow is judged on Georg's own phone, never on the debug phone.** That is
-why the emphasised edge runs from My iPhone up to Georg, and why the debug
-phone only sends results back to the agents. The debug phone verifies what can
-be measured; the glow is not one of those things.
-
-**Testing is a group, not a node.** The simulators on the laptop and the debug
-phone are two kinds of the same thing, so they share a container: dozens of
-runs with no hardware on one side, one real device on the other. Both take
-work from the agents and send results back.
+**Two phones, deliberately distinct.** The **Debug Phone** is an old iPhone
+tethered to the laptop, tested against by the agents all night. **TestFlight on
+my iPhone** is where the app is actually lived with. The glow is judged on
+Georg's own phone and never on the debug phone — that is the whole reason the
+left panel exists.
 
 **GitHub is a place, not a step.** The code lives there, so it is the tallest
-element on the map: a container holding Issues, the pull request, the gates
-and `main`. Work leaves it for the agents and comes back, and two of the
-three loops close inside it. The plan for a change lands in the issue's own
-comments, which is why the Claude tile says so.
+element on the map: a container holding Issues, the pull request, the gates and
+main. Work leaves it for the agents and comes back.
 
 **Two words for the agents, not five.** The map says **Claude** and **Codex**
-and nothing finer. Which Claude or which Codex model is running is a decision
-that changes by the week — Fable, Opus, Terra were all on this map at one point
-— and a drawing that has to be redrawn when a model is swapped is a drawing
-that will go stale. The tiles say what each vendor's model does here: Claude
-plans the change in the issue and writes most of the code, Codex takes the
-heavy implementation and the cheaper long sessions.
+and nothing finer. Which model is running changes by the week — Fable, Opus and
+Terra have each been on this map inside a day — and a drawing that has to be
+redrawn when a model is swapped is a drawing that will go stale. Terra is a
+Codex model; Sonnet is a Claude one. The tiles say what each vendor's models do
+here rather than naming them.
 
-**Claude appears twice, on purpose.** Once in the feedback loop, where it
-interviews Georg and writes the issues, and once in the agents group, where it
-plans and codes. Two different jobs in two different loops, and the group
-headers are what tell them apart.
+**Claude appears twice, on purpose.** Once on the left, where the lower models
+interview Georg and write the issues, and once in the agents panel, where the
+higher models plan and the lower ones code.
 
 Drawing rules, after several rounds of review:
 
 - **Straight lines only**, single horizontal or vertical runs with one elbow
   where a column change is unavoidable.
-- **The site's own type sizes, nothing invented.** 17px for a node's name and
-  15px for everything else, both taken from `Body Copy` and the site's
-  caption and nav styles. For those numbers to be literal, the SVG is drawn
-  one to one with the column it sits in: the viewBox is `10 0 940 720`,
-  cropping 10px of slack from each side of a 960-wide coordinate space so the
+- **Headings stay at the site's 17px**, and the tiles use 15 and 12 (see
+  above). For any of those numbers to be literal, the SVG is drawn
+  one to one with the column it sits in: the viewBox is `0 0 940 752`,
+  matching the Figma frame one to one so the
   drawing renders at exactly 940. If the column width ever changes, change
-  the viewBox width to match or the type will no longer be 17 and 15.
-- **Three columns of nodes, two of them grouped.** At 17 and 15 in a 940px
-  column, the left stack, the GitHub container and the right-hand containers
-  are what fits — and the labelled edges need roughly 100px of corridor
-  between them. Depth beyond that is bought with nesting, not with more
-  columns.
+  the viewBox width to match or the stated sizes stop being literal.
+- **Three columns of panels.** The labelled edges need roughly 90px of
+  corridor between them. Depth beyond three columns is bought with nesting —
+  the testing group sits inside the agents group — not with more columns.
 - **Every edge is labelled**, and the label sits along the edge rather than
   inside a tile. This is what sets the corridor widths: the columns are sized
   so that a two- or three-word label fits between them without touching
   either side.
-- **The loops are named** at the foot of each half, each with its cadence, and
-  the large loop is drawn in a brighter stroke so it reads as one ring rather
-  than four separate arrows.
+- **The panels are named** above themselves, centred, and the naming carries
+  the cadence: *all Night* against *each morning*.
 - **Group headings are centred** over their containers.
 - **Marks, not emoji**, except for Georg, who is an emoji by request. Both
-  Claude tiles carry the Claude mark, Codex the OpenAI mark, and the
-  container the GitHub mark. The device icons are SF Symbols too:
-  `iphone`, `laptopcomputer.and.iphone` and `macwindow`, which sits
-  outside Apple's licence for them, the same call made for the widget's icons.
-- **No crossings.** The layout is chosen so that no two edges cross. The one
-  that forced it was the red return from the gates: sent back to the agents it
-  has to cross the corridor twice, so it is drawn where it actually lands — on
-  the pull request, as another commit — which turns a crossing into a visible
-  loop.
+  Claude tiles carry the Claude mark, Codex the OpenAI mark, the middle panel
+  the GitHub mark, and the Swift Code heading the Swift bird. The device icons
+  are SF Symbols — `iphone`, `laptopcomputer.and.iphone` and `macwindow` —
+  which sits outside Apple's licence for them, the same call made for the
+  widget's icons.
+
+  Two of those sit in 26×26 boxes in the Figma file with the glyph hanging
+  over the edge. The implementation keeps the glyph's own size (30×22 and
+  34×21) and drops the clip, because clipping an SF Symbol cuts its corners.
+- **No crossings.** The layout is chosen so that no two edges cross.
+- **One arrowhead shape**, an open chevron, drawn as a single SVG marker at
+  `markerUnits="userSpaceOnUse"` so it does not scale with the 2px stroke.
 
 ## The 10,000-character cap
 
@@ -125,6 +105,7 @@ Assets in use, under
 | `6aa5bc845f5e745c5ce6e8fd_gu-sym-iphone.png` | 22 × 26 |
 | `6aa5bc84d2239e4e497dd198_gu-sym-laptopcomputer-and-iphone.png` | 34 × 21 |
 | `6aa5c72066e38c411ad07c82_gu-sym-macwindow.png` | 30 × 22 |
+| `6aa5dff443db9787bc13897d_gu-logo-swift.png` | 24 × 22 |
 
 SF Symbols keep their own aspect ratio, so each is drawn at the ratio of the
 pixels that came out of the renderer; giving them a square box distorts them.
@@ -132,16 +113,17 @@ pixels that came out of the renderer; giving them a square box distorts them.
 ## The Figma source
 
 `https://www.figma.com/design/2f1FOh6vW6BT04slOANEA3` — "Glow Up — agent
-workflow map", in the ME team's drafts. The frame is 940 × 720 and rebuilds the
-embed one to one: same coordinates, same two type sizes, the real marks as
+workflow map", in the ME team's drafts. Node 4:2 is the live layout at 940 × 752;
+the frame rebuilds the embed one to one: same coordinates, same two type sizes, the real marks as
 image fills. Each of the three containers holds its own tiles, so a container
 drags as one unit; the arrows are plain vectors rather than connectors, so a
 tile that moves leaves its arrows behind. A Spec frame beside the map carries
 the width, type and colour notes.
 
-It is a scratchpad for trying arrangements, not the source of truth — this
-directory still is. A change made in Figma has to be written back into
-`embed.html` by hand.
+Figma is where the layout is decided and this directory is what ships. A change
+made there has to be written back into `embed.html` by hand — read the node
+with `get_design_context`, then take exact geometry off the vector networks
+with `use_figma`, because the exported reference code rounds and duplicates.
 
 ## The width ceiling is 940px
 
