@@ -64,13 +64,15 @@ Drawing rules, after several rounds of review:
 - **The panels are named** above themselves, centred, and the naming carries
   the cadence: *all Night* against *each morning*.
 - **Group headings are centred** over their containers.
-- **Two corner radii and one inset.** Outer containers are 28, inner tiles 18,
-  and every tile sits 10px inside its container on each side it touches, with
-  5px between siblings. The tiles carry no stroke — the fill step from #0e0e0e
-  to #151515 is what separates them. Because the containers keep the heights
-  from the Figma file, honouring a 10px inset makes the tile heights differ
-  slightly between groups: 111 in the left and agent groups, 106 in the testing
-  group, 96 in the GitHub column.
+- **Two corner radii and one spacing number.** Outer containers are 28, inner
+  tiles 18, and 10px is the only gap in the picture: every tile sits 10px
+  inside its container on each side it touches, and 10px from its neighbours.
+  The tiles carry no stroke — the fill step from #0e0e0e to #151515 is what
+  separates them. The containers keep the heights from the Figma file, so the
+  tiles are what give: 108.5 tall in the left and agent groups, 106 in the
+  testing group, 104.25 in the GitHub column, and 142.5 wide in every
+  two-up row. Fractional values are deliberate — the alternative is rounding
+  the tiles and letting the gaps drift off 10.
 - **Arrows are white at two opacities**, not two colours. Full strength for the
   three edges a person is on — writes issues, tested builds back to the pull
   request, and the build shipping to the phone — and 40% for the machine
