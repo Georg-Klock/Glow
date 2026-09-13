@@ -64,15 +64,25 @@ Drawing rules, after several rounds of review:
 - **The panels are named** above themselves, centred, and the naming carries
   the cadence: *all Night* against *each morning*.
 - **Group headings are centred** over their containers.
-- **Two corner radii and one spacing number.** Outer containers are 28, inner
-  tiles 18, and 10px is the only gap in the picture: every tile sits 10px
-  inside its container on each side it touches, and 10px from its neighbours.
-  The tiles carry no stroke — the fill step from #0e0e0e to #151515 is what
-  separates them. The containers keep the heights from the Figma file, so the
-  tiles are what give: 108.5 tall in the left and agent groups, 106 in the
-  testing group, 104.25 in the GitHub column, and 142.5 wide in every
-  two-up row. Fractional values are deliberate — the alternative is rounding
-  the tiles and letting the gaps drift off 10.
+- **Two corner radii, one tile height, four text rows.** Outer containers are
+  28, inner tiles 18, and every tile in the map is 108.5 tall. That one number
+  is what makes the text line up: each tile lays its content out identically —
+  a 26px icon slot, the name, then the description, 86px in all, centred — so
+  every name sits 57.75 below its tile's top. Tiles that share a top therefore
+  share a baseline, and the map resolves into four rows at 164, 282.5, 415 and
+  533.5. The GitHub tiles keep the icon slot even though it is empty; without
+  it their text would sit 13px high of the rest.
+- **10px is the only gap, with one exception.** Every tile sits 10px inside its
+  container and 10px from its neighbours. The exception is the gutter between
+  Pull Request and Gates, which is 24 because it has to hold an arrow — at 10
+  the arrowhead is longer than the line it sits on.
+- **The containers were resized to fit, not the other way round.** Holding one
+  tile height meant the GitHub column growing to 498 tall and starting at 154
+  like the other two, and the testing group moving to 405. That is the trade:
+  the Figma container sizes cannot all divide into a common tile height, so
+  either the containers move or the rows do not line up.
+- **The tiles carry no stroke.** The fill step from #0e0e0e to #151515 is what
+  separates them.
 - **Arrows are white at two opacities**, not two colours. Full strength for the
   three edges a person is on — writes issues, tested builds back to the pull
   request, and the build shipping to the phone — and 40% for the machine
