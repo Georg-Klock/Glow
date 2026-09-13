@@ -12,10 +12,16 @@ holding the two test machines. Work leaves GitHub for the agents, comes back as
 a tested pull request, passes the gates, merges to main, and ships to the phone
 each morning — which closes the one loop a person is in.
 
-**The type scale here is 15 and 12**, not the site's 17 and 15. The tiles are
-150px wide in this layout and the site's sizes do not fit them. 12px is not on
-the site's scale, so it is a deliberate exception rather than a number to copy
-elsewhere; grey #8f8f8f on the #151515 tile measures 5.65:1, which clears AA.
+**The type scale here is 17 and 12.** 17 is the site's body copy, used for the
+group headings, the tile names and the two loop labels. 12 carries the tile
+descriptions and the small edge labels; it is not on the site's scale, which
+runs 17 / 15 / 10, so treat it as this drawing's exception rather than a number
+to copy elsewhere. Grey #8f8f8f on the #151515 tile measures 5.65:1, which
+clears AA at that size.
+
+The names were 15 until the switch to Söhne. Söhne Buch runs about 6% narrower
+than Inter, which is what made 17 fit the 140px-wide GitHub tiles at all — the
+longest of them, "Pull Request", measures 95 in a 140 tile.
 
 **The edges are the subject, not the tiles.** Every arrow carries the name of
 the interaction it stands for — *writes issues*, *prompts the agents*, *pulls in
