@@ -149,6 +149,25 @@ Assets in use, under
 SF Symbols keep their own aspect ratio, so each is drawn at the ratio of the
 pixels that came out of the renderer; giving them a square box distorts them.
 
+## Typeface
+
+The map is set in **Söhne Buch**, the family the rest of georgklock.com uses:
+`'Soehne Buch','Sohne Buch',Arial,sans-serif`. Both spellings are in the stack
+because the site declares two `@font-face` names for the same font — headings
+resolve to "Soehne Buch" and the body to "Sohne Buch".
+
+It was on Inter until 2026-09-12, inherited from the hero widget's stack, which
+self-hosts Inter as `GW Inter` for the HDR word plates. That is the widget's
+requirement, not the map's, and copying the stack put the map in a different
+family from every other word on the page.
+
+**Figma cannot match this.** Söhne is licensed and is not available to the
+file — `listAvailableFontsAsync` returns nothing for it — so the Figma twin
+stays in Inter and runs about 6% wide as a result. Nothing overflows at that
+difference, but it means the Figma render is not a pixel preview of the page.
+Installing Söhne locally would let the desktop app offer it, and the file could
+then be switched.
+
 ## The Figma source
 
 `https://www.figma.com/design/2f1FOh6vW6BT04slOANEA3` — "Glow Up — agent
