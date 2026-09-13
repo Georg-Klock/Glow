@@ -1,0 +1,784 @@
+<!-- Glow Up · "This Week" hero. Built by build-embed.py — edit the template, not embed.html. -->
+<style>
+/* ─── Geometry ───────────────────────────────────────────────────────────
+   Everything is the app's 24pt reference cell times one scale, --s, so the
+   ratios in WidgetMetrics / SlotLayout / GlowShape survive at every tier.
+   The tiers are discrete on purpose: a plate is a fixed raster and the CSS
+   below must land on the exact sizes the plates were cut at. */
+.gw { --s: 2; }                                   /* desktop: 48px cell */
+@media (max-width: 959px) { .gw { --s: 1.5; } }   /* tablet:  36px cell */
+@media (max-width: 599px) { .gw { --s: 0.875; } } /* mobile:  21px cell */
+
+.gw {
+  --cell: calc(24px * var(--s));
+  --gap: calc(8px * var(--s));           /* SlotLayout.gapRatio 8/24 — both axes */
+  --text: calc(12px * var(--s));         /* WidgetMetrics.textSize */
+  --icon-w: calc(24px * var(--s));       /* WidgetMetrics.iconWidth */
+  --icon-gap: calc(2.25px * var(--s));   /* WidgetMetrics.iconGap */
+  --label-w: calc(98px * var(--s));      /* WidgetMetrics.labelWidth */
+  --label-gap: calc(4px * var(--s));     /* WidgetMetrics.labelGap */
+  --header-h: calc(14px * var(--s));     /* WidgetMetrics.headerHeight */
+  --header-gap: calc(4px * var(--s));    /* WidgetMetrics.headerGap */
+  --inset: calc(1px * var(--s));         /* GlowShape.socketInset */
+  --ring: calc(1px * var(--s));          /* GlowShape.ringWeight */
+  --bevel: calc(1.5px * var(--s));       /* SlotMarkView.bevel = cell/16 */
+  --well: calc(6px * var(--s));          /* SlotMarkView.well = cell/4 */
+  --pad-l: calc(6px * var(--s));         /* WidgetMetrics.padLeading */
+  --pad-r: calc(14px * var(--s));        /* WidgetMetrics.padTrailing */
+  --pad-t: calc(10px * var(--s));        /* WidgetMetrics.padTop */
+  --pad-b: calc(14px * var(--s));        /* WidgetMetrics.padBottom */
+  --radius: calc(22px * var(--s));
+  --card: #202020;                       /* the widget's material over a dark wallpaper, measured
+                                            on the App Store frame (mode 28–32); every plate's
+                                            surround is cut in this exact colour */
+  --lit: #D9D9D9;                        /* GlowPalette.lit */
+  --resting: rgba(217, 217, 217, 0.5);   /* GlowPalette.greyResting — marks only, never text */
+  --emitting-sdr: #FFFFFF;               /* what emitting means on a screen without headroom */
+  --lit-sdr: #B4B4B4;                    /* lit type on a screen without headroom: a step below the
+                                            app's lit, so white reads as the glow it stands in for */
+  --off-day: #A0A0A0;                    /* the six weekday letters that are not today */
+  --tilt-x: 0deg; --tilt-y: 0deg; --shadow-x: 0px; --shadow-y: 0px;
+
+  display: flex; flex-direction: column; align-items: center;
+  gap: calc(14px * var(--s));                       /* card → slider → note */
+  padding: calc(40px * var(--s)) 0 calc(12px * var(--s));
+  perspective: calc(900px * var(--s));
+  font-family: 'GW Inter', 'Inter', system-ui, -apple-system, sans-serif;
+  font-weight: 400; font-synthesis: none;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  user-select: none; -webkit-user-select: none;
+}
+.gw *, .gw *::before, .gw *::after { box-sizing: border-box; }
+.gw img { max-width: none; }             /* Webflow's global img rule squashed the word slider */
+
+/* ─── The card ─────────────────────────────────────────────────────────── */
+.gw-card {
+  position: relative;
+  background: var(--card) center / cover no-repeat;   /* the JS adds the glass texture over it */
+  border-radius: var(--radius);
+  padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
+  transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  transform-style: preserve-3d;
+  box-shadow:
+    var(--shadow-x) calc(var(--shadow-y) + 18px * var(--s)) calc(48px * var(--s)) rgba(0, 0, 0, 0.42),
+    var(--shadow-x) calc(var(--shadow-y) + 4px * var(--s)) calc(12px * var(--s)) rgba(0, 0, 0, 0.28);
+  will-change: transform;
+}
+
+/* ─── Header ───────────────────────────────────────────────────────────── */
+.gw-header {
+  display: flex; align-items: center; gap: var(--label-gap);
+  height: var(--header-h); margin-bottom: var(--header-gap);
+}
+.gw-header-spacer { width: var(--label-w); flex: none; }
+.gw-days { display: flex; gap: var(--gap); }
+.gw-day {
+  width: var(--cell); display: flex; justify-content: center; align-items: center;
+}
+
+/* ─── Rows ─────────────────────────────────────────────────────────────── */
+.gw-rows { display: flex; flex-direction: column; gap: var(--gap); }
+.gw-row { display: flex; align-items: center; gap: var(--label-gap); height: var(--cell); }
+.gw-row.is-spacer { height: var(--cell); }
+.gw-label {
+  width: var(--label-w); flex: none; display: flex; align-items: center; overflow: hidden;
+}
+.gw-icon-col {
+  width: var(--icon-w); flex: none; display: flex; justify-content: center;
+  margin-right: var(--icon-gap);
+}
+
+/* ─── Type: live text, with the plate over it ─────────────────────────── */
+.gw-t {
+  position: relative; display: inline-block; white-space: nowrap;
+  font-size: var(--text);
+  /* Inter's ascent + descent (0.96875 + 0.2421875 em). The plate was cut on
+     the same typographic box, so with this line height the two share a
+     baseline. If the font is ever swapped, this number goes with it. */
+  line-height: 1.2109375;
+  color: var(--lit);
+}
+.gw-t.is-emitting { color: var(--emitting-sdr); }
+/* On a screen with headroom the plate carries the difference; without one it
+   is white against grey, and the app's lit grey is too close to white to read
+   at a glance, so lit type drops a step there. The off-day letters are darker
+   on every screen: today is the one that matters. */
+.gw-day-t { color: var(--off-day); }
+.gw:not(.gw-hdr) .gw-t, .gw:not(.gw-hdr) .gw-i { color: var(--lit-sdr); }
+.gw:not(.gw-hdr) .gw-day-t { color: var(--off-day); }
+.gw-day-t.is-emitting, .gw:not(.gw-hdr) .gw-t.is-emitting, .gw:not(.gw-hdr) .gw-i.is-emitting { color: var(--emitting-sdr); }
+/* The icon is the habit's SF Symbol. The lit tier is a PNG alpha mask of the
+   symbol, painted in the current colour through mask-image, so the two tiers
+   share one outline; the emitting tier is the plate over it. Size and mask
+   come from the manifest, per icon, because a symbol is its own size. */
+.gw-i {
+  position: relative; display: block; color: var(--lit);
+}
+.gw-i.is-emitting { color: var(--emitting-sdr); }
+.gw-i > .gw-live {
+  display: block; width: 100%; height: 100%; background: currentColor;
+  -webkit-mask: var(--mask) center / 100% 100% no-repeat; mask: var(--mask) center / 100% 100% no-repeat;
+}
+.gw-live { display: inline; }
+
+/* The plates: one per headroom step from 1x, shown only on a screen with
+   headroom, over an element that is emitting. The script sets each one's
+   display and opacity from the slider; between two steps the upper plate
+   fades in over the lower one. The live CSS twin never takes part: it is
+   rasterised by the browser and the plates by CoreText, and a cross-fade
+   between the two reads as the letters moving. */
+.gw-plate {
+  position: absolute; display: none; pointer-events: none;
+  /* Clipped to its own shape, so the opaque surround a PQ file has to carry
+     never reaches the screen — not as a seam on a card of another colour, and
+     not as the darker rectangle a tone-mapped surround makes on a screen
+     without headroom. */
+  -webkit-mask: var(--mask) 0 0 / 100% 100% no-repeat; mask: var(--mask) 0 0 / 100% 100% no-repeat;
+}
+.gw-hdr .is-emitting.has-plate > .gw-live { visibility: hidden; }
+
+/* ─── Marks ────────────────────────────────────────────────────────────── */
+.gw-track {
+  position: relative; flex: none;
+  width: calc(7 * var(--cell) + 6 * var(--gap)); height: var(--cell);
+}
+.gw-span {
+  position: absolute; top: 0; height: var(--cell);
+  left: calc(var(--first) * (var(--cell) + var(--gap)));
+  width: calc(var(--n) * var(--cell) + (var(--n) - 1) * var(--gap));
+  margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit;
+  -webkit-appearance: none; appearance: none;
+}
+.gw-icon-col { position: relative; }
+button.gw-span { cursor: pointer; }
+button.gw-span:focus-visible { outline: 2px solid var(--lit); outline-offset: 2px; border-radius: 999px; }
+
+/* The socket: SlotMarkView.socket — 15% black, a black bevel on the top
+   edge and a 13% white one on the bottom. On #000 only the bottom rim shows,
+   which is how the This Week screen looks too. */
+.gw-socket {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.15);
+  box-shadow:
+    inset 0 var(--bevel) calc(2 * var(--bevel)) #000,
+    inset 0 calc(-1 * var(--bevel)) calc(2 * var(--bevel)) rgba(255, 255, 255, 0.13);
+}
+/* Done: SlotMarkView.doneMark — the lit fill, a white rim at the top, a 30%
+   black one at the bottom, and a soft well a quarter-cell deep. */
+.gw-done {
+  position: absolute; inset: var(--inset); border-radius: 999px;
+  background: var(--lit);
+  box-shadow:
+    inset 0 var(--well) calc(2 * var(--well)) rgba(0, 0, 0, 0.25),
+    inset 0 calc(-1 * var(--inset)) calc(2 * var(--inset)) rgba(0, 0, 0, 0.30),
+    inset 0 var(--inset) calc(2 * var(--inset)) #fff;
+}
+/* Open: the ring. Live version is the SDR fallback; the plate sits over it. */
+.gw-ring {
+  position: absolute; inset: var(--inset); border-radius: 999px;
+  border: var(--ring) solid var(--emitting-sdr);
+}
+/* Missed: the app's own CrossShape and its three inner shadows, rendered by
+   the app's SwiftUI code into a PNG with alpha (make-week-plates.swift). An
+   SVG-filter rebuild came out flat beside it. No socket underneath. */
+.gw-cross { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
+
+/* ─── The note: three lines of the page's own copy, as HDR word images ──
+   Tools/make-glow-word.swift renders each line once per headroom step (Söhne
+   Buch at 68pt, the site's body face at 4x the 17px it is set in); the lines
+   are stacked <img> layers like the plates, and the slider fades between
+   neighbours. Widths are the render's pixel widths at 17px; the stage shrinks
+   with the viewport and the three lines shrink together. The render carries
+   0.32em of vertical air, pulled back with a negative margin so the lines
+   sit on the body's 26px pitch. */
+.gw-note { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 521px; }
+.gw-note-line { position: relative; margin: -1.15% 0; }
+.gw-note-line > img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; }
+.gw-note-line > img + img { position: absolute; inset: 0; opacity: 0; }
+.gw:not(.gw-hdr) .gw-note-line > img + img { display: none; }   /* SDR: the 1x image alone */
+
+/* ─── The slider: headroom from 1x to 12x, shared by card and note ──────── */
+.gw-slider {
+  display: none; align-items: center; justify-content: center;
+  width: calc(7 * var(--cell) + 6 * var(--gap)); max-width: 100%;
+  column-gap: calc(8px * var(--s));
+}
+.gw-hdr .gw-slider { display: flex; }   /* on a screen without headroom there is nothing to slide */
+.gw-slider-out {
+  flex: 0 0 auto; min-width: 2.6em; text-align: right;
+  font-size: calc(7.5px * var(--s)); color: #fff; font-variant-numeric: tabular-nums;
+}
+.gw-slider-range {
+  -webkit-appearance: none; appearance: none; flex: 1 1 auto; margin: 0;
+  height: calc(1px * var(--s)); border-radius: 2px; background: rgba(255, 255, 255, 0.3); outline: none;
+}
+.gw-slider-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: calc(11px * var(--s)); height: calc(11px * var(--s));
+  border-radius: 50%; background: #fff; cursor: pointer;
+}
+.gw-slider-range::-moz-range-thumb {
+  width: calc(11px * var(--s)); height: calc(11px * var(--s)); border: 0; border-radius: 50%; background: #fff; cursor: pointer;
+}
+.gw-slider-range:focus-visible { outline: 2px solid #fff; outline-offset: 6px; }
+
+/* ─── Motion ───────────────────────────────────────────────────────────── */
+.gw-card { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .gw-card { transform: none !important; }
+}
+</style>
+
+<div class="gw" id="gw">
+  <div class="gw-card" id="gw-card">
+    <div class="gw-header" id="gw-header"></div>
+    <div class="gw-rows" id="gw-rows"></div>
+  </div>
+  <div class="gw-slider">
+    <output class="gw-slider-out" id="gw-out">1×</output>
+    <input class="gw-slider-range" id="gw-range" type="range" min="1" max="12" step="any" value="1"
+           aria-label="Glow headroom, 1 to 12 times SDR white">
+  </div>
+  <div class="gw-note" id="gw-note"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ─── Assets ────────────────────────────────────────────────────────────
+  // Every plate, per tier, density and headroom step, as make-week-plates.swift
+  // wrote it, with sizes and offsets in CSS pixels relative to the element the
+  // plate sits over; the icon masks; the missed mark; and where the files
+  // live. build-embed.py either inlines all of it here or, for Webflow's
+  // 10,000-character code blocks, writes it to one JSON asset named on the
+  // root element's data-manifest attribute and inlines null.
+  var INLINE = __INLINE__;
+  var MANIFESTS, ASSET_MAP, ASSET_BASE;
+  function useData(data) {
+    MANIFESTS = data.manifests || {};
+    // File name → URL. Webflow prefixes every upload with a hash, so the page
+    // cannot guess a file's address from its name. Empty means
+    // ASSET_BASE/<set>/<file>, the layout of the repository's assets/.
+    ASSET_MAP = window.GLOW_WEEK_ASSET_MAP || data.assetMap || {};
+    ASSET_BASE = window.GLOW_WEEK_ASSET_BASE || data.assetBase || '';
+  }
+
+  // ─── Content ───────────────────────────────────────────────────────────
+  // The app's default seed list, in order. The card always shows the same
+  // Thursday: `pattern` is the demo's history, the columns (Monday = 0) that
+  // count as completed before today; `doneToday` marks a habit already
+  // logged today, so its mark is a lit disc and its name and icon do not
+  // emit — the same tier the app gives a completion. `miss` is a day a daily
+  // habit was skipped, relative to today.
+  var TODAY = 3;                                          // Thursday, always
+  var HABITS = [
+    { slug: 'gratitude',   name: 'Gratitude',   target: 7, miss: -2 },
+    { slug: 'stretch',     name: 'Stretch',     target: 4, pattern: [0, 1] },
+    { slug: 'read-book',   name: 'Read Book',   target: 4, pattern: [0, 2] },
+    { slug: 'workout',     name: 'Workout',     target: 3, pattern: [0, 1], doneToday: true },   // complete for the week
+    { slug: 'vo2-max',     name: 'VO2 Max',     target: 2, pattern: [2], doneToday: true },      // complete for the week
+    { slug: 'tutorial',    name: 'Tutorial',    target: 3, pattern: [0, 2], doneToday: true },   // complete for the week
+    { slug: 'sunset',      name: 'Sunset',      target: 3, pattern: [0, 1] },
+    { slug: 'early-night', name: 'Early night', target: 7, miss: -1 }
+  ];
+  var LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];   // Monday start, hardcoded for the demo
+  var LAST = 6;
+  var MIN_GAIN = 1, MAX_GAIN = 12;                       // the slider's range; plates exist for every whole step
+
+  // ─── Placement: WeekSpans.dividedWithoutRestDay + assignColumns, ported ─
+  // A habit due N times draws N marks against seven columns. Completions
+  // anchor on their day, lost reps are one-day ✕ on the earliest blank past
+  // day, the open mark reaches back over unused days and ends on today (or
+  // on Sunday when it is the final rep), and future reps divide what is left
+  // with the remainder to the right. docs/week-marks.md §4.
+  function widths(columns, count) {
+    if (count <= 0 || columns < count) return [];
+    var base = Math.floor(columns / count), extra = columns % count, out = [];
+    for (var i = 0; i < count; i++) out.push(base + (i >= count - extra ? 1 : 0));
+    return out;
+  }
+  function assignColumns(marks) {
+    var count = marks.length, ends = [], previousEnd = -1, previousIndex = -1, i;
+    for (i = 0; i < count; i++) {
+      ends.push(null);
+      if (marks[i].anchor === null) continue;
+      var low = previousEnd + (i - previousIndex);
+      var high = LAST - (count - 1 - i);
+      var isFinal = i === count - 1 && (marks[i].state === 'done' || marks[i].state === 'open');
+      var end = isFinal ? LAST : Math.max(low, Math.min(marks[i].anchor, high));
+      ends[i] = end; previousEnd = end; previousIndex = i;
+    }
+    var spans = [], cursor = 0, runStart = 0;
+    function push(mark, first, last) { spans.push({ state: mark.state, first: first, last: last }); }
+    for (i = 0; i < count; i++) {
+      if (ends[i] === null) continue;
+      var w = widths(ends[i] - cursor, i - runStart), k;
+      for (k = 0; k < w.length; k++) { push(marks[runStart + k], cursor, cursor + w[k] - 1); cursor += w[k]; }
+      var first = marks[i].state === 'missed' ? ends[i] : cursor;
+      push(marks[i], first, ends[i]);
+      cursor = ends[i] + 1; runStart = i + 1;
+    }
+    var tail = widths(LAST - cursor + 1, count - runStart);
+    for (i = 0; i < tail.length; i++) { push(marks[runStart + i], cursor, cursor + tail[i] - 1); cursor += tail[i]; }
+    return spans;
+  }
+  function rowSpans(target, completed, today) {
+    var done = Object.keys(completed).map(Number).sort(function (a, b) { return a - b; });
+    var doneToday = !!completed[today];
+    var repsLeft = Math.max(0, target - done.length);
+    var actionableLeft = 0, c;
+    for (c = today; c <= LAST; c++) if (!completed[c]) actionableLeft++;
+    var lost = Math.max(0, repsLeft - actionableLeft), live = repsLeft - lost;
+    var blankPast = [];
+    for (c = 0; c < today; c++) if (!completed[c]) blankPast.push(c);
+    var anchored = done.map(function (d) { return { state: 'done', anchor: d }; });
+    blankPast.slice(0, lost).forEach(function (d) { anchored.push({ state: 'missed', anchor: d }); });
+    var canOpen = live > 0 && !doneToday;
+    if (canOpen) anchored.push({ state: 'open', anchor: today });
+    anchored.sort(function (a, b) { return a.anchor - b.anchor; });
+    var upcoming = live - (canOpen ? 1 : 0);
+    for (c = 0; c < upcoming; c++) anchored.push({ state: 'upcoming', anchor: null });
+    return assignColumns(anchored);
+  }
+
+  // ─── State ─────────────────────────────────────────────────────────────
+  // In memory only. Nothing here is stored or sent; a reload starts over.
+  var root = document.getElementById('gw');
+  if (!root) return;   // site-wide code on a page without the card
+  var card = document.getElementById('gw-card');
+  var headerEl = document.getElementById('gw-header');
+  var rowsEl = document.getElementById('gw-rows');
+  var rangeEl = document.getElementById('gw-range');
+  var outEl = document.getElementById('gw-out');
+  var today = todayIndex();
+  var rows = [];
+  var gainValue = 1;                                     // the floor; the sweep takes it up from here
+
+  function todayIndex() { return TODAY; }               // not the visitor's date: the demo is one fixed week
+
+  function seed() {
+    today = todayIndex();
+    rows = HABITS.map(function (h) {
+      var completed = {}, c;
+      if (h.target === 7) {
+        for (c = 0; c < today; c++) if (c !== today + h.miss) completed[c] = true;
+      } else {
+        h.pattern.forEach(function (d) { if (d < today) completed[d] = true; });
+        if (h.doneToday) completed[today] = true;
+      }
+      return { habit: h, completed: completed, spans: [] };
+    });
+  }
+
+  // ─── Sets and files ────────────────────────────────────────────────────
+  var hdrQuery = window.matchMedia('(dynamic-range: high)');
+  var tierQueries = {
+    mobile: window.matchMedia('(max-width: 599px)'),
+    tablet: window.matchMedia('(min-width: 600px) and (max-width: 959px)')
+  };
+  var currentSet = null;
+
+  function chooseSet() {
+    var tier = tierQueries.mobile.matches ? 'mobile' : tierQueries.tablet.matches ? 'tablet' : 'desktop';
+    var dpr = window.devicePixelRatio || 1, best = null, bestDpr = 0;
+    Object.keys(MANIFESTS).forEach(function (name) {
+      var m = MANIFESTS[name];
+      if (m.tier !== tier) return;
+      // The smallest density that is not below the screen's; else the largest.
+      if (best === null || (m.dpr >= dpr && (bestDpr < dpr || m.dpr < bestDpr)) || (bestDpr < dpr && m.dpr > bestDpr)) {
+        best = name; bestDpr = m.dpr;
+      }
+    });
+    return best;
+  }
+  function assetURL(file) {
+    return ASSET_MAP[file] || (ASSET_BASE + currentSet + '/' + file);
+  }
+
+  // ─── Plates ────────────────────────────────────────────────────────────
+  // Every emitting host on the page: its key into the manifest and one <img>
+  // per headroom step it has needed so far. Nothing is fetched until the
+  // slider (or the default 2x) asks for that step, on a screen with headroom.
+  var plates = [];
+  function plate(host, key) {
+    var p = { host: host, key: key, imgs: {} };
+    plates.push(p);
+    return p;
+  }
+  function plateImage(p, gain) {
+    if (p.imgs[gain]) return p.imgs[gain];
+    var entry = MANIFESTS[currentSet] && MANIFESTS[currentSet].plates[p.key];
+    if (!entry || !entry.files[gain]) return null;
+    var img = document.createElement('img');
+    img.className = 'gw-plate'; img.alt = ''; img.setAttribute('aria-hidden', 'true');
+    img.decoding = 'async'; img.draggable = false;
+    img.style.width = entry.cssWidth + 'px'; img.style.height = entry.cssHeight + 'px';
+    img.style.left = entry.offsetLeft + 'px'; img.style.top = entry.offsetTop + 'px';
+    img.style.setProperty('--mask', 'url("' + assetURL(entry.mask) + '")');
+    var url = assetURL(entry.files[gain]);
+    // A file the server happily sends but the decoder refuses (the odd-grid
+    // AVIF in docs/glow.md) arrives as `error`, not as a 404, and a file that
+    // loads but has no pixels reports naturalWidth 0. Both keep the live
+    // element and never show a broken-image icon.
+    img.onerror = function () { img.dataset.state = 'broken'; applyGain(p); };
+    img.onload = function () { img.dataset.state = img.naturalWidth ? 'ready' : 'broken'; applyGain(p); };
+    img.src = url;
+    p.host.appendChild(img);
+    p.imgs[gain] = img;
+    return img;
+  }
+  function ready(img) { return !!img && img.dataset.state === 'ready'; }
+
+  /// The slider's value as the two plates that show it: `lower` at full
+  /// opacity, `upper` faded in by `f`. 1x is a plate like the others.
+  function steps() {
+    var v = Math.max(MIN_GAIN, Math.min(MAX_GAIN, gainValue));
+    var lower = Math.floor(v), upper = Math.min(MAX_GAIN, Math.ceil(v));
+    return { lower: lower, upper: upper, f: v - lower };
+  }
+  function applyGain(p) {
+    // A plate is the emitting tier and nothing else: a name, icon or letter
+    // that is merely lit keeps its live CSS twin and shows no plate at all.
+    var wantHDR = hdrQuery.matches && currentSet && p.host.classList.contains('is-emitting');
+    var st = steps();
+    var lower = wantHDR ? plateImage(p, st.lower) : null;
+    var upper = wantHDR && st.upper !== st.lower ? plateImage(p, st.upper) : null;
+    var covered = wantHDR && ready(lower);
+    Object.keys(p.imgs).forEach(function (g) {
+      var img = p.imgs[g];
+      var on = wantHDR && ((img === lower && covered) || (img === upper && ready(upper) && st.f > 0));
+      img.style.display = on ? 'block' : 'none';
+      img.style.opacity = img === upper ? String(st.f) : '1';
+    });
+    p.host.classList.toggle('has-plate', !!covered);
+  }
+  function applyGainAll() { plates.forEach(applyGain); }
+
+  function loadPlates() {
+    var wantHDR = hdrQuery.matches;
+    root.classList.toggle('gw-hdr', wantHDR);
+    var set = chooseSet();
+    if (set !== currentSet) {
+      currentSet = set;
+      plates.forEach(function (p) {
+        Object.keys(p.imgs).forEach(function (g) { p.imgs[g].remove(); });
+        p.imgs = {};
+      });
+      applyMasks();
+      applyCard();
+    }
+    if (wantHDR && set) {
+      plates.forEach(function (p) { for (var g = MIN_GAIN; g <= MAX_GAIN; g++) plateImage(p, g); });
+    }
+    applyGainAll();
+    applyNote();
+  }
+
+  // ─── Icons and the missed mark: SDR files, needed on every screen ──────
+  var iconHosts = [], missedImgs = [];
+  function applyMasks() {
+    var m = MANIFESTS[currentSet];
+    iconHosts.forEach(function (h) {
+      var mask = m && m.masks && m.masks[h.dataset.slug];
+      if (!mask) { h.style.removeProperty('--mask'); return; }
+      h.style.width = mask.cssWidth + 'px'; h.style.height = mask.cssHeight + 'px';
+      h.style.setProperty('--mask', 'url("' + assetURL(mask.file) + '")');
+    });
+    missedImgs.forEach(function (img) {
+      if (m && m.missed && m.missed.file) img.src = assetURL(m.missed.file);
+    });
+  }
+
+  // The card's glass: the widget's material over the wallpaper, lifted from
+  // the App Store frame and inpainted where marks and text stood. One image
+  // for every tier; the corner radius and the marks are drawn on top.
+  function applyCard() {
+    var m = MANIFESTS[currentSet];
+    if (m && m.card && m.card.file) {
+      card.style.backgroundImage = 'url("' + (ASSET_MAP[m.card.file] || (ASSET_BASE + m.card.file)) + '")';
+    }
+  }
+
+  // ─── Render ────────────────────────────────────────────────────────────
+  function textNode(text, key, className) {
+    var host = document.createElement('span');
+    host.className = 'gw-t ' + (className || '');
+    var live = document.createElement('span'); live.className = 'gw-live'; live.textContent = text;
+    host.appendChild(live);
+    plate(host, key);
+    return host;
+  }
+  function iconNode(slug) {
+    var host = document.createElement('span');
+    host.className = 'gw-i'; host.dataset.slug = slug;
+    var live = document.createElement('span'); live.className = 'gw-live';
+    host.appendChild(live);
+    iconHosts.push(host);
+    plate(host, 'icon-' + slug);
+    return host;
+  }
+  function missedNode() {
+    var img = document.createElement('img');
+    img.className = 'gw-cross'; img.alt = ''; img.setAttribute('aria-hidden', 'true'); img.draggable = false;
+    missedImgs.push(img);
+    return img;
+  }
+
+  function buildHeader() {
+    headerEl.innerHTML = '';
+    var spacer = document.createElement('div'); spacer.className = 'gw-header-spacer';
+    headerEl.appendChild(spacer);
+    var days = document.createElement('div'); days.className = 'gw-days';
+    LETTERS.forEach(function (letter, i) {
+      var day = document.createElement('div'); day.className = 'gw-day';
+      var t = textNode(letter, 'day-' + letter, 'gw-day-t');
+      t.dataset.column = i;
+      day.appendChild(t); days.appendChild(day);
+    });
+    headerEl.appendChild(days);
+  }
+
+  function buildRows() {
+    rowsEl.innerHTML = '';
+    iconHosts = []; missedImgs = [];
+    plates = plates.filter(function (p) { return headerEl.contains(p.host); });
+    rows.forEach(function (row, index) {
+      var el = document.createElement('div'); el.className = 'gw-row';
+      var label = document.createElement('div'); label.className = 'gw-label';
+      var iconCol = document.createElement('div'); iconCol.className = 'gw-icon-col';
+      row.icon = iconNode(row.habit.slug);
+      iconCol.appendChild(row.icon);
+      row.name = textNode(row.habit.name, 'name-' + row.habit.slug, 'gw-name');
+      label.appendChild(iconCol); label.appendChild(row.name);
+      var track = document.createElement('div'); track.className = 'gw-track';
+      row.track = track;
+      el.appendChild(label); el.appendChild(track);
+      rowsEl.appendChild(el);
+      renderRow(index);
+    });
+    loadPlates();
+    updateTiers();
+  }
+
+  function renderRow(index) {
+    var row = rows[index];
+    row.spans = rowSpans(row.habit.target, row.completed, today);
+    row.track.innerHTML = '';
+    missedImgs = missedImgs.filter(function (img) { return document.contains(img); });
+    row.spans.forEach(function (span) {
+      var n = span.last - span.first + 1;
+      var tappable = span.state === 'open' || (span.state === 'done' && span.first <= today && today <= span.last && row.completed[today]);
+      var el = document.createElement(tappable ? 'button' : 'div');
+      el.className = 'gw-span is-' + span.state;
+      el.style.setProperty('--first', span.first);
+      el.style.setProperty('--n', n);
+      if (tappable) {
+        el.type = 'button';
+        el.setAttribute('aria-label', row.habit.name + (span.state === 'open' ? ', open today. Mark done' : ', done today. Undo'));
+        el.addEventListener('click', function () { toggleToday(index); });
+      }
+      if (span.state === 'missed') {
+        el.appendChild(missedNode());
+      } else {
+        var socket = document.createElement('div'); socket.className = 'gw-socket'; el.appendChild(socket);
+        if (span.state === 'done') {
+          var done = document.createElement('div'); done.className = 'gw-done'; el.appendChild(done);
+        } else if (span.state === 'open') {
+          var ring = document.createElement('div'); ring.className = 'gw-ring gw-live'; el.appendChild(ring);
+          el.classList.add('is-emitting');
+          plate(el, 'ring-' + n);
+        }
+      }
+      row.track.appendChild(el);
+    });
+  }
+
+  function toggleToday(index) {
+    var row = rows[index];
+    if (row.completed[today]) delete row.completed[today]; else row.completed[today] = true;
+    // Invariant 7: completing today changes the open window to filled without
+    // moving the remaining future windows, so the row can simply be redrawn.
+    plates = plates.filter(function (p) { return !row.track.contains(p.host); });
+    renderRow(index);
+    applyMasks();
+    updateTiers();          // ends by re-applying the plates: the tier decides what glows
+  }
+
+  // TypeTier: a name and its icon emit while the row has an open mark today;
+  // today's letter emits while any row does. Everything else is lit.
+  function updateTiers() {
+    var anyOpen = false;
+    rows.forEach(function (row) {
+      var open = row.spans.some(function (s) { return s.state === 'open'; });
+      anyOpen = anyOpen || open;
+      row.name.classList.toggle('is-emitting', open);
+      row.icon.classList.toggle('is-emitting', open);
+    });
+    var letters = headerEl.querySelectorAll('.gw-day-t');
+    for (var i = 0; i < letters.length; i++) {
+      letters[i].classList.toggle('is-emitting', i === today && anyOpen);
+    }
+    applyGainAll();
+  }
+
+  // ─── The note ──────────────────────────────────────────────────────────
+  // The page's own copy, one HDR word image per line and headroom step
+  // (Tools/make-glow-word.swift; 1x written as Display P3, the rest PQ).
+  // Widths are the render's pixels; each line is set at 17px, the body size.
+  var noteEl = document.getElementById('gw-note');
+  var NOTE_BASE = 'https://cdn.prod.website-files.com/620d05babdddc967daa0780a/';
+  var NOTE_PT = 68, NOTE_PX = 17, NOTE_H = 154;
+  var NOTE_LINES = [
+    { text: 'If this text doesn’t glow significantly brighter on your current screen,', width: 2082, files: ['6aa49456993a9a6b0fbda68c_gu-note-l1-01.avif', '6aa49457993a9a6b0fbda6b6_gu-note-l1-02.avif', '6aa49457993a9a6b0fbda70f_gu-note-l1-03.avif', '6aa4945748ea33ad49914040_gu-note-l1-04.avif', '6aa49457b4f49881c543b0b9_gu-note-l1-05.avif', '6aa49457a4242aef36ee1b27_gu-note-l1-06.avif', '6aa494575624023334f8dc59_gu-note-l1-07.avif', '6aa494575624023334f8dc8e_gu-note-l1-08.avif', '6aa49458afc1abf295d4a819_gu-note-l1-09.avif', '6aa49458afc1abf295d4a83f_gu-note-l1-10.avif', '6aa494584df93e64c4b16308_gu-note-l1-11.avif', '6aa494585624023334f8dd33_gu-note-l1-12.avif'] },
+    { text: 'please come back on iPhone 12 Pro or newer, MacBook Pro', width: 1808, files: ['6aa494585624023334f8dd59_gu-note-l2-01.avif', '6aa49458afc1abf295d4a8b3_gu-note-l2-02.avif', '6aa49458afc1abf295d4a8dd_gu-note-l2-03.avif', '6aa49459f7bd3eba24e8f702_gu-note-l2-04.avif', '6aa494594df93e64c4b16395_gu-note-l2-05.avif', '6aa4945997ac49d00e319ace_gu-note-l2-06.avif', '6aa49459fe51df7ce929c515_gu-note-l2-07.avif', '6aa49459ad883641884c82bf_gu-note-l2-08.avif', '6aa49459f59d5c30e111db8b_gu-note-l2-09.avif', '6aa4945944fb1ee0978c91d3_gu-note-l2-10.avif', '6aa4945944fb1ee0978c91e8_gu-note-l2-11.avif', '6aa49459afc1abf295d4a951_gu-note-l2-12.avif'] },
+    { text: 'or other HDR capable screens to see the effect.', width: 1464, files: ['6aa49459a4242aef36ee1c14_gu-note-l3-01.avif', '6aa4945948ea33ad4991416d_gu-note-l3-02.avif', '6aa4945a48ea33ad499141a5_gu-note-l3-03.avif', '6aa4945a48ea33ad499141df_gu-note-l3-04.avif', '6aa4945a5624023334f8de98_gu-note-l3-05.avif', '6aa4945a4df93e64c4b163e9_gu-note-l3-06.avif', '6aa4945a97ac49d00e319bcc_gu-note-l3-07.avif', '6aa4945afe51df7ce929c55c_gu-note-l3-08.avif', '6aa4945c48ea33ad49914280_gu-note-l3-09.avif', '6aa4945cc5edb4f69a1f4b81_gu-note-l3-10.avif', '6aa4945c44fb1ee0978c932e_gu-note-l3-11.avif', '6aa4945c3e1276c9eb2b5959_gu-note-l3-12.avif'] }
+  ];
+  var noteImgs = [];   // [line][step]
+  function buildNote() {
+    var widest = Math.max.apply(null, NOTE_LINES.map(function (l) { return l.width; }));
+    NOTE_LINES.forEach(function (line, li) {
+      var host = document.createElement('div');
+      host.className = 'gw-note-line';
+      host.style.width = (100 * line.width / widest).toFixed(3) + '%';
+      var imgs = [];
+      line.files.forEach(function (file, i) {
+        var img = document.createElement('img');
+        img.decoding = 'async'; img.draggable = false;
+        img.alt = i === 0 ? line.text : '';
+        if (i > 0) img.setAttribute('aria-hidden', 'true');
+        img.width = line.width; img.height = NOTE_H;
+        if (i === 0 || hdrQuery.matches) img.src = NOTE_BASE + file;
+        host.appendChild(img); imgs.push(img);
+      });
+      noteEl.appendChild(host); noteImgs.push(imgs);
+    });
+    noteEl.style.maxWidth = (widest * NOTE_PX / NOTE_PT).toFixed(1) + 'px';
+  }
+  function applyNote() {
+    var hdr = hdrQuery.matches;
+    var st = steps();
+    noteImgs.forEach(function (imgs, li) {
+      imgs.forEach(function (img, i) {
+        var step = i + 1;
+        if (i > 0 && hdr && !img.src) img.src = NOTE_BASE + NOTE_LINES[li].files[i];
+        img.style.opacity = i === 0 ? '1' : step <= st.lower ? '1' : step === st.upper ? String(st.f) : '0';
+      });
+    });
+  }
+
+  // ─── The slider ────────────────────────────────────────────────────────
+  function setGain(v) {
+    gainValue = Math.max(MIN_GAIN, Math.min(MAX_GAIN, v));
+    outEl.textContent = (Math.round(gainValue * 10) / 10).toString().replace(/\.0$/, '') + '×';
+    applyGainAll();
+    applyNote();
+  }
+
+  // The sweep: 1x up to 12x and back, on a loop, eased at both ends. A drag
+  // takes over and the loop resumes from where the visitor left it once
+  // they have let go for a while. Under reduced motion it holds at the top.
+  var SWEEP_MS = 5200, SWEEP_RESUME_MS = 4000;
+  var sweep = { raf: 0, timer: 0, dir: 1 };
+  function sweepPass() {
+    var from = gainValue, to = sweep.dir > 0 ? MAX_GAIN : MIN_GAIN;
+    var span = Math.abs(to - from);
+    if (span < 0.01) { sweep.dir = -sweep.dir; to = sweep.dir > 0 ? MAX_GAIN : MIN_GAIN; span = Math.abs(to - from); }
+    var duration = SWEEP_MS * span / (MAX_GAIN - MIN_GAIN);
+    var t0 = performance.now();
+    function frame(now) {
+      var p = Math.min(1, (now - t0) / duration);
+      var e = 0.5 - Math.cos(Math.PI * p) / 2;
+      var v = from + (to - from) * e;
+      rangeEl.value = v; setGain(v);
+      if (p < 1) { sweep.raf = requestAnimationFrame(frame); return; }
+      sweep.dir = -sweep.dir;
+      sweep.raf = requestAnimationFrame(function () { sweepPass(); });
+    }
+    sweep.raf = requestAnimationFrame(frame);
+  }
+  function sweepStop() {
+    if (sweep.raf) cancelAnimationFrame(sweep.raf);
+    if (sweep.timer) clearTimeout(sweep.timer);
+    sweep.raf = sweep.timer = 0;
+  }
+  function sweepStart() {
+    sweepStop();
+    if (!hdrQuery.matches) return;                      // nothing to sweep on an SDR screen
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      rangeEl.value = MAX_GAIN; setGain(MAX_GAIN); return;
+    }
+    sweepPass();
+  }
+  rangeEl.addEventListener('input', function () {
+    sweepStop();
+    setGain(parseFloat(rangeEl.value));
+    sweep.timer = setTimeout(sweepStart, SWEEP_RESUME_MS);
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) sweepStop(); else if (!sweep.timer) sweepStart();
+  });
+
+  // ─── Tilt ──────────────────────────────────────────────────────────────
+  // A slow, weighty float under a fine pointer. Nothing on touch, nothing
+  // under reduced motion: the card just sits.
+  (function tilt() {
+    var fine = window.matchMedia('(hover: hover) and (pointer: fine)');
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    root.dataset.tilt = (fine.matches && !reduced.matches) ? 'on' : 'off';
+    if (!fine.matches || reduced.matches) return;
+    var MAX = 7, targetX = 0, targetY = 0, x = 0, y = 0, running = false;
+    function frame() {
+      x += (targetX - x) * 0.055; y += (targetY - y) * 0.055;
+      card.style.setProperty('--tilt-y', (x * MAX).toFixed(3) + 'deg');
+      card.style.setProperty('--tilt-x', (-y * MAX).toFixed(3) + 'deg');
+      card.style.setProperty('--shadow-x', (-x * 22).toFixed(2) + 'px');
+      card.style.setProperty('--shadow-y', (-y * 22).toFixed(2) + 'px');
+      if (Math.abs(targetX - x) + Math.abs(targetY - y) > 0.0005) requestAnimationFrame(frame);
+      else running = false;
+    }
+    function kick() { if (!running) { running = true; requestAnimationFrame(frame); } }
+    window.addEventListener('pointermove', function (e) {
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      var r = card.getBoundingClientRect();
+      var dx = (e.clientX - (r.left + r.width / 2)) / (window.innerWidth / 2);
+      var dy = (e.clientY - (r.top + r.height / 2)) / (window.innerHeight / 2);
+      targetX = Math.max(-1, Math.min(1, dx)); targetY = Math.max(-1, Math.min(1, dy));
+      kick();
+    }, { passive: true });
+    document.addEventListener('pointerleave', function () { targetX = 0; targetY = 0; kick(); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) { targetX = 0; targetY = 0; kick(); } });
+    reduced.addEventListener('change', function (e) { if (e.matches) { targetX = targetY = x = y = 0; card.style.transform = ''; } });
+  })();
+
+  // ─── Boot ──────────────────────────────────────────────────────────────
+  function boot(data) {
+    useData(data);
+    seed(); buildHeader(); buildRows(); buildNote();
+    setGain(parseFloat(rangeEl.value) || MIN_GAIN);
+    sweepStart();
+
+    hdrQuery.addEventListener('change', function () { loadPlates(); sweepStart(); });   // moved to another screen
+    Object.keys(tierQueries).forEach(function (k) { tierQueries[k].addEventListener('change', loadPlates); });
+    window.addEventListener('resize', loadPlates);                   // devicePixelRatio has no event of its own
+  }
+  if (INLINE) {
+    boot(INLINE);
+  } else if (root.dataset.manifest) {
+    // One request, before anything is drawn, for the manifest. If it fails the
+    // card still draws — every tier as live CSS, no plates, as on an SDR screen.
+    fetch(root.dataset.manifest, { credentials: 'omit' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(boot, function () { boot({ manifests: {} }); });
+  }
+
+  // For the page's own checks (and nothing else): what the card decided.
+  window.GlowWeek = {
+    get set() { return currentSet; }, get hdr() { return hdrQuery.matches; }, get today() { return today; },
+    get gain() { return gainValue; }, set gain(v) { sweepStop(); rangeEl.value = v; setGain(v); },
+    get sweeping() { return !!sweep.raf; }, sweep: function (on) { if (on) sweepStart(); else sweepStop(); },
+    note: function () { return noteImgs.map(function (imgs) { return imgs.map(function (i) { return (i.src ? 'src' : '-') + '@' + i.style.opacity; }); }); },
+    plates: function () { return plates.map(function (p) { return { key: p.key, imgs: Object.keys(p.imgs).map(function (g) { return g + ':' + (p.imgs[g].dataset.state || 'loading') + ':' + p.imgs[g].style.display + '@' + p.imgs[g].style.opacity; }) }; }); },
+    rows: function () { return rows.map(function (r) { return { name: r.habit.name, spans: r.spans }; }); }
+  };
+})();
+</script>

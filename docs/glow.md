@@ -817,3 +817,40 @@ size**:
 
 Ink-to-ink, at 0.1px, is a claim about the rendering. Advance width was a claim
 about a box that happened to be the right size.
+
+## The same technique, as the week grid
+
+`Tools/make-week-plates.swift` cuts the emitting tier of the This Week hero
+for the project page: the open ring one to seven columns wide, the weekday
+letters, the eight default habit names and their icons, each a PQ AVIF with
+the halo baked in, per responsive tier and density. It is the word slider's
+pipeline with three shapes instead of one, and everything above still holds.
+`Tools/check-week-plates.swift` reads every plate back through libavif — the
+decoder Chrome uses — and fails on an odd dimension, a missing PQ tag, an alpha
+plane, or a decoded peak that is not above SDR white. The page, its build and
+the upload notes live in `Website/week-widget/`.
+
+Two things the grid taught that the word did not:
+
+- **Only the emitting tier is a plate.** Lit (`#D9D9D9`) and resting marks are
+  ordinary CSS; the plate is needed only where a pixel has to go above SDR
+  white. So a state change on the page is showing or hiding an `<img>` over its
+  live twin, never a re-encode.
+- **A plate's padding covers its neighbours.** The halo needs about a third of a
+  cell around the ring, and the gap between marks is a third of a cell, so an
+  open ring's opaque surround overlapped the sockets beside it and the rows
+  above and below — measured as clipped sockets in the first Chrome capture.
+  Paint order is the fix: plates go beneath every other mark. The card and the
+  plate are the same `#000000`, so a socket over a plate's surround is
+  indistinguishable from one over the card, and only the halo goes behind the
+  neighbour, which is where spilled light belongs.
+
+The word slider and the grid share one control now. The sentence's twelve
+files sit under the card as stacked layers, and one range from 1x to 12x —
+the plates were re-cut to twelve steps to match — drives both, sweeping on a
+loop until a visitor drags it. `Website/week-widget/README.md` has the cut.
+
+The halo numbers are the word slider's and were judged on letterforms. The
+ring is a far thinner shape, and `Website/week-widget/tuning.html` shows it cut
+at several radii and strengths for a decision on a screen with headroom; the
+default ships until that decision is made.

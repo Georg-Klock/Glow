@@ -1,0 +1,537 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Dark glass — material lab</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --radius: 28px;
+  --blur: 14px;              /* frost */
+  --sat: 1.7;
+  --bright: 0.72;            /* dark material: the backdrop is dimmed, not painted over */
+  --tint: 0.30;              /* black tint alpha */
+  --lift: 0.055;             /* white lift: glass is never pure black */
+  --rim: 0.55;               /* specular rim strength */
+  --bevel-glow: 0.20;        /* inner illumination */
+  --sheen: 0.14;             /* pointer highlight */
+  --light: 128deg;           /* direction the light comes from */
+  --lx: -6px; --ly: -6px;    /* light vector, for the inset bevel */
+  --mx: 50%; --my: 0%;
+  --hover: 0;
+  --tilt-x: 0deg; --tilt-y: 0deg;
+  --par-x: 0px; --par-y: 0px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: #08080a; color: #e8e8ea;
+  font: 13px/1.45 ui-sans-serif, -apple-system, system-ui, sans-serif;
+  display: grid; grid-template-columns: 1fr 300px; min-height: 100%;
+}
+
+/* ── The stage: what the glass has to refract ─────────────────────────── */
+.stage {
+  position: relative; overflow: hidden;
+  display: grid; place-items: center;
+  perspective: 1400px;
+}
+.wall {
+  position: absolute; inset: -8%;
+  transform: translate3d(var(--par-x), var(--par-y), 0);
+  transition: transform .5s cubic-bezier(.2,.7,.2,1);
+}
+.wall--mesh {
+  background:
+    radial-gradient(58% 44% at 22% 18%, #2b4cc4 0%, transparent 62%),
+    radial-gradient(48% 40% at 82% 26%, #b5327a 0%, transparent 60%),
+    radial-gradient(60% 50% at 66% 88%, #0e7f76 0%, transparent 64%),
+    radial-gradient(40% 34% at 12% 82%, #7a4bd6 0%, transparent 60%),
+    linear-gradient(160deg, #14141b, #05050a 70%);
+}
+.wall--mesh::after {          /* small bright detail: refraction needs edges to bend */
+  content: ""; position: absolute; inset: 0;
+  background:
+    repeating-linear-gradient(115deg, rgba(255,255,255,.10) 0 2px, transparent 2px 46px),
+    radial-gradient(9px 9px at 30% 62%, #fff 0 60%, transparent 61%),
+    radial-gradient(7px 7px at 71% 40%, #ffd479 0 60%, transparent 61%);
+}
+.wall--photo {
+  background:
+    radial-gradient(70% 55% at 30% 8%, #f2b06a 0%, #a83f52 34%, transparent 70%),
+    radial-gradient(90% 60% at 78% 100%, #13233f 0%, transparent 70%),
+    linear-gradient(#1a1226, #05070d);
+}
+.wall--grid {
+  background:
+    repeating-linear-gradient(0deg,  #fff 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(90deg, #fff 0 1px, transparent 1px 24px),
+    #101014;
+}
+.wall--flat { background: #141416; }
+
+/* ── The material ─────────────────────────────────────────────────────── */
+.glass {
+  position: relative;
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  transform-style: preserve-3d;
+  transition: transform .12s ease-out;
+  isolation: isolate;                       /* keep plus-lighter inside the card */
+  box-shadow:
+    0 24px 60px rgba(0,0,0,.55),
+    0 6px 16px rgba(0,0,0,.38),
+    0 1px 0 rgba(255,255,255,.06);
+}
+.glass > .layer {
+  position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+}
+
+/* 1 — refraction + frost: the only layer that reads the backdrop */
+.refract {
+  backdrop-filter: url(#gw-glass) saturate(var(--sat)) brightness(var(--bright));
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(var(--sat)) brightness(var(--bright));
+}
+.no-refract .refract {                      /* Safari / Firefox: frost only, no lensing */
+  backdrop-filter: blur(var(--blur)) saturate(var(--sat)) brightness(var(--bright));
+}
+
+/* 2 — tint: dark material, lit slightly from the top */
+.tint {
+  background:
+    linear-gradient(165deg, rgba(255,255,255,calc(var(--lift) * 1.7)), rgba(255,255,255,0) 46%),
+    linear-gradient(180deg, rgba(0,0,0,calc(var(--tint) * .82)), rgba(0,0,0,var(--tint)));
+}
+
+/* 3 — bevel: the inner illumination, thrown by the light vector */
+.bevel {
+  box-shadow:
+    inset var(--lx) var(--ly) 14px -8px rgba(255,255,255,calc(var(--bevel-glow) * 1.2)),
+    inset calc(var(--lx) * -1) calc(var(--ly) * -1) 18px -12px rgba(255,255,255,calc(var(--bevel-glow) * .55)),
+    inset 0 0 0 .5px rgba(255,255,255,.10),
+    inset 0 0 24px rgba(0,0,0,.22);
+}
+
+/* 4 — rim: a 1px specular ring, hottest where it faces the light */
+.rim {
+  padding: 1px;
+  background: conic-gradient(from calc(var(--light) - 90deg),
+    rgba(255,255,255,calc(var(--rim) * 1.00)) 0deg,
+    rgba(255,255,255,calc(var(--rim) * .10)) 62deg,
+    rgba(255,255,255,calc(var(--rim) * .48)) 176deg,
+    rgba(255,255,255,calc(var(--rim) * .08)) 254deg,
+    rgba(255,255,255,calc(var(--rim) * 1.00)) 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+}
+
+/* 5 — sheen: the pointer's own reflection */
+.sheen {
+  background: radial-gradient(240px 240px at var(--mx) var(--my),
+    rgba(255,255,255,var(--sheen)), rgba(255,255,255,0) 68%);
+  opacity: var(--hover);
+  mix-blend-mode: plus-lighter;
+  transition: opacity .25s ease;
+}
+.glass.is-press { transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) scale(.988); }
+.glass.is-press .bevel { box-shadow:
+    inset var(--lx) var(--ly) 10px -6px rgba(255,255,255,calc(var(--bevel-glow) * 1.7)),
+    inset 0 0 0 .5px rgba(255,255,255,.16),
+    inset 0 0 30px rgba(0,0,0,.30); }
+
+.ripple {
+  position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px;
+  border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255,255,255,.30), rgba(255,255,255,0) 70%);
+  animation: ripple .55s cubic-bezier(.2,.7,.2,1) forwards;
+}
+@keyframes ripple { from { transform: scale(1); opacity: .9 } to { transform: scale(26); opacity: 0 } }
+
+/* ── The mock grid, so legibility is judged on the real thing ─────────── */
+.content { position: relative; z-index: 1; }
+.grid { display: flex; flex-direction: column; gap: 6px; }
+.hdr, .row { display: flex; align-items: center; gap: 10px; }
+.label { width: 116px; flex: none; font-size: 15px; letter-spacing: .1px; color: #D9D9D9; }
+.label.emit { color: #fff; text-shadow: 0 0 12px rgba(255,255,255,.45); }
+.track { display: flex; gap: 6px; }
+.cell { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center;
+  background: rgba(0,0,0,.16); box-shadow: inset 0 .5px 0 rgba(255,255,255,.07), inset 0 0 0 .5px rgba(255,255,255,.04); }
+.day { width: 46px; text-align: center; font-size: 15px; color: rgba(217,217,217,.5); }
+.day.emit { color: #fff; text-shadow: 0 0 10px rgba(255,255,255,.5); }
+.dot { width: 16px; height: 16px; border-radius: 50%; background: #D9D9D9; }
+.ring { width: 20px; height: 20px; border-radius: 50%; border: 2.5px solid #fff; box-shadow: 0 0 14px rgba(255,255,255,.55); }
+.cross { color: rgba(217,217,217,.5); font-size: 15px; }
+.cut { width: 16px; height: 2px; border-radius: 2px; background: rgba(217,217,217,.5); }
+
+/* ── Controls ─────────────────────────────────────────────────────────── */
+.panel { background: #0e0e11; border-left: 1px solid #1e1e24; padding: 16px; overflow: auto; }
+.panel h1 { font-size: 13px; margin: 0 0 4px; letter-spacing: .3px; text-transform: uppercase; color: #8a8a95; }
+.panel p.note { color: #75757f; margin: 0 0 14px; font-size: 11.5px; }
+.ctl { margin-bottom: 9px; }
+.ctl label { display: flex; justify-content: space-between; font-size: 11.5px; color: #a5a5b0; }
+.ctl label b { color: #e8e8ea; font-weight: 500; font-variant-numeric: tabular-nums; }
+.ctl input[type=range] { width: 100%; accent-color: #fff; }
+.seg { display: flex; gap: 4px; margin: 6px 0 14px; flex-wrap: wrap; }
+.seg button { flex: 1 1 auto; background: #17171c; color: #cfcfd8; border: 1px solid #26262e;
+  border-radius: 7px; padding: 5px 7px; font: inherit; font-size: 11.5px; cursor: pointer; }
+.seg button[aria-pressed=true] { background: #fff; color: #111; border-color: #fff; }
+hr { border: 0; border-top: 1px solid #1e1e24; margin: 14px 0; }
+#css { width: 100%; height: 170px; background: #08080b; color: #b9c8ff; border: 1px solid #24242c;
+  border-radius: 7px; font: 11px/1.4 ui-monospace, Menlo, monospace; padding: 8px; resize: vertical; }
+.badge { display: inline-block; padding: 2px 6px; border-radius: 5px; font-size: 10.5px; }
+.ok { background: #10331d; color: #6ee7a0; } .no { background: #3a1a1a; color: #ff9d9d; }
+@media (max-width: 900px) { body { grid-template-columns: 1fr; } }
+</style>
+
+<div class="stage" id="stage">
+  <div class="wall wall--mesh" id="wall"></div>
+
+  <div class="glass" id="glass">
+    <div class="layer refract"></div>
+    <div class="layer tint"></div>
+    <div class="layer bevel"></div>
+    <div class="layer rim"></div>
+    <div class="layer sheen"></div>
+    <div class="content">
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h1>Dark glass</h1>
+  <p class="note">
+    Refraction: <span id="support" class="badge"></span><br>
+    The map is ray-traced per size, not a canned PNG.
+  </p>
+
+  <div class="seg" id="walls">
+    <button data-wall="mesh" aria-pressed="true">Mesh</button>
+    <button data-wall="photo">Photo</button>
+    <button data-wall="grid">Grid</button>
+    <button data-wall="flat">Flat</button>
+  </div>
+  <div class="seg" id="modes">
+    <button data-mode="refract" aria-pressed="true">Refract</button>
+    <button data-mode="fallback">Fallback</button>
+    <button data-mode="map">Show map</button>
+  </div>
+
+  <div id="ctls"></div>
+  <hr>
+  <textarea id="css" readonly spellcheck="false"></textarea>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="gw-glass" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"
+          x="0" y="0" width="10" height="10">
+    <!-- The map carries three things: R and G are the refraction vector,
+         B is the coverage of the bevel, which becomes the lens mask. -->
+    <feImage id="fe-map" x="0" y="0" width="10" height="10" result="map"/>
+
+    <!-- Pass 1: the frost. The whole backdrop, blurred. -->
+    <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="frost" id="fe-frost"/>
+
+    <!-- Pass 2: the lens. Barely blurred, so the bent edge stays legible. -->
+    <feGaussianBlur in="SourceGraphic" stdDeviation="1" result="clear" id="fe-clear"/>
+    <feDisplacementMap in="clear" in2="map" scale="0" xChannelSelector="R" yChannelSelector="G" result="dR" id="fe-r"/>
+    <feDisplacementMap in="clear" in2="map" scale="0" xChannelSelector="R" yChannelSelector="G" result="dG" id="fe-g"/>
+    <feDisplacementMap in="clear" in2="map" scale="0" xChannelSelector="R" yChannelSelector="G" result="dB" id="fe-b"/>
+    <!-- One channel from each: the three take slightly different paths
+         through the glass, which is what chromatic aberration is. -->
+    <feColorMatrix in="dR" type="matrix" result="cR"
+      values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"/>
+    <feColorMatrix in="dG" type="matrix" result="cG"
+      values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0"/>
+    <feColorMatrix in="dB" type="matrix" result="cB"
+      values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0"/>
+    <feComposite in="cR" in2="cG" operator="arithmetic" k2="1" k3="1" result="rg"/>
+    <feComposite in="rg" in2="cB" operator="arithmetic" k2="1" k3="1" result="lensRGB"/>
+
+    <!-- The mask: alpha taken from the map's blue channel. -->
+    <feColorMatrix in="map" type="matrix" result="edge"
+      values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 1 0 0"/>
+    <feComposite in="lensRGB" in2="edge" operator="in" result="lens"/>
+
+    <feMerge>
+      <feMergeNode in="frost"/>
+      <feMergeNode in="lens"/>
+    </feMerge>
+  </filter>
+</svg>
+
+<script>
+(function () {
+  var glass = document.getElementById('glass'),
+      stage = document.getElementById('stage'),
+      wall  = document.getElementById('wall'),
+      feMap = document.getElementById('fe-map'),
+      feFrost = document.getElementById('fe-frost'),
+      feClear = document.getElementById('fe-clear'),
+      filt  = document.getElementById('gw-glass'),
+      feR = document.getElementById('fe-r'), feG = document.getElementById('fe-g'), feB = document.getElementById('fe-b');
+
+  var supported = CSS.supports('backdrop-filter', 'url(#gw-glass)') ||
+                  CSS.supports('-webkit-backdrop-filter', 'url(#gw-glass)');
+  var badge = document.getElementById('support');
+  badge.textContent = supported ? 'supported here' : 'not supported — frost fallback';
+  badge.className = 'badge ' + (supported ? 'ok' : 'no');
+  if (!supported) document.body.classList.add('no-refract');
+
+  // ── Parameters ────────────────────────────────────────────────────────
+  var P = {
+    radius: 28, blur: 14, sat: 1.7, bright: 0.72, tint: 0.30, lift: 0.055,
+    bevel: 26,            // px of glass edge that carries the curvature
+    index: 1.52,          // refractive index
+    refract: 12,          // max displacement, px
+    chroma: 0.06,         // per-channel spread
+    crisp: 0.88,          // how much sharper the lens is than the frost
+    rim: 0.55, glow: 0.20, sheen: 0.14, light: 128, tiltMax: 7
+  };
+  var SPEC = [
+    ['radius', 'Corner radius', 0, 60, 1, 'px'],
+    ['blur', 'Frost blur', 0, 40, 0.5, 'px'],
+    ['sat', 'Saturation', 1, 3, 0.05, '×'],
+    ['bright', 'Brightness', 0.2, 1.4, 0.01, '×'],
+    ['tint', 'Black tint', 0, 0.7, 0.01, ''],
+    ['lift', 'White lift', 0, 0.2, 0.005, ''],
+    ['bevel', 'Bevel width', 4, 60, 1, 'px'],
+    ['index', 'Refractive index', 1.05, 2.2, 0.01, ''],
+    ['refract', 'Refraction', 0, 90, 1, 'px'],
+    ['chroma', 'Chromatic', 0, 0.3, 0.005, ''],
+    ['crisp', 'Lens sharpness', 0, 1, 0.01, ''],
+    ['rim', 'Specular rim', 0, 1, 0.01, ''],
+    ['glow', 'Bevel glow', 0, 0.6, 0.01, ''],
+    ['sheen', 'Pointer sheen', 0, 0.4, 0.005, ''],
+    ['light', 'Light angle', 0, 360, 1, '°'],
+    ['tiltMax', 'Tilt', 0, 14, 0.5, '°']
+  ];
+
+  var ctls = document.getElementById('ctls');
+  SPEC.forEach(function (s) {
+    var key = s[0];
+    var d = document.createElement('div'); d.className = 'ctl';
+    d.innerHTML = '<label><span>' + s[1] + '</span><b id="v-' + key + '"></b></label>' +
+      '<input type="range" id="r-' + key + '" min="' + s[2] + '" max="' + s[3] + '" step="' + s[4] + '">';
+    ctls.appendChild(d);
+    var r = d.querySelector('input');
+    r.value = P[key];
+    r.addEventListener('input', function () {
+      P[key] = parseFloat(r.value);
+      apply(key === 'radius' || key === 'bevel' || key === 'index' || key === 'refract');
+    });
+  });
+
+  // ── The displacement map ──────────────────────────────────────────────
+  // For every pixel: distance to the rounded-rect edge, and the outward
+  // normal there. Inside the bevel the surface is a quarter circle, so the
+  // incidence angle is known; Snell gives the refracted angle and the lateral
+  // offset is tan(θ − φ). Normalised to ±1 and written as R (x) and G (y),
+  // 128 meaning no displacement — the encoding feDisplacementMap reads.
+  var mapURL = '', folds = false;
+  function buildMap(w, h, r, bevel, index) {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var cw = Math.max(1, Math.round(w * dpr)), ch = Math.max(1, Math.round(h * dpr));
+    var cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+    var ctx = cv.getContext('2d'), img = ctx.createImageData(cw, ch), D = img.data;
+
+    var N = 256, prof = new Float32Array(N + 1), max = 0, i;
+    for (i = 0; i <= N; i++) {
+      var s = i / N;                                   // 0 at the edge, 1 at the flat top
+      var a = Math.acos(Math.max(-1, Math.min(1, 1 - s)));
+      var th = Math.PI / 2 - a;                        // angle of incidence
+      var ph = Math.asin(Math.min(1, Math.sin(th) / index));
+      var m = Math.tan(th - ph);
+      prof[i] = m; if (m > max) max = m;
+    }
+    if (max > 0) for (i = 0; i <= N; i++) prof[i] /= max;
+    // d + u(d)·M must keep increasing, or the rim shows a mirrored sliver
+    // instead of a lens. Real thick glass does that; it is worth knowing which.
+    folds = false;
+    for (i = 1; i <= N; i++) {
+      var dd = bevel / N;
+      if (dd + (prof[i] - prof[i - 1]) * P.refract < 0) { folds = true; break; }
+    }
+
+    var hw = w / 2, hh = h / 2, rr = Math.min(r, hw, hh);
+    var ax = hw - rr, ay = hh - rr;                    // half-size of the straight part
+    for (var y = 0; y < ch; y++) {
+      var py = (y + 0.5) / dpr - hh;
+      for (var x = 0; x < cw; x++) {
+        var px = (x + 0.5) / dpr - hw;
+        var qx = Math.abs(px) - ax, qy = Math.abs(py) - ay;
+        var sd, nx, ny;
+        if (qx > 0 && qy > 0) {
+          var l = Math.hypot(qx, qy) || 1e-6;
+          sd = l - rr; nx = (qx / l) * (px < 0 ? -1 : 1); ny = (qy / l) * (py < 0 ? -1 : 1);
+        } else if (qx > qy) {
+          sd = qx - rr; nx = px < 0 ? -1 : 1; ny = 0;
+        } else {
+          sd = qy - rr; nx = 0; ny = py < 0 ? -1 : 1;
+        }
+        var d = -sd;                                   // depth inside the shape
+        var u = 0;
+        if (d >= 0 && d < bevel) u = prof[Math.round((d / bevel) * N)];
+        // The rim samples inward, so nothing is fetched from outside the
+        // element, where the backdrop is not available.
+        // Blue carries the bevel's coverage, which the filter turns into the
+        // lens mask: 1 at the edge, feathered to 0 where the glass goes flat.
+        var cov = 0;
+        if (d >= 0 && d < bevel) { var f = 1 - d / bevel; cov = f * f * (3 - 2 * f); }
+        var o = (y * cw + x) * 4;
+        D[o]     = Math.max(0, Math.min(255, Math.round(128 - nx * u * 127)));
+        D[o + 1] = Math.max(0, Math.min(255, Math.round(128 - ny * u * 127)));
+        D[o + 2] = Math.round(cov * 255);
+        D[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    mapURL = cv.toDataURL('image/png');
+    return mapURL;
+  }
+
+  // ── Apply ─────────────────────────────────────────────────────────────
+  var mode = 'refract';
+  function apply(rebuild) {
+    var s = glass.style;
+    s.setProperty('--radius', P.radius + 'px');
+    s.setProperty('--blur', P.blur + 'px');
+    s.setProperty('--sat', P.sat);
+    s.setProperty('--bright', P.bright);
+    s.setProperty('--tint', P.tint);
+    s.setProperty('--lift', P.lift);
+    s.setProperty('--rim', P.rim);
+    s.setProperty('--bevel-glow', P.glow);
+    s.setProperty('--sheen', P.sheen);
+    s.setProperty('--light', P.light + 'deg');
+    var rad = (P.light - 90) * Math.PI / 180;
+    s.setProperty('--lx', (Math.cos(rad) * -7).toFixed(2) + 'px');
+    s.setProperty('--ly', (Math.sin(rad) * -7).toFixed(2) + 'px');
+
+    SPEC.forEach(function (sp) {
+      var el = document.getElementById('v-' + sp[0]);
+      if (el) el.textContent = P[sp[0]] + (sp[5] || '');
+    });
+
+    if (rebuild === false) return;   // pointer frames touch CSS variables only
+    // Writing an SVG filter attribute rebuilds the whole chain, so none of
+    // this runs on a pointer frame — only when a parameter actually changes.
+    var w = glass.offsetWidth, h = glass.offsetHeight;
+    filt.setAttribute('width', w); filt.setAttribute('height', h);
+    feMap.setAttribute('width', w); feMap.setAttribute('height', h);
+    feFrost.setAttribute('stdDeviation', P.blur / 2);
+    feClear.setAttribute('stdDeviation', (P.blur / 2) * (1 - P.crisp));
+    var sc = P.refract * 255 / 127;
+    feR.setAttribute('scale', sc * (1 + P.chroma));
+    feG.setAttribute('scale', sc);
+    feB.setAttribute('scale', sc * (1 - P.chroma));
+    feMap.setAttribute('href', buildMap(w, h, P.radius, P.bevel, P.index));
+    if (mode === 'map') wall.style.background = '#666 url(' + mapURL + ') center/contain no-repeat';
+    writeCSS();
+  }
+
+  function writeCSS() {
+    document.getElementById('css').value =
+      '.card {\n' +
+      '  border-radius: ' + P.radius + 'px;\n' +
+      '  backdrop-filter: url(#gw-glass) saturate(' + P.sat + ') brightness(' + P.bright + ');\n' +
+      '  /* fallback: blur(' + P.blur + 'px) saturate(' + P.sat + ') brightness(' + P.bright + ') */\n' +
+      '  background:\n' +
+      '    linear-gradient(165deg, rgba(255,255,255,' + (P.lift * 1.7).toFixed(3) + '), transparent 46%),\n' +
+      '    linear-gradient(180deg, rgba(0,0,0,' + (P.tint * .82).toFixed(3) + '), rgba(0,0,0,' + P.tint + '));\n' +
+      '  box-shadow:\n' +
+      '    inset ' + glass.style.getPropertyValue('--lx') + ' ' + glass.style.getPropertyValue('--ly') +
+          ' 14px -8px rgba(255,255,255,' + (P.glow * 1.2).toFixed(3) + '),\n' +
+      '    inset 0 0 0 .5px rgba(255,255,255,.10),\n' +
+      '    inset 0 0 24px rgba(0,0,0,.22),\n' +
+      '    0 24px 60px rgba(0,0,0,.55);\n' +
+      '}\n/* map: bevel ' + P.bevel + 'px, n=' + P.index + ', \u00b1' + P.refract + 'px, chroma ' + P.chroma +
+      '\n   ' + (folds ? 'the rim folds: it shows a mirrored sliver, as thick glass does'
+                        : 'the rim is a monotonic lens') + ' */';
+  }
+
+  // ── Interaction ───────────────────────────────────────────────────────
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  if (fine && !reduce) {
+    stage.addEventListener('pointermove', function (e) {
+      var b = glass.getBoundingClientRect();
+      var cx = (e.clientX - b.left) / b.width, cy = (e.clientY - b.top) / b.height;
+      glass.style.setProperty('--mx', (cx * 100).toFixed(1) + '%');
+      glass.style.setProperty('--my', (cy * 100).toFixed(1) + '%');
+      var inside = cx > -0.15 && cx < 1.15 && cy > -0.15 && cy < 1.15;
+      glass.style.setProperty('--hover', inside ? 1 : 0);
+      glass.style.setProperty('--tilt-x', ((0.5 - cy) * 2 * P.tiltMax).toFixed(2) + 'deg');
+      glass.style.setProperty('--tilt-y', ((cx - 0.5) * 2 * P.tiltMax).toFixed(2) + 'deg');
+      wall.style.setProperty('--par-x', ((0.5 - cx) * 16).toFixed(1) + 'px');
+      wall.style.setProperty('--par-y', ((0.5 - cy) * 16).toFixed(1) + 'px');
+      // The light follows the pointer: the rim brightens on the side it faces.
+      var ang = Math.atan2(cy - 0.5, cx - 0.5) * 180 / Math.PI;
+      P.light = Math.round((ang + 360) % 360);
+      document.getElementById('r-light').value = P.light;
+      apply(false);
+    });
+    stage.addEventListener('pointerleave', function () {
+      glass.style.setProperty('--hover', 0);
+      glass.style.setProperty('--tilt-x', '0deg'); glass.style.setProperty('--tilt-y', '0deg');
+      wall.style.setProperty('--par-x', '0px'); wall.style.setProperty('--par-y', '0px');
+    });
+  }
+  glass.addEventListener('pointerdown', function (e) {
+    glass.classList.add('is-press');
+    if (reduce) return;
+    var b = glass.getBoundingClientRect();
+    var r = document.createElement('span'); r.className = 'ripple';
+    r.style.left = (e.clientX - b.left) + 'px'; r.style.top = (e.clientY - b.top) + 'px';
+    glass.appendChild(r); setTimeout(function () { r.remove(); }, 600);
+  });
+  addEventListener('pointerup', function () { glass.classList.remove('is-press'); });
+
+  document.getElementById('walls').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    [].forEach.call(this.children, function (x) { x.setAttribute('aria-pressed', x === b); });
+    wall.className = 'wall wall--' + b.dataset.wall; wall.style.background = '';
+    if (mode === 'map') apply(true);
+  });
+  document.getElementById('modes').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    [].forEach.call(this.children, function (x) { x.setAttribute('aria-pressed', x === b); });
+    mode = b.dataset.mode;
+    document.body.classList.toggle('no-refract', mode === 'fallback' || !supported);
+    if (mode === 'map') { wall.className = 'wall'; wall.style.background = '#666 url(' + mapURL + ') center/contain no-repeat'; }
+    else { wall.className = 'wall wall--mesh'; wall.style.background = ''; }
+  });
+
+  // ── The mock grid ─────────────────────────────────────────────────────
+  var LETTERS = ['M','T','W','T','F','S','S'], today = 3;
+  var ROWS = [
+    { name: 'Gratitude',  marks: ['done','done','miss','open','','',''] },
+    { name: 'Early night',marks: ['done','miss','done','open','','',''] },
+    { name: 'Run',        marks: ['','done','','cut','','',''] },
+    { name: 'Read',       marks: ['done','','','done','','',''] }
+  ];
+  var g = document.getElementById('grid');
+  var hdr = document.createElement('div'); hdr.className = 'hdr';
+  hdr.innerHTML = '<div class="label"></div><div class="track">' +
+    LETTERS.map(function (l, i) { return '<div class="day' + (i === today ? ' emit' : '') + '">' + l + '</div>'; }).join('') +
+    '</div>';
+  g.appendChild(hdr);
+  ROWS.forEach(function (row) {
+    var open = row.marks[today] === 'open';
+    var el = document.createElement('div'); el.className = 'row';
+    el.innerHTML = '<div class="label' + (open ? ' emit' : '') + '">' + row.name + '</div><div class="track">' +
+      row.marks.map(function (m) {
+        var inner = m === 'done' ? '<span class="dot"></span>'
+                  : m === 'open' ? '<span class="ring"></span>'
+                  : m === 'miss' ? '<span class="cross">✕</span>'
+                  : m === 'cut'  ? '<span class="cut"></span>' : '';
+        return '<div class="cell">' + inner + '</div>';
+      }).join('') + '</div>';
+    g.appendChild(el);
+  });
+
+  apply(true);
+  addEventListener('resize', function () { apply(true); });
+})();
+</script>

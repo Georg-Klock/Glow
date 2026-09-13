@@ -1,0 +1,137 @@
+<!-- Glow Up · how it was built. Source: Website/agent-flow/. One embed, no script. -->
+<style>
+.af { --dim:#8f8f8f; --line:rgba(255,255,255,.13); --card:#151515;
+  width:100%; max-width:960px; margin:0 auto; padding:8px 0 0;
+  font-family:'Soehne Buch','Sohne Buch',Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+.af-map { display:block; width:100%; height:auto; }
+.af-map .b { fill:var(--card); }
+.af-map .grp { fill:#0e0e0e; }
+.af-map .t { font-size:17px; fill:#fff; }
+.af-map .n { font-size:17px; fill:#fff; }
+.af-map .g { font-size:17px; fill:var(--dim); }
+.af-map .s { font-size:12px; fill:var(--dim); }
+.af-map .w { fill:#fff; }
+.af-map .m { text-anchor:middle; }
+.af-map .e { text-anchor:end; }
+.af-map .l { fill:none; stroke:#fff; stroke-width:2; }
+.af-map .l.d { opacity:.4; }
+.af-stack { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.af-grp { border:1px solid var(--line); border-radius:16px; padding:16px 18px; margin:0 0 12px; background:var(--card); }
+.af-h { margin:0 0 10px; font-size:17px; color:#fff; }
+.af-h span { display:block; font-size:15px; color:var(--dim); }
+.af-grp ol { margin:0; padding-left:18px; font-size:15px; line-height:1.5; color:var(--dim); }
+.af-grp li b { color:#fff; font-weight:400; }
+.af-rep { margin:10px 0 0; font-size:15px; color:var(--dim); }
+.af-cross { margin:0 0 12px; font-size:15px; color:var(--dim); text-align:center; }
+@media (max-width:767px) {
+  .af-map { display:none; }
+  .af-stack { position:static; width:auto; height:auto; overflow:visible; clip-path:none; }
+}
+</style>
+<div class="af">
+<svg class="af-map" viewBox="0 0 940 680" aria-hidden="true">
+<defs><marker id="afa" markerWidth="14" markerHeight="14" refX="10" refY="7" orient="auto" markerUnits="userSpaceOnUse"><path d="M3.5 1.5 L10 7 L3.5 12.5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></marker>
+<image id="afc" href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5c2d5ec475c215f50ebd9_gu-logo-claude.png" width="26" height="26"/></defs>
+
+<rect class="grp" x="625" y="154" width="315" height="384" rx="28"/>
+<rect class="grp" x="625" y="405" width="315" height="128.5" rx="28"/>
+<rect class="grp" x="356" y="154" width="160" height="498" rx="28"/>
+<rect class="grp" x="0" y="154" width="315" height="247" rx="28"/>
+
+<path class="l d" marker-end="url(#afa)" d="M233 119 L233 69 A15 15 0 0 1 248 54 L767 54 A15 15 0 0 1 782 69 L782 108"/>
+<path class="l" marker-end="url(#afa)" d="M233 148 L233 69 A15 15 0 0 1 248 54 L424 54 A15 15 0 0 1 439 69 L439 109"/>
+<path class="l d" marker-end="url(#afa)" d="M436 395 L436 411"/>
+<path class="l d" marker-end="url(#afa)" d="M524 221 L614 221"/>
+<path class="l" marker-end="url(#afa)" d="M619 351 L524 351"/>
+<path class="l d" marker-end="url(#afa)" d="M771 297 L771 370"/>
+<path class="l d" marker-end="url(#afa)" d="M795 370 L795 297"/>
+<path class="l" marker-end="url(#afa)" d="M348 568 L82 568 A15 15 0 0 1 67 553 L67 412"/>
+
+<text class="n" x="299" y="42">writes issues</text>
+<text class="g" x="560" y="42">prompts the agents</text>
+<text class="s" x="524" y="194">pulls in the<tspan x="524" y="209">issue backlog</tspan></text>
+<text class="s w e" x="619" y="324">tested builds<tspan x="619" y="339">PR to main</tspan></text>
+<text class="s" x="806" y="332">Agents tests<tspan x="806" y="347">as they build</tspan></text>
+<text class="n m" x="156" y="596">ships the latest build to my phone<tspan x="156" y="619">each morning &amp; evening</tspan></text>
+
+<text class="t m" x="156" y="144">Human reacts</text>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5c72066e38c411ad07ca0_gu-logo-github.png" x="389" y="125.5" width="26" height="25"/>
+<text class="t" x="425" y="144">GitHub</text>
+<text class="t m" x="782" y="144">Agents work all Night</text>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5dff443db9787bc13897d_gu-logo-swift.png" x="724" y="378" width="24" height="22"/>
+<text class="t m" x="797.5" y="395">Swift Code</text>
+
+<rect class="b" x="10" y="164" width="142.5" height="108.5" rx="18"/>
+<text class="m" x="81.25" y="194.96" style="font-size:26px">🧑‍🎨</text>
+<text class="n m" x="81.25" y="222.43">Georg</text>
+<text class="s m" x="81.25" y="244.41">the only human<tspan x="81.25" y="259.41">in the loop</tspan></text>
+
+<rect class="b" x="162.5" y="164" width="142.5" height="108.5" rx="18"/>
+<use href="#afc" x="220.75" y="173.96"/>
+<text class="n m" x="233.75" y="222.43">Claude</text>
+<text class="s m" x="233.75" y="244.41">lower models<tspan x="233.75" y="259.41">interview me</tspan></text>
+
+<rect class="b" x="10" y="282.5" width="295" height="108.5" rx="18"/>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5bc845f5e745c5ce6e8fd_gu-sym-iphone.png" x="146.5" y="292.46" width="22" height="26"/>
+<text class="n m" x="157.5" y="340.93">TestFlight on my iPhone</text>
+<text class="s m" x="157.5" y="362.91">I interact with the latest build on real hardware<tspan x="157.5" y="377.91">45 mins before work and again in the evening</tspan></text>
+
+<rect class="b" x="366" y="164" width="140" height="108.5" rx="18"/>
+<text class="n m" x="436" y="222.43">Issues</text>
+<text class="s m" x="436" y="244.41">one per change</text>
+
+<rect class="b" x="366" y="282.5" width="140" height="108.5" rx="18"/>
+<text class="n m" x="436" y="340.93">Pull Request</text>
+<text class="s m" x="436" y="362.91">one branch per change</text>
+
+<rect class="b" x="366" y="415" width="140" height="108.5" rx="18"/>
+<text class="n m" x="436" y="473.43">Gates</text>
+<text class="s m" x="436" y="495.41">the suite and CI</text>
+
+<rect class="b" x="366" y="533.5" width="140" height="108.5" rx="18"/>
+<text class="n m" x="436" y="591.93">main</text>
+<text class="s m" x="436" y="613.91">merges when green</text>
+
+<rect class="b" x="635" y="164" width="142.5" height="108.5" rx="18"/>
+<use href="#afc" x="693.25" y="173.96"/>
+<text class="n m" x="706.25" y="222.43">Claude</text>
+<text class="s m" x="706.25" y="244.41">higher models plan<tspan x="706.25" y="259.41">lower models code</tspan></text>
+
+<rect class="b" x="787.5" y="164" width="142.5" height="108.5" rx="18"/>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5c2d5c46b3e61cedcc6ea_gu-logo-openai.png" x="845.75" y="173.96" width="26" height="26"/>
+<text class="n m" x="858.75" y="222.43">Codex</text>
+<text class="s m" x="858.75" y="244.41">builds cheaper<tspan x="858.75" y="259.41">for long sessions</tspan></text>
+
+<rect class="b" x="635" y="415" width="142.5" height="108.5" rx="18"/>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5c72066e38c411ad07c82_gu-sym-macwindow.png" x="691.25" y="426.96" width="30" height="22"/>
+<text class="n m" x="706.25" y="473.43">Simulators</text>
+<text class="s m" x="706.25" y="495.41">dozens of runs<tspan x="706.25" y="510.41">no hardware</tspan></text>
+
+<rect class="b" x="787.5" y="415" width="142.5" height="108.5" rx="18"/>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5bc84d2239e4e497dd198_gu-sym-laptopcomputer-and-iphone.png" x="841.75" y="427.46" width="34" height="21"/>
+<text class="n m" x="858.75" y="473.43">Debug Phone</text>
+<text class="s m" x="858.75" y="495.41">tethered hardware<tspan x="858.75" y="510.41">for agentic testing</tspan></text>
+</svg>
+
+<div class="af-stack">
+  <div class="af-grp">
+    <p class="af-h">Agents work all night <span>minutes at a time, around the clock, no person in it</span></p>
+    <ol>
+      <li>An agent <b>pulls in the issue backlog</b> from GitHub. <b>Claude</b> plans with the higher models and codes with the lower ones; <b>Codex</b> builds cheaper for the long sessions.</li>
+      <li>They <b>test as they build</b>, on <b>simulators</b> — dozens of runs, no hardware — and on the <b>debug phone</b>, tethered hardware for agentic testing.</li>
+      <li>Tested builds go back as a <b>pull request</b>, one branch per change. The <b>gates</b>, the Xcode suite and CI, run on it, and <b>main merges when green</b>.</li>
+    </ol>
+    <p class="af-rep">Then round again, without me.</p>
+  </div>
+  <p class="af-cross">The glow leaves the machines here, because no gate can judge it.</p>
+  <div class="af-grp">
+    <p class="af-h">A human reacts <span>twice a day, 45 minutes — the large loop, the one I am in</span></p>
+    <ol>
+      <li>Main <b>ships the latest build to my phone each morning and evening</b>. <b>TestFlight on my iPhone</b> is where I interact with it on real hardware, 45 minutes before work and again in the evening.</li>
+      <li><b>Georg</b>, the only human in the loop, reacts to what it is actually like.</li>
+      <li><b>Claude</b> interviews me with the lower models, then <b>writes the issues</b> and the <b>prompts the agents</b> run.</li>
+    </ol>
+    <p class="af-rep">Back into the night's work.</p>
+  </div>
+</div>
+</div>
