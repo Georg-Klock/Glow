@@ -171,3 +171,38 @@ The SVG is hidden and a visually-hidden prose stack takes over, which is also
 what a screen reader gets at every width — the map itself is `aria-hidden`.
 Keep the two in step: a node added to the picture and not to the stack is a
 node that does not exist on a phone.
+
+## Spacing audit, 2026-09-12
+
+Measured on the published page at a 1487px viewport, ink edge to ink edge.
+
+**The page has three content columns, not one.** All three are centred on the
+same axis, so the mismatch shows as ragged left and right edges between
+sections rather than as anything being off-centre.
+
+| Block | Width | Left edge | Set by |
+| --- | --- | --- | --- |
+| Page heading | 980 | 254 | `.section-heading` max-width 980 |
+| Stats, hero widget, body copy, widget stills | 960 | 264 | `.section` max-width 960 |
+| App Store stills | 980 | 254 | `.project-image` max-width 980, uncapped inside `.video-section` |
+| This map, FAQ items | 940 | 274 | `.faq` 980 wide with 20px of side padding |
+
+**And no single vertical unit.** The gaps between blocks, in document order:
+40, 40, 64, 88, 34, 128, 130, 56, 156. Two things cause most of it.
+`.project-image` carries `padding: 24px 0` *and* a stray `margin-bottom: 10px`,
+which is why the gap below a stills row (34) is less than half the gap above it
+(88). And each container spaces its children differently: `.section` uses
+`padding-bottom`, `.faq` uses `row-gap: 56`, `.video-section` uses `padding: 40`.
+
+**What was fixed here:** this embed's own canvas. The Figma frame is 752 tall
+but the drawing ends at 623, so the map was shipping 130px of empty SVG that
+padded the page. The viewBox is now `0 0 940 651` — 28px of slack above the
+first ink and 28px below the last, matched.
+
+**What was not:** every other number above comes from a class shared with five
+other project pages (`.section`, `.section-heading`, `.project-image`,
+`.video-section`) or, for `.faq`, with one. Changing them here changes them
+everywhere, and several carry larger-breakpoint overrides on top of their base
+values — the live `.faq` reads 980 while its base is 960. That is a decision
+about the portfolio's layout system, not about this page, so it is written
+down rather than applied.
