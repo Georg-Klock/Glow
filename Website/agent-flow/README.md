@@ -64,6 +64,23 @@ Drawing rules, after several rounds of review:
 - **The panels are named** above themselves, centred, and the naming carries
   the cadence: *all Night* against *each morning*.
 - **Group headings are centred** over their containers.
+- **Two corner radii and one inset.** Outer containers are 28, inner tiles 18,
+  and every tile sits 10px inside its container on each side it touches, with
+  5px between siblings. The tiles carry no stroke — the fill step from #0e0e0e
+  to #151515 is what separates them. Because the containers keep the heights
+  from the Figma file, honouring a 10px inset makes the tile heights differ
+  slightly between groups: 111 in the left and agent groups, 106 in the testing
+  group, 96 in the GitHub column.
+- **Arrows are white at two opacities**, not two colours. Full strength for the
+  three edges a person is on — writes issues, tested builds back to the pull
+  request, and the build shipping to the phone — and 40% for the machine
+  traffic. That is how the Figma file does it: one white stroke, `opacity` on
+  the node. In SVG the element's `opacity` dims its marker too, so both weights
+  share a single arrowhead definition.
+- **The shared top rail is two paths, not one.** The grey rail and the white
+  branch overlap from the Claude tile up and along to the branch point; drawing
+  them separately with the white last is what puts the white on top, the same
+  as the file.
 - **Marks, not emoji**, except for Georg, who is an emoji by request. Both
   Claude tiles carry the Claude mark, Codex the OpenAI mark, the middle panel
   the GitHub mark, and the Swift Code heading the Swift bird. The device icons

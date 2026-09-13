@@ -4,7 +4,7 @@
   width:100%; max-width:960px; margin:0 auto; padding:8px 0 0;
   font-family:'GW Inter','Inter','Soehne Buch',system-ui,-apple-system,sans-serif; -webkit-font-smoothing:antialiased; }
 .af-map { display:block; width:100%; height:auto; }
-.af-map .b { fill:var(--card); stroke:var(--line); }
+.af-map .b { fill:var(--card); }
 .af-map .grp { fill:#0e0e0e; }
 .af-map .t { font-size:17px; fill:#fff; }
 .af-map .n { font-size:15px; fill:#fff; }
@@ -14,6 +14,7 @@
 .af-map .m { text-anchor:middle; }
 .af-map .e { text-anchor:end; }
 .af-map .l { fill:none; stroke:#fff; stroke-width:2; }
+.af-map .l.d { opacity:.4; }
 .af-stack { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 .af-grp { border:1px solid var(--line); border-radius:16px; padding:16px 18px; margin:0 0 12px; background:var(--card); }
 .af-h { margin:0 0 10px; font-size:17px; color:#fff; }
@@ -32,19 +33,18 @@
 <defs><marker id="afa" markerWidth="14" markerHeight="14" refX="10" refY="7" orient="auto" markerUnits="userSpaceOnUse"><path d="M3.5 1.5 L10 7 L3.5 12.5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></marker>
 <image id="afc" href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5c2d5ec475c215f50ebd9_gu-logo-claude.png" width="26" height="26"/></defs>
 
-<rect class="grp" x="625" y="154" width="315" height="384" rx="22"/>
-<rect class="grp" x="625" y="412" width="315" height="126" rx="22"/>
-<rect class="grp" x="356" y="151" width="160" height="467" rx="22"/>
-<rect class="grp" x="0" y="154" width="315" height="247" rx="22"/>
+<rect class="grp" x="625" y="154" width="315" height="384" rx="28"/>
+<rect class="grp" x="625" y="412" width="315" height="126" rx="28"/>
+<rect class="grp" x="356" y="151" width="160" height="467" rx="28"/>
+<rect class="grp" x="0" y="154" width="315" height="247" rx="28"/>
 
-<path class="l" d="M233 148 L233 69 A15 15 0 0 1 248 54 L767 54 A15 15 0 0 1 782 69"/>
-<path class="l" marker-end="url(#afa)" d="M782 69 L782 108"/>
-<path class="l" marker-end="url(#afa)" d="M424 54 A15 15 0 0 1 439 69 L439 109"/>
-<path class="l" marker-end="url(#afa)" d="M437 389 L437 409"/>
-<path class="l" marker-end="url(#afa)" d="M524 221 L614 221"/>
+<path class="l d" marker-end="url(#afa)" d="M233 119 L233 69 A15 15 0 0 1 248 54 L767 54 A15 15 0 0 1 782 69 L782 108"/>
+<path class="l" marker-end="url(#afa)" d="M233 148 L233 69 A15 15 0 0 1 248 54 L424 54 A15 15 0 0 1 439 69 L439 109"/>
+<path class="l d" marker-end="url(#afa)" d="M436 377 L436 392"/>
+<path class="l d" marker-end="url(#afa)" d="M524 221 L614 221"/>
 <path class="l" marker-end="url(#afa)" d="M619 351 L524 351"/>
-<path class="l" marker-end="url(#afa)" d="M771 297 L771 373"/>
-<path class="l" marker-end="url(#afa)" d="M795 373 L795 297"/>
+<path class="l d" marker-end="url(#afa)" d="M771 297 L771 373"/>
+<path class="l d" marker-end="url(#afa)" d="M795 373 L795 297"/>
 <path class="l" marker-end="url(#afa)" d="M348 568 L82 568 A15 15 0 0 1 67 553 L67 412"/>
 
 <text class="n" x="299" y="42">writes issues</text>
@@ -61,56 +61,56 @@
 <image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5dff443db9787bc13897d_gu-logo-swift.png" x="724" y="385" width="24" height="22"/>
 <text class="t m" x="797.5" y="402">Swift Code</text>
 
-<rect class="b" x="5" y="159" width="150" height="116" rx="18"/>
-<text class="m" x="80" y="197" style="font-size:26px">🧑‍🎨</text>
-<text class="n m" x="80" y="221">Georg</text>
-<text class="s m" x="80" y="242">the only human<tspan x="80" y="257">in the loop</tspan></text>
+<rect class="b" x="10" y="164" width="145" height="111" rx="18"/>
+<text class="m" x="82.5" y="197.5" style="font-size:26px">🧑‍🎨</text>
+<text class="n m" x="82.5" y="223">Georg</text>
+<text class="s m" x="82.5" y="244.4">the only human<tspan x="82.5" y="259.4">in the loop</tspan></text>
 
-<rect class="b" x="160" y="159" width="150" height="116" rx="18"/>
-<use href="#afc" x="222" y="174"/>
-<text class="n m" x="235" y="221">Claude</text>
-<text class="s m" x="235" y="242">lower models<tspan x="235" y="257">interview me</tspan></text>
+<rect class="b" x="160" y="164" width="145" height="111" rx="18"/>
+<use href="#afc" x="219.5" y="176.5"/>
+<text class="n m" x="232.5" y="223">Claude</text>
+<text class="s m" x="232.5" y="244.4">lower models<tspan x="232.5" y="259.4">interview me</tspan></text>
 
-<rect class="b" x="5" y="280" width="305" height="116" rx="18"/>
-<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5bc845f5e745c5ce6e8fd_gu-sym-iphone.png" x="146.5" y="295" width="22" height="26"/>
-<text class="n m" x="157.5" y="342">TestFlight on my iPhone</text>
-<text class="s m" x="157.5" y="363">I interact with the latest build on real hardware<tspan x="157.5" y="378">45 mins before work and again in the evening</tspan></text>
+<rect class="b" x="10" y="280" width="295" height="111" rx="18"/>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5bc845f5e745c5ce6e8fd_gu-sym-iphone.png" x="146.5" y="292.5" width="22" height="26"/>
+<text class="n m" x="157.5" y="339">TestFlight on my iPhone</text>
+<text class="s m" x="157.5" y="360.4">I interact with the latest build on real hardware<tspan x="157.5" y="375.4">45 mins before work and again in the evening</tspan></text>
 
-<rect class="b" x="361" y="156" width="151" height="96" rx="18"/>
-<text class="n m" x="436.5" y="199">Issues</text>
-<text class="s m" x="436.5" y="220">one per change</text>
+<rect class="b" x="366" y="161" width="140" height="96" rx="18"/>
+<text class="n m" x="436" y="204">Issues</text>
+<text class="s m" x="436" y="225.4">one per change</text>
 
-<rect class="b" x="361" y="286" width="151" height="96" rx="18"/>
-<text class="n m" x="436.5" y="329">Pull Request</text>
-<text class="s m" x="436.5" y="350">one branch per change</text>
+<rect class="b" x="366" y="278" width="140" height="96" rx="18"/>
+<text class="n m" x="436" y="321">Pull Request</text>
+<text class="s m" x="436" y="342.4">one branch per change</text>
 
-<rect class="b" x="361" y="416" width="151" height="96" rx="18"/>
-<text class="n m" x="436.5" y="459">Gates</text>
-<text class="s m" x="436.5" y="480">the suite and CI</text>
+<rect class="b" x="366" y="395" width="140" height="96" rx="18"/>
+<text class="n m" x="436" y="438">Gates</text>
+<text class="s m" x="436" y="459.4">the suite and CI</text>
 
-<rect class="b" x="361" y="517" width="151" height="96" rx="18"/>
-<text class="n m" x="436.5" y="560">main</text>
-<text class="s m" x="436.5" y="581">merges when green</text>
+<rect class="b" x="366" y="512" width="140" height="96" rx="18"/>
+<text class="n m" x="436" y="555">main</text>
+<text class="s m" x="436" y="576.4">merges when green</text>
 
-<rect class="b" x="630" y="159" width="150" height="116" rx="18"/>
-<use href="#afc" x="692" y="174"/>
-<text class="n m" x="705" y="221">Claude</text>
-<text class="s m" x="705" y="242">higher models plan<tspan x="705" y="257">lower models code</tspan></text>
+<rect class="b" x="635" y="164" width="145" height="111" rx="18"/>
+<use href="#afc" x="694.5" y="176.5"/>
+<text class="n m" x="707.5" y="223">Claude</text>
+<text class="s m" x="707.5" y="244.4">higher models plan<tspan x="707.5" y="259.4">lower models code</tspan></text>
 
-<rect class="b" x="785" y="159" width="150" height="116" rx="18"/>
-<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5c2d5c46b3e61cedcc6ea_gu-logo-openai.png" x="847" y="174" width="26" height="26"/>
-<text class="n m" x="860" y="221">Codex</text>
-<text class="s m" x="860" y="242">builds cheaper<tspan x="860" y="257">for long sessions</tspan></text>
+<rect class="b" x="785" y="164" width="145" height="111" rx="18"/>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5c2d5c46b3e61cedcc6ea_gu-logo-openai.png" x="844.5" y="176.5" width="26" height="26"/>
+<text class="n m" x="857.5" y="223">Codex</text>
+<text class="s m" x="857.5" y="244.4">builds cheaper<tspan x="857.5" y="259.4">for long sessions</tspan></text>
 
-<rect class="b" x="630" y="417" width="150" height="116" rx="18"/>
-<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5c72066e38c411ad07c82_gu-sym-macwindow.png" x="690" y="434" width="30" height="22"/>
-<text class="n m" x="705" y="479">Simulators</text>
-<text class="s m" x="705" y="500">dozens of runs<tspan x="705" y="515">no hardware</tspan></text>
+<rect class="b" x="635" y="422" width="145" height="106" rx="18"/>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5c72066e38c411ad07c82_gu-sym-macwindow.png" x="692.5" y="434" width="30" height="22"/>
+<text class="n m" x="707.5" y="478.5">Simulators</text>
+<text class="s m" x="707.5" y="499.9">dozens of runs<tspan x="707.5" y="514.9">no hardware</tspan></text>
 
-<rect class="b" x="785" y="417" width="150" height="116" rx="18"/>
-<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5bc84d2239e4e497dd198_gu-sym-laptopcomputer-and-iphone.png" x="843" y="435" width="34" height="21"/>
-<text class="n m" x="860" y="479">Debug Phone</text>
-<text class="s m" x="860" y="500">tethered hardware<tspan x="860" y="515">for agentic testing</tspan></text>
+<rect class="b" x="785" y="422" width="145" height="106" rx="18"/>
+<image href="https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa5bc84d2239e4e497dd198_gu-sym-laptopcomputer-and-iphone.png" x="840.5" y="434.5" width="34" height="21"/>
+<text class="n m" x="857.5" y="478.5">Debug Phone</text>
+<text class="s m" x="857.5" y="499.9">tethered hardware<tspan x="857.5" y="514.9">for agentic testing</tspan></text>
 </svg>
 
 <div class="af-stack">
