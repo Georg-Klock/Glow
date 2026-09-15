@@ -1,224 +1,168 @@
 <script>(function () {
 'use strict';
-var M = window.GWA_M, G = window.GWA_G;
-if (!M || !G) return;
-var W = M.W, H = M.H, THICK = M.THICK, WELLD = M.WELLD;
+var M = window.GWA_M;
+if (!M) return;
+var W = M.W, H = M.H, RADIUS = M.RADIUS, THICK = M.THICK, EDGE = M.EDGE;
+var WELLD = M.WELLD, RIM = M.RIM, CELL = M.CELL, INSET = M.INSET;
+var PILLTOP = M.PILLTOP, PR = M.PR, RINGW = M.RINGW, RINGTOP = M.RINGTOP;
+var EB = 1.5;      // fillet where the side wall meets the underside
+var FR = 0.5;      // fillet where a pocket wall meets its floor
+var BV = 0.3;      // bevel on the open ring's top edges
+var SEG = 14;      // segments per corner, so a socket end is a 28-sided arc
+var LIP = 4, FIL = 3;
 
-var VERT = [
-'attribute float aMat;',
-'varying vec3 vN, vWorld;',
-'varying vec2 vP;',
-'varying float vMat;',
-'void main(){',
-'  vMat = aMat;',
-'  vP = vec2(position.x+' + (W / 2).toFixed(1) + ', position.z+' + (H / 2).toFixed(1) + ');',
-'  vN = mat3(modelMatrix)*normal;',
-'  vec4 wp = modelMatrix*vec4(position,1.0);',
-'  vWorld = wp.xyz;',
-'  gl_Position = projectionMatrix*viewMatrix*wp;',
-'}'
-].join('\n');
+function rrLoop(bx, bz, r, seg) {
+var pts = [], k, i, a;
+r = Math.max(0, Math.min(r, bx, bz));
+var cx = bx - r, cz = bz - r;
+var centres = [[cx, cz], [-cx, cz], [-cx, -cz], [cx, -cz]];
+for (k = 0; k < 4; k++) {
+for (i = 0; i <= seg; i++) {
+a = (k + i / seg) * Math.PI / 2;
+var nx = Math.cos(a), nz = Math.sin(a);
+pts.push({ x: centres[k][0] + nx * r, z: centres[k][1] + nz * r, nx: nx, nz: nz });
+}
+}
+return pts;
+}
 
-var FRAG = [
-'precision highp float;',
-'const float W=' + W.toFixed(1) + ';',
-'const float H=' + H.toFixed(1) + ';',
-'const float THICK=' + THICK.toFixed(2) + ';',
-'const float WELLD=' + WELLD.toFixed(2) + ';',
-'const float RAISE=' + M.RAISE.toFixed(2) + ';',
-'const float ENGRAVE=' + M.ENGRAVE.toFixed(2) + ';',
-'uniform sampler2D uColor, uMask;',
-'uniform vec3 uCam;',
-'varying vec3 vN, vWorld;',
-'varying vec2 vP;',
-'varying float vMat;',
-'vec3 s2l(vec3 c){ return pow(c, vec3(2.2)); }',
-'float rel(vec2 uv){ vec2 m = texture2D(uMask, uv).rg; return RAISE*m.r-ENGRAVE*m.g; }',
-'void main(){',
-'  vec2 uv = vP/vec2(W,H);',
-'  vec3 n = normalize(vN);',
-'  if(n.y > 0.92){',
-'    float e = 0.32;',
-'    float rx = rel(uv+vec2(e/W,0.0))-rel(uv-vec2(e/W,0.0));',
-'    float rz = rel(uv+vec2(0.0,e/H))-rel(uv-vec2(0.0,e/H));',
-'    n = normalize(n + vec3(-rx/(2.0*e), 0.0, -rz/(2.0*e)));',
-'  }',
-'  vec3 base; float sh, f0;',
-'  if(vMat<0.5){ base=s2l(vec3(0.125)); sh=16.0; f0=0.05; }',
-'  else if(vMat<1.5){ base=s2l(vec3(0.098)); sh=12.0; f0=0.05; }',
-'  else if(vMat<2.5){ base=s2l(vec3(0.851)); sh=48.0; f0=0.07; }',
-'  else { base=s2l(vec3(1.0)); sh=90.0; f0=0.09; }',
-'  if(vMat<0.5){ vec4 d = texture2D(uColor, uv); base = mix(base, s2l(d.rgb), d.a); }',
-'  vec3 v = normalize(uCam-vWorld);',
-'  float ao = mix(0.42, 1.0, smoothstep(THICK-WELLD-0.6, THICK-0.3, vWorld.y));',
-'  vec3 sky = vec3(0.16,0.17,0.20), ground = vec3(0.012,0.012,0.015);',
-'  vec3 col = base*mix(ground, sky, n.y*0.5+0.5)*ao;',
-'  vec3 L1 = normalize(vec3(-0.45, 0.82, 0.36));',
-'  vec3 L2 = normalize(vec3(0.72, 0.42, -0.30));',
-'  vec3 C1 = vec3(1.0,0.99,0.96)*1.15, C2 = vec3(0.55,0.62,0.78)*0.55;',
-'  col += base*max(dot(n,L1),0.0)*C1*ao;',
-'  col += base*max(dot(n,L2),0.0)*C2*ao;',
-'  float fres = pow(1.0-max(dot(n,v),0.0), 5.0);',
-'  float F = f0+(1.0-f0)*fres;',
-'  float norm = (sh+8.0)/28.0;',
-'  col += C1*pow(max(dot(n,normalize(L1+v)),0.0), sh)*F*norm*ao;',
-'  col += C2*pow(max(dot(n,normalize(L2+v)),0.0), sh)*F*norm*ao*0.5;',
-'  col += vec3(0.30,0.34,0.42)*fres*0.12;',
-'  col = col/(col+vec3(1.0));',
-'  gl_FragColor = vec4(pow(col, vec3(1.0/2.2)), 1.0);',
-'}'
-].join('\n');
+function Builder() { this.p = []; this.n = []; this.m = []; this.i = []; }
+Builder.prototype.vert = function (x, y, z, nx, ny, nz, mat) {
+this.p.push(x, y, z); this.n.push(nx, ny, nz); this.m.push(mat);
+return this.p.length / 3 - 1;
+};
+Builder.prototype.ring = function (bx, bz, r, cx, cz, off, y, rad, up, mat) {
+var loop = rrLoop(bx - off, bz - off, r - off, SEG), out = [], i;
+var len = Math.sqrt(rad * rad + up * up) || 1;
+for (i = 0; i < loop.length; i++) {
+var p = loop[i];
+out.push(this.vert(cx + p.x, y, cz + p.z, p.nx * rad / len, up / len, p.nz * rad / len, mat));
+}
+return out;
+};
+Builder.prototype.strip = function (a, b) {
+for (var i = 0; i < a.length; i++) {
+var j = (i + 1) % a.length;
+this.i.push(a[i], b[i], a[j], a[j], b[i], b[j]);
+}
+};
+Builder.prototype.fan = function (ring, cx, cz, y, ny, mat) {
+var c = this.vert(cx, y, cz, 0, ny, 0, mat), i;
+for (i = 0; i < ring.length; i++) {
+var j = (i + 1) % ring.length;
+if (ny > 0) this.i.push(c, ring[i], ring[j]); else this.i.push(c, ring[j], ring[i]);
+}
+};
 
-function boot(THREE, host) {
-var small = window.matchMedia('(max-width: 767px)').matches;
-var colour = M.canvas2d(), mask = M.canvas2d();
-var uColor = new THREE.CanvasTexture(colour.c);
-var uMask = new THREE.CanvasTexture(mask.c);
-[uColor, uMask].forEach(function (t) {
-t.flipY = false;                                    // vP.y = 0 is the canvas's first row, not its last
-t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
-t.minFilter = THREE.LinearMipmapLinearFilter;
-t.anisotropy = 8;
-if ('colorSpace' in t) t.colorSpace = THREE.NoColorSpace;
+function pocket(B, bx, bz, r, cx, cz, mat) {
+var prev = null, i, b, off, y;
+for (i = 0; i <= LIP; i++) {
+b = i / LIP * Math.PI / 2;
+off = RIM * Math.sin(b);
+y = THICK - RIM + RIM * Math.cos(b);
+var ring = B.ring(bx, bz, r, cx, cz, off, y, -Math.sin(b), Math.cos(b), mat);
+if (prev) B.strip(prev, ring);
+prev = ring;
+}
+var floorY = THICK - WELLD;
+var wall = B.ring(bx, bz, r, cx, cz, RIM, floorY + FR, -1, 0, mat);
+B.strip(prev, wall);
+prev = wall;
+for (i = 1; i <= FIL; i++) {
+var g = i / FIL * Math.PI / 2;
+var ring2 = B.ring(bx, bz, r, cx, cz, RIM + FR - FR * Math.cos(g), floorY + FR - FR * Math.sin(g),
+-Math.cos(g), Math.sin(g), mat);
+B.strip(prev, ring2); prev = ring2;
+}
+B.fan(prev, cx, cz, floorY, 1, mat);
+}
+
+function pill(B, bx, bz, r, cx, cz) {
+var d = RIM + INSET;                                 // clear the pocket wall, not the opening
+var pb = bx - d, pz = bz - d, pr = r - d, prev = null, i;
+var top = B.ring(pb, pz, pr, cx, cz, PR, PILLTOP, 0, 1, 2);
+B.fan(top, cx, cz, PILLTOP, 1, 2);
+prev = top;
+for (i = 1; i <= LIP; i++) {
+var b = i / LIP * Math.PI / 2;
+var ring = B.ring(pb, pz, pr, cx, cz, PR - PR * Math.sin(b), PILLTOP - PR + PR * Math.cos(b),
+Math.sin(b), Math.cos(b), 2);
+B.strip(prev, ring); prev = ring;
+}
+B.strip(prev, B.ring(pb, pz, pr, cx, cz, 0, THICK - WELLD, 1, 0, 2));
+}
+
+function openRing(B, bx, bz, r, cx, cz) {
+var d = RIM + INSET;
+var ob = bx - d, oz = bz - d, orr = r - d, floorY = THICK - WELLD;
+var a = B.ring(ob, oz, orr, cx, cz, 0, floorY, 1, 0, 3);
+var b = B.ring(ob, oz, orr, cx, cz, 0, RINGTOP - BV, 1, 0, 3);
+B.strip(a, b);
+var c = B.ring(ob, oz, orr, cx, cz, BV, RINGTOP, 1, 1, 3);
+B.strip(b, c);
+var d = B.ring(ob, oz, orr, cx, cz, RINGW - BV, RINGTOP, 0, 1, 3);
+B.strip(c, d);
+var e = B.ring(ob, oz, orr, cx, cz, RINGW, RINGTOP - BV, -1, 1, 3);
+B.strip(d, e);
+var f = B.ring(ob, oz, orr, cx, cz, RINGW, floorY, -1, 0, 3);
+B.strip(e, f);
+}
+
+function build(THREE) {
+var B = new Builder(), i, prev = null;
+
+for (i = 0; i <= LIP; i++) {
+var phi = i / LIP * Math.PI / 2;
+var off = EDGE - EDGE * Math.sin(phi);
+var ring = B.ring(W / 2, H / 2, RADIUS, 0, 0, off, THICK - EDGE + EDGE * Math.cos(phi),
+Math.sin(phi), Math.cos(phi), 0);
+if (prev) B.strip(prev, ring);
+prev = ring;
+}
+var low = B.ring(W / 2, H / 2, RADIUS, 0, 0, 0, EB, 1, 0, 0);
+B.strip(prev, low); prev = low;
+for (i = 1; i <= FIL; i++) {
+var g = i / FIL * Math.PI / 2;
+var ring2 = B.ring(W / 2, H / 2, RADIUS, 0, 0, EB - EB * Math.cos(g), EB - EB * Math.sin(g),
+Math.cos(g), -Math.sin(g), 0);
+B.strip(prev, ring2); prev = ring2;
+}
+B.fan(prev, 0, 0, 0, -1, 0);
+
+var holes = [];
+M.sockets().forEach(function (s) {
+var bx = s.w / 2, bz = CELL / 2, r = CELL / 2;
+var cx = s.x + bx - W / 2, cz = s.z + bz - H / 2;
+pocket(B, bx, bz, r, cx, cz, 1);
+if (s.kind === 2) pill(B, bx, bz, r, cx, cz);
+else if (s.kind === 3) openRing(B, bx, bz, r, cx, cz);
+holes.push({ bx: bx, bz: bz, r: r, cx: cx, cz: cz });
 });
 
-var mat = new THREE.ShaderMaterial({
-uniforms: { uMask: { value: uMask }, uColor: { value: uColor }, uCam: { value: new THREE.Vector3() } },
-vertexShader: VERT, fragmentShader: FRAG, side: THREE.DoubleSide
+var shape = new THREE.Shape(rrLoop(W / 2 - EDGE, H / 2 - EDGE, RADIUS - EDGE, SEG)
+.map(function (p) { return new THREE.Vector2(p.x, p.z); }));
+shape.holes = holes.map(function (o) {
+var pts = rrLoop(o.bx, o.bz, o.r, SEG).map(function (p) {
+return new THREE.Vector2(o.cx + p.x, o.cz + p.z);
 });
-var card = new THREE.Mesh(G.build(THREE), mat);
-var scene = new THREE.Scene();
-scene.add(card);
-
-var camera = new THREE.PerspectiveCamera(30, 1, 10, 4000);
-var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.75 : 2));
-if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-host.appendChild(renderer.domElement);
-
-var view = { yaw: -0.22, pitch: 0.92, dist: 640, tYaw: -0.22, tPitch: 0.92, tDist: 640, zoom: 1 };
-var LOW = 0.10, HIGH = 1.45;
-function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
-var CORNERS = [];
-(function () {
-for (var sx = -1; sx <= 1; sx += 2) for (var sz = -1; sz <= 1; sz += 2) for (var sy = 0; sy <= 1; sy++) {
-CORNERS.push([sx * W / 2, sy * THICK, sz * H / 2]);
-}
-})();
-function frameDistance() {
-var vt = Math.tan(camera.fov * Math.PI / 360), ht = vt * camera.aspect;
-var cp = Math.cos(view.pitch), sp = Math.sin(view.pitch);
-var sy = Math.sin(view.yaw), cy = Math.cos(view.yaw);
-var dx = sy * cp, dy = sp, dz = cy * cp;               // target -> camera
-var rx = cy, rz = -sy;                                 // right
-var ux = -sp * sy, uy = cp, uz = -sp * cy;             // up
-var ty = THICK * 0.4, d = 0, i;
-for (i = 0; i < CORNERS.length; i++) {
-var px = CORNERS[i][0], py = CORNERS[i][1] - ty, pz = CORNERS[i][2];
-var x = px * rx + pz * rz;
-var y = px * ux + py * uy + pz * uz;
-var z = px * dx + py * dy + pz * dz;
-d = Math.max(d, z + Math.abs(x) / ht, z + Math.abs(y) / vt);
-}
-return d * 0.96;              // the corners are rounded away, so the box over-reserves
-}
-var idle = true, dragging = false, last = null, pointers = {}, pinch = 0;
-function resize() {
-var w = host.clientWidth, h = host.clientHeight;
-if (!w || !h) return;
-renderer.setSize(w, h, false);
-camera.aspect = w / h;
-camera.updateProjectionMatrix();
-view.tDist = frameDistance() * view.zoom;
-if (idle) view.dist = view.tDist;
-}
-host.addEventListener('pointerdown', function (e) {
-try { host.setPointerCapture(e.pointerId); } catch (err) {}
-pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
-if (Object.keys(pointers).length === 1) { dragging = true; last = { x: e.clientX, y: e.clientY }; }
-idle = false;
+pts.reverse();
+return new THREE.Path(pts);
 });
-host.addEventListener('pointermove', function (e) {
-if (!pointers[e.pointerId]) return;
-pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
-var ids = Object.keys(pointers);
-if (ids.length >= 2) {
-var a = pointers[ids[0]], b = pointers[ids[1]];
-var d = Math.hypot(a.x - b.x, a.y - b.y);
-if (pinch) view.zoom = clamp(view.zoom * (pinch / d), 0.5, 2.4);
-pinch = d; dragging = false; return;
-}
-if (!dragging || !last) return;
-view.tYaw += (e.clientX - last.x) * 0.006;
-view.tPitch = clamp(view.tPitch - (e.clientY - last.y) * 0.006, LOW, HIGH);
-last = { x: e.clientX, y: e.clientY };
-});
-function release(e) {
-delete pointers[e.pointerId];
-if (!Object.keys(pointers).length) { dragging = false; pinch = 0; last = null; }
-}
-host.addEventListener('pointerup', release);
-host.addEventListener('pointercancel', release);
-host.addEventListener('wheel', function (e) {
-e.preventDefault();
-idle = false;
-view.zoom = clamp(view.zoom * (1 + e.deltaY * 0.0012), 0.5, 2.4);
-}, { passive: false });
-var reset = host.parentNode.querySelector('[data-gwa-reset]');
-if (reset) reset.addEventListener('click', function () {
-view.tYaw = -0.22; view.tPitch = 0.92; view.zoom = 1; idle = true; resize();
-});
+var face = new THREE.ShapeGeometry(shape);
+var fp = face.attributes.position.array, fi = face.index.array;
+var base = B.p.length / 3;
+for (i = 0; i < fp.length; i += 3) B.vert(fp[i], THICK, fp[i + 1], 0, 1, 0, 0);
+for (i = 0; i < fi.length; i += 3) B.i.push(base + fi[i], base + fi[i + 2], base + fi[i + 1]);
+face.dispose();
 
-var t0 = performance.now(), visible = true;
-if (window.IntersectionObserver) {
-new IntersectionObserver(function (es) { visible = es[0].isIntersecting; }).observe(host);
-}
-var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-function frame() {
-requestAnimationFrame(frame);
-if (!visible) return;
-if (idle && !still) view.tYaw = -0.22 + Math.sin((performance.now() - t0) * 0.00018) * 0.30;
-view.yaw += (view.tYaw - view.yaw) * 0.12;
-view.pitch += (view.tPitch - view.pitch) * 0.12;
-view.tDist = frameDistance() * view.zoom;      // the card keeps its share of the frame at any angle
-view.dist += (view.tDist - view.dist) * 0.12;
-var cp = Math.cos(view.pitch), sp = Math.sin(view.pitch);
-camera.position.set(Math.sin(view.yaw) * cp * view.dist, sp * view.dist, Math.cos(view.yaw) * cp * view.dist);
-camera.lookAt(0, THICK * 0.4, 0);
-mat.uniforms.uCam.value.copy(camera.position);
-renderer.render(scene, camera);
+var geo = new THREE.BufferGeometry();
+geo.setAttribute('position', new THREE.Float32BufferAttribute(B.p, 3));
+geo.setAttribute('normal', new THREE.Float32BufferAttribute(B.n, 3));
+geo.setAttribute('aMat', new THREE.Float32BufferAttribute(B.m, 1));
+geo.setIndex(B.i);
+return geo;
 }
 
-M.paint(colour.ctx, mask.ctx).then(function () {
-uColor.needsUpdate = true; uMask.needsUpdate = true;
-});
-
-if (host.dataset.debug) {
-window.GWA = { view: view, camera: camera, frame: frameDistance, mesh: card };
-var q = new URLSearchParams(location.search);
-if (q.has('p')) view.tPitch = view.pitch = parseFloat(q.get('p'));
-if (q.has('y')) view.tYaw = view.yaw = parseFloat(q.get('y'));
-if (q.has('z')) view.zoom = parseFloat(q.get('z'));
-if (q.has('p') || q.has('y') || q.has('z')) idle = false;   // a fixed view, for repeatable captures
-}
-window.addEventListener('resize', resize);
-if (window.ResizeObserver) new ResizeObserver(resize).observe(host);
-resize();
-view.dist = view.tDist;
-frame();
-host.dataset.ready = '1';
-}
-
-function start() {
-var host = document.getElementById('gwa');
-if (!host) return;
-if (!window.THREE) { host.dataset.error = 'three'; return; }
-var gl = document.createElement('canvas').getContext('webgl2') ||
-document.createElement('canvas').getContext('webgl');
-if (!gl) { host.dataset.error = 'webgl'; return; }
-boot(window.THREE, host);
-}
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-else start();
+window.GWA_G = { build: build };
 })();
 </script>

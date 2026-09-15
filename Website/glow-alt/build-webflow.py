@@ -51,8 +51,8 @@ def main() -> int:
     src = (HERE / 'scene.js').read_text(encoding='utf-8')
     parts = re.split(r'/\* ===== block \d+ of \d+ =+.*?\*/\n', src, flags=re.S)
     parts = [p for p in parts if p.strip()]
-    if len(parts) != 3:
-        print('expected 3 blocks, found %d' % len(parts), file=sys.stderr)
+    if len(parts) < 2:
+        print('expected several blocks, found %d' % len(parts), file=sys.stderr)
         return 1
 
     OUT.mkdir(exist_ok=True)

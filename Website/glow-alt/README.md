@@ -7,9 +7,37 @@ The week grid from `/glow-up`, rebuilt in WebGL. The CSS version is a stack of
 rounded `<div>`s with inset box-shadows: the sockets look recessed because
 someone drew a shadow at the top and a highlight at the bottom, and they stop
 looking recessed the moment anything moves. Here the card is a mesh, every
-socket is a hole in it, and the light does the rest. Drag it and the pockets
+socket is a hole in it, and the light does the rest. Lean it and the pockets
 occlude, catch a rim highlight on the near lip and go black on the far wall,
 because that is what a hole does.
+
+**It behaves like the 2-D widget, not like a 3-D viewer.** Same movement, same
+interaction — see below.
+
+## The same rails as the CSS version
+
+It is not an orbit and there is no zoom. The 2-D widget tilts its card toward
+the pointer by at most **7 degrees**, eases at **0.055** a frame, takes its
+target from the pointer's offset from the card's centre over half the window,
+and returns to flat on `pointerleave` or when the tab is hidden — and does none
+of it without `(hover: hover) and (pointer: fine)`, or under
+`prefers-reduced-motion`. Every one of those numbers is lifted from
+`Website/week-widget/webflow/footer.html`, so the two pages move alike.
+
+The camera never moves. It sits square on at a fixed **900 units**, which is
+the CSS `perspective: 900px` against a 338-unit card, so the foreshortening
+matches too. Framing is done by fitting the **field of view** to the card's
+eight bounding corners at the tilt extremes — not by dollying, which would
+change the perspective, and not per frame, which would make the framing breathe
+while the card leans.
+
+**Tapping works, the same way it does in the 2-D widget.** An open mark can be
+finished and today's own finished mark can be undone; everything else ignores
+the tap. A hit is resolved by raycasting the card and converting to card
+coordinates, so it stays correct while the card is leaning. A toggle rewrites
+that habit's `completed` map, re-derives every span in the row, rebuilds the
+mesh and repaints the decals — which is how the habit's name goes dim when it
+stops being open, and how today's weekday letter goes dim when nothing is.
 
 ## What is actually geometry
 
@@ -22,6 +50,7 @@ Everything that has depth:
 | A socket | A rounded-over lip, a wall, a floor fillet and a floor, swept around that socket's own outline |
 | A finished mark | A pill seated in its pocket — proud of the floor, below the face |
 | An open mark | A ring standing on the pocket floor, bevelled so its top edge takes a highlight |
+| The shadow | One quad under the slab: a blurred rounded rectangle that slides opposite the lean, the 3-D form of the CSS card's `box-shadow` |
 
 About 27,000 vertices and 49,000 triangles, exact at any zoom.
 
@@ -50,7 +79,7 @@ Sweeping the profile around each socket's own outline needs 49,000 triangles and
 is exact. The grid was 550,000 and exact nowhere. If a future change reaches for
 a heightfield again, this is the reason not to.
 
-## Three bugs this cost, all worth knowing
+## Four bugs this cost, all worth knowing
 
 - **A mark has to clear the pocket wall, not the opening.** The lip eats `RIM`
   inward as it rolls over, so a pill inset by `INSET` from the socket outline
@@ -62,6 +91,13 @@ a heightfield again, this is the reason not to.
   every pill upside down and lit them with the ground colour. Every ring already
   carries the outward normal its profile says it has — use it, and render
   `DoubleSide` so the winding cannot punch holes.
+- **A shadow plane needs real clearance, and turning off depth testing is not
+  the fix.** A 7-degree lean on both axes drops a corner about 42 units, so a
+  shadow quad at 8 units below got *intersected* by the card and showed through
+  it as a hard diagonal wedge. `depthTest: false` replaced that with a worse
+  bug: a transparent object is drawn after every opaque one, so the shadow then
+  painted over the whole card and dimmed it. It hangs at 70 units, and depth
+  does the right thing because nothing intersects.
 - **A specular lobe is not a material.** A directional light with `shininess`
   in the seventies across a flat 338-unit face reads as one big vertical
   gradient, not as a surface. Shininess and F₀ are now per material (card 16 /
@@ -92,23 +128,28 @@ about *light*.
 python3 -m http.server 8912 --directory Website/glow-alt
 ```
 
-`index.html` carries `data-debug` on the stage, which turns on `?p=`, `?y=` and
-`?z=` (pitch in radians, yaw in radians, zoom multiplier) for repeatable
-captures and publishes `window.GWA` for poking at the view. The Webflow embed
-carries no `data-debug`, so neither exists on the live page.
+`index.html` carries `data-debug` on the stage, which turns on `?tx=` and `?tz=`
+— tilt as a multiple of the 7-degree maximum, for repeatable captures — and
+publishes `window.GWA` for poking at the scene. Values past about ±2.5 lean the
+card far enough to reach the shadow plane, which is a debug artefact, not a
+bug. The Webflow embed carries no `data-debug`, so neither exists on the live
+page.
 
 ## How it is deployed
 
-`scene.js` is the source. It is one file in three IIFE blocks marked
-`===== block n of 3`, because a Webflow custom-code block stops at 10,000
-characters and the scene is 24,000.
+`scene.js` is the source. It is one file in four IIFE blocks marked
+`===== block n of 4`, because a Webflow custom-code block stops at 10,000
+characters and the scene is 27,000. Block 1 publishes `window.GWA_M` (the week,
+the plan, the socket list, the toggle), block 2 adds the decal painter to it,
+block 3 publishes `window.GWA_G` (the geometry builder) and block 4 builds the
+scene.
 
 ```bash
 python3 Website/glow-alt/build-webflow.py
 ```
 
 strips comment-only lines, splits on those markers and writes
-`webflow/block1.html` … `block3.html`, printing each block's size and failing if
+`webflow/block1.html` … `block4.html`, printing each block's size and failing if
 one is over the cap. That is the fallback path: paste the three into embeds on
 the page, in order.
 
@@ -118,7 +159,7 @@ the page, in order.
 styles and two `<script src>` tags. The scene is at
 
 ```
-https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa89dff5b2dcf08aed1794c_gwa-scene.js
+https://cdn.prod.website-files.com/620d05babdddc967daa0780a/6aa8a364915103a55347a4ba_gwa-scene-4.js
 ```
 
 served with `cache-control: max-age=31536000`. **That URL is immutable**: a
@@ -136,6 +177,7 @@ disappears, the scene needs an ES-module loader, not a newer UMD guess.
 512 × 536 was the grid version's cost; this one is a fixed ~49,000 triangles and
 the fragment shader is a dozen lines, so the frame cost is trivial and the only
 real budget is the two 1352 × 1416 canvas textures (colour and relief mask).
-Rendering pauses when the stage leaves the viewport, the idle drift respects
-`prefers-reduced-motion`, and the device pixel ratio is capped at 2 (1.75 under
-768px).
+Rendering pauses when the stage leaves the viewport, the tilt respects
+`prefers-reduced-motion` and a coarse pointer, and the device pixel ratio is
+capped at 2 (1.75 under 768px). A tap rebuilds the mesh from scratch, which is
+a few milliseconds and happens once per tap.

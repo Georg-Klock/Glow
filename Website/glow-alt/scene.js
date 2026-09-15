@@ -99,7 +99,7 @@ for (c = 0; c < TODAY; c++) if (c !== TODAY + h.miss) completed[c] = true;
 h.pattern.forEach(function (d) { if (d < TODAY) completed[d] = true; });
 if (h.doneToday) completed[TODAY] = true;
 }
-return { habit: h, spans: rowSpans(h.target, completed, TODAY) };
+return { habit: h, completed: completed, spans: [] };
 });
 }
 
@@ -128,13 +128,29 @@ var RINGW = 1.7, RINGTOP = THICK - 0.45;
 var RAISE = 0.28;      // names, letters and icons stand off the face
 var ENGRAVE = 0.5;     // a missed day is cut into it — both as relief in the normal, not as triangles
 
-/* ---- rows in display order (the two spacer rows are real gaps) ---- */
-var DISPLAY = [];
-(function () {
-var rows = week(), out = rows.slice();
-SPACERS.forEach(function (at) { out.splice(at, 0, null); });
-DISPLAY = out;
-})();
+/* ---- rows in display order (the two spacer rows are real gaps) ----
+   ROWS is live: marking a habit done rewrites its `completed` map and every
+   span in the row is derived again, exactly as the 2-D widget does it. */
+var ROWS = week(), DISPLAY = [];
+function relayout() {
+ROWS.forEach(function (row) { row.spans = rowSpans(row.habit.target, row.completed, TODAY); });
+DISPLAY = ROWS.slice();
+SPACERS.forEach(function (at) { DISPLAY.splice(at, 0, null); });
+}
+relayout();
+/* A row emits while it still has an open mark; today's letter emits only
+   while any row does. Both rules are the 2-D widget's updateTiers(). */
+function emitting(row) {
+return !!row && row.spans.some(function (s) { return s.state === 'open'; });
+}
+function anyOpen() { return ROWS.some(emitting); }
+function toggle(rowIndex) {
+var row = ROWS[rowIndex];
+if (!row) return false;
+if (row.completed[TODAY]) delete row.completed[TODAY]; else row.completed[TODAY] = true;
+relayout();
+return true;
+}
 
 var SPAN_KIND = { upcoming: 1, done: 2, open: 3 };   // 0 means "no span here"
 
@@ -145,14 +161,48 @@ function sockets() {
 var out = [];
 DISPLAY.forEach(function (row, ri) {
 if (!row) return;
+var index = ROWS.indexOf(row);
 row.spans.forEach(function (s) {
 if (s.state === 'missed') return;                // a missed day has no socket, only the cross
 var n = s.last - s.first + 1;
-out.push({ x: cellX(s.first), z: rowY(ri), w: n * CELL + (n - 1) * GAP, kind: SPAN_KIND[s.state] });
+// the same rule as the 2-D widget: an open mark, or today's own finished one
+var tappable = s.state === 'open' ||
+(s.state === 'done' && s.first <= TODAY && TODAY <= s.last && !!row.completed[TODAY]);
+out.push({
+x: cellX(s.first), z: rowY(ri), w: n * CELL + (n - 1) * GAP,
+kind: SPAN_KIND[s.state], row: index, tappable: tappable
+});
 });
 });
 return out;
 }
+
+window.GWA_M = {
+W: W, H: H, RADIUS: RADIUS, CELL: CELL, INSET: INSET,
+THICK: THICK, EDGE: EDGE, WELLD: WELLD, RIM: RIM,
+PILLTOP: PILLTOP, PR: PR, RINGW: RINGW, RINGTOP: RINGTOP,
+RAISE: RAISE, ENGRAVE: ENGRAVE,
+TEXT: TEXT, PAD_L: PAD_L, PAD_T: PAD_T, HEADER_H: HEADER_H,
+ICON_W: ICON_W, ICON_GAP: ICON_GAP, LETTERS: LETTERS, TODAY: TODAY,
+ICON_BASE: ICON_BASE, ICONS: ICONS,
+sockets: sockets, toggle: toggle, anyOpen: anyOpen, cellX: cellX, rowY: rowY,
+rows: function () { return DISPLAY; }
+};
+})();
+
+/* ===== block 2 of 4 =====================================================
+   The decals: the text, icons and missed crosses that are painted onto the
+   card rather than modelled into it. Split here only because a Webflow
+   custom-code block stops at 10,000 characters. */
+(function () {
+'use strict';
+var M = window.GWA_M;
+if (!M) return;
+var W = M.W, H = M.H, CELL = M.CELL, TEXT = M.TEXT, PAD_L = M.PAD_L, PAD_T = M.PAD_T;
+var HEADER_H = M.HEADER_H, ICON_W = M.ICON_W, ICON_GAP = M.ICON_GAP;
+var LETTERS = M.LETTERS, TODAY = M.TODAY, ICON_BASE = M.ICON_BASE, ICONS = M.ICONS;
+var cellX = M.cellX, rowY = M.rowY;
+function iconURL(slug) { return ICON_BASE + ICONS[slug] + '_gw-mobile-3x-icon-' + slug + '-mask.png'; }
 
 /* ---- decals ----
    Text, icons and the missed cross are not geometry: they are two canvases the
@@ -167,13 +217,11 @@ ctx.scale(K, K);
 return { c: c, ctx: ctx };
 }
 var LIT_SDR = '#969696', EMIT = '#FFFFFF', OFF_DAY = '#888888', RESTING = 'rgba(217,217,217,0.5)';
-function emitting(row) {
-return !!row && row.spans.some(function (s) { return s.state === 'open'; });
-}
 function fontStack() { return '"GW Inter","Inter",system-ui,-apple-system,sans-serif'; }
 
 function drawDecals(colorCtx, maskCtx, icons) {
-var f = TEXT + 'px ' + fontStack();
+var f = TEXT + 'px ' + fontStack(), live = M.anyOpen();
+[colorCtx, maskCtx].forEach(function (ctx) { ctx.clearRect(0, 0, W, H); });
 [colorCtx, maskCtx].forEach(function (ctx) {
 ctx.font = f; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
 });
@@ -181,16 +229,16 @@ ctx.font = f; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
 colorCtx.textAlign = maskCtx.textAlign = 'center';
 LETTERS.forEach(function (letter, i) {
 var x = cellX(i) + CELL / 2, y = PAD_T + HEADER_H / 2;
-colorCtx.fillStyle = i === TODAY ? EMIT : OFF_DAY;
+colorCtx.fillStyle = (i === TODAY && live) ? EMIT : OFF_DAY;
 colorCtx.fillText(letter, x, y);
 maskCtx.fillStyle = '#f00';
 maskCtx.fillText(letter, x, y);
 });
 colorCtx.textAlign = maskCtx.textAlign = 'left';
 // names, icons, and the cross for a missed day
-DISPLAY.forEach(function (row, ri) {
+M.rows().forEach(function (row, ri) {
 if (!row) return;
-var y = rowY(ri) + CELL / 2, on = emitting(row);
+var y = rowY(ri) + CELL / 2, on = row.spans.some(function (s) { return s.state === 'open'; });
 colorCtx.fillStyle = on ? EMIT : LIT_SDR;
 colorCtx.fillText(row.habit.name, PAD_L + ICON_W + ICON_GAP, y);
 maskCtx.fillStyle = '#f00';
@@ -245,23 +293,23 @@ im.src = iconURL(slug);
 })).then(function () { return out; });
 }
 
+var iconCache = null;
 function paint(colorCtx, maskCtx) {
+if (iconCache) { drawDecals(colorCtx, maskCtx, iconCache); return Promise.resolve(); }
 var fonts = document.fonts && document.fonts.load
 ? document.fonts.load(TEXT + 'px "GW Inter"').catch(function () {})
 : Promise.resolve();
-return Promise.all([fonts, loadIcons()]).then(function (r) { drawDecals(colorCtx, maskCtx, r[1] || {}); });
+return Promise.all([fonts, loadIcons()]).then(function (r) {
+iconCache = r[1] || {};
+drawDecals(colorCtx, maskCtx, iconCache);
+});
 }
 
-window.GWA_M = {
-W: W, H: H, RADIUS: RADIUS, CELL: CELL, INSET: INSET,
-THICK: THICK, EDGE: EDGE, WELLD: WELLD, RIM: RIM,
-PILLTOP: PILLTOP, PR: PR, RINGW: RINGW, RINGTOP: RINGTOP,
-RAISE: RAISE, ENGRAVE: ENGRAVE,
-sockets: sockets, canvas2d: canvas2d, paint: paint
-};
+M.canvas2d = canvas2d;
+M.paint = paint;
 })();
 
-/* ===== block 2 of 3 =====================================================
+/* ===== block 3 of 4 =====================================================
    The geometry. Split here only because a Webflow custom-code block stops at
    10,000 characters; in this repository it is one file.
 
@@ -457,7 +505,7 @@ return geo;
 window.GWA_G = { build: build };
 })();
 
-/* ===== block 3 of 3 ===================================================== */
+/* ===== block 4 of 4 ===================================================== */
 (function () {
 'use strict';
 var M = window.GWA_M, G = window.GWA_G;
@@ -559,107 +607,160 @@ var card = new THREE.Mesh(G.build(THREE), mat);
 var scene = new THREE.Scene();
 scene.add(card);
 
+/* The CSS card carries a box-shadow that slides with the tilt. This is that
+   shadow: one quad under the slab, a blurred rounded rectangle, moved the
+   opposite way to the lean. Without it the card floats. */
+var shadowGeo = new THREE.PlaneGeometry(M.W + 300, M.H + 300);
+shadowGeo.rotateX(-Math.PI / 2);
+/* It hangs 70 units down, not 8. A 7-degree lean on both axes drops a corner
+   about 42 units, so a shadow plane any closer gets *intersected* by the card
+   and shows through it as a hard diagonal wedge. Turning off depth testing is
+   not the fix either: a transparent object is drawn after the opaque ones, so
+   it then paints over the whole card and dims it. Depth does the right thing
+   once nothing intersects. */
+var shadow = new THREE.Mesh(shadowGeo, new THREE.ShaderMaterial({
+transparent: true, depthWrite: false,
+vertexShader: [
+'varying vec2 vXZ;',
+'void main(){ vXZ = vec2(position.x, position.z);',
+'gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }'
+].join('\n'),
+fragmentShader: [
+'precision mediump float;',
+'varying vec2 vXZ;',
+'float sdRR(vec2 p, vec2 b, float r){ vec2 q=abs(p)-b+r; return min(max(q.x,q.y),0.0)+length(max(q,0.0))-r; }',
+'void main(){',
+'  float d = sdRR(vXZ, vec2(' + (M.W / 2).toFixed(1) + ',' + (M.H / 2).toFixed(1) + '), ' + M.RADIUS.toFixed(1) + ');',
+'  float a = 1.0-smoothstep(-52.0, 52.0, d);',
+'  gl_FragColor = vec4(0.0, 0.0, 0.0, a*a*0.62);',
+'}'
+].join('\n')
+}));
+shadow.renderOrder = -1;
+scene.add(shadow);
+
 var camera = new THREE.PerspectiveCamera(30, 1, 10, 4000);
 var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.75 : 2));
 if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 host.appendChild(renderer.domElement);
 
-/* Orbit, written here rather than pulled in: it is forty lines against a
-   second network request and a second version to pin. */
-var view = { yaw: -0.22, pitch: 0.92, dist: 640, tYaw: -0.22, tPitch: 0.92, tDist: 640, zoom: 1 };
-var LOW = 0.10, HIGH = 1.45;
-function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
-/* Fit the card's eight bounding corners in the frustum, at whatever yaw,
-   pitch and aspect are current. An approximation from height alone let the
-   idle drift swing a corner out of frame on a phone, because a yawed card is
-   wider than the card. */
+/* ---- the 2-D widget's movement, exactly ----
+   Not an orbit. The CSS version tilts the card toward the pointer by at most
+   7 degrees, eases at 0.055 a frame, and returns to flat when the pointer
+   leaves the document or the tab is hidden — and it does none of that without
+   a fine pointer, or under prefers-reduced-motion. Those numbers are lifted
+   from Website/week-widget/webflow/footer.html so the two pages move alike.
+
+   The camera does not move at all. It sits square on at a fixed 900 units,
+   which is the CSS `perspective: 900px` at --s: 1 with a 338-unit card, so the
+   foreshortening matches too; framing is done by fitting the field of view
+   rather than by dollying, which would change the perspective. */
+var MAX = 7 * Math.PI / 180, EASE = 0.055, PERSP = 900;
+var tiltX = 0, tiltZ = 0, wantX = 0, wantZ = 0;
+var fine = window.matchMedia('(hover: hover) and (pointer: fine)');
+var still = window.matchMedia('(prefers-reduced-motion: reduce)');
+function tiltOn() { return fine.matches && !still.matches; }
+
+/* Fit by field of view, at the tilt extremes, so the framing does not breathe
+   while the card moves. */
 var CORNERS = [];
 (function () {
 for (var sx = -1; sx <= 1; sx += 2) for (var sz = -1; sz <= 1; sz += 2) for (var sy = 0; sy <= 1; sy++) {
-CORNERS.push([sx * W / 2, sy * THICK, sz * H / 2]);
+CORNERS.push([sx * W / 2, sy * THICK - THICK * 0.4, sz * H / 2]);
 }
 })();
-function frameDistance() {
-var vt = Math.tan(camera.fov * Math.PI / 360), ht = vt * camera.aspect;
-var cp = Math.cos(view.pitch), sp = Math.sin(view.pitch);
-var sy = Math.sin(view.yaw), cy = Math.cos(view.yaw);
-var dx = sy * cp, dy = sp, dz = cy * cp;               // target -> camera
-var rx = cy, rz = -sy;                                 // right
-var ux = -sp * sy, uy = cp, uz = -sp * cy;             // up
-var ty = THICK * 0.4, d = 0, i;
+function fitFov() {
+var need = 0, i, k;
+for (k = 0; k < 4; k++) {
+var ax = (k & 1 ? 1 : -1) * MAX, az = (k & 2 ? 1 : -1) * MAX;
+var ca = Math.cos(ax), sa = Math.sin(ax), cb = Math.cos(az), sb = Math.sin(az);
 for (i = 0; i < CORNERS.length; i++) {
-var px = CORNERS[i][0], py = CORNERS[i][1] - ty, pz = CORNERS[i][2];
-var x = px * rx + pz * rz;
-var y = px * ux + py * uy + pz * uz;
-var z = px * dx + py * dy + pz * dz;
-d = Math.max(d, z + Math.abs(x) / ht, z + Math.abs(y) / vt);
+var p = CORNERS[i];
+// rotate about Z then about X, the same order the card is drawn with
+var x = p[0] * cb - p[1] * sb, y = p[0] * sb + p[1] * cb, z = p[2];
+var y2 = y * ca - z * sa, z2 = y * sa + z * ca;
+var depth = PERSP - y2;                                   // the camera looks down -Y
+if (depth < 1) depth = 1;
+need = Math.max(need, Math.abs(z2) / depth, Math.abs(x) / (camera.aspect * depth));
 }
-return d * 0.96;              // the corners are rounded away, so the box over-reserves
 }
-var idle = true, dragging = false, last = null, pointers = {}, pinch = 0;
+return 2 * Math.atan(need * 1.06) * 180 / Math.PI;
+}
 function resize() {
 var w = host.clientWidth, h = host.clientHeight;
 if (!w || !h) return;
 renderer.setSize(w, h, false);
 camera.aspect = w / h;
+camera.fov = Math.min(fitFov(), 70);
 camera.updateProjectionMatrix();
-view.tDist = frameDistance() * view.zoom;
-if (idle) view.dist = view.tDist;
 }
-host.addEventListener('pointerdown', function (e) {
-try { host.setPointerCapture(e.pointerId); } catch (err) {}
-pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
-if (Object.keys(pointers).length === 1) { dragging = true; last = { x: e.clientX, y: e.clientY }; }
-idle = false;
+camera.position.set(0, PERSP, 0);
+camera.up.set(0, 0, -1);                                     // screen up is -Z, as in the CSS card
+camera.lookAt(0, THICK * 0.4, 0);
+
+document.addEventListener('pointermove', function (e) {
+if (!tiltOn() || (e.pointerType && e.pointerType !== 'mouse')) return;
+var r = host.getBoundingClientRect();
+var dx = (e.clientX - (r.left + r.width / 2)) / (window.innerWidth / 2);
+var dy = (e.clientY - (r.top + r.height / 2)) / (window.innerHeight / 2);
+wantZ = -Math.max(-1, Math.min(1, dx)) * MAX;              // CSS rotateY
+wantX = -Math.max(-1, Math.min(1, dy)) * MAX;              // CSS rotateX
+}, { passive: true });
+document.addEventListener('pointerleave', function () { wantX = wantZ = 0; });
+document.addEventListener('visibilitychange', function () { if (document.hidden) wantX = wantZ = 0; });
+still.addEventListener('change', function () { if (!tiltOn()) wantX = wantZ = 0; });
+
+/* ---- tapping a mark ----
+   The same rule as the 2-D widget: an open mark can be finished and today's
+   own finished mark can be undone. Everything else ignores the tap. A hit is
+   resolved against the card's own plane, so it stays right while it is tilted. */
+var ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), local = new THREE.Vector3();
+function socketAt(e) {
+var r = host.getBoundingClientRect();
+ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height * 2 - 1));
+ray.setFromCamera(ndc, camera);
+var hit = ray.intersectObject(card, false)[0];
+if (!hit) return null;
+card.worldToLocal(local.copy(hit.point));
+var px = local.x + W / 2, pz = local.z + H / 2, list = M.sockets(), i;
+for (i = 0; i < list.length; i++) {
+var t = list[i];
+if (px >= t.x && px <= t.x + t.w && pz >= t.z && pz <= t.z + M.CELL) return t;
+}
+return null;
+}
+function repaint() {
+card.geometry.dispose();
+card.geometry = G.build(THREE);
+M.paint(colour.ctx, mask.ctx);
+uColor.needsUpdate = true; uMask.needsUpdate = true;
+}
+var downAt = null;
+host.addEventListener('pointerdown', function (e) { downAt = { x: e.clientX, y: e.clientY }; });
+host.addEventListener('pointerup', function (e) {
+if (!downAt || Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 8) { downAt = null; return; }
+downAt = null;
+var t = socketAt(e);
+if (t && t.tappable && M.toggle(t.row)) repaint();
 });
 host.addEventListener('pointermove', function (e) {
-if (!pointers[e.pointerId]) return;
-pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
-var ids = Object.keys(pointers);
-if (ids.length >= 2) {
-var a = pointers[ids[0]], b = pointers[ids[1]];
-var d = Math.hypot(a.x - b.x, a.y - b.y);
-if (pinch) view.zoom = clamp(view.zoom * (pinch / d), 0.5, 2.4);
-pinch = d; dragging = false; return;
-}
-if (!dragging || !last) return;
-view.tYaw += (e.clientX - last.x) * 0.006;
-view.tPitch = clamp(view.tPitch - (e.clientY - last.y) * 0.006, LOW, HIGH);
-last = { x: e.clientX, y: e.clientY };
-});
-function release(e) {
-delete pointers[e.pointerId];
-if (!Object.keys(pointers).length) { dragging = false; pinch = 0; last = null; }
-}
-host.addEventListener('pointerup', release);
-host.addEventListener('pointercancel', release);
-host.addEventListener('wheel', function (e) {
-e.preventDefault();
-idle = false;
-view.zoom = clamp(view.zoom * (1 + e.deltaY * 0.0012), 0.5, 2.4);
-}, { passive: false });
-var reset = host.parentNode.querySelector('[data-gwa-reset]');
-if (reset) reset.addEventListener('click', function () {
-view.tYaw = -0.22; view.tPitch = 0.92; view.zoom = 1; idle = true; resize();
-});
+if (!fine.matches) return;
+var t = socketAt(e);
+host.style.cursor = (t && t.tappable) ? 'pointer' : 'default';
+}, { passive: true });
 
-var t0 = performance.now(), visible = true;
+var visible = true;
 if (window.IntersectionObserver) {
 new IntersectionObserver(function (es) { visible = es[0].isIntersecting; }).observe(host);
 }
-var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 function frame() {
 requestAnimationFrame(frame);
 if (!visible) return;
-if (idle && !still) view.tYaw = -0.22 + Math.sin((performance.now() - t0) * 0.00018) * 0.30;
-view.yaw += (view.tYaw - view.yaw) * 0.12;
-view.pitch += (view.tPitch - view.pitch) * 0.12;
-view.tDist = frameDistance() * view.zoom;      // the card keeps its share of the frame at any angle
-view.dist += (view.tDist - view.dist) * 0.12;
-var cp = Math.cos(view.pitch), sp = Math.sin(view.pitch);
-camera.position.set(Math.sin(view.yaw) * cp * view.dist, sp * view.dist, Math.cos(view.yaw) * cp * view.dist);
-camera.lookAt(0, THICK * 0.4, 0);
+tiltX += (wantX - tiltX) * EASE;
+tiltZ += (wantZ - tiltZ) * EASE;
+card.rotation.set(tiltX, 0, tiltZ);
+shadow.position.set(-tiltZ / MAX * 20, -70, -tiltX / MAX * 20);
 mat.uniforms.uCam.value.copy(camera.position);
 renderer.render(scene, camera);
 }
@@ -669,17 +770,14 @@ uColor.needsUpdate = true; uMask.needsUpdate = true;
 });
 
 if (host.dataset.debug) {
-window.GWA = { view: view, camera: camera, frame: frameDistance, mesh: card };
+window.GWA = { camera: camera, mesh: card, tilt: function (x, z) { wantX = x; wantZ = z; } };
 var q = new URLSearchParams(location.search);
-if (q.has('p')) view.tPitch = view.pitch = parseFloat(q.get('p'));
-if (q.has('y')) view.tYaw = view.yaw = parseFloat(q.get('y'));
-if (q.has('z')) view.zoom = parseFloat(q.get('z'));
-if (q.has('p') || q.has('y') || q.has('z')) idle = false;   // a fixed view, for repeatable captures
+if (q.has('tx')) wantX = tiltX = parseFloat(q.get('tx')) * MAX;
+if (q.has('tz')) wantZ = tiltZ = parseFloat(q.get('tz')) * MAX;
 }
 window.addEventListener('resize', resize);
 if (window.ResizeObserver) new ResizeObserver(resize).observe(host);
 resize();
-view.dist = view.tDist;
 frame();
 host.dataset.ready = '1';
 }

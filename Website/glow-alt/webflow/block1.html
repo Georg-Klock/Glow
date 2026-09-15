@@ -81,7 +81,7 @@ for (c = 0; c < TODAY; c++) if (c !== TODAY + h.miss) completed[c] = true;
 h.pattern.forEach(function (d) { if (d < TODAY) completed[d] = true; });
 if (h.doneToday) completed[TODAY] = true;
 }
-return { habit: h, spans: rowSpans(h.target, completed, TODAY) };
+return { habit: h, completed: completed, spans: [] };
 });
 }
 
@@ -107,12 +107,24 @@ var RINGW = 1.7, RINGTOP = THICK - 0.45;
 var RAISE = 0.28;      // names, letters and icons stand off the face
 var ENGRAVE = 0.5;     // a missed day is cut into it — both as relief in the normal, not as triangles
 
-var DISPLAY = [];
-(function () {
-var rows = week(), out = rows.slice();
-SPACERS.forEach(function (at) { out.splice(at, 0, null); });
-DISPLAY = out;
-})();
+var ROWS = week(), DISPLAY = [];
+function relayout() {
+ROWS.forEach(function (row) { row.spans = rowSpans(row.habit.target, row.completed, TODAY); });
+DISPLAY = ROWS.slice();
+SPACERS.forEach(function (at) { DISPLAY.splice(at, 0, null); });
+}
+relayout();
+function emitting(row) {
+return !!row && row.spans.some(function (s) { return s.state === 'open'; });
+}
+function anyOpen() { return ROWS.some(emitting); }
+function toggle(rowIndex) {
+var row = ROWS[rowIndex];
+if (!row) return false;
+if (row.completed[TODAY]) delete row.completed[TODAY]; else row.completed[TODAY] = true;
+relayout();
+return true;
+}
 
 var SPAN_KIND = { upcoming: 1, done: 2, open: 3 };   // 0 means "no span here"
 
@@ -120,105 +132,19 @@ function sockets() {
 var out = [];
 DISPLAY.forEach(function (row, ri) {
 if (!row) return;
+var index = ROWS.indexOf(row);
 row.spans.forEach(function (s) {
 if (s.state === 'missed') return;                // a missed day has no socket, only the cross
 var n = s.last - s.first + 1;
-out.push({ x: cellX(s.first), z: rowY(ri), w: n * CELL + (n - 1) * GAP, kind: SPAN_KIND[s.state] });
+var tappable = s.state === 'open' ||
+(s.state === 'done' && s.first <= TODAY && TODAY <= s.last && !!row.completed[TODAY]);
+out.push({
+x: cellX(s.first), z: rowY(ri), w: n * CELL + (n - 1) * GAP,
+kind: SPAN_KIND[s.state], row: index, tappable: tappable
+});
 });
 });
 return out;
-}
-
-var K = 4;   // texels per unit
-function canvas2d() {
-var c = document.createElement('canvas');
-c.width = Math.round(W * K); c.height = Math.round(H * K);
-var ctx = c.getContext('2d');
-ctx.scale(K, K);
-return { c: c, ctx: ctx };
-}
-var LIT_SDR = '#969696', EMIT = '#FFFFFF', OFF_DAY = '#888888', RESTING = 'rgba(217,217,217,0.5)';
-function emitting(row) {
-return !!row && row.spans.some(function (s) { return s.state === 'open'; });
-}
-function fontStack() { return '"GW Inter","Inter",system-ui,-apple-system,sans-serif'; }
-
-function drawDecals(colorCtx, maskCtx, icons) {
-var f = TEXT + 'px ' + fontStack();
-[colorCtx, maskCtx].forEach(function (ctx) {
-ctx.font = f; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-});
-colorCtx.textAlign = maskCtx.textAlign = 'center';
-LETTERS.forEach(function (letter, i) {
-var x = cellX(i) + CELL / 2, y = PAD_T + HEADER_H / 2;
-colorCtx.fillStyle = i === TODAY ? EMIT : OFF_DAY;
-colorCtx.fillText(letter, x, y);
-maskCtx.fillStyle = '#f00';
-maskCtx.fillText(letter, x, y);
-});
-colorCtx.textAlign = maskCtx.textAlign = 'left';
-DISPLAY.forEach(function (row, ri) {
-if (!row) return;
-var y = rowY(ri) + CELL / 2, on = emitting(row);
-colorCtx.fillStyle = on ? EMIT : LIT_SDR;
-colorCtx.fillText(row.habit.name, PAD_L + ICON_W + ICON_GAP, y);
-maskCtx.fillStyle = '#f00';
-maskCtx.fillText(row.habit.name, PAD_L + ICON_W + ICON_GAP, y);
-var ic = icons[row.habit.slug];
-if (ic) {
-var s = ICON_W / Math.max(ic.width, ic.height) * 0.86;
-var w = ic.width * s, h = ic.height * s;
-var ix = PAD_L + (ICON_W - w) / 2, iy = y - h / 2;
-tinted(colorCtx, ic, ix, iy, w, h, on ? EMIT : LIT_SDR);
-tinted(maskCtx, ic, ix, iy, w, h, '#f00');
-}
-row.spans.forEach(function (s) {
-if (s.state !== 'missed') return;
-var cx = cellX(s.first) + CELL / 2, cy = y, a = 6.4;
-[colorCtx, maskCtx].forEach(function (ctx, i) {
-ctx.save();
-ctx.strokeStyle = i ? '#0f0' : RESTING;
-ctx.lineWidth = 3.4; ctx.lineCap = 'round';
-ctx.beginPath();
-ctx.moveTo(cx - a, cy - a); ctx.lineTo(cx + a, cy + a);
-ctx.moveTo(cx + a, cy - a); ctx.lineTo(cx - a, cy + a);
-ctx.stroke();
-ctx.restore();
-});
-});
-});
-}
-var tintCanvas = null;
-function tinted(ctx, img, x, y, w, h, colour) {
-if (!tintCanvas) { tintCanvas = document.createElement('canvas'); }
-tintCanvas.width = img.width; tintCanvas.height = img.height;
-var t = tintCanvas.getContext('2d');
-t.clearRect(0, 0, img.width, img.height);
-t.drawImage(img, 0, 0);
-t.globalCompositeOperation = 'source-in';
-t.fillStyle = colour;
-t.fillRect(0, 0, img.width, img.height);
-t.globalCompositeOperation = 'source-over';
-ctx.drawImage(tintCanvas, x, y, w, h);
-}
-function loadIcons() {
-var out = {}, keys = Object.keys(ICONS);
-return Promise.all(keys.map(function (slug) {
-return new Promise(function (res) {
-var im = new Image();
-im.crossOrigin = 'anonymous';
-im.onload = function () { out[slug] = im; res(); };
-im.onerror = function () { res(); };
-im.src = iconURL(slug);
-});
-})).then(function () { return out; });
-}
-
-function paint(colorCtx, maskCtx) {
-var fonts = document.fonts && document.fonts.load
-? document.fonts.load(TEXT + 'px "GW Inter"').catch(function () {})
-: Promise.resolve();
-return Promise.all([fonts, loadIcons()]).then(function (r) { drawDecals(colorCtx, maskCtx, r[1] || {}); });
 }
 
 window.GWA_M = {
@@ -226,7 +152,11 @@ W: W, H: H, RADIUS: RADIUS, CELL: CELL, INSET: INSET,
 THICK: THICK, EDGE: EDGE, WELLD: WELLD, RIM: RIM,
 PILLTOP: PILLTOP, PR: PR, RINGW: RINGW, RINGTOP: RINGTOP,
 RAISE: RAISE, ENGRAVE: ENGRAVE,
-sockets: sockets, canvas2d: canvas2d, paint: paint
+TEXT: TEXT, PAD_L: PAD_L, PAD_T: PAD_T, HEADER_H: HEADER_H,
+ICON_W: ICON_W, ICON_GAP: ICON_GAP, LETTERS: LETTERS, TODAY: TODAY,
+ICON_BASE: ICON_BASE, ICONS: ICONS,
+sockets: sockets, toggle: toggle, anyOpen: anyOpen, cellX: cellX, rowY: rowY,
+rows: function () { return DISPLAY; }
 };
 })();
 </script>

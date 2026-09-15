@@ -16,22 +16,19 @@ html, body { margin:0; background:#000; color:#86868b;
   font-family:'Soehne Buch', Arial, sans-serif; font-size:17px; line-height:22.1px; }
 .gwa-wrap { max-width:940px; margin:0 auto; padding:40px 20px 24px; }
 .gwa-stage { position:relative; width:100%; height:min(72vh, 680px);
-  background:radial-gradient(120% 90% at 50% 12%, #16171b 0%, #0a0a0c 55%, #000 100%);
+  background:radial-gradient(70% 55% at 50% 40%, #121317 0%, #08080a 42%, #000 70%);
   border-radius:20px; overflow:hidden; touch-action:none; cursor:grab; }
 .gwa-stage:active { cursor:grabbing; }
 .gwa-stage canvas { display:block; width:100%; height:100%; }
-.gwa-bar { display:flex; align-items:center; justify-content:center; gap:18px;
-  margin:14px 0 0; font-size:15px; color:#6a6a70; }
-.gwa-bar button { font:inherit; color:#a0a0a6; background:rgba(255,255,255,.07);
-  border:0; border-radius:999px; padding:6px 14px; cursor:pointer; }
+.gwa-bar { margin:16px 0 0; text-align:center; font-size:15px; line-height:20px; color:#6a6a70; }
 .gwa-note { max-width:520px; margin:28px auto 0; text-align:center; text-wrap:balance; }
 </style>
 </head>
 <body>
 <div class="gwa-wrap">
   <div class="gwa-stage" id="gwa" data-debug="1"></div>
-  <p class="gwa-bar"><span>Drag to orbit · scroll to zoom</span><button type="button" data-gwa-reset>Reset view</button></p>
-  <p class="gwa-note">Every empty slot is a real pocket in the surface, not a painted shadow — tilt the card and they cut into it.</p>
+  <p class="gwa-bar">Move the pointer to tilt it. Tap today's slot to mark it done — or again to undo.</p>
+  <p class="gwa-note">Every empty slot is a real pocket cut into the surface, not a painted shadow — lean the card and they cut into it.</p>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
 <script src="./scene.js"></script>
