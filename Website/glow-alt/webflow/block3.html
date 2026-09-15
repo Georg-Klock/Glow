@@ -1,0 +1,224 @@
+<script>(function () {
+'use strict';
+var M = window.GWA_M, G = window.GWA_G;
+if (!M || !G) return;
+var W = M.W, H = M.H, THICK = M.THICK, WELLD = M.WELLD;
+
+var VERT = [
+'attribute float aMat;',
+'varying vec3 vN, vWorld;',
+'varying vec2 vP;',
+'varying float vMat;',
+'void main(){',
+'  vMat = aMat;',
+'  vP = vec2(position.x+' + (W / 2).toFixed(1) + ', position.z+' + (H / 2).toFixed(1) + ');',
+'  vN = mat3(modelMatrix)*normal;',
+'  vec4 wp = modelMatrix*vec4(position,1.0);',
+'  vWorld = wp.xyz;',
+'  gl_Position = projectionMatrix*viewMatrix*wp;',
+'}'
+].join('\n');
+
+var FRAG = [
+'precision highp float;',
+'const float W=' + W.toFixed(1) + ';',
+'const float H=' + H.toFixed(1) + ';',
+'const float THICK=' + THICK.toFixed(2) + ';',
+'const float WELLD=' + WELLD.toFixed(2) + ';',
+'const float RAISE=' + M.RAISE.toFixed(2) + ';',
+'const float ENGRAVE=' + M.ENGRAVE.toFixed(2) + ';',
+'uniform sampler2D uColor, uMask;',
+'uniform vec3 uCam;',
+'varying vec3 vN, vWorld;',
+'varying vec2 vP;',
+'varying float vMat;',
+'vec3 s2l(vec3 c){ return pow(c, vec3(2.2)); }',
+'float rel(vec2 uv){ vec2 m = texture2D(uMask, uv).rg; return RAISE*m.r-ENGRAVE*m.g; }',
+'void main(){',
+'  vec2 uv = vP/vec2(W,H);',
+'  vec3 n = normalize(vN);',
+'  if(n.y > 0.92){',
+'    float e = 0.32;',
+'    float rx = rel(uv+vec2(e/W,0.0))-rel(uv-vec2(e/W,0.0));',
+'    float rz = rel(uv+vec2(0.0,e/H))-rel(uv-vec2(0.0,e/H));',
+'    n = normalize(n + vec3(-rx/(2.0*e), 0.0, -rz/(2.0*e)));',
+'  }',
+'  vec3 base; float sh, f0;',
+'  if(vMat<0.5){ base=s2l(vec3(0.125)); sh=16.0; f0=0.05; }',
+'  else if(vMat<1.5){ base=s2l(vec3(0.098)); sh=12.0; f0=0.05; }',
+'  else if(vMat<2.5){ base=s2l(vec3(0.851)); sh=48.0; f0=0.07; }',
+'  else { base=s2l(vec3(1.0)); sh=90.0; f0=0.09; }',
+'  if(vMat<0.5){ vec4 d = texture2D(uColor, uv); base = mix(base, s2l(d.rgb), d.a); }',
+'  vec3 v = normalize(uCam-vWorld);',
+'  float ao = mix(0.42, 1.0, smoothstep(THICK-WELLD-0.6, THICK-0.3, vWorld.y));',
+'  vec3 sky = vec3(0.16,0.17,0.20), ground = vec3(0.012,0.012,0.015);',
+'  vec3 col = base*mix(ground, sky, n.y*0.5+0.5)*ao;',
+'  vec3 L1 = normalize(vec3(-0.45, 0.82, 0.36));',
+'  vec3 L2 = normalize(vec3(0.72, 0.42, -0.30));',
+'  vec3 C1 = vec3(1.0,0.99,0.96)*1.15, C2 = vec3(0.55,0.62,0.78)*0.55;',
+'  col += base*max(dot(n,L1),0.0)*C1*ao;',
+'  col += base*max(dot(n,L2),0.0)*C2*ao;',
+'  float fres = pow(1.0-max(dot(n,v),0.0), 5.0);',
+'  float F = f0+(1.0-f0)*fres;',
+'  float norm = (sh+8.0)/28.0;',
+'  col += C1*pow(max(dot(n,normalize(L1+v)),0.0), sh)*F*norm*ao;',
+'  col += C2*pow(max(dot(n,normalize(L2+v)),0.0), sh)*F*norm*ao*0.5;',
+'  col += vec3(0.30,0.34,0.42)*fres*0.12;',
+'  col = col/(col+vec3(1.0));',
+'  gl_FragColor = vec4(pow(col, vec3(1.0/2.2)), 1.0);',
+'}'
+].join('\n');
+
+function boot(THREE, host) {
+var small = window.matchMedia('(max-width: 767px)').matches;
+var colour = M.canvas2d(), mask = M.canvas2d();
+var uColor = new THREE.CanvasTexture(colour.c);
+var uMask = new THREE.CanvasTexture(mask.c);
+[uColor, uMask].forEach(function (t) {
+t.flipY = false;                                    // vP.y = 0 is the canvas's first row, not its last
+t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+t.minFilter = THREE.LinearMipmapLinearFilter;
+t.anisotropy = 8;
+if ('colorSpace' in t) t.colorSpace = THREE.NoColorSpace;
+});
+
+var mat = new THREE.ShaderMaterial({
+uniforms: { uMask: { value: uMask }, uColor: { value: uColor }, uCam: { value: new THREE.Vector3() } },
+vertexShader: VERT, fragmentShader: FRAG, side: THREE.DoubleSide
+});
+var card = new THREE.Mesh(G.build(THREE), mat);
+var scene = new THREE.Scene();
+scene.add(card);
+
+var camera = new THREE.PerspectiveCamera(30, 1, 10, 4000);
+var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.75 : 2));
+if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+host.appendChild(renderer.domElement);
+
+var view = { yaw: -0.22, pitch: 0.92, dist: 640, tYaw: -0.22, tPitch: 0.92, tDist: 640, zoom: 1 };
+var LOW = 0.10, HIGH = 1.45;
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+var CORNERS = [];
+(function () {
+for (var sx = -1; sx <= 1; sx += 2) for (var sz = -1; sz <= 1; sz += 2) for (var sy = 0; sy <= 1; sy++) {
+CORNERS.push([sx * W / 2, sy * THICK, sz * H / 2]);
+}
+})();
+function frameDistance() {
+var vt = Math.tan(camera.fov * Math.PI / 360), ht = vt * camera.aspect;
+var cp = Math.cos(view.pitch), sp = Math.sin(view.pitch);
+var sy = Math.sin(view.yaw), cy = Math.cos(view.yaw);
+var dx = sy * cp, dy = sp, dz = cy * cp;               // target -> camera
+var rx = cy, rz = -sy;                                 // right
+var ux = -sp * sy, uy = cp, uz = -sp * cy;             // up
+var ty = THICK * 0.4, d = 0, i;
+for (i = 0; i < CORNERS.length; i++) {
+var px = CORNERS[i][0], py = CORNERS[i][1] - ty, pz = CORNERS[i][2];
+var x = px * rx + pz * rz;
+var y = px * ux + py * uy + pz * uz;
+var z = px * dx + py * dy + pz * dz;
+d = Math.max(d, z + Math.abs(x) / ht, z + Math.abs(y) / vt);
+}
+return d * 0.96;              // the corners are rounded away, so the box over-reserves
+}
+var idle = true, dragging = false, last = null, pointers = {}, pinch = 0;
+function resize() {
+var w = host.clientWidth, h = host.clientHeight;
+if (!w || !h) return;
+renderer.setSize(w, h, false);
+camera.aspect = w / h;
+camera.updateProjectionMatrix();
+view.tDist = frameDistance() * view.zoom;
+if (idle) view.dist = view.tDist;
+}
+host.addEventListener('pointerdown', function (e) {
+try { host.setPointerCapture(e.pointerId); } catch (err) {}
+pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+if (Object.keys(pointers).length === 1) { dragging = true; last = { x: e.clientX, y: e.clientY }; }
+idle = false;
+});
+host.addEventListener('pointermove', function (e) {
+if (!pointers[e.pointerId]) return;
+pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+var ids = Object.keys(pointers);
+if (ids.length >= 2) {
+var a = pointers[ids[0]], b = pointers[ids[1]];
+var d = Math.hypot(a.x - b.x, a.y - b.y);
+if (pinch) view.zoom = clamp(view.zoom * (pinch / d), 0.5, 2.4);
+pinch = d; dragging = false; return;
+}
+if (!dragging || !last) return;
+view.tYaw += (e.clientX - last.x) * 0.006;
+view.tPitch = clamp(view.tPitch - (e.clientY - last.y) * 0.006, LOW, HIGH);
+last = { x: e.clientX, y: e.clientY };
+});
+function release(e) {
+delete pointers[e.pointerId];
+if (!Object.keys(pointers).length) { dragging = false; pinch = 0; last = null; }
+}
+host.addEventListener('pointerup', release);
+host.addEventListener('pointercancel', release);
+host.addEventListener('wheel', function (e) {
+e.preventDefault();
+idle = false;
+view.zoom = clamp(view.zoom * (1 + e.deltaY * 0.0012), 0.5, 2.4);
+}, { passive: false });
+var reset = host.parentNode.querySelector('[data-gwa-reset]');
+if (reset) reset.addEventListener('click', function () {
+view.tYaw = -0.22; view.tPitch = 0.92; view.zoom = 1; idle = true; resize();
+});
+
+var t0 = performance.now(), visible = true;
+if (window.IntersectionObserver) {
+new IntersectionObserver(function (es) { visible = es[0].isIntersecting; }).observe(host);
+}
+var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function frame() {
+requestAnimationFrame(frame);
+if (!visible) return;
+if (idle && !still) view.tYaw = -0.22 + Math.sin((performance.now() - t0) * 0.00018) * 0.30;
+view.yaw += (view.tYaw - view.yaw) * 0.12;
+view.pitch += (view.tPitch - view.pitch) * 0.12;
+view.tDist = frameDistance() * view.zoom;      // the card keeps its share of the frame at any angle
+view.dist += (view.tDist - view.dist) * 0.12;
+var cp = Math.cos(view.pitch), sp = Math.sin(view.pitch);
+camera.position.set(Math.sin(view.yaw) * cp * view.dist, sp * view.dist, Math.cos(view.yaw) * cp * view.dist);
+camera.lookAt(0, THICK * 0.4, 0);
+mat.uniforms.uCam.value.copy(camera.position);
+renderer.render(scene, camera);
+}
+
+M.paint(colour.ctx, mask.ctx).then(function () {
+uColor.needsUpdate = true; uMask.needsUpdate = true;
+});
+
+if (host.dataset.debug) {
+window.GWA = { view: view, camera: camera, frame: frameDistance, mesh: card };
+var q = new URLSearchParams(location.search);
+if (q.has('p')) view.tPitch = view.pitch = parseFloat(q.get('p'));
+if (q.has('y')) view.tYaw = view.yaw = parseFloat(q.get('y'));
+if (q.has('z')) view.zoom = parseFloat(q.get('z'));
+if (q.has('p') || q.has('y') || q.has('z')) idle = false;   // a fixed view, for repeatable captures
+}
+window.addEventListener('resize', resize);
+if (window.ResizeObserver) new ResizeObserver(resize).observe(host);
+resize();
+view.dist = view.tDist;
+frame();
+host.dataset.ready = '1';
+}
+
+function start() {
+var host = document.getElementById('gwa');
+if (!host) return;
+if (!window.THREE) { host.dataset.error = 'three'; return; }
+var gl = document.createElement('canvas').getContext('webgl2') ||
+document.createElement('canvas').getContext('webgl');
+if (!gl) { host.dataset.error = 'webgl'; return; }
+boot(window.THREE, host);
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+else start();
+})();
+</script>
