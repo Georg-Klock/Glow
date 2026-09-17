@@ -75,25 +75,29 @@ struct TestHostTests {
 
     @Test("A launch does its four things in the one order that is correct")
     func launchWorkIsOrderedAndInert() throws {
-        // Four steps, and the order is not arrangement: the first three each
-        // change what a widget should draw, and the reload is last so that it
-        // reloads against the settled answer.
+        // Four steps, and the order is not arrangement: the middle two each
+        // delete rows a widget draws, and the reload is last so that it reloads
+        // against the settled answer.
         //
-        //  1. `DebugToday.clearOnLaunch()` (#204) — in `init`, before the
-        //     store. The override is in the App Group, where the widget reads
-        //     it from its own process.
-        //  2. The container opens, or nothing else happens.
-        //  3. `migrateDailyHabitsOut` (#239) — in `init`, on that container.
-        //     It deletes rows the widget draws.
+        //  1. The container opens, or nothing else happens.
+        //  2. `migrateDailyHabitsOut` (#239) — in `init`, on that container.
+        //  3. `purgeRetiredDebugData` (#628) — in `init`, on the same
+        //     container, after the sweep. It deletes the rows the removed demo
+        //     invented and the keys the removed override wrote.
         //  4. `WidgetRefresh.invalidate()` (#236) — a `.task` on `body`'s
         //     container branch, so strictly after all of the above.
         //
-        // Steps 3 and 4 must also be unreachable from the test host, which
-        // shares `init`. Both are, without a second check: the migration is
-        // behind `if let container = attempt.container` and that binding is
-        // `nil` under tests, and the reload is past `body`'s `isRunningTests`
-        // guard as well. A migration or a reload running in the test process is
-        // the process-wide store leak #105, #168, #175 and #179 closed.
+        // The first launch step used to be clearing the debug day override
+        // (#204). The override is gone, so there is nothing to clear before the
+        // store opens.
+        //
+        // Steps 2 to 4 must also be unreachable from the test host, which
+        // shares `init`. All are, without a second check: the sweep and the
+        // purge are behind `if let container = attempt.container` and that
+        // binding is `nil` under tests, and the reload is past `body`'s
+        // `isRunningTests` guard as well. A migration or a reload running in
+        // the test process is the process-wide store leak #105, #168, #175 and
+        // #179 closed.
         //
         // Read from source for `sceneIsInert`'s reason: a `Scene` is not
         // inspectable, and by the time a test runs the hierarchy either exists
@@ -106,10 +110,13 @@ struct TestHostTests {
             encoding: .utf8
         )
 
-        let clear = try #require(source.range(of: "DebugToday.clearOnLaunch()"))
         let sweep = try #require(
             source.range(of: "Self.migrateDailyHabitsOut(in: container)"),
             "the launch sweep is gone"
+        )
+        let purge = try #require(
+            source.range(of: "Self.purgeRetiredDebugData(in: container)"),
+            "the retired debug data purge is gone"
         )
         let reload = try #require(
             source.range(of: ".task { WidgetRefresh.invalidate() }"),
@@ -118,16 +125,16 @@ struct TestHostTests {
         let bodyAt = try #require(source.range(of: "var body: some Scene"))
         let rootView = try #require(source.range(of: "RootTabView()"))
 
-        // 1 before 3: an override still in force would decide which week the
-        // sweep's own reload asks for.
-        #expect(clear.lowerBound < sweep.lowerBound)
-        // 1 and 3 in `init`, 4 in the container branch of `body`.
-        #expect(sweep.lowerBound < bodyAt.lowerBound, "the sweep left init")
+        #expect(sweep.lowerBound < purge.lowerBound)
+        // 2 and 3 in `init`, 4 in the container branch of `body`.
+        #expect(purge.lowerBound < bodyAt.lowerBound, "the purge left init")
         #expect(bodyAt.lowerBound < reload.lowerBound, "the reload moved into init")
         #expect(rootView.lowerBound < reload.lowerBound, "the reload left the branch")
 
-        // The sweep is gated on a container that the test host is never given.
+        // Both are gated on a container that the test host is never given.
         let gate = try #require(source.range(of: "if let container = attempt.container {"))
         #expect(gate.lowerBound < sweep.lowerBound)
+        let gateEnd = try #require(source[gate.upperBound...].range(of: "\n        }"))
+        #expect(purge.upperBound < gateEnd.lowerBound, "the purge left the container gate")
     }
 }

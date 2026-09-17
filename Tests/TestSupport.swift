@@ -35,9 +35,8 @@ enum TestCalendar {
 /// so a test states the one it means in the call and cannot leak it.
 ///
 /// What is left is `firstWeekday`, which `WeekCalendar.calendar` reads and which
-/// is not this issue's to move, and the store boundary — `HabitStore` and
-/// `DemoHistory` read the rest day when they are not told one, and one test
-/// asserts exactly that.
+/// is not this issue's to move, and the store boundary — `HabitStore` reads
+/// the rest day when it is not told one, and one test asserts exactly that.
 ///
 /// **Two things still stop an overlap, and the first one is the real one.** The
 /// scheme runs tests sequentially (`parallelizable: false`, stated in

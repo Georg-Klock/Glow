@@ -91,11 +91,12 @@ August rather than against whenever they happen to run.
 
 **`WeekCalendar.today()` is the one exception, and it is not in this directory**
 (#204). It answers "what day is it" for every surface, and to answer it has to
-read both the clock and the App Group — so it is declared in
-`Glow/Store/DebugToday.swift`, at the boundary, and only the spelling lives on
-`WeekCalendar`. `TestIsolationTests` scans `Glow/Logic/` for `Date()`,
-`DebugToday` and `WeekCalendar.today`, because the extension is in the same
-module and a call to it from in here would otherwise compile.
+read the clock — so it is declared in `Glow/Store/Today.swift`, at the
+boundary, and only the spelling lives on `WeekCalendar`. `TestIsolationTests`
+scans `Glow/Logic/` for `Date()` and `WeekCalendar.today`, because the
+extension is in the same module and a call to it from in here would otherwise
+compile. It read a debug override from the App Group as well until #628 removed
+the override.
 
 **The rest day arrives the same way** (#181) — though nothing supplies one any
 more: #390 retired the Settings rows for MVP scope and `GlowApp.init` calls
@@ -107,8 +108,7 @@ stored value lives; nothing else in here reads it. `WeekGrid`, `WeekSpans`,
 take `restDay: Int?` — the weekday nothing is expected on, or nil for none — and
 the boundaries read it once: a view through `@AppStorage`, so SwiftUI can see
 the dependency; a widget once per render, because it has no live hierarchy to
-observe with; `HabitStore` and `DemoHistory` at construction, beside their
-calendar. `TestIsolationTests` scans this directory for the read, because the
+observe with; `HabitStore` at construction, beside its calendar. `TestIsolationTests` scans this directory for the read, because the
 property is the absence of a call and no runtime assertion can watch an absence.
 
 ### The snapshot boundary
@@ -348,9 +348,11 @@ insert left, an empty store means one thing and gets one answer — the empty
 state's two buttons. `DailyHabitMigration` still runs unasked, still on a flag
 written after its save, and is now the only thing on that pattern.
 
-`DemoHistory` writes its own transaction, and the demo's provenance is
-a column on `Completion` rather than a list of ids beside the store: one write,
-so "what did the demo add" cannot disagree with what is there. Both are in
+The retired Demo history (#628) recorded what it invented as a column on
+`Completion` — `demoSessionID` — rather than as a list of ids beside the store,
+so "what did the demo add" could not disagree with what is there. That column is
+what `RetiredDebugData` deletes by at every launch; the column and the purge come
+out together in the first update after 1.0 ships. Both decisions are in
 decisions.md.
 
 **The stored shape is a declared version** (#283). `GlowSchemaV1` freezes the
@@ -538,8 +540,8 @@ The cache key is the normalized day, first-weekday preference, ordered habit
 fingerprints and a successful-store revision. Ordinary geometry and optimistic
 redraws therefore return values synchronously without another read or an empty
 loading frame. Every successful `HabitStore` commit advances the revision via
-`StoreChange.committed`; `DemoHistory` posts the same signal because it owns a
-separate save boundary. Failed, unchanged and refused operations do not
+`StoreChange.committed`; `RetiredDebugData` posts the same signal because its
+purge is a separate save boundary. Failed, unchanged and refused operations do not
 invalidate history. `StoreChange.fromIntent` remains the redraw/reconciliation
 signal for all final intent verdicts, while a successful intent also crosses
 the commit signal from the shared `HabitStore` operation.
@@ -629,15 +631,13 @@ into.
 ## What a launch does, in order
 
 Four steps, three of them in `GlowApp.init` and the last in `body`. The order is
-not arrangement — each of the first three changes what the widget should draw,
-and the reload is last so that it reloads against the settled answer.
+not arrangement — the middle two delete rows the widget draws, and the reload is
+last so that it reloads against the settled answer. (The first step used to be
+clearing the debug day override, #204; the override is gone, #628.)
 
-1. **`DebugToday.clearOnLaunch()`**, before the store is opened (#204). The
-   override lives in the App Group, so the widget reads it from its own process
-   and draws the simulated week; clearing it changes what a widget is showing.
-2. **The container opens**, or does not — `StoreUnavailableView` is the answer
-   when it does not, and steps 3 and 4 do not happen at all.
-3. **`DailyHabitMigration.runIfNeeded`**, on a context of that container
+1. **The container opens**, or does not — `StoreUnavailableView` is the answer
+   when it does not, and the steps after it do not happen at all.
+2. **`DailyHabitMigration.runIfNeeded`**3. **`DailyHabitMigration.runIfNeeded`**, on a context of that container
    (#239). It used to run when `WeeklyGridView` appeared, which is a screen a
    session can skip and another process cannot reach at all: the system's widget
    configurator calls `WeeklyHabitQuery.suggestedEntities()` from outside the
@@ -645,20 +645,24 @@ and the reload is last so that it reloads against the settled answer.
    asked to delete. Everything downstream — the reload below, the pager's reach,
    the empty state's claim about what the store holds — then reads a swept
    store without knowing the sweep exists.
+3. **`RetiredDebugData.purge`**, on the same container (#628). Demo history and
+   Debug: Override Today are out of the app; this deletes every completion the
+   demo invented and the App Group keys both tools wrote. Idempotent, and two
+   fetches' worth of work on an install that never used either.
 4. **`WidgetRefresh.invalidate()`**, unconditionally, from a `.task` on the
    container branch of `body` (#236). Every other reload in the app is
    write-triggered, so before this a build that changed what a widget *draws*
    rather than what the store *holds* reached the phone with nothing to tell
    WidgetKit to ask the provider again.
 
-Steps 3 and 4 are inert in the test host without a second check: the binding in
+Steps 2 to 4 are inert in the test host without a second check: the binding in
 `init` hands back no container under tests (#179), so there is nothing for the
-migration to open a context on, and `body`'s `isRunningTests` guard draws
+migration or the purge to open a context on, and `body`'s `isRunningTests` guard draws
 `Color.black` before the container branch is reached. A migration or a reload
 running in the test process is the process-wide leak #105, #168, #175 and #179
 closed.
 
-On the one launch where the sweep actually deletes something, step 3 invalidates
+On the one launch where the sweep actually deletes something, step 2 invalidates
 too. `WidgetRefresh` coalesces calls made inside the same turn of the main
 actor — the turn, not the launch — so whether that costs one reload or two is
 the runtime's to decide. Measured on the simulator it was one:
@@ -674,14 +678,9 @@ changes. Three paths, and all are needed:
 - `NSCalendarDayChanged` covers the app being open across midnight.
 - `scenePhase == .active` covers it being resumed the next morning without ever
   having been killed.
-- `UserDefaults.didChangeNotification` covers the debug override moving (#204).
-  It is set from Settings, which is a sibling tab, so the screens that draw the
-  week stay alive and unredrawn while it moves. The handler compares the
-  override before it touches anything: the notification fires for every key
-  the process writes, and a tap writes several.
 - `StoreChange.committed` covers what the *record* decides — how far back the
   week pager reaches, in every mode. Every save posts it, from `HabitStore` and
-  `DemoHistory` alike.
+  the launch purge alike.
   These used to ride on the defaults notification too, which a save reached
   only through the trace line the widget reload writes; see decisions.md,
   2026-09-02.
@@ -693,35 +692,12 @@ needs one calls it and hands the answer down as a parameter. Nothing
 downstream — `WeekGrid`, `WeekSpans`, `HabitStore`'s future-write guard, the
 widgets' timeline providers — knows there is anything to know.
 
-`DebugToday` is what it consults first: a day of the current week, stored in the
-App Group, that the app treats as today on every screen and in every widget
-(#204). It is a simulation rather than a preview — a tap while it is on writes a
-real completion dated to the simulated day — so it is fenced three ways, and
-each fence exists because the failure it prevents is a write:
-
-1. **Scoped to the real current week.** `override(calendar:)` compares the
-   stored day against the seven midnights the real week is made of and clears
-   the key when it is not one of them, so a stored day cannot outlive the week
-   it meant something in. A midnight from another time zone matches none of
-   them either, which fails in the safe direction.
-2. **Cleared at launch**, first thing in `GlowApp.init`, before the store is
-   opened. The longest a stray override can affect anything is one app session.
-3. **Said out loud.** `DebugTodayBanner` sits on This Week for as long as one
-   is set, and one tap on it clears the override — leaving it on must never be
-   more convenient than turning it off.
-
-It ships in every build, TestFlight included, and deliberately not behind
-`#if DEBUG`: a Release archive is the build that gets installed on the phone
-this app is tested on, and compiling the tool out of it would remove it from
-the only place it is wanted.
-
-**Its Settings row is hidden, not gone** (#566). Demo history and Debug:
-Override Today no longer appear in the Data section until the version line
-under it has been tapped seven times; `DebugReveal` holds that as one
-in-memory instance for the process, so the reveal survives leaving the tab and
-dies with the session, deliberately mirroring clear-on-launch one level up.
-This narrows who reaches the entry point without touching what it does or
-which builds carry it — see docs/decisions.md.
+It is the clock's day and nothing else. It used to consult Debug: Override
+Today first (#204), a simulated day of the current week stored in the App
+Group, and that tool and Demo history sat behind seven taps on Settings' version
+line (#566). App Review guideline 2.3.1(a) does not allow hidden features, so
+both came out of the app entirely (#628) — not behind `#if DEBUG`, not hidden.
+What they left on an install is purged at launch; see step 3 above.
 
 ## Testing
 

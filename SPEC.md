@@ -344,11 +344,11 @@ A build that violates one of these is broken regardless of what else works.
   not only to the log. Error surfaces never carry habit names, identifiers,
   paths, or framework error text.
 
-**"Today" is whatever `WeekCalendar.today()` answers**, not what the clock says
-(#204). R1 and R2 are stated against that rather than against the clock, so the
-debug override below moves them without weakening them: exactly one slot is
-open, on exactly the day the app believes it is on, and the write path refuses
-anything after it.
+**"Today" is whatever `WeekCalendar.today()` answers** (#204): the clock's day,
+in the week calendar. R1 and R2 are stated against that one answer, so every
+surface agrees on it: exactly one slot is open, on today, and the write path
+refuses anything after it. It used to be movable by a debug override; that tool
+is gone (#628).
 
 R1, R2, R5 and R7 are asserted in `Tests/WeekGridTests.swift`, including an
 exhaustive pass over all 128 possible completion histories of a week under the
@@ -485,8 +485,7 @@ was forgiven, so it counts toward the target like a remaining day does — and
 counting it is what keeps the row fitting. Over-granting puts an extra mark into
 the columns the grant has already claimed, and since a mark's end clamps up as
 well as down, the open mark was pushed off today: six a week made on Wednesday
-with Monday and Tuesday back-filled drew its ring on Thursday. `DemoHistory`
-writes exactly that week.
+with Monday and Tuesday back-filled drew its ring on Thursday.
 
 **The grant is frozen at creation and can only shrink.** `Habit.targetAtCreation`
 stores the target the habit was made with, so an *upward* edit gets no amnesty —
@@ -602,33 +601,20 @@ If `count < N` and today is not already logged, pill index `count` is open.
 Otherwise no slot is open: everything filled stays filled, unfilled pills stay
 inactive.
 
-**"Today" can be simulated, deliberately and visibly** (#204). Settings → Data
-→ **Debug: Override Today** picks another day of the current week and the whole
-app treats it as today: the open slot moves to it, the edit rules move with it,
-the widgets follow from their own process, and **a tap logs a real completion
-dated to that day**. It is a simulation, not a preview — which is why it is
-scoped to the real current week, cleared whenever the app relaunches, and
-announced by a persistent banner on every screen that reads it, with one tap on
-the banner to turn it off. It ships in every build, TestFlight included, for the
-reason demo history does: the phone is where this app is tested.
+**There is no simulated "today" and no demo history** (#628). Both existed as
+debug tools — Debug: Override Today (#204) and Demo history — first in every
+build and then behind seven taps on Settings' version line (#566). App Review
+guideline 2.3.1(a) does not allow hidden features, so both came out of the app.
+A launch purges what they left behind: every completion the demo invented, which
+carries a `demoSessionID`, and the App Group keys both tools wrote. See
+`RetiredDebugData`.
 
-**Neither it nor Demo history is offered to someone who does not know to look**
-(#566). The Data section shows Export History, Reset to Default Habits and a
-version line — `Version 0.1 (1)`, marketing version and build, read from the
-bundle. Tapping the version line seven times, Apple's own count for Developer
-Mode, reveals both debug rows in place for the rest of the app session; a
-relaunch hides them again. The reveal is in-memory state, never persisted,
-matching the override's own clear-on-launch: an entry point left on by accident
-would be the same risk one level up. This narrows who reaches the rows, not
-what they do or which builds carry them — `DebugToday`'s three fences and its
-every-build shipping are unchanged.
+The Data section shows Export History, Reset to Default Habits and a version line
+— marketing version and build, read from the bundle — as plain text.
 
-**"The whole app" includes the Widgets tab's previews** (#439). It did not: that
-page established today from the clock directly, so with an override set the
-placed widget honoured the chosen day and the preview of that same widget drew
-the real one — on the one page whose claim is that it cannot drift from the Home
-Screen. This paragraph was right and the code was wrong; the page now reads the
-override like every other surface, and carries the banner because it does.
+**The Widgets tab's previews establish today the same way** (#439): through
+`WeekCalendar.today()`, not the clock directly, so the page cannot disagree with
+the grid or a placed widget about which column is today.
 
 **Nothing in the app sets a rest day any more** (#390). Settings' toggle and
 day picker are gone for MVP scope, and `WeekPreferences.retireRestDay()` clears

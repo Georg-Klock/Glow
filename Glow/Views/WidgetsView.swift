@@ -44,13 +44,6 @@ import WidgetKit
 /// pictures of the same card, and a confidently wrong one is worse than a
 /// generic one.
 ///
-/// **So the page reads the debug day override, and says so** (#439). "Cannot
-/// drift" is a claim about every day the app is willing to believe it is, not
-/// only the real one, and the override is the one way the two can be made to
-/// differ on purpose. `DebugTodayBanner` comes with it, for `DebugToday`'s own
-/// reason: a screen that reads the override and does not admit it is the shape
-/// this tool is fenced against.
-///
 /// The glow is real here too, and unverifiable in the simulator like every
 /// other lit surface in this app.
 struct WidgetsView: View {
@@ -67,15 +60,10 @@ struct WidgetsView: View {
     /// one: the open slot is defined as today, so today has to be re-read when
     /// the app comes back.
     ///
-    /// **`WeekCalendar.today()`, not `WeekCalendar.day(Date())`** (#439). This
-    /// was the one surface in the app that established today from the clock
-    /// directly, so the debug day override reached every other screen and every
-    /// widget and not this page — which is the page whose whole claim is that
-    /// what it shows *cannot* drift from what is on the Home Screen. With an
-    /// override set, that was exactly what drifted: the placed widget honoured
-    /// it, the preview of it did not, and the two disagreed about which column
-    /// is today. See `DebugToday`, and the banner below, which is the other
-    /// half of what a screen that reads the override owes.
+    /// **`WeekCalendar.today()`, not `WeekCalendar.day(Date())`** (#439): the
+    /// one place "today" is established, so this page cannot disagree with the
+    /// grid or a placed widget about which column is today.
+    ///
     /// Nil in production. A hosted render supplies a day so this entire
     /// scrolling screen, not a substitute view, can join the pixel gate with a
     /// stable calendar input (#386).
@@ -154,31 +142,21 @@ struct WidgetsView: View {
                     storeRevision: storeRevision
                 )
                 ScrollView {
-                    // **Two stacks, and the outer one has no spacing** (#439).
-                    // `DebugTodayBanner` draws nothing while the override is
-                    // off, and a nothing inside a `spacing: 32` stack is still
-                    // a 32pt gap above the instructions on every ordinary
-                    // launch. The banner's own note says the same about padding
-                    // applied from outside: what it costs when it is not there
-                    // is the whole question. The 10pt below it is its own.
-                    //
                     // **Centred, not leading** (#591). A card's rendered width
                     // is the family's real WidgetKit frame times a scale capped
                     // at 1, and nothing makes that equal the column the page
                     // has to offer; `.leading` collected every point of the
-                    // difference on the right. Each level of this stack
-                    // centres what it holds, so the slack splits evenly. The
+                    // difference on the right. Each level of this stack centres
+                    // what it holds, so the slack splits evenly. The
                     // instructions keep their own leading frame — prose reads
                     // from the left.
+                    //
+                    // The outer stack held the debug-day banner above the
+                    // cards (#439). The banner is gone (#628); the stack stays
+                    // so the scroll content and the lazy catalog inside it keep
+                    // the structure the render gate and #478's realisation
+                    // test were measured on.
                     VStack(alignment: .center, spacing: 0) {
-                        // Inside the scroll rather than fixed above it. This
-                        // page is one scroll from the instructions to the last
-                        // preview, and `TopFade` is what dissolves whatever
-                        // passes under the navigation bar — a strip pinned
-                        // above the scroll would sit inside that falloff and be
-                        // drawn half-dimmed. Its horizontal margin is the
-                        // stack's, so it is passed nothing of its own.
-                        DebugTodayBanner(horizontalPadding: 0)
                         LazyVStack(alignment: .center, spacing: 32) {
                             instructions
                             ForEach(groups) { group in
@@ -211,12 +189,10 @@ struct WidgetsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
             refreshEnvironment()
         }
-        // And the debug override, which is a defaults key in the App Group
-        // rather than a scalar `@AppStorage` can bind to (#204). Settings is a
-        // sibling tab, so this view stays alive and unredrawn while the
-        // override moves — `WeeklyGridView` watches the same notification for
-        // the same reason, and without it this page would only catch up the
-        // next time the app was backgrounded and resumed.
+        // And the widget display sizes, which the extension writes into the
+        // App Group from its own process (#544). The defaults' own notification
+        // is the signal that reaches this tab while it stays alive; without it
+        // the page would catch up only the next time the app was resumed.
         .onReceive(
             NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
         ) { _ in
@@ -235,13 +211,8 @@ struct WidgetsView: View {
             storeRevision &+= 1
         }
         // **And once on the way in, which the notification cannot cover.**
-        // `onReceive` subscribes when this view appears, and this tab may never
-        // have appeared: the override is set in Settings, and a tab that has
-        // not been on screen yet was not listening when it moved. Screenshotted
-        // — the banner said Wednesday, drawn from its own read at construction,
-        // while the previews underneath it still drew Saturday's open ring.
-        // `DebugTodayBanner` carries the same pair for the same reason, and
-        // says so in its own note.
+        // `onReceive` subscribes when this view appears, and a value that moved
+        // before this tab was ever on screen was never delivered to it.
         .task { refreshEnvironment() }
     }
 

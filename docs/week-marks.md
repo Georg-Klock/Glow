@@ -273,10 +273,9 @@ Credit marks are unlit. They are arithmetic, not a claim that anything was done.
 **A day before creation that carries a completion is not a day that was
 forgiven** (#415). It is a day a rep landed on, so it counts toward what the
 target can be met out of exactly as a remaining day does — which is why
-`capacity` has two terms rather than one. Back-filling one is reachable:
-`DemoHistory.seed` hands every habit to `SeededHistory.completions` with no
-bound from `createdDay`, so the demo writes ten weeks of past onto a habit made
-this morning, and #265 leaves a daily row's pre-creation day tappable on purpose.
+`capacity` has two terms rather than one. Back-filling one is reachable: #265
+leaves a daily row's pre-creation day tappable on purpose, and the retired Demo
+history (#628) wrote ten weeks of past onto habits made that morning.
 
 Counting it is not politeness, it is what makes the row fit. `credit` is at most
 the creation day's column — `target ≤ 7` is the whole proof — so the grant's marks

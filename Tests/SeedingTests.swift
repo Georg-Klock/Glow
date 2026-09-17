@@ -29,9 +29,8 @@ struct SeedingTests {
     @Test("The curated set goes in on the tap, with an empty grid")
     func theCuratedSetGoesInEmpty() throws {
         // Habits only, in every configuration: a tracker that opens showing a
-        // streak you did not earn is lying on the first screen. The invented
-        // past is DemoHistory's, behind the Settings toggle, and has its own
-        // suite.
+        // streak you did not earn is lying on the first screen, and no path
+        // in the app writes an invented past into the store any more (#628).
         //
         // This is what the empty state's second button does: `resetToDefaults`
         // on a store holding nothing.
@@ -440,13 +439,6 @@ struct ResetToDefaultsTests {
         return ModelContext(container)
     }
 
-    private func makeDefaults() -> UserDefaults {
-        let suite = "reset-tests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite) ?? .standard
-        defaults.removePersistentDomain(forName: suite)
-        return defaults
-    }
-
     /// A store somebody has actually used: their own habits, their own days.
     private func handTypedStore() throws -> (ModelContext, HabitStore) {
         let context = try makeContext()
@@ -506,41 +498,6 @@ struct ResetToDefaultsTests {
         try store.resetToDefaults(now: today)
 
         #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
-    }
-
-    @Test("The demo reads as out afterwards, however it was recorded")
-    func resetLeavesNoDemoBehind() throws {
-        let defaults = makeDefaults()
-        let context = try makeContext()
-        try HabitStore(context: context, calendar: calendar, restDay: nil)
-            .resetToDefaults(now: today)
-        let demo = DemoHistory(
-            context: context, defaults: defaults, calendar: calendar, restDay: nil
-        )
-        try demo.seed(now: today)
-        #expect(demo.isSeeded)
-
-        try HabitStore(context: context, calendar: calendar, restDay: nil)
-            .resetToDefaults(now: today)
-
-        // Provenance is on the row now (#140), so this holds because the rows
-        // are gone — not because anything was told to forget them.
-        #expect(!demo.isSeeded)
-        #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
-    }
-
-    @Test("The pre-provenance record is dropped rather than left naming nothing")
-    func discardingTheLegacyRecordEmptiesTheKey() throws {
-        let defaults = makeDefaults()
-        let context = try makeContext()
-        defaults.set([UUID().uuidString], forKey: DemoHistory.legacyIDsKey)
-        let demo = DemoHistory(
-            context: context, defaults: defaults, calendar: calendar, restDay: nil
-        )
-
-        demo.discardLegacyRecord()
-
-        #expect(defaults.stringArray(forKey: DemoHistory.legacyIDsKey) == nil)
     }
 
     @Test("Resetting twice is resetting once")

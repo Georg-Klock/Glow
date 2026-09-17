@@ -50,7 +50,6 @@ final class OperationNotices {
         case addSpacer
         case installDefaults
         case reset
-        case demo
         case export
 
         var message: String {
@@ -62,7 +61,6 @@ final class OperationNotices {
             case .addSpacer: "The blank row could not be added."
             case .installDefaults: "The habits could not be added."
             case .reset: "Nothing was reset. Your habits are unchanged."
-            case .demo: "The demo history could not be changed."
             case .export: "The export could not be written, so nothing was shared."
             }
         }
@@ -74,7 +72,7 @@ final class OperationNotices {
         var allowsRetry: Bool {
             switch self {
             case .delete, .reset: false
-            case .save, .mark, .reorder, .addSpacer, .installDefaults, .demo, .export: true
+            case .save, .mark, .reorder, .addSpacer, .installDefaults, .export: true
             }
         }
     }

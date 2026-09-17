@@ -18,25 +18,12 @@ struct GlowApp: App {
     @State private var failure: String?
 
     init() {
-        // **An overridden "today" does not survive a launch** (#204). The
-        // override is a full simulation with real write powers: a tap while it
-        // is on logs a genuine completion dated to the simulated day, and once
-        // that row is in the store nothing distinguishes it from a real one.
-        // The week-boundary check in `DebugToday` bounds it to days; this
-        // bounds it to one app session, which is the difference between a
-        // debug tool somebody forgot to turn off and one that quietly rewrites
-        // what "today" means until somebody happens to notice.
-        //
-        // First, before the store is opened or a view can read it, so no
-        // surface is ever built from a stale override.
-        DebugToday.clearOnLaunch()
-
         // **A setting no screen offers must not go on being read** (#390). The
         // rest day came out of Settings for MVP scope, which retires the UI
         // and not the arithmetic — so an install that had one stored before
         // this build would keep resting on that day with nothing anywhere to
-        // turn it off. Cleared here, beside the override above and for the
-        // same reason: before the store is opened or a view can read it.
+        // turn it off. Cleared here, first, before the store is opened or a
+        // view can read it.
         //
         // Runs in the test host too, and harmlessly: the host's store is a
         // per-process suite whose persistent domain `GlowSettings` already
@@ -113,6 +100,7 @@ struct GlowApp: App {
         // #179 closed.
         if let container = attempt.container {
             Self.migrateDailyHabitsOut(in: container)
+            Self.purgeRetiredDebugData(in: container)
         }
 
         _container = State(initialValue: attempt.container)
@@ -259,6 +247,18 @@ struct GlowApp: App {
         }
     }
 
+    /// Takes out what Demo history and Debug: Override Today left behind
+    /// (#628). After the daily-habit sweep and before the launch reload, for
+    /// that sweep's reason: it deletes rows the widget draws. See
+    /// `RetiredDebugData`.
+    private static func purgeRetiredDebugData(in container: ModelContainer) {
+        do {
+            try RetiredDebugData.purge(context: ModelContext(container))
+        } catch {
+            HabitStore.report(error, operation: "purgeRetiredDebugData")
+        }
+    }
+
     #if DEBUG
     /// Records a burst and reloads, so the widget's burst path can be driven
     /// from a tethered Mac without a thumb on the glass.
@@ -360,12 +360,10 @@ struct GlowApp: App {
                     // reload fired from `init` would fire in the test process
                     // too, which is the class of leak #179 closed.
                     //
-                    // **Last of the three things a launch does, and the order
-                    // is load-bearing.** `init` clears a stale `DebugToday`
-                    // override (#204) and sweeps the per-day habits out
-                    // (#239), and both change what the widget should draw —
-                    // the override lives in the App Group where the widget
-                    // reads it, and the sweep deletes rows the widget renders.
+                    // **Last of the things a launch does, and the order is
+                    // load-bearing.** `init` sweeps the per-day habits out
+                    // (#239) and purges what the removed debug tools left
+                    // behind (#628), and both delete rows the widget renders.
                     // A reload placed ahead of either would ask the provider
                     // for a redraw of data about to be discarded, and then
                     // nothing would ask again. `init` runs before any of

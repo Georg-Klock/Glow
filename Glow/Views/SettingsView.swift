@@ -10,9 +10,9 @@ import WidgetKit
 /// Glow leads because it is the product rather than a preference about it.
 /// Week holds both controls that decide what a week is — where it starts and
 /// which day the app stops asking about — which were two sections, one of them
-/// headerless. Data holds the export, the reset, and — behind seven taps on
-/// its version line (#566) — the two controls that write something invented
-/// into the same store.
+/// headerless. Data holds the export and the reset, over the version line.
+/// Demo history and Debug: Override Today sat behind seven taps on that line
+/// (#566) until #628 took both out of the app.
 ///
 /// A tab now rather than a sheet, so there is no Done button and nothing to
 /// dismiss — the changes are live and the way out is the tab bar.
@@ -68,21 +68,6 @@ struct SettingsView: View {
     /// once, unprompted; this screen never does — here the notice is something
     /// the person tapped the preview to ask for.
     @State private var isShowingLowPowerNotice = false
-
-    /// Mirrors `DemoHistory.isSeeded`. State rather than a computed binding so
-    /// the toggle animates the flip it caused instead of waiting on a re-read.
-    @State private var isDemoSeeded = false
-
-    /// Mirrors `DebugToday.override()`, for the same reason `isDemoSeeded`
-    /// mirrors the record: a `Date?` in the App Group is not something
-    /// `@AppStorage` can bind to, so the control is driven from state and the
-    /// store is written behind it. Nil is off.
-    @State private var overrideDay: Date?
-
-    /// Whether the two debug rows are showing (#566). Process state shared
-    /// through `DebugReveal.shared`, so it survives leaving this tab and dies
-    /// with the session — see that type for why neither is negotiable.
-    @State private var reveal = DebugReveal.shared
 
     /// Whether the reset confirmation is up, and what has been typed into it.
     /// See `resetRow`.
@@ -143,18 +128,6 @@ struct SettingsView: View {
             // keeps light off the top of the screen is `TopFade`. See #195.
             .toolbarBackground(.visible, for: .navigationBar)
 
-            .onAppear {
-                isDemoSeeded = DemoHistory(context: context).isSeeded
-                // Re-read rather than assumed: the banner on another screen
-                // can have cleared it, and the week can have rolled over and
-                // expired it, since this view was last built.
-                overrideDay = DebugToday.override()
-            }
-            // Cleared from a banner on another tab, this row has to follow.
-            .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
-                let current = DebugToday.override()
-                if current != overrideDay { overrideDay = current }
-            }
             // The notification the monitor watches is not delivered while the
             // app is suspended, so coming back to the foreground is its own
             // read. `WeeklyGridView` pairs the two the same way.
@@ -333,8 +306,7 @@ struct SettingsView: View {
                         .font(.footnote)
                 }
 
-                // Data last: the export, beside the one control that writes
-                // something invented into the same store.
+                // Data last: the export, and the reset.
                 Section {
                     Button {
                         isChoosingFormat = true
@@ -347,33 +319,6 @@ struct SettingsView: View {
                     }
                     .disabled(habits.isEmpty)
 
-                    // Both debug rows are hidden until the version line below
-                    // has been tapped seven times (#566). Hidden, not compiled
-                    // out: they are in every build, TestFlight included, which
-                    // is #204's requirement and is untouched — see
-                    // `DebugReveal` for why this narrows that decision rather
-                    // than reversing it.
-                    if reveal.isRevealed {
-                        Toggle("Demo history", isOn: demoBinding)
-                            .tint(GlowPalette.controlTint)
-
-                        // The same tier as demo history, and in the same
-                        // section: both write real rows into the real store,
-                        // and this one decides what day they are dated to. Not
-                        // `#if DEBUG` — see `DebugToday` for why a build that
-                        // compiles it out is a build where it is missing from
-                        // the only place it is needed.
-                        Toggle("Debug: Override Today", isOn: overrideBinding)
-                            .tint(GlowPalette.controlTint)
-                        if overrideDay != nil {
-                            Picker("Day", selection: dayBinding) {
-                                ForEach(DebugToday.choices(), id: \.self) { day in
-                                    Text(DebugToday.dayName(day)).tag(day)
-                                }
-                            }
-                        }
-                    }
-
                     resetRow
                 } header: {
                     Text("Data")
@@ -382,15 +327,10 @@ struct SettingsView: View {
                     // paragraphs of explanation under Reset, and the decision
                     // was that the section explains itself through its rows;
                     // the same entry noted that a version line somewhere would
-                    // be a new decision, and this is it (#566). An ordinary
-                    // piece of Settings UI on its own merits — and the seventh
-                    // tap on it reveals the two debug rows above for the rest
-                    // of the session. A `Text` with a tap gesture rather than
-                    // a `Button`, so VoiceOver reads a version number and not
-                    // a control; the gesture is found by trying, the way
-                    // Apple's own is.
+                    // be a new decision, and this is it (#566). Plain text: seven
+                    // taps on it used to reveal two debug rows, and those rows
+                    // are gone (#628).
                     Text(Self.version.label)
-                        .onTapGesture { reveal.registerTap() }
                 }
 
                 // Last, on its own, header-less (#564). Not a fifth row in
@@ -622,72 +562,6 @@ struct SettingsView: View {
         pendingExport = nil
     }
 
-    /// Seeds or removes the invented past. Errors leave the toggle where the
-    /// truth is: the state is re-read from the record rather than assumed.
-    private var demoBinding: Binding<Bool> {
-        Binding(
-            get: { isDemoSeeded },
-            set: { wantsDemo in
-                let demo = DemoHistory(context: context)
-                do {
-                    if wantsDemo {
-                        // The day the app currently believes it is, so a demo
-                        // seeded under a debug override leaves *that* day's
-                        // slot open rather than the real one (#204).
-                        try demo.seed(now: WeekCalendar.today())
-                    } else {
-                        try demo.remove()
-                    }
-                } catch {
-                    HabitStore.report(error, operation: wantsDemo ? "seedDemo" : "removeDemo")
-                    // No retry closure: the toggle below re-reads the record,
-                    // so the switch is already showing the truth, and flipping
-                    // it again *is* the retry — through the same confirmed
-                    // gesture (#282).
-                    OperationNotices.shared.report(.demo)
-                }
-                isDemoSeeded = demo.isSeeded
-                // Demo history writes through `DemoHistory` rather than
-                // `HabitStore`, so it says so itself. See `WidgetRefresh`.
-                WidgetRefresh.invalidate()
-            }
-        )
-    }
-
-    // MARK: - Debug: override today
-
-    /// On means "some day of this week", and the day it starts on is the real
-    /// today — the one position that changes nothing until the picker moves.
-    ///
-    /// Off clears the stored key outright rather than remembering the last day,
-    /// because a remembered override is the thing this feature is fenced
-    /// against: nothing may survive being switched off.
-    private var overrideBinding: Binding<Bool> {
-        Binding(
-            get: { overrideDay != nil },
-            set: { wantsOverride in
-                let day = wantsOverride ? WeekCalendar.realToday() : nil
-                DebugToday.set(day)
-                overrideDay = DebugToday.override()
-                // Every surface follows the override, the widget included, and
-                // the widget is a second process that is not told when a
-                // default moves.
-                WidgetRefresh.invalidate()
-            }
-        )
-    }
-
-    private var dayBinding: Binding<Date> {
-        Binding(
-            get: { overrideDay ?? WeekCalendar.realToday() },
-            set: { day in
-                DebugToday.set(day)
-                overrideDay = DebugToday.override()
-                WidgetRefresh.invalidate()
-            }
-        )
-    }
-
     // MARK: - Feedback
 
     /// Copies the address and says so for a moment (#564).
@@ -746,20 +620,10 @@ struct SettingsView: View {
     /// Synchronously, and #193 says why: this is a rare, explicitly confirmed
     /// action, and a background-context path for something that happens once in
     /// an install's life is machinery nobody would ever get to exercise.
-    ///
-    /// The order matters at the end. `isDemoSeeded` is state mirroring the
-    /// store, and the reset has just deleted every completion the demo
-    /// invented — so the toggle is re-read from the record rather than assumed
-    /// off, exactly as the toggle's own binding does.
     private func performReset() {
         typedConfirmation = ""
-        let demo = DemoHistory(context: context)
         do {
             try HabitStore(context: context).resetToDefaults()
-            // The rows the pre-provenance record named are gone with
-            // everything else. Dropping the key is tidying, not correctness —
-            // see `DemoHistory.discardLegacyRecord`.
-            demo.discardLegacyRecord()
         } catch {
             HabitStore.report(error, operation: "resetToDefaults")
             // Destructive, so no retry is offered — `OperationNotices` would
@@ -769,9 +633,6 @@ struct SettingsView: View {
             // confirmation, again (#282).
             OperationNotices.shared.report(.reset)
         }
-        // Whether the reset threw or not: the toggle shows what the store
-        // holds, and after a failure that is whatever it held before.
-        isDemoSeeded = demo.isSeeded
     }
 
     /// Weekday names from the calendar, so a non-English locale gets its own.

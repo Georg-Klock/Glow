@@ -9118,3 +9118,47 @@ shuffle bag, one pop per tap. 218 is still thirty-six times the six-word list
 #420 replaced; a person logging twice a day sees a phrase again after about
 three and a half months rather than inside a week.
 
+
+## 2026-09-17 — Demo history and Debug: Override Today come out of the app entirely (#628)
+
+**Supersedes #204 and #566.** Both tools are removed from the app — not
+compiled out behind `#if DEBUG`, not hidden. Settings' Data section is Export
+History, Reset to Default Habits and a version line, and the version line is
+plain text.
+
+**Why.** App Review guideline 2.3.1(a): "Don't include any hidden, dormant, or
+undocumented features in your app." #566 put both rows behind seven taps on the
+version line, which made them harder to find and made them exactly the kind of
+feature that sentence names. #204 kept the override out of `#if DEBUG` because
+the phone is where this app is tested; that reason does not extend to the binary
+App Review installs and customers download, and version 1.0 is that binary. The
+1.0 Review Notes also had to describe both switches to App Review, which is its
+own sign that they did not belong in it.
+
+**What an install keeps is purged, not stranded.** `DemoHistory` was the only
+code that could take out what the demo wrote. Deleting it alone would have left
+ten weeks of invented completions as real history on any install that had the
+demo on, and dropping `Completion.demoSessionID` with it would have let
+SwiftData's lightweight migration keep those rows with nothing marking them. So
+`RetiredDebugData.purge` runs at every launch, after the daily-habit sweep and
+before the launch reload: it deletes every completion with a `demoSessionID`,
+the rows a pre-#140 demo named in `demoHistoryCompletionIDs`, and both App Group
+keys. The attribute stays on the model for this release. **The column and the
+purge come out together in the first update after 1.0 ships.** Version 1.0 has
+no App Store users, so the only installs this protects are TestFlight ones — the
+cost is one counting fetch per launch for one release, and it was taken rather
+than asking anyone to reinstall.
+
+**What stayed.** `SeededHistory`, because `WidgetPreviewSample` draws the Widgets
+tab's previews from it and that ships. The `#if DEBUG` launch-argument hooks
+(`-glow-widget-preview-ui-test`, `-glow-edit-pitch-ui-test`, `-glow-force-burst`,
+`-glow-debug-pop`, `-glow-dump-widgets`, `-glow-force-low-power`, the reorder
+trace, `prepareForSynchronousRendering`) compile out of Release, so none of them
+is in an App Store binary, and the UI and render suites depend on some of them.
+
+**What changed for tests.** `DebugTodayTests` and `DemoHistoryTests` are deleted;
+the reveal tests in `SettingsSupportTests` became one scan that Settings offers
+no debug controls; `StaleWriterTests` holds the purge to the peer-delete
+standard the demo's removal was held to; `RetiredDebugDataTests` is new. The
+`GlowTests` floor is lowered in the same change by what the deleted cases
+reported.

@@ -50,7 +50,7 @@ struct WidgetPreviewSampleTests {
     }
 
     /// The open slot is the one thing the widget is *for*, so the sample must
-    /// not fill it — the same rule `SeededHistory` states for the demo.
+    /// not fill it — the same rule `SeededHistory` states.
     @Test("Today is never already logged")
     func todayStaysOpen() {
         for habit in rows() {
