@@ -1,4 +1,8 @@
-# Glow Up Habit Tracker, product spec (v1)
+# Weekly Practice, product spec (v1)
+
+The app was called Glow Up until 2026-09-17 (#629). The name on the Home Screen
+and in the widget gallery is **Practice**; the App Store name is **Weekly
+Practice**.
 
 Product truth. Where this and the code disagree, one of them is a bug; say
 which in the same session you find it.

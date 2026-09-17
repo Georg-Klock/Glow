@@ -9162,3 +9162,36 @@ no debug controls; `StaleWriterTests` holds the purge to the peer-delete
 standard the demo's removal was held to; `RetiredDebugDataTests` is new. The
 `GlowTests` floor is unchanged: the bundle still reports 762 tests against a
 floor of 449, and a floor is a minimum.
+`GlowTests` floor is lowered in the same change by what the deleted cases
+reported.
+
+## 2026-09-17 — The app is Weekly Practice, and Practice on the Home Screen (#629)
+
+**What changed.** The App Store name is **Weekly Practice**. The Home Screen
+label and the widget extension's display name are **Practice**, the widget
+gallery lists "Practice: This Week", an export is "Weekly Practice history
+<day>.csv", and the Widgets tab tells a person to search the gallery for
+Practice. The bundle identifiers, the targets, the App Group, the repository,
+the provisioning profile names and "the glow" as the HDR feature's name are
+unchanged: none of them is a product name a person reads, and the bundle
+identifier of an existing app record cannot change.
+
+**Why.** Version 1.0 was rejected under guideline 4.3(a) — "similar binary,
+metadata, and/or concept as apps submitted to the App Store by other
+developers". The name was the most visible similarity: 113 App Store apps carry
+"Glow" in the name, among them *Glow Up Habit Tracker - Nectar*, *HabitTracker -
+GlowHabit* and *Glow: Habit & Goal Tracker*, and 325 habit and planning apps
+carry "Habit". None of the roughly 700 collected carries "Practice". Checked on
+2026-09-17: no App Store app named or containing "Weekly Practice" on the US,
+German or UK stores, and no live trademark for it in the offices TMview covers.
+That is a screening search, not a clearance opinion.
+
+**Why a build and not only the listing.** Guideline 2.3.8 asks for the name on
+the device and the name on the store to be similar enough not to confuse. An app
+listed as Weekly Practice whose icon said Glow Up would not meet it.
+
+**Why "Practice" and not "Weekly Practice" under the icon.** A Home Screen label
+truncates at about twelve characters; "Weekly Pract…" is not a name.
+
+**Not decided here.** The feedback address in Settings is still
+`glowup@georgklock.com`; changing it needs a mailbox first.

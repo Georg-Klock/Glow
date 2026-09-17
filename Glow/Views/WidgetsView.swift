@@ -244,7 +244,7 @@ struct WidgetsView: View {
             // `LocalizedStringKey`, which is what a string *literal* becomes;
             // two literals joined with `+` are a `String` before `Text` sees
             // them, and the `**+**` would render as four asterisks.
-            Text("Long-press your Home Screen, tap the **+** in the top corner, search for Glow Up, and drag the size you want onto the screen.")
+            Text("Long-press your Home Screen, tap the **+** in the top corner, search for Practice, and drag the size you want onto the screen.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

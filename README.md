@@ -1,13 +1,13 @@
-# Glow Up
+# Weekly Practice
 
-Glow Up Habit Tracker. The home screen icon says "Glow Up", because a home
-screen label truncates at about twelve characters and "Glow Up habit tra..."
-is not a name.
+Weekly Practice on the App Store. The home screen icon says "Practice", because
+a home screen label truncates at about twelve characters and "Weekly Pract..."
+is not a name. It was called Glow Up until #629.
 
 A habit tracker whose weekly overview is the whole app: a grid of habits by
 day, filled when done.
 
-The one twist is in the name. A mark physically glows on an HDR-capable screen,
+The one twist: a mark physically glows on an HDR-capable screen,
 brighter than white, the way an HDR photo does in Photos.
 
 Light marks the habit: today's slot glows because it is still actionable, and
@@ -16,7 +16,6 @@ never happened — a missed day, a day still to come. Open and done are told apa
 by *shape* rather than by brightness: a ring against a dot in the week grid, an
 outlined band against a line on the Today ring.
 
-Working name. Rename freely.
 
 ## Status
 

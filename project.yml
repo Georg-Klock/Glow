@@ -120,7 +120,7 @@ targets:
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
-        INFOPLIST_KEY_CFBundleDisplayName: Glow Up
+        INFOPLIST_KEY_CFBundleDisplayName: Practice
 
   # The widget shares the model, logic and store with the app by compiling the
   # same files into both. A framework would avoid the duplication and cost a
@@ -166,7 +166,7 @@ targets:
     info:
       path: GlowWidget/Info.plist
       properties:
-        CFBundleDisplayName: Glow Up
+        CFBundleDisplayName: Practice
         # An extension whose version differs from its host app is a build
         # warning and an App Store rejection.
         CFBundleShortVersionString: $(MARKETING_VERSION)

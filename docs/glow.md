@@ -609,7 +609,7 @@ would move neither delay.
 
 ## The widget gallery's preview is a cached picture
 
-**The iOS widget gallery — long-press the Home Screen, tap +, pick Glow Up — does not ask the extension for anything.** Its preview is a rendering the system took at some earlier moment and kept, and there is no public call that invalidates it. `WidgetCenter.reloadAllTimelines()` refreshes *placed* widgets and does not touch it.
+**The iOS widget gallery — long-press the Home Screen, tap +, pick Practice — does not ask the extension for anything.** Its preview is a rendering the system took at some earlier moment and kept, and there is no public call that invalidates it. `WidgetCenter.reloadAllTimelines()` refreshes *placed* widgets and does not touch it.
 
 Measured on an iPhone 17 Pro simulator, iOS 26:
 

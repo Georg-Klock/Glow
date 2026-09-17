@@ -136,8 +136,8 @@ struct HistoryExportTests {
     @Test("The filename carries the day, so two exports do not collide")
     func filename() {
         #expect(HistoryExport.filename(on: day(20), extension: "csv", calendar: calendar)
-            == "Glow Up history 2026-08-20.csv")
+            == "Weekly Practice history 2026-08-20.csv")
         #expect(HistoryExport.filename(on: day(3), extension: "json", calendar: calendar)
-            == "Glow Up history 2026-08-03.json")
+            == "Weekly Practice history 2026-08-03.json")
     }
 }

@@ -1,8 +1,10 @@
-# Glow Up
+# Weekly Practice
 
 An iPhone habit tracker: three tabs — Widgets, This Week, Settings — around
-one weekly grid. The one twist is in the name: a mark **physically glows** on
-an HDR-capable screen.
+one weekly grid. **Practice** on the Home Screen, **Weekly Practice** on the
+App Store; it was Glow Up until #629, and the repository, targets, bundle
+identifiers and "the glow" as the HDR feature's name keep that history. The one
+twist: a mark **physically glows** on an HDR-capable screen.
 
 **Light marks the habit; what stays dark is what never happened.** Today's open
 slot is lit because it is still actionable, and every completion is lit too,
