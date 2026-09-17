@@ -11,8 +11,9 @@ import Testing
 /// Reading a stored attribute on that element is `_InvalidFutureBackingData`,
 /// a precondition inside SwiftData: the process dies rather than the test
 /// failing. #318 took the by-hand mutation off the tap; the writers that
-/// remove a demo, reset to the defaults and delete a habit kept it, and each
-/// read the array on the way through.
+/// removed a demo, reset to the defaults and delete a habit kept it, and each
+/// read the array on the way through. The demo's removal is gone with the demo
+/// (#628); the launch purge that replaced it is held to the same standard.
 ///
 /// Every test here is the same shape as `StaleCompletionTests`: seed through
 /// the app's context, delete one row through a peer, then run the writer
@@ -41,8 +42,28 @@ struct StaleWriterTests {
         )
     }
 
-    /// The app's context with a seeded demo, and one demo row deleted behind
-    /// its back through a peer context — the widget's tap, in one process.
+    /// Isolated defaults, so the purge's key removals touch nothing shared.
+    private func defaults() -> UserDefaults {
+        let suite = "stale-writer-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite) ?? .standard
+        defaults.removePersistentDomain(forName: suite)
+        return defaults
+    }
+
+    /// Rows a demo invented, written the way it wrote them: stamped with a
+    /// session id, on days before today.
+    private func insertInvented(for habit: Habit, into context: ModelContext) throws {
+        let session = UUID()
+        for offset in 1...3 {
+            let day = calendar.date(byAdding: .day, value: -offset, to: today)!
+            context.insert(Completion(day: day, habit: habit, demoSessionID: session, calendar: calendar))
+        }
+        try context.save()
+    }
+
+    /// The app's context with invented rows and one real one, and one invented
+    /// row deleted behind its back through a peer context — the widget's tap,
+    /// in one process.
     private func seededWithOnePeerDelete()
         throws -> (container: ModelContainer, app: ModelContext, habit: Habit)
     {
@@ -50,14 +71,15 @@ struct StaleWriterTests {
         let app = ModelContext(container)
         let store = HabitStore(context: app, calendar: calendar, restDay: nil)
         let habit = try store.addHabit(name: "Read", icon: "📖", frequency: .daily)
-        try DemoHistory(context: app, calendar: calendar, restDay: nil).seed(now: today)
+        try insertInvented(for: habit, into: app)
+        #expect(try store.addCompletion(for: habit, on: today) == 1)
         // The array is populated on this side, which is the precondition.
         #expect((habit.completions ?? []).isEmpty == false)
 
         let peer = ModelContext(container)
         let habitID = habit.id
         let theirs = try peer.fetch(FetchDescriptor<Completion>(
-            predicate: #Predicate { $0.habit?.id == habitID }
+            predicate: #Predicate { $0.habit?.id == habitID && $0.demoSessionID != nil }
         ))
         let doomed = try #require(theirs.first)
         peer.delete(doomed)
@@ -65,19 +87,19 @@ struct StaleWriterTests {
         return (container, app, habit)
     }
 
-    @Test("Removing the demo after a peer deleted one of its rows")
-    func demoRemovalSurvivesAPeerDelete() throws {
+    @Test("Purging invented rows after a peer deleted one of them")
+    func purgeSurvivesAPeerDelete() throws {
         let (container, app, habit) = try seededWithOnePeerDelete()
         defer { withExtendedLifetime(container) {} }
 
-        try DemoHistory(context: app, calendar: calendar, restDay: nil).remove()
+        #expect(try RetiredDebugData.purge(context: app, defaults: defaults()) == 2)
 
         let habitID = habit.id
         let left = try app.fetch(FetchDescriptor<Completion>(
             predicate: #Predicate { $0.habit?.id == habitID }
         ))
-        #expect(left.isEmpty)
-        #expect(DemoHistory(context: app, calendar: calendar, restDay: nil).isSeeded == false)
+        #expect(left.count == 1, "the completion the person logged survives")
+        #expect(left.allSatisfy { $0.demoSessionID == nil })
     }
 
     @Test("Resetting to the defaults after a peer deleted a row")
@@ -107,10 +129,10 @@ struct StaleWriterTests {
         #expect(try store.clearDay(for: habit, on: today) == 1)
         #expect(habit.completions?.isEmpty == true)
 
-        try DemoHistory(context: app, calendar: calendar, restDay: nil).seed(now: today)
+        try insertInvented(for: habit, into: app)
         let seeded = habit.completions?.count ?? 0
         #expect(seeded > 0)
-        try DemoHistory(context: app, calendar: calendar, restDay: nil).remove()
+        try RetiredDebugData.purge(context: app, defaults: defaults())
         #expect(habit.completions?.isEmpty == true)
     }
 }

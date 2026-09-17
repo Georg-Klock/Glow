@@ -139,9 +139,8 @@ struct CreationCreditTests {
     @Test("A day before creation that was logged is not a day that was forgiven")
     func aBackfilledDayIsNotForgiven() {
         // Six a week made on Wednesday, with Monday and Tuesday logged —
-        // `DemoHistory.seed` writes exactly this, because it hands every habit
-        // to `SeededHistory.completions` with no bound from `createdDay`, and
-        // #265 lets a daily row back-fill one by hand.
+        // #265 lets a daily row back-fill exactly this by hand, and the
+        // retired Demo history wrote it too (#628).
         //
         // Capacity is seven against a target of six: five days from Wednesday,
         // plus the two days that already carried a rep. Nothing is unavoidable,

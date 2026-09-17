@@ -9,8 +9,6 @@ import Foundation
 ///
 /// Habits and nothing else: a tracker opening with a streak you did not earn
 /// is lying to you on the first screen, so the set arrives with an empty grid.
-/// The invented past that shows the design off is `DemoHistory`, behind a
-/// toggle in Settings — asked for, never assumed.
 ///
 /// They are ordinary habits, editable and deletable like any other, which is
 /// what the empty state says before the tap rather than after it.

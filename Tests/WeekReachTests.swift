@@ -106,19 +106,19 @@ struct WeekReachTests {
         #expect(floor == reach.earliest)
     }
 
-    @Test("The demo's ten weeks are all reachable")
-    func theDemoIsReachableEndToEnd() {
-        // `SeededHistory.weeks` of invented past, and the pager has to reach
-        // the whole of it or the demo shows a week the app cannot open. This
+    @Test("Ten weeks of past are all reachable")
+    func tenWeeksAreReachableEndToEnd() {
+        // `SeededHistory.weeks` of past, and the pager has to reach the whole
+        // of it or a record that long shows a week the app cannot open. This
         // used to be a comparison against the cap, which had to clear ten;
         // nothing encodes that constraint any more, so it is asserted the only
-        // way left — by reaching the demo's own first week.
+        // way left — by reaching that record's own first week.
         let seeded = calendar.date(byAdding: .day, value: -7 * SeededHistory.weeks, to: today)!
         let reach = reach(recordStart: seeded)
 
-        // Since #259 the floor reaches further back than the demo does, so the
+        // Since #259 the floor reaches further back than that, so the
         // claim is containment rather than equality — which is what this test
-        // was always about. `>=` rather than `==` is the honest form: the demo
+        // was always about. `>=` rather than `==` is the honest form: the record
         // must be reachable, not exactly reachable.
         #expect(weeksBack(reach) >= SeededHistory.weeks)
         let first = calendar.date(byAdding: .day, value: -7 * SeededHistory.weeks, to: thisWeek)!

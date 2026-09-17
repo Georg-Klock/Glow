@@ -120,10 +120,10 @@ struct TestIsolationTests {
     /// The rule has always been "no views, no store, no `Date()`" — the rest
     /// day was the exception that proved it, and it cost four issues. #204
     /// added a second thing a surface has to be *told*: which day is today.
-    /// Its `WeekCalendar.today()` reads the clock and the App Group both, and
-    /// it is declared in `Glow/Store/DebugToday.swift` rather than beside the
-    /// rest of `WeekCalendar` precisely so that `Glow/Logic/` keeps neither
-    /// read. Nothing but a scan can hold that: the extension is in the same
+    /// `WeekCalendar.today()` reads the clock, and it is declared in
+    /// `Glow/Store/Today.swift` rather than beside the rest of `WeekCalendar`
+    /// precisely so that `Glow/Logic/` does not. (It read a debug override in
+    /// the App Group as well until #628 removed the override.) Nothing but a scan can hold that: the extension is in the same
     /// module, so a call to it from inside `Glow/Logic/` compiles.
     ///
     /// A scan for the same reason the one above is one — the property is the
@@ -151,10 +151,6 @@ struct TestIsolationTests {
             #expect(
                 !code.contains("Date()"),
                 "\(file.lastPathComponent) reads the clock; a day arrives as a parameter"
-            )
-            #expect(
-                !code.contains("DebugToday"),
-                "\(file.lastPathComponent) reads the debug override rather than being told a day"
             )
             #expect(
                 !code.contains("WeekCalendar.today"),

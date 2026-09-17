@@ -225,11 +225,6 @@ struct WeeklyGridView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Above the Low Power strip, because it is the more
-                // consequential of the two: one explains why the marks look
-                // dimmer, the other says the app is writing to a day that is
-                // not today. See `DebugTodayBanner`.
-                DebugTodayBanner(horizontalPadding: GridMetrics.horizontalPadding)
                 if lowPower.isLowPowerMode {
                     LowPowerBanner { isShowingLowPowerNotice = true }
                         .padding(.horizontal, GridMetrics.horizontalPadding)
@@ -384,32 +379,8 @@ struct WeeklyGridView: View {
                 lowPower.refresh()
             }
         }
-        // The debug override is a defaults key in the App Group (#204), and
-        // `@AppStorage` cannot bind to it — it is a `Date`. The defaults' own
-        // notification is the signal, and it has to be one: Settings is a
-        // sibling tab, so this view stays alive and unredrawn while the
-        // override moves, and a value read once at appear would leave the
-        // grid on the wrong day.
-        //
-        // **Compared before anything is fetched.** This notification fires
-        // for every key the process writes to any defaults store, and the app
-        // writes several per tap — the pop's shuffle state and the widget
-        // reload's trace line, on the same turn as the tap. The handler used
-        // to answer each of them with a demo-history count and two fetches
-        // for the reach, so one tap on the grid ran those three queries three
-        // times over, and a tap on the Widgets tab ran them five times, for a
-        // day that had not moved. Now a defaults change costs one read of the
-        // override, and the store is touched only when today has changed.
-        //
-        // Demo history used to be read here too, from the days when it was a
-        // list of ids in the defaults. It is a column on the row since #140,
-        // and seeding or removing it is a save — `StoreChange.committed`
-        // below is its signal.
-        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
-            if (pinnedToday ?? WeekCalendar.today()) != today { refreshToday() }
-        }
         // **Every successful save, from this screen or any other** — a mark,
-        // a demo seeded or removed in Settings, a reset, a widget tap written
+        // an edit, a reset, a widget tap written
         // through the app's own context. The record's start is the one thing
         // this screen derives from those events now that its editing policy is
         // permanently today-only (#543).
@@ -1192,9 +1163,9 @@ struct WeeklyGridView: View {
     /// inside it.
     ///
     /// Both ends move: the newest week moves at midnight, and the oldest moves
-    /// when the record does — a demo switched on ten weeks of past, a demo
-    /// switched off takes them away again. Clamping here is what stops the view
-    /// standing on a week that has stopped existing.
+    /// when the record does — a completion corrected into an earlier week, or
+    /// the earliest one removed. Clamping here is what stops the view standing
+    /// on a week that has stopped existing.
     ///
     /// Called after every save, a toggle included, through
     /// `StoreChange.committed`. This used to say it was *not* called from
@@ -1364,7 +1335,7 @@ struct WeeklyGridView: View {
                 Haptics.uncompleted()
             case .refused, .unchanged:
                 // The grid never hands out a rest-day tap, and never a day
-                // ahead unless the demo is in — but the store's answer is the
+                // ahead — but the store's answer is the
                 // truth, and nothing changed, so nothing haptic and nothing to
                 // reload.
                 //

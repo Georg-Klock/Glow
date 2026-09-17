@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import Glow
 
-/// The two small types behind Settings' version line and its hidden rows
-/// (#566).
+/// Settings' version line (#566), and the absence of the debug rows it used to
+/// reveal (#628).
 @Suite("Settings support")
 struct SettingsSupportTests {
     private static var root: URL {
@@ -12,69 +12,31 @@ struct SettingsSupportTests {
             .deletingLastPathComponent()
     }
 
-    // MARK: - The reveal
+    // MARK: - No debug controls
 
-    @Test("Seven taps reveal the debug rows, six do not")
-    @MainActor
-    func sevenTapsReveal() {
-        let reveal = DebugReveal()
-        #expect(DebugReveal.tapsToReveal == 7, "Apple's own count; changing it is a decision")
-        #expect(!reveal.isRevealed)
-        for _ in 1..<DebugReveal.tapsToReveal {
-            #expect(!reveal.registerTap())
-        }
-        #expect(!reveal.isRevealed)
-        #expect(reveal.registerTap())
-        #expect(reveal.isRevealed)
-        // Once revealed, stays revealed for the session.
-        #expect(reveal.registerTap())
-        #expect(reveal.isRevealed)
-    }
-
-    @Test("A fresh instance starts hidden, so a relaunch hides the rows again")
-    @MainActor
-    func freshInstanceIsHidden() {
-        let first = DebugReveal()
-        for _ in 0..<DebugReveal.tapsToReveal { first.registerTap() }
-        #expect(first.isRevealed)
-        #expect(!DebugReveal().isRevealed)
-    }
-
-    /// The reveal must not outlive the session it was tapped in — see the
-    /// type's own header and #566. Nothing that persists may be named in it.
-    @Test("The reveal is process state, not a stored default")
-    func revealIsNotPersisted() throws {
-        let source = try String(
-            contentsOf: Self.root.appending(path: "Glow/Store/DebugReveal.swift"),
-            encoding: .utf8
-        )
-        let code = source
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
-            .joined(separator: "\n")
-        #expect(!code.contains("UserDefaults"))
-        #expect(!code.contains("GlowSettings.store"))
-        #expect(!code.contains("@AppStorage"))
-        #expect(!code.contains("FileManager"))
-    }
-
-    /// The rows are hidden by visibility in `SettingsView`, not by compiling
-    /// them out — #204's reasoning about TestFlight builds still holds.
-    @Test("The debug rows are hidden, not compiled out")
-    func rowsAreNotBehindDebugFlag() throws {
+    /// Demo history and Debug: Override Today are out of the app (#628), not
+    /// hidden: guideline 2.3.1(a) does not allow hidden features, which is what
+    /// the seven-tap reveal of #566 made them. Scanned rather than rendered,
+    /// because the property is an absence.
+    @Test("Settings offers no debug controls, hidden or otherwise")
+    func noDebugControls() throws {
         let source = try String(
             contentsOf: Self.root.appending(path: "Glow/Views/SettingsView.swift"),
             encoding: .utf8
         )
-        // Comments name `#if DEBUG` to say why it is not used; only code counts.
+        // Comments may say what used to be here; only code counts.
         let code = source
             .split(separator: "\n", omittingEmptySubsequences: false)
             .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
             .joined(separator: "\n")
-        #expect(code.contains("Toggle(\"Demo history\""))
-        #expect(code.contains("Toggle(\"Debug: Override Today\""))
-        #expect(code.contains("if reveal.isRevealed"))
-        #expect(!code.contains("#if DEBUG"))
+        #expect(!code.contains("Demo history"))
+        #expect(!code.contains("Override Today"))
+        let version = try #require(code.range(of: "Text(Self.version.label)"))
+        let after = code[version.upperBound...].drop { $0.isWhitespace }
+        #expect(!after.hasPrefix(".onTapGesture"), "the version line is plain text")
+        #expect(!FileManager.default.fileExists(
+            atPath: Self.root.appending(path: "Glow/Store/DebugReveal.swift").path
+        ))
     }
 
     // MARK: - The version

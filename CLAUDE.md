@@ -387,10 +387,9 @@ merges asks for it**, with the `ios18` label or `workflow_dispatch`.
   day was the exception and cost four issues in one night (#105, #168, #175,
   #179) before #181 removed it; `TestIsolationTests` now scans for the read.
 
-  **So does "today".** `WeekCalendar.today()` reads the clock and the App Group
-  — the debug override (#204) lives there — so it is declared in
-  `Glow/Store/DebugToday.swift`, not beside the rest of `WeekCalendar`, and
-  `TestIsolationTests` scans `Glow/Logic/` for `Date()` as well. The spelling is
+  **So does "today".** `WeekCalendar.today()` reads the clock, so it is
+  declared in `Glow/Store/Today.swift`, not beside the rest of `WeekCalendar`,
+  and `TestIsolationTests` scans `Glow/Logic/` for `Date()` as well. The spelling is
   still `WeekCalendar.today()`; only the declaration sits at the boundary.
 
 - **Per-day habits are on `feature/daily-habits-2.0`, not in the app** (#209).

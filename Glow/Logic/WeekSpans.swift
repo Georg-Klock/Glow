@@ -707,9 +707,8 @@ enum WeekSpans {
         //
         // So this is §6's own rule — "the minimum credit that avoids a ✕, and
         // not one more" — applied to a week the rule was written without: it
-        // assumed no day before creation could carry anything. `DemoHistory`
-        // writes exactly that week, and #265 lets a daily row back-fill one by
-        // hand.
+        // assumed no day before creation could carry anything, and #265 lets a
+        // daily row back-fill one by hand.
         let backfilled = (0..<column).count { habit.completedDays.contains(week.days[$0]) }
         let now = max(0, target - daysLeft - backfilled)
         guard let atCreation = habit.targetAtCreation else { return 0 }

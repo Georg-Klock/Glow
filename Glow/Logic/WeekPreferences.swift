@@ -70,9 +70,8 @@ enum WeekPreferences {
     /// Clears the stored rest day, so an install that had one before #390 stops
     /// having one.
     ///
-    /// Called once per launch from `GlowApp.init`, beside
-    /// `DebugToday.clearOnLaunch()` and for the same shape of reason: a value
-    /// no surface can change any more must not go on being read. Unconditional
+    /// Called once per launch from `GlowApp.init`, before the store is opened: a
+    /// value no surface can change any more must not go on being read. Unconditional
     /// rather than guarded by a "has migrated" flag — removing an absent key is
     /// a no-op, and a flag would be a second thing to be wrong.
     ///

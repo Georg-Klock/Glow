@@ -58,11 +58,12 @@ final class Completion {
     /// completion is invented is saved in the same transaction as the
     /// completion, so either both landed or neither did. See #140.
     ///
-    /// A session id rather than a flag because it says *which* demo: the id is
-    /// stable across one seeding, so a future question about a particular run
-    /// has an answer. Removal does not need it — `DemoHistory` takes out
-    /// everything with any session id — and that is deliberate, because it
-    /// makes a half-finished seeding removable too.
+    /// **The demo is gone (#628), and this column stays for one release.**
+    /// `RetiredDebugData.purge` deletes every row that has a session id at each
+    /// launch; the column and the purge come out together in the first update
+    /// after 1.0 ships. Dropping the column first would let SwiftData's
+    /// lightweight migration keep the invented rows with nothing left marking
+    /// them.
     ///
     /// Optional with a `nil` default, like every other property here: the
     /// schema stays CloudKit-shaped, and an install that predates this column

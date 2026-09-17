@@ -1,20 +1,20 @@
 import Foundation
 
-/// The invented past behind the demo-history toggle in Settings.
+/// An invented past, for pictures of the app that need one.
 ///
 /// **This is invented history, and that is a real cost.** A tracker that opens
-/// showing a streak you did not earn is lying to you on the first screen. It
-/// exists because an empty grid shows none of what the app is for — no streak,
-/// no run of light, no shape to a week — and judging the design against a
-/// blank slate is judging a different app.
+/// showing a streak you did not earn is lying to you on the first screen, so
+/// none of it is ever written into a person's store. It exists because an
+/// empty preview shows none of what a widget is for — no run of light, no
+/// shape to a week — and `WidgetPreviewSample` draws the Widgets tab's
+/// previews over it.
 ///
-/// So it is asked for, never assumed: no install seeds it on first launch, and
-/// `DemoHistory` puts it in and takes exactly it back out when the toggle
-/// moves. See docs/decisions.md.
+/// It used to back Settings' Demo history toggle as well, which wrote it into
+/// the real store; that toggle is gone (#628). See docs/decisions.md.
 ///
 /// Deterministic on purpose. Each habit's past is generated from a fixed
-/// per-habit seed, so toggling the demo off and on rebuilds the same days and
-/// the tests can assert against it.
+/// per-habit seed, so the same habit always gets the same days and the tests
+/// can assert against it.
 enum SeededHistory {
     /// How far back the invented past runs.
     static let weeks = 10
