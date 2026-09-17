@@ -9160,5 +9160,5 @@ is in an App Store binary, and the UI and render suites depend on some of them.
 the reveal tests in `SettingsSupportTests` became one scan that Settings offers
 no debug controls; `StaleWriterTests` holds the purge to the peer-delete
 standard the demo's removal was held to; `RetiredDebugDataTests` is new. The
-`GlowTests` floor is lowered in the same change by what the deleted cases
-reported.
+`GlowTests` floor is unchanged: the bundle still reports 762 tests against a
+floor of 449, and a floor is a minimum.

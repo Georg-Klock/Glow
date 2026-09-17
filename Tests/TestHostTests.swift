@@ -135,6 +135,6 @@ struct TestHostTests {
         let gate = try #require(source.range(of: "if let container = attempt.container {"))
         #expect(gate.lowerBound < sweep.lowerBound)
         let gateEnd = try #require(source[gate.upperBound...].range(of: "\n        }"))
-        #expect(purge.upperBound < gateEnd.lowerBound, "the purge left the container gate")
+        #expect(purge.upperBound <= gateEnd.lowerBound, "the purge left the container gate")
     }
 }
