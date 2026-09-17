@@ -326,7 +326,7 @@ struct WidgetPlacementTests {
     /// The gallery title is the app's name and the kind's, in that order.
     @Test("The gallery title puts the app in front of the kind")
     func galleryNameCarriesTheApp() {
-        #expect(WidgetKind.week.galleryName == "Glow Up: This Week")
+        #expect(WidgetKind.week.galleryName == "Practice: This Week")
         for kind in WidgetKind.allCases {
             #expect(kind.galleryName.hasSuffix(kind.displayName))
         }

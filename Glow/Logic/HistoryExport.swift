@@ -135,7 +135,7 @@ enum HistoryExport {
         extension ext: String,
         calendar: Calendar = WeekCalendar.calendar
     ) -> String {
-        "Glow Up history \(day(date, calendar)).\(ext)"
+        "Weekly Practice history \(day(date, calendar)).\(ext)"
     }
 
     // MARK: - Shared shape

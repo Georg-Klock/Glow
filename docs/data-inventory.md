@@ -114,7 +114,7 @@ falls back). **Backed up.**
 
 ### Temporary exports
 
-`<app container>/tmp/HistoryExports/Glow Up history <yyyy-MM-dd>.csv` or
+`<app container>/tmp/HistoryExports/Weekly Practice history <yyyy-MM-dd>.csv` or
 `.json`. The full history as plaintext, existing between "Export" being
 tapped and the share sheet going away — discarded on dismissal, swept before
 the next export, and reclaimable by the OS like anything in `tmp` (#142).

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Glow Up — the widget extension. An appex is independently shipped and needs its own manifest; it compiles Glow/Glow and Glow/Store, so it reaches the same two UserDefaults uses the app does.
+  Weekly Practice — the widget extension. An appex is independently shipped and needs its own manifest; it compiles Glow/Glow and Glow/Store, so it reaches the same two UserDefaults uses the app does.
 
   Audited rather than copied (#132). Every required-reason family was searched
   for across both targets' sources; UserDefaults is the only one this app
