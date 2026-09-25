@@ -9244,3 +9244,25 @@ Split View and Stage Manager, and it arrives as a parameter.
 so a name truncates at the same character on every surface. Declined for now:
 spending the width on more than one week side by side — a new layout, which
 belongs in `docs/vision.md` first.
+
+## 2026-09-24 — Type on This Week never drops below 11pt (#635)
+
+**What changed.** `RowGeometry.textSize` and `nameTextSize` are floored at
+11pt, `caption2`'s default size. Every other measurement goes on scaling by
+the one factor.
+
+**Why.** Once the iPad is declared (#633), a 320pt Slide Over or ⅓ Split View
+window becomes a supported one, and it gave the grid a 280pt panel with names
+at 9.9pt. Only type is floored. Floors on the whole geometry were tried
+before #370 and drew "a widget with oversized marks in it", and that argument
+still stands.
+
+**The 44pt hit target #635 first proposed is not possible here.** A daily slot
+is 24pt tall at the widget's own size, and a column is 32pt from the next, so
+no content shape inside the row reaches 44 at any scale. That is #370's
+removal of the 34pt floor, and this entry does not reopen it.
+
+**The cost.** #405's parity, where the screen and the widget cut a name at the
+same character, now holds only down to a panel of about 310pt. That is below
+every phone. The editor's preview uses the same geometry at the same width,
+so it is still honest about the row it previews.

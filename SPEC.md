@@ -402,6 +402,13 @@ ordinary 20 on an iPhone 17e, 31pt over it on a 17 Pro Max. The Widgets tab has 
 drawn its previews by that rule; the two screens now share it. The row's 6/14
 inset pair is the widget's and is not symmetrised (#331, #591).
 
+**Type never drops below 11pt** (#635), the platform's smallest text style.
+No phone reaches that floor, since an iPhone SE's panel is 335pt and the floor
+binds below about 310. An iPad in Slide Over or a third of Split View does
+reach it, and so will any narrower window. There the label column goes on
+shrinking with everything else while the type stops, so a name is cut a
+character or two sooner than the widget would cut it.
+
 **The name is 12pt at the widget's scale whatever the phone's text size** —
 a deliberate trade recorded in `docs/decisions.md` (2026-08-24) — **unless the
 person has asked for the middle position** (#567). Settings → Text has one
