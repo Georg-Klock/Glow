@@ -9244,3 +9244,32 @@ Split View and Stage Manager, and it arrives as a parameter.
 so a name truncates at the same character on every surface. Declined for now:
 spending the width on more than one week side by side — a new layout, which
 belongs in `docs/vision.md` first.
+
+## 2026-09-24 — Sizes are gated by hosted frames, device kinds by an iPad lane (#643, #632)
+
+**What changed.** `HostedScreenFrames` is a table of surfaces rather than one:
+the 393 × 852 reference phone, an iPhone SE, a Pro Max, an iPad ⅓ split, and a
+full-screen iPad Air 11-inch in both orientations, each with its own safe area
+and both size classes forced through `traitOverrides`. `HostedResizeTests`
+resizes a hosted This Week 375pt → 820pt → 375pt and compares each step with a
+fresh render. `GLOW_DEVICE_KIND=ipad Tools/test.sh` runs `GlowUITests` on an
+iPad simulator, nightly in CI.
+
+**Why the iPad lane runs `GlowUITests` alone.** Both committed render
+baselines are one iPhone's render, and a hosted frame already gives the phone
+lanes every iPad size; comparing them on an iPad would be comparing the idiom
+against a phone's picture. `GlowTests` does not branch on the device. A
+skipped test fails the validator, so the lane is not "the whole suite with the
+rest skipped": it is declared under `lanes` in `Tools/test-inventory.json`
+with its own floor and evidence, and the other bundles are left out of the
+build's test run.
+
+**Why the resize test uses the gate's tolerances, not equality.** Measured on
+iOS 26.5: the 820pt step matched a fresh render exactly, while both 375pt
+steps — including the first, before any resize — differed from their fresh
+render by at most three levels across the panel's material, one cell mean by
+one level. A width or size class kept from before moves cells by tens; the
+test checks that it can see one by rendering 820pt at the wrong size class.
+
+**What neither half covers.** A foldable's real widths, and iPad multitasking
+chrome beyond a full-screen launch.

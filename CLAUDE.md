@@ -180,6 +180,19 @@ contradiction left standing reads as an instruction to whoever finds it next.
   named is the phone, not the change — re-run on the baseline's phone before
   reading anything into it.
 
+  **Sizes and device kinds are covered by different halves** (#632, #643).
+  The render baseline's hosted frames cover the sizes — This Week on the
+  reference phone, an iPhone SE, a Pro Max, an iPad ⅓ split and a full-screen
+  iPad in both orientations, Widgets on four of those — with each surface's
+  size classes forced, so both lanes' baselines carry every size. A hosted
+  window does not reproduce the idiom, so the device kind is the other half:
+  `GLOW_DEVICE_KIND=ipad Tools/test.sh` picks an iPad simulator by the same
+  rules (App Review's iPad Air 11-inch where there is one) and runs
+  `GlowUITests` alone, validated against the inventory's `ipad` lane — no
+  render baseline names an iPad, so none is compared there. The default,
+  `iphone`, is the run described above. The table is in
+  `docs/ARCHITECTURE.md` under "Sizes and device kinds".
+
 - **Approve both render baselines:** `Tools/approve-baseline.sh` (and `--check`)
 
   A visual change moves two committed files: `render-signatures.json`, measured
@@ -309,7 +322,9 @@ lives has already been seen to differ between platform versions. Two lanes run
 the suite: the current runtime, and the declared minimum — an iOS 18 simulator
 runtime the lane installs and pins with `GLOW_EXPECTED_RUNTIME_MAJOR` so it
 cannot silently fall forward (#286). The deployment target stays 18.0 because
-that lane gates it; raising it is a product decision.
+that lane gates it; raising it is a product decision. A third lane runs
+`GlowUITests` on an iPad (`GLOW_DEVICE_KIND=ipad`), nightly and on
+`workflow_dispatch` only (#643).
 
 **The two lanes do not run at the same times.** The current runtime gates every
 pull request and every push. The minimum-iOS lane runs **nightly at 06:00 UTC**,
@@ -519,9 +534,9 @@ actual bug. Every line here is something that already happened.
   because both were the placeholder. A baseline approved from that is a
   committed picture of an error icon, and it agrees with itself forever. Whole
   screens therefore use `HostedScreenFrames`: host the production view in a
-  `UIWindow`, force the 393 × 852 reference surface's 59pt/34pt safe area before
-  the host enters the live scene, force 2x display/output scale, pin today,
-  then capture `drawHierarchy`. The timing is part of the contract: a
+  `UIWindow`, force the surface's safe area (the 393 × 852 reference phone's is
+  59pt/34pt) and size classes before the host enters the live scene, force 2x
+  display/output scale, pin today, then capture `drawHierarchy`. The timing is part of the contract: a
   post-layout correction reports the requested inset but leaves the inherited
   model-specific navigation layout in place (#481). Do not move a
   `NavigationStack` screen back to the direct `ImageRenderer` path.

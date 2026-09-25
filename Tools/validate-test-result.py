@@ -212,6 +212,34 @@ def attachment_names(manifest: list[dict], test: str | None = None) -> list[str]
     return names
 
 
+def for_lane(inventory: dict, lane: str | None) -> dict:
+    """The inventory a run on `lane` answers to.
+
+    A lane is a run that deliberately runs *part* of the suite — the iPad lane
+    runs `GlowUITests` alone, because the render baselines are pictures of one
+    iPhone each and there is no iPad baseline to compare against (#632, #643).
+    Its entry replaces `bundles` and `requiredAttachments` and nothing else, so
+    the lane is held to its own floors and its own evidence, a bundle it was not
+    meant to run still fails as undeclared, and the skip rule is untouched: a
+    lane leaves bundles out of the run, it never runs a test and skips it.
+
+    An unknown lane is an error rather than the default inventory, or a typo in
+    a workflow would quietly hold that lane to nothing it expects.
+    """
+    if lane is None:
+        return inventory
+    lanes = inventory.get("lanes", {})
+    if lane not in lanes:
+        raise KeyError(f"lane {lane!r} is not declared in Tools/test-inventory.json "
+                       f"(declared: {sorted(lanes)})")
+    entry = lanes[lane]
+    return {
+        **inventory,
+        "bundles": entry["bundles"],
+        "requiredAttachments": entry.get("requiredAttachments", []),
+    }
+
+
 def validate(build: dict, tests: dict, summary: dict, manifest: list[dict], inventory: dict) -> tuple[list[str], dict]:
     """The whole decision, as a pure function. Returns (failures, report)."""
     failures: list[str] = []
@@ -290,8 +318,8 @@ def validate(build: dict, tests: dict, summary: dict, manifest: list[dict], inve
     for required in inventory.get("requiredAttachments", []):
         if required not in names:
             failures.append(
-                f"the run attached no {required}. The visual baseline records what it "
-                "rendered on every run; its absence means the gate did not run."
+                f"the run attached no {required}. That evidence is recorded on every "
+                "run; its absence means the test that owes it did not run."
             )
 
     visual = inventory.get("visualFailureAttachments")
@@ -382,6 +410,18 @@ def self_test() -> int:
                          "render-signatures-actual_0_E13EAD92-777B-4F8E-B68A-4A24EF56BF7C.json"}],
     }]
     good = tests_tree({"GlowTests": 320, "GlowRenderTests": 12})
+    lane_inventory = {
+        **inventory,
+        "lanes": {"ipad": {
+            "bundles": {"GlowUITests": {"minimum": 6}},
+            "requiredAttachments": ["today-slot-smoke.png"],
+        }},
+    }
+    smoke = [{
+        "testIdentifier": "TodaySlotSmokeTests/testTodaysSlotOnTheFirstRowTakesATap",
+        "attachments": [{"suggestedHumanReadableName":
+                         "today-slot-smoke_0_E13EAD92-777B-4F8E-B68A-4A24EF56BF7C.png"}],
+    }]
     # A run whose render bundle did not pass, which is what makes
     # `visualFailureAttachments` apply at all.
     render_failed = {"testNodes": [{"nodeType": "Test Plan", "name": "Glow", "children": [
@@ -503,6 +543,34 @@ def self_test() -> int:
         ("a summary that disagrees with the tree fails",
          (clean_build, good, summary(9999), manifest, inventory),
          "is not describing this run"),
+        # A lane runs part of the suite on purpose (#643). It answers to its
+        # own floors and evidence, and to nothing else.
+        ("a lane that ran only its own bundle passes",
+         (clean_build, tests_tree({"GlowUITests": 6}), summary(6), smoke,
+          for_lane(lane_inventory, "ipad")), None),
+        ("a lane still fails when its own bundle is missing",
+         (clean_build, tests_tree({"GlowTests": 320}), summary(320), smoke,
+          for_lane(lane_inventory, "ipad")), "GlowUITests did not run"),
+        ("a lane that ran a bundle it does not declare fails",
+         (clean_build, tests_tree({"GlowUITests": 6, "GlowRenderTests": 12}), summary(18),
+          smoke + manifest, for_lane(lane_inventory, "ipad")),
+         "GlowRenderTests ran but is not declared"),
+        ("a lane that left out its evidence fails",
+         (clean_build, tests_tree({"GlowUITests": 6}), summary(6), [],
+          for_lane(lane_inventory, "ipad")),
+         "attached no today-slot-smoke.png"),
+        ("a lane under its floor fails",
+         (clean_build, tests_tree({"GlowUITests": 2}), summary(2), smoke,
+          for_lane(lane_inventory, "ipad")),
+         "the reviewed floor is 6"),
+        ("a skip is still a failure on a lane",
+         (clean_build,
+          {"testNodes": [{"nodeType": "Test Plan", "name": "Glow", "children": [
+              {"nodeType": "UI test bundle", "name": "GlowUITests",
+               "children": [node(f"u{i}") for i in range(6)] + [node("later", "Skipped")]},
+          ]}]},
+          summary(7, skipped=1), smoke, for_lane(lane_inventory, "ipad")),
+         "later [Skipped]"),
     ]
 
     bad = 0
@@ -525,7 +593,14 @@ def self_test() -> int:
         print(f"  {'ok  ' if ok else 'FAIL'} {name}{detail}")
         bad += 0 if ok else 1
 
-    print(f"validate-test-result self-test: {len(scenarios) - bad}/{len(scenarios)} scenarios")
+    try:
+        for_lane(lane_inventory, "ipda")
+        print("  FAIL an undeclared lane is refused — it fell back to an inventory")
+        bad += 1
+    except KeyError:
+        print("  ok   an undeclared lane is refused")
+
+    print(f"validate-test-result self-test: {len(scenarios) + 1 - bad}/{len(scenarios) + 1} scenarios")
     return 1 if bad else 0
 
 
@@ -541,6 +616,9 @@ def main() -> int:
     parser.add_argument("--json-output", type=Path)
     parser.add_argument("--summary-output", type=Path,
                         help="the same verdict as markdown, for a CI run summary")
+    parser.add_argument("--lane",
+                        help="a declared entry under `lanes` in the inventory: a run that "
+                             "deliberately runs part of the suite (Tools/test.sh sets it)")
     parser.add_argument("--self-test", action="store_true")
     arguments = parser.parse_args()
 
@@ -555,7 +633,11 @@ def main() -> int:
               file=sys.stderr)
         return 1
 
-    inventory = json.loads(arguments.inventory.read_text())
+    try:
+        inventory = for_lane(json.loads(arguments.inventory.read_text()), arguments.lane)
+    except KeyError as error:
+        print(f"error: {error.args[0]}", file=sys.stderr)
+        return 1
     data = read(arguments.xcresult)
     manifest = read_attachments(arguments.attachments)
     failures, report = validate(

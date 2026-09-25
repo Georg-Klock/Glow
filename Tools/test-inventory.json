@@ -42,7 +42,10 @@
     "WeekdayHeader; and two whole production screens, WeeklyGridView and",
     "WidgetsView. ImageRenderer cannot flatten either screen's NavigationStack,",
     "so HostedScreenFrames uses a UIWindow and drawHierarchy with a pinned",
-    "393 x 852 surface, that surface's 59pt top and 34pt bottom safe area, 2x",
+    "surface from its table — the 393 x 852 reference phone (59pt/34pt), and",
+    "since #643 an iPhone SE, a Pro Max, an iPad 1/3 split and a full-screen",
+    "iPad in portrait and landscape, This Week on all six and Widgets on four —",
+    "with that surface's safe area and size classes forced, 2x",
     "display/output scale, dark appearance, fixed Tuesday and the same nine-row",
     "fixture in real SwiftData. The safe area is corrected before the host enters",
     "the live scene, so a simulator model cannot move the navigation layout.",
@@ -61,6 +64,17 @@
     "refused every addition, which closed the route RenderBaselineTests",
     "documents for adding a family. See #385.",
     "",
+    "lanes: a run that deliberately runs part of the suite, selected with",
+    "Tools/validate-test-result.py --lane <name>, which Tools/test.sh passes. A",
+    "lane's entry replaces bundles and requiredAttachments and nothing else.",
+    "The one lane is ipad (GLOW_DEVICE_KIND=ipad Tools/test.sh, nightly): it",
+    "runs GlowUITests alone on an iPad simulator, because both committed render",
+    "baselines are pictures of one iPhone each, and GlowTests is logic that",
+    "does not branch on the device. Leaving a",
+    "bundle out of the build's test run is not skipping a test in it, so the",
+    "skip rule holds on the lane unchanged; a bundle the lane runs and does not",
+    "declare still fails. See #632 and #643.",
+    "",
     "release: what a built product has to contain to be shippable. Read by",
     "Tools/check-release-build.py, which CI runs on the unsigned Release build",
     "and Tools/ship-testflight.sh runs on the archive and on the exported .ipa.",
@@ -71,8 +85,16 @@
   ],
   "bundles": {
     "GlowTests": { "minimum": 449 },
-    "GlowRenderTests": { "minimum": 13 },
-    "GlowUITests": { "minimum": 1 }
+    "GlowRenderTests": { "minimum": 18 },
+    "GlowUITests": { "minimum": 6 }
+  },
+  "lanes": {
+    "ipad": {
+      "bundles": {
+        "GlowUITests": { "minimum": 6 }
+      },
+      "requiredAttachments": ["today-slot-smoke.png"]
+    }
   },
   "release": {
     "appGroup": "group.com.georgklock.glow",
@@ -98,7 +120,7 @@
       }
     }
   },
-  "requiredAttachments": ["render-signatures-actual.json"],
+  "requiredAttachments": ["render-signatures-actual.json", "today-slot-smoke.png"],
   "visualFailureAttachments": {
     "bundle": "GlowRenderTests",
     "always": "actual",

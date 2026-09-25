@@ -5,30 +5,129 @@ import UIKit
 
 @testable import Glow
 
-/// Full production screens for the render baseline (#386).
+/// Full production screens for the render baseline (#386), at every size the
+/// universal app is laid out for (#632, #643).
 ///
 /// `ImageRenderer` cannot flatten either screen's `NavigationStack`; it
 /// returns the same yellow invalid-configuration picture for both. Hosting the
 /// real views in a window takes the compositor path the app takes. The window,
 /// safe area, traits and output context are pinned here so the signature is a
 /// picture of the view rather than of whichever simulator model ran the test.
+///
+/// ## A table of surfaces, not one
+///
+/// Each `Surface` is a logical size, that size's native safe area, and the two
+/// size classes the system gives it, forced through `traitOverrides`. The
+/// forcing is the point: a window is otherwise handed its scene's size
+/// classes, so an 820pt window hosted on an iPhone would still report compact
+/// width, and a 393pt window hosted on an iPad would report regular. Each frame
+/// is one screen on one surface; the first two, on the 393 × 852 phone, are the
+/// frames this harness rendered before the table existed.
+///
+/// ## What a hosted window does not reproduce
+///
+/// **The idiom.** A hosted window reproduces the *size* and the forced size
+/// classes, not the device: `UIUserInterfaceIdiom` is whatever the simulator
+/// running the test is — an iPhone, on both lanes that run this suite — so the
+/// iPad frames are an iPhone drawing into an iPad-sized, regular-width window.
+/// Anything that branches on idiom, and the chrome an iPad draws around an app
+/// (the iPad tab bar, window controls, Stage Manager), is not covered here.
+/// `GlowUITests` on a real iPad destination is the half that covers those:
+/// `GLOW_DEVICE_KIND=ipad Tools/test.sh`, nightly.
 @MainActor
 enum HostedScreenFrames {
-    static let names = ["weekly grid screen", "widgets screen"]
+    /// One logical screen the app is laid out for.
+    struct Surface: Equatable {
+        let size: CGSize
+        /// That surface's native insets. A window attached to the live test
+        /// scene otherwise inherits the simulator model's insets even though
+        /// its own frame is pinned (#481).
+        let safeArea: UIEdgeInsets
+        let horizontalSizeClass: UIUserInterfaceSizeClass
+        let verticalSizeClass: UIUserInterfaceSizeClass
 
-    private static let size = CGSize(width: 393, height: 852)
+        /// The 6.1" phone every hosted frame was measured on before #643: an
+        /// iPhone 17e's 393 × 852, 59pt/34pt.
+        static let phone = Surface(
+            size: CGSize(width: 393, height: 852),
+            safeArea: UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0),
+            horizontalSizeClass: .compact, verticalSizeClass: .regular
+        )
+        /// The narrowest supported phone, the iPhone SE: 375pt, just under the
+        /// 378pt scale break, with a status bar and no home indicator.
+        static let phoneSE = Surface(
+            size: CGSize(width: 375, height: 667),
+            safeArea: UIEdgeInsets(top: 20, left: 0, bottom: 0, right: 0),
+            horizontalSizeClass: .compact, verticalSizeClass: .regular
+        )
+        /// The widest phone, a Pro Max: 440pt, where the compact ceiling on the
+        /// panel shows as margin.
+        static let phoneProMax = Surface(
+            size: CGSize(width: 440, height: 956),
+            safeArea: UIEdgeInsets(top: 62, left: 0, bottom: 34, right: 0),
+            horizontalSizeClass: .compact, verticalSizeClass: .regular
+        )
+        /// The app in a third of an iPad in Split View: compact width at an
+        /// iPad's height, the narrowest window the app can be given.
+        static let iPadSplit = Surface(
+            size: CGSize(width: 320, height: 1024),
+            safeArea: UIEdgeInsets(top: 24, left: 0, bottom: 20, right: 0),
+            horizontalSizeClass: .compact, verticalSizeClass: .regular
+        )
+        /// App Review's iPad Air 11-inch, full screen in portrait (#632).
+        static let iPad = Surface(
+            size: CGSize(width: 820, height: 1180),
+            safeArea: UIEdgeInsets(top: 24, left: 0, bottom: 20, right: 0),
+            horizontalSizeClass: .regular, verticalSizeClass: .regular
+        )
+        /// The same iPad in landscape, where the regular ceiling on the panel
+        /// shows as margin.
+        static let iPadLandscape = Surface(
+            size: CGSize(width: 1180, height: 820),
+            safeArea: UIEdgeInsets(top: 24, left: 0, bottom: 20, right: 0),
+            horizontalSizeClass: .regular, verticalSizeClass: .regular
+        )
+    }
+
+    enum Screen {
+        case weeklyGrid
+        case widgets
+    }
+
+    struct Frame {
+        let name: String
+        let screen: Screen
+        let surface: Surface
+    }
+
+    /// Every hosted frame the baseline gates. The first two predate the table
+    /// and must stay what they were.
+    static let frames: [Frame] = [
+        Frame(name: "weekly grid screen", screen: .weeklyGrid, surface: .phone),
+        Frame(name: "widgets screen", screen: .widgets, surface: .phone),
+        Frame(name: "weekly grid screen iphone se", screen: .weeklyGrid, surface: .phoneSE),
+        Frame(name: "weekly grid screen iphone pro max", screen: .weeklyGrid, surface: .phoneProMax),
+        Frame(name: "weekly grid screen ipad split", screen: .weeklyGrid, surface: .iPadSplit),
+        Frame(name: "weekly grid screen ipad", screen: .weeklyGrid, surface: .iPad),
+        Frame(name: "weekly grid screen ipad landscape", screen: .weeklyGrid, surface: .iPadLandscape),
+        Frame(name: "widgets screen iphone se", screen: .widgets, surface: .phoneSE),
+        Frame(name: "widgets screen ipad split", screen: .widgets, surface: .iPadSplit),
+        Frame(name: "widgets screen ipad", screen: .widgets, surface: .iPad),
+    ]
+
+    static var names: [String] { frames.map(\.name) }
+
     private static let scale: CGFloat = 2
-    /// The native safe area of the 393 × 852 surface this harness claims to
-    /// render. A window attached to the live test scene otherwise inherits the
-    /// simulator model's insets even though its own frame is pinned (#481).
-    static let safeArea = UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0)
 
-    static func additionalSafeAreaInsets(for inherited: UIEdgeInsets) -> UIEdgeInsets {
+    /// The correction that brings a window's inherited insets to `surface`'s.
+    static func additionalSafeAreaInsets(
+        for inherited: UIEdgeInsets, surface: Surface = .phone
+    ) -> UIEdgeInsets {
         UIEdgeInsets(
-            top: safeArea.top - inherited.top,
-            left: safeArea.left - inherited.left,
-            bottom: safeArea.bottom - inherited.bottom,
-            right: safeArea.right - inherited.right
+            top: surface.safeArea.top - inherited.top,
+            left: surface.safeArea.left - inherited.left,
+            bottom: surface.safeArea.bottom - inherited.bottom,
+            right: surface.safeArea.right - inherited.right
         )
     }
 
@@ -47,76 +146,123 @@ enum HostedScreenFrames {
     private static var keptContainers: [ModelContainer] = []
 
     static func render(named name: String) throws -> CGImage? {
-        guard names.contains(name) else { return nil }
-        let fixture = try Fixture()
-        let root: AnyView
-        switch name {
-        case "weekly grid screen":
-            root = AnyView(
-                Glow.WeeklyGridView(today: fixture.today)
-                    .modelContainer(fixture.container)
+        guard let frame = frames.first(where: { $0.name == name }) else { return nil }
+        let host = try Host(screen: frame.screen, surface: frame.surface)
+        defer { host.close() }
+        return host.capture()
+    }
+
+    /// One production screen in one window, kept open so a test can change the
+    /// surface under it (#643) as well as capture it once.
+    @MainActor
+    final class Host {
+        private let controller: UIHostingController<AnyView>
+        private let window: UIWindow
+        private let container: ModelContainer
+        private(set) var surface: Surface
+
+        init(screen: Screen, surface: Surface) throws {
+            let fixture = try Fixture()
+            let root: AnyView
+            switch screen {
+            case .weeklyGrid:
+                root = AnyView(
+                    Glow.WeeklyGridView(today: fixture.today)
+                        .modelContainer(fixture.container)
+                )
+            case .widgets:
+                root = AnyView(
+                    Glow.WidgetsView(today: fixture.today)
+                        .modelContainer(fixture.container)
+                )
+            }
+            container = fixture.container
+            self.surface = surface
+
+            let host = UIHostingController(
+                rootView: AnyView(root.environment(\.colorScheme, .dark))
             )
-        case "widgets screen":
-            root = AnyView(
-                Glow.WidgetsView(today: fixture.today)
-                    .modelContainer(fixture.container)
+            host.safeAreaRegions = []
+            host.overrideUserInterfaceStyle = UIUserInterfaceStyle.dark
+            host.traitOverrides.displayScale = HostedScreenFrames.scale
+            // Forced rather than inherited: the scene's size classes are the
+            // simulator's, not the surface's.
+            host.traitOverrides.horizontalSizeClass = surface.horizontalSizeClass
+            host.traitOverrides.verticalSizeClass = surface.verticalSizeClass
+            controller = host
+
+            let frame = CGRect(origin: .zero, size: surface.size)
+            window = UIWindow(frame: frame)
+            if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                window.windowScene = scene
+            }
+            window.overrideUserInterfaceStyle = .dark
+            // This has to be installed before `rootViewController`: SwiftUI
+            // reads the safe area as the NavigationStack enters the hierarchy.
+            // Changing the same value after its first layout updates UIKit's
+            // reported inset but leaves the model-specific navigation layout in
+            // place.
+            host.additionalSafeAreaInsets = HostedScreenFrames.additionalSafeAreaInsets(
+                for: window.safeAreaInsets, surface: surface
             )
-        default:
-            return nil
+            window.rootViewController = host
+            window.isHidden = false
+            window.makeKeyAndVisible()
+            host.view.frame = frame
+            try settle()
         }
 
-        let host = UIHostingController(
-            rootView: root
-                .environment(\.colorScheme, .dark)
-        )
-        host.safeAreaRegions = []
-        host.overrideUserInterfaceStyle = UIUserInterfaceStyle.dark
-        if #available(iOS 17.0, *) {
-            host.traitOverrides.displayScale = scale
+        /// Gives the open screen another surface, the way Stage Manager, Split
+        /// View or a foldable resizes a window: the same view and its state, a
+        /// new size and new size classes.
+        func resize(to surface: Surface) throws {
+            self.surface = surface
+            let frame = CGRect(origin: .zero, size: surface.size)
+            window.frame = frame
+            controller.traitOverrides.horizontalSizeClass = surface.horizontalSizeClass
+            controller.traitOverrides.verticalSizeClass = surface.verticalSizeClass
+            controller.additionalSafeAreaInsets = HostedScreenFrames.additionalSafeAreaInsets(
+                for: window.safeAreaInsets, surface: surface
+            )
+            controller.view.frame = frame
+            try settle()
         }
 
-        let frame = CGRect(origin: .zero, size: size)
-        let window = UIWindow(frame: frame)
-        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-            window.windowScene = scene
-        }
-        window.overrideUserInterfaceStyle = .dark
-        // This has to be installed before `rootViewController`: SwiftUI reads
-        // the safe area as the NavigationStack enters the hierarchy. Changing
-        // the same value after its first layout updates UIKit's reported inset
-        // but leaves the model-specific navigation layout in place.
-        host.additionalSafeAreaInsets = additionalSafeAreaInsets(for: window.safeAreaInsets)
-        window.rootViewController = host
-        window.isHidden = false
-        window.makeKeyAndVisible()
-        host.view.frame = frame
-        host.view.setNeedsLayout()
-        host.view.layoutIfNeeded()
-        // `@Query`, the navigation container and both screens' `.task`s settle
-        // on the main run loop. The existing accessibility harness measured
-        // this same boundary at 1.5 seconds.
-        RunLoop.current.run(until: Date().addingTimeInterval(1.5))
-        host.view.layoutIfNeeded()
-        guard host.view.safeAreaInsets == safeArea else {
-            throw SafeAreaMismatch(actual: host.view.safeAreaInsets, expected: safeArea)
+        private func settle() throws {
+            controller.view.setNeedsLayout()
+            controller.view.layoutIfNeeded()
+            // `@Query`, the navigation container and both screens' `.task`s
+            // settle on the main run loop. The existing accessibility harness
+            // measured this same boundary at 1.5 seconds.
+            RunLoop.current.run(until: Date().addingTimeInterval(1.5))
+            controller.view.layoutIfNeeded()
+            guard controller.view.safeAreaInsets == surface.safeArea else {
+                throw SafeAreaMismatch(
+                    actual: controller.view.safeAreaInsets, expected: surface.safeArea
+                )
+            }
         }
 
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = scale
-        format.opaque = true
-        format.preferredRange = .standard
-        var drew = false
-        let image = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            drew = host.view.drawHierarchy(in: frame, afterScreenUpdates: true)
+        func capture() -> CGImage? {
+            let frame = CGRect(origin: .zero, size: surface.size)
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = HostedScreenFrames.scale
+            format.opaque = true
+            format.preferredRange = .standard
+            var drew = false
+            let image = UIGraphicsImageRenderer(size: surface.size, format: format).image { _ in
+                drew = controller.view.drawHierarchy(in: frame, afterScreenUpdates: true)
+            }
+            guard drew else { return nil }
+            return image.cgImage
         }
 
-        window.rootViewController = nil
-        window.isHidden = true
-        window.windowScene = nil
-        keptContainers.append(fixture.container)
-
-        guard drew else { return nil }
-        return image.cgImage
+        func close() {
+            window.rootViewController = nil
+            window.isHidden = true
+            window.windowScene = nil
+            HostedScreenFrames.keptContainers.append(container)
+        }
     }
 
     /// The exact nine-row fixture the existing app-row and widget baselines
