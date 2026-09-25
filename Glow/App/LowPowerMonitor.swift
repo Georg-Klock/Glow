@@ -17,7 +17,12 @@ final class LowPowerMonitor {
     /// The headroom the system is currently granting, for the notice to quote.
     /// 1.0 means "no more than SDR white", which is exactly the failure being
     /// explained.
-    var currentHeadroom: Double { Double(UIScreen.main.currentEDRHeadroom) }
+    ///
+    /// Read from the screen the app is on, not `UIScreen.main` (#642): on an
+    /// iPad driving an external display those are different screens. Sampled
+    /// when the notice is built, as before; with no scene connected yet it
+    /// reports SDR, which is what a screen nobody is looking at grants.
+    var currentHeadroom: Double { EDRHeadroomSnapshot.activeScreen.current }
 
     // Written once in init, read once in deinit. deinit is nonisolated, so
     // the property has to be too.

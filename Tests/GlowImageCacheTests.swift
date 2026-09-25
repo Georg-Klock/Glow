@@ -56,6 +56,6 @@ struct GlowImageCacheTests {
         )
 
         #expect(source.contains("if sampled != headroom { headroom = sampled }"))
-        #expect(!source.contains("headroom = .mainScreen"))
+        #expect(!source.contains("headroom = .activeScreen"))
     }
 }
