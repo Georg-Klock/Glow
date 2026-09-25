@@ -90,7 +90,8 @@ struct WeekWidgetView: View {
             // `rowLayout` lets the height overrule: the slot shrinks by under a
             // percent until the design's rows fit, and the marks bring their
             // column rhythm down with them rather than stretching. What is left
-            // over — 0.4 to 1.8pt — stays at the trailing edge, which is why
+            // over — 0.4 to 1.8pt on a phone, 14.8pt on an iPad Air's square
+            // large frame — is shared by both margins (#652), which is why
             // the track drawn on is re-derived from the slot here and handed to
             // every row, the header and the rest day's line alike.
             let frameTrack = max(0, proxy.size.width - labelWidth - labelGap)
@@ -212,6 +213,12 @@ struct WeekWidgetView: View {
             // slack downwards, which is why two habits on a medium sat against
             // the top edge with the frame empty under them.
             .padding(.top, groupOffset)
+            // Half the leftover track on the leading side, so the other half
+            // is what remains trailing (#652).
+            .padding(
+                .leading,
+                WidgetMetrics.trackCentring(frameTrack: frameTrack, drawnTrack: track)
+            )
             .frame(
                 width: proxy.size.width, height: proxy.size.height, alignment: .topLeading
             )

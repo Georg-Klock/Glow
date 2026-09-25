@@ -345,13 +345,43 @@ struct WidgetMetricsTests {
         }
     }
 
+    /// #652: the leftover is shared, so the two margins keep the design's
+    /// 6/14 difference instead of one of them taking all of it. The iPad
+    /// squares are the frames #640 measured on an iPad mini, Air 11-inch and
+    /// Pro 13-inch — the case that made trailing-only visible.
+    @Test("The leftover track is split across both margins, on phones and iPads")
+    func leftoverTrackIsCentred() {
+        let squares = [305.5, 342, 378.5].map { CGSize(width: $0, height: $0) }
+        for frame in Self.measuredLargeFrames.map(\.1) + squares {
+            let (rows, track) = largeLayout(frame)
+            let drawn = SlotLayout.trackWidth(dailySlot: rows.slot)
+            let centring = WidgetMetrics.trackCentring(frameTrack: track, drawnTrack: drawn)
+            let leading = WidgetMetrics.padLeading + centring
+            let trailing = frame.width - leading - WidgetMetrics.labelWidth
+                - WidgetMetrics.labelGap - drawn
+            #expect(
+                abs((trailing - leading) - (WidgetMetrics.padTrailing - WidgetMetrics.padLeading)) < 1e-9,
+                "margins \(leading) / \(trailing) at \(frame)"
+            )
+        }
+        // An iPad Air's square: 14.8pt of leftover, 7.4 on each side.
+        let air = largeLayout(CGSize(width: 342, height: 342))
+        let airDrawn = SlotLayout.trackWidth(dailySlot: air.rows.slot)
+        #expect(abs(WidgetMetrics.trackCentring(frameTrack: air.track, drawnTrack: airDrawn) - 7.4) < 0.01)
+        // Nothing to share, or nonsense in, is no shift.
+        #expect(WidgetMetrics.trackCentring(frameTrack: 200, drawnTrack: 200) == 0)
+        #expect(WidgetMetrics.trackCentring(frameTrack: 100, drawnTrack: 200) == 0)
+        #expect(WidgetMetrics.trackCentring(frameTrack: .nan, drawnTrack: 200) == 0)
+    }
+
     @Test("What it costs is the track, and the cost is under two points")
     func measuredFramesLeaveTheTrackShort() {
         // The stated price of #410's fix, asserted rather than left to be
         // discovered: the marks keep their proportion, so a slot small enough
         // for ten rows draws a track narrower than the frame's, and the
-        // difference lands at the trailing edge. The right margin is
-        // `padTrailing` plus this, and is no longer exactly 14 on a phone.
+        // difference is shared by both margins (#652, which moved it off the
+        // trailing edge alone). Neither margin is exactly the design's on a
+        // phone, by under a point each.
         for (name, frame) in Self.measuredLargeFrames {
             let (rows, track) = largeLayout(frame)
             let drawn = SlotLayout.trackWidth(dailySlot: rows.slot)

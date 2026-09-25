@@ -206,8 +206,9 @@ enum WidgetMetrics {
     /// **What it costs is the track.** The marks keep their proportion — round
     /// is the one thing a mark cannot give up — so the narrower slot brings a
     /// narrower column rhythm with it, and 0.40pt (17e) to 1.77pt (17 Pro) of
-    /// the frame's track is left unused at the trailing edge. The right margin
-    /// stops being exactly `padTrailing` on a real phone. Of the three things
+    /// the frame's track is left unused — split across both margins since
+    /// #652 (`trackCentring`), so neither is exactly `padLeading` or
+    /// `padTrailing` on a real phone. Of the three things
     /// that cannot all hold on a frame whose aspect differs from the design's —
     /// round marks, a track filled exactly, a height filled exactly — this
     /// gives up the one the design file does not specify.
@@ -218,6 +219,22 @@ enum WidgetMetrics {
     /// is the row the issue is about. Where the frame is proportionally *taller*
     /// than the design the cap does not bind, the division is the only answer,
     /// and it is the one that is used.
+    /// How far the row block moves in from the leading inset so that the
+    /// track `rowLayout` left over is shared by both margins (#652).
+    ///
+    /// On a phone the leftover is 0.4 to 1.8pt and trailing was a fine place
+    /// for it. Every iPad hands the large family a **square** — 305.5, 342 and
+    /// 378.5pt measured (#640) — and there ten rows cost 14.8pt of an iPad
+    /// Air's track: all on the right, a 28.8pt margin against 6pt on the left
+    /// and a grid visibly off-centre. Half on each side keeps the design's
+    /// 6/14 asymmetry as the difference between the margins and moves no
+    /// phone's widget by more than 0.9pt. Never negative: a frame whose track
+    /// is the one drawn has nothing to share.
+    static func trackCentring(frameTrack: CGFloat, drawnTrack: CGFloat) -> CGFloat {
+        guard frameTrack.isFinite, drawnTrack.isFinite else { return 0 }
+        return max(0, (frameTrack - drawnTrack) / 2)
+    }
+
     static func rowLayout(
         trackWidth: CGFloat, contentHeight: CGFloat, designRows: Int, hasHeader: Bool
     ) -> RowLayout {
