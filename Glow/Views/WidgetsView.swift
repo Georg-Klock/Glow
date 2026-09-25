@@ -435,7 +435,17 @@ struct WidgetsView: View {
             // The scaled footprint, so the layout above and below reserves what
             // is actually drawn — `scaleEffect` alone changes nothing about the
             // space the view takes.
-            .frame(width: size.width * scale, height: size.height * scale)
+            //
+            // **Top-leading, the same corner `scaleEffect` is anchored to.**
+            // Centred — the default — a preview drawn below its true size
+            // was laid out at full size inside the smaller frame, overhanging
+            // it by half the difference on every side, and then scaled about
+            // *its own* top-leading corner: the picture landed up and to the
+            // left by half of what it shrank. Invisible at scale 1, which is
+            // every phone the render gate had measured; 3.5pt on an iPhone
+            // SE; and at a 320pt iPad window 31pt, over the Large card's own
+            // heading and off the left of the screen.
+            .frame(width: size.width * scale, height: size.height * scale, alignment: .topLeading)
             .onAppear { previewDidAppear(card.id) }
     }
 
