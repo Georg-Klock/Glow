@@ -61,6 +61,10 @@ struct SpanView: View {
                     .buttonStyle(PressStyle(scale: MotionPolicy.pressScale(
                         SlotView.pressScale, reduceMotion: reduceMotion
                     )))
+                    // See `SlotView`: the system's highlight under a pointer,
+                    // not a light tier (#641). A capsule, the span's own shape.
+                    .contentShape(.hoverEffect, Capsule())
+                    .hoverEffect(.highlight)
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 0, coordinateSpace: .local)
                             .onChanged { touchX = $0.location.x }

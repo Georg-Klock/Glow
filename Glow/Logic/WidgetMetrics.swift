@@ -48,6 +48,15 @@ enum WidgetMetrics {
     /// | iPhone 15 Pro | 344.67 × 162.67 | 344.67 × 360.00 |
     /// | iPhone 17 Pro | 349.67 × 164.33 | 349.67 × 365.00 |
     /// | iPhone 17e | 342.00 × 162.00 | 342.00 × 358.00 |
+    /// | iPad mini (A17 Pro) | 305.50 × 141.00 | 305.50 × 305.50 |
+    /// | iPad Air 11-inch (M4) | 342.00 × 155.00 | 342.00 × 342.00 |
+    /// | iPad Pro 13-inch (M5) | 378.50 × 170.00 | 378.50 × 378.50 |
+    ///
+    /// The iPad rows (#640) were read from the App Group's `WidgetDisplaySize`
+    /// entries after the extension rendered on a simulator, not from a pixel
+    /// count, and every large frame is **square**: ten rows still fit, at a
+    /// slot 7% under the track's, and the difference is the trailing-margin
+    /// question in #652.
     ///
     /// **For the large family that gap cost a row**, which is #410 and the
     /// `rowLayout` above. **For the medium family it costs nothing**, and the
@@ -83,6 +92,31 @@ enum WidgetMetrics {
         let width = size(of: family).width
         guard width > 0 else { return 1 }
         return max(1, Int(largeWidth / width))
+    }
+
+    /// How many widgets of one width fit side by side in a column, with the
+    /// Home Screen's gutter between them — never fewer than `perRow` (#640).
+    ///
+    /// For a regular-width window, where the Widgets tab has an iPad's width
+    /// to lay previews out in. A phone's column fits exactly `perRow`: two
+    /// Smalls. An iPad Air's 780pt column fits four, which is what its own
+    /// Home Screen puts in a row. Previews keep their true size either way —
+    /// the width becomes more of them, not bigger ones.
+    ///
+    /// **Only a family that already tiles grows.** Medium and Large are lines
+    /// of one on every Home Screen; letting them fit two made each card's line
+    /// two widgets wide with its one preview at the leading edge, which drew
+    /// both week cards off-centre on the first iPad render.
+    static func perRow(
+        _ family: WidgetFamily,
+        widgetWidth: CGFloat,
+        fitting column: CGFloat,
+        gutter: CGFloat
+    ) -> Int {
+        let minimum = perRow(family)
+        guard minimum > 1, widgetWidth > 0, column.isFinite, gutter.isFinite else { return minimum }
+        let fits = Int(((column + max(0, gutter)) / (widgetWidth + max(0, gutter))).rounded(.down))
+        return max(minimum, fits)
     }
 
     /// How many rows the design's own frame holds, for a family.

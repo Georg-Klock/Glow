@@ -75,6 +75,15 @@ struct SlotView: View {
                     .buttonStyle(PressStyle(
                         scale: MotionPolicy.pressScale(Self.pressScale, reduceMotion: reduceMotion)
                     ))
+                    // **The pointer snaps to the day it will toggle** (#641).
+                    // The system's highlight, in the slot's own circle: it is
+                    // the system's material under a pointer, not a step of
+                    // `GlowPalette`, so it makes no claim about the day — a
+                    // fourth light tier is exactly what it must not become.
+                    // Only tappable slots have it, because only they are
+                    // buttons.
+                    .contentShape(.hoverEffect, Circle())
+                    .hoverEffect(.highlight)
             } else {
                 mark
             }

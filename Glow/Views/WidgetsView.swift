@@ -55,6 +55,9 @@ struct WidgetsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    /// Read once and handed to the row split (#640): at regular width a
+    /// column holds as many previews as fit, rather than a phone's two.
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     /// The day the previews are drawn for. Same reason `WeeklyGridView` holds
     /// one: the open slot is defined as today, so today has to be re-read when
@@ -281,10 +284,20 @@ struct WidgetsView: View {
             // The horizontal gap is what is left of a Medium's width once the
             // Smalls in it are placed, so two previews here sit as far apart
             // as two widgets do.
-            let perRow = WidgetMetrics.perRow(group.placement.family)
             let gutter = group.placement.family == .systemSmall
                 ? widgetDisplaySizes.smallGutter
                 : Self.designGutter
+            // At regular width the line is as long as the column allows
+            // (#640) — four Smalls on an iPad Air, the count its own Home
+            // Screen puts in a row — and previews stay at their true size.
+            let perRow = horizontalSizeClass == .regular
+                ? WidgetMetrics.perRow(
+                    group.placement.family,
+                    widgetWidth: widgetDisplaySizes.referenceSize(of: group.placement.family).width,
+                    fitting: width,
+                    gutter: gutter
+                )
+                : WidgetMetrics.perRow(group.placement.family)
             let cardWidth = perRow > 1
                 // A `GeometryReader` can briefly propose zero while the
                 // hosted screen is entering the hierarchy. A negative frame
@@ -307,7 +320,7 @@ struct WidgetsView: View {
             // place one card per row, where the same number is simply the
             // space between two placements.
             LazyVStack(alignment: .center, spacing: gutter) {
-                ForEach(group.rows, id: \.self) { row in
+                ForEach(group.rows(perRow: perRow), id: \.self) { row in
                     HStack(alignment: .top, spacing: gutter) {
                         ForEach(row) { card in
                             preview(card, width: cardWidth, projection: projection)

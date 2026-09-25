@@ -454,6 +454,14 @@ rather than collapsed so that #210 could fill it in the same position, and the
 bar reflowed once rather than twice. #238 then moved Widgets to the front,
 an order argued on its own terms rather than inherited.
 
+**On iPad the bar is the platform's own** (#639). `RootTabView` sets no
+`tabViewStyle`, so at regular width iPadOS draws the three tabs as its compact
+control at the top of the window. `.labelStyle(.iconOnly)` holds there: the
+tabs draw their icons with no titles, and each tab's navigation bar and title
+sit below the control. A sidebar (`.sidebarAdaptable`) was declined, because
+with three destinations it mostly spends width, and the grid is what should
+get the width (#634). Measured on an iPad Air 11-inch (M4), iPadOS 26.5.
+
 **Correct History is a mode of `WeeklyGridView`, not a view** (#557; it was
 `EditHistoryView`, a `fullScreenCover`, from #543 to #557). `WeekGridMode` in
 `Glow/Logic` names the three modes — browsing, editing the list, correcting

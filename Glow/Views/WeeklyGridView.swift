@@ -264,6 +264,7 @@ struct WeeklyGridView: View {
             // is said, as #103 first decided, and the Island's real update is
             // requested from `toggle` for the moment the app is out of view.
             .overlay(alignment: .top) { TopFade() }
+            .background { newHabitShortcut }
             .navigationTitle(weekTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -604,8 +605,10 @@ struct WeeklyGridView: View {
                     // panel — after. The panel is now a single shape
                     // behind the whole list; see `panel`.
                     .listRowBackground(Color.clear)
-                    // Swipe actions rather than a long-press menu: this is
-                    // where iOS users already reach for edit and delete.
+                    // Swipe actions first: this is where iOS users already
+                    // reach for edit and delete. The context menu below is
+                    // the same two actions for a pointer, where a swipe is a
+                    // two-finger trackpad gesture nobody finds (#641).
                     .swipeActions(edge: .trailing) {
                         if mode.offersHabitManagement {
                             // Explicitly red: the app's white tint at the root
@@ -625,6 +628,26 @@ struct WeeklyGridView: View {
                                     editingHabit = habit
                                 }
                                 .tint(.indigo)
+                            }
+                        }
+                    }
+                    // **The swipe's two actions, and only while the swipe
+                    // itself is offered** (#641): browsing, on any week. The
+                    // list's edit mode has its own delete control and
+                    // correcting manages no habits (#557). Delete goes
+                    // through the same `delete(_:)` as the swipe, with no
+                    // confirmation in front of it, because the swipe has
+                    // none; a blank row offers Delete alone, as there.
+                    // On a phone this is a long press on the row.
+                    .contextMenu {
+                        if mode == .browsing {
+                            if !habit.isSpacer {
+                                Button("Edit", systemImage: "pencil") {
+                                    editingHabit = habit
+                                }
+                            }
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                delete(habit)
                             }
                         }
                     }
@@ -981,8 +1004,14 @@ struct WeeklyGridView: View {
     /// `.borderedProminent` capsule under it fills white and writes its label
     /// in white (#162). A toolbar button needs no fill to be found — it is the
     /// only thing on that side of the bar.
+    ///
+    /// **⌘T** (#641), on the button itself rather than on the screen: the
+    /// shortcut exists exactly where the button does — on a past week while
+    /// browsing — so it can never take somebody home from a place the bar
+    /// offers no Today in, and correcting history (#592) stays without one.
     private var todayButton: some View {
         Button("Today") { show(week: currentWeek) }
+            .keyboardShortcut("t", modifiers: .command)
     }
 
     /// The way out of correcting history (#557, reshaped by #592). It was a
@@ -1020,6 +1049,36 @@ struct WeeklyGridView: View {
         .labelStyle(.iconOnly)
     }
 
+    /// Where the menu offers New Habit: the current week, browsing or editing
+    /// the list. The menu itself is not drawn while correcting, which is the
+    /// other half of the condition — spelled out here because ⌘N has to agree
+    /// with it without being inside the menu.
+    private var offersNewHabit: Bool {
+        !isCorrectingHistory && isOnCurrentWeek
+    }
+
+    /// **⌘N** (#641): the menu's New Habit, with its action and its condition.
+    ///
+    /// **Not on the menu item, because there it does nothing** until the menu
+    /// is open. A `keyboardShortcut` inside a toolbar `Menu` registers with
+    /// the menu's content, which is built when the menu is presented —
+    /// measured: `KeyboardShortcutTests` sent ⌘N to This Week on the current
+    /// week and no editor came up, while ⌘← and ⌘→ on the chevrons beside it
+    /// worked. So the key lives on a button of its own that draws nothing,
+    /// takes no touch and says nothing to VoiceOver, and exists exactly when
+    /// the menu offers New Habit: a key never does what a tap could not.
+    @ViewBuilder
+    private var newHabitShortcut: some View {
+        if offersNewHabit {
+            Button("New Habit") { isAddingHabit = true }
+                .keyboardShortcut("n", modifiers: .command)
+                .frame(width: 0, height: 0)
+                .opacity(0)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+
     /// The existing list menu, available from every browsed week now that it
     /// is also the door to correcting history (#543). Row-management actions
     /// remain current-week-only; the history action keeps the week being
@@ -1028,7 +1087,7 @@ struct WeeklyGridView: View {
     /// its place in the bar.
     private var moreMenu: some View {
         Menu {
-            if isOnCurrentWeek {
+            if offersNewHabit {
                 Button("New Habit", systemImage: "plus") {
                     isAddingHabit = true
                 }
@@ -1228,6 +1287,13 @@ struct WeeklyGridView: View {
             }
             .labelStyle(.iconOnly)
             .disabled(weekStart <= reach.earliest)
+            // **⌘← and ⌘→ are these two chevrons** (#641), not a key handler
+            // on the screen. A shortcut on the button inherits everything the
+            // button already decided: back disabled against the record's floor,
+            // forward absent on the current week while browsing, both gone with the whole
+            // pager while the list is being edited (#399). So a key cannot
+            // page anywhere a tap could not.
+            .keyboardShortcut(.leftArrow, modifiers: .command)
         }
 
         // Forward exists exactly when the reach has somewhere forward to go.
@@ -1255,6 +1321,7 @@ struct WeeklyGridView: View {
                     Label("Next Week", systemImage: "chevron.right")
                 }
                 .labelStyle(.iconOnly)
+                .keyboardShortcut(.rightArrow, modifiers: .command)
             }
         }
     }

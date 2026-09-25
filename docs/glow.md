@@ -50,8 +50,16 @@ PQ files are also about ten times smaller: 2,230 bytes against 22,681.
 With the glow on screen, `UIScreen.currentEDRHeadroom` rises from **1.2 to
 6.0**, which is exactly the renderer's `peakHeadroom`. The system granted the
 headroom the image asked for, which is as close to "it glows" as a machine can
-report. Reproduce it by printing `UIScreen.main.currentEDRHeadroom` before the
-grid appears and three seconds after.
+report. Reproduce it by printing `currentEDRHeadroom` before the grid appears
+and three seconds after.
+
+**Which screen is asked matters** (#642). The app reads headroom from the
+screen of the window scene it is showing in — `ActiveScreen`, choosing among
+connected scenes by `HeadroomScreen`'s rule: the active scene, then one still
+coming to the foreground, the key window breaking a tie. `UIScreen.main` is
+not used: it answers for the built-in screen even when an iPad's window is on
+an external display, and it is deprecated on iPadOS. `HeadroomScreenTests`
+fails if it comes back. On an iPhone there is one scene and so one answer.
 
 `potentialEDRHeadroom` on that device is 8.0, so there is room to push harder if
 6x turns out to be too subtle in daylight.

@@ -135,7 +135,12 @@ extension WidgetCardGroup {
     /// centred: it is one widget, at one widget's size, in the place the next
     /// one would go.
     var rows: [[WidgetCard]] {
-        let width = WidgetMetrics.perRow(placement.family)
+        rows(perRow: WidgetMetrics.perRow(placement.family))
+    }
+
+    /// The same split at a given line length, for a column wider than a
+    /// phone's (#640). `rows` is this at the Home Screen's own count.
+    func rows(perRow width: Int) -> [[WidgetCard]] {
         guard width > 1 else { return cards.map { [$0] } }
         return stride(from: 0, to: cards.count, by: width).map {
             Array(cards[$0..<min($0 + width, cards.count)])
