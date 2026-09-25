@@ -59,7 +59,7 @@ struct RowGeometry: Equatable {
     /// The name's size on screen: the label's design points times the one
     /// factor everything else here is multiplied by. Equal to `textSize`
     /// whenever the icon is drawn; at most `WidgetMetrics.textSizeCap` × scale.
-    var nameTextSize: CGFloat { label.textSize * scale }
+    var nameTextSize: CGFloat { Self.floored(label.textSize * scale) }
     /// Whether the row draws its icon. False only when the name has grown.
     var showsIcon: Bool { label.showsIcon }
 
@@ -220,6 +220,29 @@ struct RowGeometry: Equatable {
         )
     }
 
+    /// The smallest size this screen draws type at (#635): 11pt, the
+    /// platform's own smallest text style (`caption2` at the default size).
+    ///
+    /// **Only a window narrower than any phone reaches it.** The one factor
+    /// takes the widget's 12pt to 11 at a scale of 11/12, a panel of about
+    /// 310pt — below an iPhone SE's 335. What does reach it is an iPad in
+    /// Slide Over or a third of Split View, whose 320pt window left a 280pt
+    /// panel and 9.9pt names, and whatever a phone with a changing width
+    /// turns out to offer.
+    ///
+    /// **The cost, named rather than discovered.** Under the floor the label
+    /// column keeps shrinking and the type does not, so a name there is cut a
+    /// character or two sooner than the widget cuts it — the one place the
+    /// parity #405 relies on does not hold. The editor's preview is built
+    /// from the same geometry at the same width, so it is still honest about
+    /// the row the person is looking at. Zero stays zero: a degenerate
+    /// proposal draws nothing rather than 11pt type in no room (#136).
+    static let minimumTextSize: CGFloat = 11
+
+    private static func floored(_ size: CGFloat) -> CGFloat {
+        size > 0 ? max(size, minimumTextSize) : 0
+    }
+
     /// A width this can actually divide up.
     ///
     /// A `GeometryReader` proposes zero on its first pass, and `.infinity` and
@@ -300,7 +323,7 @@ struct RowGeometry: Equatable {
         // `98/338` of the width by construction now, so it cannot outgrow the
         // row it is in without the row growing too.
         labelWidth = max(0, WidgetMetrics.labelWidth * scale)
-        textSize = WidgetMetrics.textSize * scale
+        textSize = Self.floored(WidgetMetrics.textSize * scale)
 
         // From the panel's width, not the proposal's: past 338pt the two
         // differ by twice `sideMargin`, and that difference is margin, not

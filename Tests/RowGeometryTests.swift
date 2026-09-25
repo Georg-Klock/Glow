@@ -218,10 +218,15 @@ struct RowGeometryTests {
     /// about both. They cannot disagree: this type applies one factor to the
     /// label column *and* to the text size, so the ratio between the two is the
     /// widget's ratio at every width. `HabitEditorView`'s preview rests on this.
+    ///
+    /// **Down to the type floor** (#635). Below a panel of about 310pt the
+    /// type stops shrinking and the label column does not, so the ratio there
+    /// is smaller by design; `typeNeverFallsBelowTheFloor` holds that half.
+    /// Every phone is above it: an iPhone SE's panel is 335pt.
     @Test("A name is cut at the same character on the screen as in the widget")
     func nameRunIsTheWidgetsRatio() {
         let widget = WidgetMetrics.nameMaxWidth / WidgetMetrics.textSize
-        for width in [1, 100, 200, 320, 338, 353, 402, 430, 1024] as [CGFloat] {
+        for width in [311, 320, 335, 338, 353, 402, 430, 1024] as [CGFloat] {
             let geometry = RowGeometry(totalWidth: width)
             let screen = geometry.nameMaxWidth / geometry.textSize
             #expect(
@@ -529,6 +534,26 @@ struct RowGeometryTests {
             #expect(RowGeometry(totalWidth: width, maximumPanelWidth: 100) == before)
             #expect(RowGeometry(totalWidth: width, maximumPanelWidth: .nan) == before)
         }
+    }
+
+    /// #635: type is never drawn below 11pt, at any width that draws a row,
+    /// while every other measurement keeps scaling; zero stays zero (#136).
+    @Test("Type never falls below the floor, and only a sub-phone window reaches it")
+    func typeNeverFallsBelowTheFloor() {
+        let floor = RowGeometry.minimumTextSize
+        #expect(floor == 11)
+        for width in [1, 50, 100, 200, 280, 300, 309] as [CGFloat] {
+            let g = RowGeometry(totalWidth: width)
+            #expect(g.textSize == floor, "text is \(g.textSize) at \(width)")
+            #expect(g.nameTextSize == floor)
+            #expect(abs(g.labelWidth - WidgetMetrics.labelWidth * width / WidgetMetrics.largeWidth) < 1e-9)
+        }
+        // An iPhone SE's panel, and anything wider, is untouched by it.
+        for width in [335, 338, 353, 402] as [CGFloat] {
+            let g = RowGeometry(totalWidth: width)
+            #expect(abs(g.textSize - WidgetMetrics.textSize * g.scale) < 1e-12)
+        }
+        #expect(RowGeometry(totalWidth: 0).textSize == 0)
     }
 
     /// The floor #370 removed stays removed: under 338pt the ratio is plain, the

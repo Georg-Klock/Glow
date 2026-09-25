@@ -596,6 +596,33 @@ struct WidgetPreviewLayoutTests {
         #expect(group(.systemSmall, cards: 4).rows.map(\.count) == [2, 2])
     }
 
+    /// #640: a regular-width column holds as many as fit, and a phone's
+    /// column is still exactly the Home Screen's two.
+    @Test("A wider column fits more Smalls, never fewer than the Home Screen's")
+    func widerColumnsFitMoreSmalls() {
+        let small = WidgetMetrics.smallSide
+        let gutter: CGFloat = 18
+        // A phone's column: the design's own two.
+        #expect(WidgetMetrics.perRow(.systemSmall, widgetWidth: small, fitting: 353, gutter: gutter) == 2)
+        // An iPad Air 11-inch column in portrait, 820 − 2 × 20.
+        #expect(WidgetMetrics.perRow(.systemSmall, widgetWidth: small, fitting: 780, gutter: gutter) == 4)
+        // Exactly three with gutters fits three; a point less does not.
+        let three = 3 * small + 2 * gutter
+        #expect(WidgetMetrics.perRow(.systemSmall, widgetWidth: small, fitting: three, gutter: gutter) == 3)
+        #expect(WidgetMetrics.perRow(.systemSmall, widgetWidth: small, fitting: three - 1, gutter: gutter) == 2)
+        // Narrow or degenerate columns fall back to the Home Screen's count.
+        for column in [0, 100, -1, .nan, .infinity] as [CGFloat] {
+            #expect(WidgetMetrics.perRow(.systemSmall, widgetWidth: small, fitting: column, gutter: gutter) == 2)
+        }
+        // A family that is a line of one stays one, however wide the column:
+        // two would put its single card at the leading edge of a double line.
+        #expect(WidgetMetrics.perRow(.systemMedium, widgetWidth: WidgetMetrics.largeWidth, fitting: 780, gutter: gutter) == 1)
+        #expect(WidgetMetrics.perRow(.systemLarge, widgetWidth: WidgetMetrics.largeWidth, fitting: 1336, gutter: gutter) == 1)
+        #expect(group(.systemSmall, cards: 5).rows(perRow: 4).map(\.count) == [4, 1])
+        let four = group(.systemSmall, cards: 4)
+        #expect(four.rows(perRow: 2) == four.rows)
+    }
+
     @Test("A trailing odd card is a line of its own, not a stretched one")
     func oddCardStandsAlone() {
         // Any odd count can now reach this layout (#465); three is the smallest
