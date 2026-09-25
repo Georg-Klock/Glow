@@ -156,16 +156,42 @@ enum HostedScreenFrames {
     /// surface under it (#643) as well as capture it once.
     @MainActor
     final class Host {
-        /// A plain view controller: the hosting controller's concrete type is the
-        /// root view's, unwrapped. Wrapping it in one more `AnyView` to name the
-        /// type moved 31 cells of the reference `weekly grid screen` frame by a
-        /// level, measured against the harness before the table.
+        /// Held as a plain view controller so the hosted root keeps the exact
+        /// view type it had before the surface table, with no extra `AnyView`.
         private let controller: UIViewController
         private let window: UIWindow
         private let container: ModelContainer
         private(set) var surface: Surface
 
+        /// Whether this process has hosted a screen yet. See `warmUp()`.
+        private static var warmed = false
+
+        /// One throwaway render of each screen before the first one anyone
+        /// captures.
+        ///
+        /// **The first hosted screen in a process does not draw what every
+        /// later one draws** (#643), and that was measured rather than assumed.
+        /// On iOS 26.5 the reference `weekly grid screen`, rendered first in
+        /// its process, differs from the same frame rendered after any other
+        /// hosted screen in 31 cells, by one level each; every render after
+        /// the first agreed with every other. Before `HostedResizeTests` the
+        /// gate's own frame was always first, so the committed signature was
+        /// the first-render one and nobody could tell. With a second suite
+        /// hosting screens, which one Swift Testing starts first would decide
+        /// which picture the gate compares. Warming up makes every captured
+        /// frame a later render, whatever ran before it.
+        private static func warmUp() throws {
+            guard !warmed else { return }
+            warmed = true
+            for screen in [Screen.weeklyGrid, .widgets] {
+                let host = try Host(screen: screen, surface: .phone)
+                _ = host.capture()
+                host.close()
+            }
+        }
+
         init(screen: Screen, surface: Surface) throws {
+            try Self.warmUp()
             let fixture = try Fixture()
             let root: AnyView
             switch screen {

@@ -9264,12 +9264,23 @@ rest skipped": it is declared under `lanes` in `Tools/test-inventory.json`
 with its own floor and evidence, and the other bundles are left out of the
 build's test run.
 
-**Why the resize test uses the gate's tolerances, not equality.** Measured on
-iOS 26.5: the 820pt step matched a fresh render exactly, while both 375pt
-steps — including the first, before any resize — differed from their fresh
-render by at most three levels across the panel's material, one cell mean by
-one level. A width or size class kept from before moves cells by tens; the
-test checks that it can see one by rendering 820pt at the wrong size class.
+**The first hosted screen in a process is not like the others.** Measured on
+iOS 26.5: the reference `weekly grid screen`, hosted first in its process,
+differs by one level in 31 cells from the same frame hosted after any other
+screen, and every later render agrees with every other. The committed frame
+had always been a first render, because the gate was the only suite hosting
+screens. With `HostedResizeTests` hosting screens too, suite order would have
+decided which picture the gate compared, so the harness now makes one
+throwaway render of each screen before the first capture. That is the one
+move in the existing frames: `weekly grid screen` by one level in 31 cells on
+iOS 26.5 and 34 on iOS 18.5, and `widgets screen` by one level in 69 cells on
+iOS 18.5 — all inside the gate's tolerance of three.
+
+**Why the resize test keeps the gate's tolerances.** With the warm-up every
+step matched its fresh render exactly on both runtimes, but iOS 18.5 does not
+render the same picture twice (#431). A width or size class kept from before
+moves cells by tens; the test checks that it can see one by rendering 820pt at
+the wrong size class.
 
 **What neither half covers.** A foldable's real widths, and iPad multitasking
 chrome beyond a full-screen launch.

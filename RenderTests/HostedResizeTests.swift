@@ -25,17 +25,14 @@ import UIKit
 ///
 /// Compared by `RenderSignature`, the gate's own statistic, at the gate's own
 /// tolerances for a hosted frame: `cellTolerance` on the cell grid and
-/// `hostedBlackTolerance` on the ground share, with the size exact. **Not
-/// exactly**, and that was measured rather than assumed: on iOS 26.5 the 820pt
-/// step came back signature-identical to a fresh render, while both 375pt
-/// steps differed from theirs in 278,000 of 1,278,000 pixels — every one of
-/// them inside the panel, none by more than three levels, one cell mean by
-/// one. That is the `.ultraThinMaterial` the panel is drawn on, which #431
-/// already measured as the larger source of render-to-render noise; the
-/// first 375pt step, which has not been resized at all, differs by the same
-/// amount as the one that has. A kept width or size class moves whole columns
-/// and cells by tens — `wideButCompact` below is the check that this test
-/// can see one.
+/// `hostedBlackTolerance` on the ground share, with the size exact. Every step
+/// came back signature-identical to its fresh render on iOS 26.5 and on iOS
+/// 18.5 once `HostedScreenFrames` warms up; before the warm-up, the fresh
+/// 375pt render was the first screen hosted in its process and differed from
+/// every later one by a level in a cell. The tolerance stays because iOS 18.5
+/// does not render the same picture twice (#431), and each step prints how
+/// close it came. A kept width or size class moves whole columns and cells by
+/// tens — `wideButCompact` below is the check that this test can see one.
 @MainActor
 @Suite("Hosted resize")
 struct HostedResizeTests {
