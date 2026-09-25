@@ -197,6 +197,25 @@ struct HabitEditorView: View {
                             isConfirmingDelete = true
                         }
                         .foregroundStyle(.red)
+                        // Destructive and irreversible: the completions
+                        // cascade with it.
+                        //
+                        // On the button, not on the sheet (#637): at regular
+                        // width a confirmation dialog is a popover, and its
+                        // arrow points at whatever the modifier is attached
+                        // to. On the stack it floated over the middle of the
+                        // sheet pointing at nothing. At compact width it is
+                        // the same action sheet either way.
+                        .confirmationDialog(
+                            "Delete this habit?",
+                            isPresented: $isConfirmingDelete,
+                            titleVisibility: .visible
+                        ) {
+                            Button("Delete Habit", role: .destructive, action: delete)
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("This also removes every day logged against it. It cannot be undone.")
+                        }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 12)
                     }
@@ -231,17 +250,6 @@ struct HabitEditorView: View {
             }
         }
         .onAppear(perform: loadExisting)
-        // Destructive and irreversible: the completions cascade with it.
-        .confirmationDialog(
-            "Delete this habit?",
-            isPresented: $isConfirmingDelete,
-            titleVisibility: .visible
-        ) {
-            Button("Delete Habit", role: .destructive, action: delete)
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This also removes every day logged against it. It cannot be undone.")
-        }
         // This view is a sheet, and `RootTabView`'s copy of this alert cannot
         // present under an active sheet — a save failure in here would be
         // feedback nobody sees. See `operationNoticeAlert()` (#282).

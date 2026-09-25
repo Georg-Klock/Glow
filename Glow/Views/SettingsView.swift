@@ -318,6 +318,24 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(habits.isEmpty)
+                    // A choice of two, rather than a format setting nobody
+                    // would ever change twice. CSV opens in a spreadsheet;
+                    // JSON parses.
+                    //
+                    // On the row, not on the Form (#637): at regular width a
+                    // confirmation dialog is a popover whose arrow points at
+                    // what the modifier is attached to, and on the Form that
+                    // was the middle of the screen. At compact width it is
+                    // the same action sheet either way.
+                    .confirmationDialog(
+                        "Export History",
+                        isPresented: $isChoosingFormat,
+                        titleVisibility: .visible
+                    ) {
+                        Button("CSV") { export(as: .csv) }
+                        Button("JSON") { export(as: .json) }
+                        Button("Cancel", role: .cancel) {}
+                    }
 
                     resetRow
                 } header: {
@@ -366,17 +384,6 @@ struct SettingsView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            // A choice of two, rather than a format setting nobody would ever
-            // change twice. CSV opens in a spreadsheet; JSON parses.
-            .confirmationDialog(
-                "Export History",
-                isPresented: $isChoosingFormat,
-                titleVisibility: .visible
-            ) {
-                Button("CSV") { export(as: .csv) }
-                Button("JSON") { export(as: .json) }
-                Button("Cancel", role: .cancel) {}
-            }
             // The share sheet is the only way out of the app, and it opens on
             // a tap. Nothing here uploads.
             // `onDismiss` covers sharing and cancelling both, because they are
