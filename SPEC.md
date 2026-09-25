@@ -1018,6 +1018,15 @@ asking.** A kind change is not free, and the next one proposed should not read
 this entry as precedent that it is — it was the population that made this
 cheap, not the mechanism.
 
+**No extra-large, on purpose** (#640, 2026-09-24). `systemExtraLarge` exists
+only on iPad, and the app became universal with #633. It is not offered in
+this pass: small, medium and large come first on iPad, measured against the
+frames an iPad actually hands them. Its absence is a decision, not an
+oversight. Adding it means new families in `WidgetKind`, a size in
+`WidgetMetrics.size(of:)` (which sends any unknown family to the small
+square), a key in `WidgetDisplaySize`, and raising that type's 600pt
+plausibility bound, which an extra-large frame exceeds.
+
 **Small's history**: the week's own small family was dropped by PR #277 — it
 drew the week's rows with the labels off, legible only to somebody who knew
 their own row order. #322 brings the family back with the month's content,
@@ -1147,7 +1156,11 @@ centred in the page's column with its heading (#591): a preview is the
 family's real frame scaled by at most 1, so it can be narrower than the column,
 and the slack splits evenly rather than collecting on the right. A row of
 Smalls centres as a row and keeps its cards at its leading edge, so a trailing
-odd card sits where the next one would go. No card carries an
+odd card sits where the next one would go. On a phone a row holds two Smalls,
+as a Home Screen does. At regular width (#640) it holds as many as the column
+fits, four on an iPad Air 11-inch in portrait (`WidgetMetrics.perRow(_:widgetWidth:fitting:gutter:)`).
+Previews stay at their true size, so the extra width becomes more of them,
+not bigger ones. No card carries an
 explaining sentence under its heading — the gallery does, because there a
 widget is an unfamiliar tile in a list, but here the widget itself is drawn
 directly below over the person's own habits and says the same thing without

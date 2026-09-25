@@ -415,6 +415,26 @@ struct WidgetMetricsTests {
         )
     }
 
+    /// #640: the first iPad frames, read out of the App Group after the
+    /// extension rendered on an iPad Air 11-inch (M4) simulator, iPadOS 26.5.
+    /// Kept apart from the phones' lists on purpose: the large one is
+    /// **square**, and the phones' "the cost is under two points" does not
+    /// hold for it — ten rows fit, but at a 22.8pt slot the drawn track is
+    /// 14.8pt short of the frame's, and that lands on the trailing margin.
+    /// Whether that is worth a layout change is #652; the row counts are
+    /// what this pins.
+    private static let measuredIPadFrames: [(String, large: CGSize, medium: CGSize)] = [
+        ("iPad Air 11-inch (M4)", CGSize(width: 342, height: 342), CGSize(width: 342, height: 155)),
+    ]
+
+    @Test("Every frame an iPad was measured giving draws ten large rows and four medium")
+    func measuredIPadFramesDrawTheDesignRows() {
+        for (name, large, medium) in Self.measuredIPadFrames {
+            #expect(largeLayout(large).rows.capacity == 10, "\(name) large")
+            #expect(mediumLayout(medium).rows.capacity == 4, "\(name) medium")
+        }
+    }
+
     @Test("Every frame a phone was measured giving draws four medium rows")
     func measuredMediumFramesDrawFourRows() {
         // The question #367 was open on: the constant is wrong for medium too,
