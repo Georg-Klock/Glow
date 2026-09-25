@@ -55,11 +55,15 @@ struct RowGeometryTests {
             0, 1, 10, 40, 100, 200, 338, 402, 430, 1024, 2048,
             -1, -1000, .infinity, -.infinity, .nan,
         ]
+        // Both ceilings (#634): the regular one is the only way the factor
+        // passes 1, so it is the one that could first overflow.
         for width in proposals {
-            let geometry = RowGeometry(totalWidth: width)
-            for (name, value) in values(geometry) {
-                #expect(value.isFinite, "\(name) is not finite at width \(width)")
-                #expect(value >= 0, "\(name) is \(value) at width \(width)")
+            for ceiling in [WidgetMetrics.largeWidth, PanelCeiling.regularWidth] {
+                let geometry = RowGeometry(totalWidth: width, maximumPanelWidth: ceiling)
+                for (name, value) in values(geometry) {
+                    #expect(value.isFinite, "\(name) is not finite at width \(width), ceiling \(ceiling)")
+                    #expect(value >= 0, "\(name) is \(value) at width \(width), ceiling \(ceiling)")
+                }
             }
         }
     }
@@ -472,6 +476,58 @@ struct RowGeometryTests {
             // And the margin plus the panel is the whole proposal: nothing is
             // lost or invented on the way to the screen.
             #expect(abs(g.sideMargin * 2 + g.panelWidth - width) < 1e-9)
+        }
+    }
+
+    /// #634: at regular width the ceiling is the readable width. Up to it the
+    /// screen is the widget scaled *up*, every measurement by the one factor;
+    /// past it the surplus is margin again, as at compact width past 338.
+    @Test("At regular width the widget grows to the readable width, then centres")
+    func regularWidthGrowsToTheReadableWidth() {
+        let ceiling = PanelCeiling.maximumPanelWidth(isRegularWidth: true)
+        #expect(ceiling == 672)
+        let widget = RowGeometry(totalWidth: WidgetMetrics.largeWidth)
+
+        for width in [339, 400, 500, 600, 671] as [CGFloat] {
+            let g = RowGeometry(totalWidth: width, maximumPanelWidth: ceiling)
+            let factor = width / WidgetMetrics.largeWidth
+            #expect(abs(g.scale - factor) < 1e-12, "scale is \(g.scale) at \(width)")
+            #expect(g.panelWidth == width)
+            #expect(g.sideMargin == 0)
+            #expect(abs(g.trackWidth - widget.trackWidth * factor) < 1e-9)
+            #expect(abs(g.textSize - WidgetMetrics.textSize * factor) < 1e-9)
+            #expect(abs(g.slotHeight - widget.slotHeight * factor) < 1e-9)
+        }
+
+        for width in [672, 700, 780, 1140, 1336] as [CGFloat] {
+            let g = RowGeometry(totalWidth: width, maximumPanelWidth: ceiling)
+            #expect(g.panelWidth == ceiling)
+            #expect(abs(g.scale - ceiling / WidgetMetrics.largeWidth) < 1e-12)
+            #expect(abs(g.sideMargin * 2 + g.panelWidth - width) < 1e-9)
+        }
+    }
+
+    /// The truncation point is a ratio, so it does not move when the widget
+    /// grows: a name cut at one character on the phone is cut at the same one
+    /// on the iPad, and the editor's preview stays honest on both.
+    @Test("Growing the widget does not move where a name is cut")
+    func regularWidthKeepsTheTruncationRatio() {
+        let phone = RowGeometry(totalWidth: 393)
+        let pad = RowGeometry(totalWidth: 780, maximumPanelWidth: PanelCeiling.regularWidth)
+        #expect(pad.scale > 1.9)
+        #expect(abs(phone.nameMaxWidth / phone.nameTextSize - pad.nameMaxWidth / pad.nameTextSize) < 1e-9)
+    }
+
+    /// Compact width is every iPhone: the ceiling there is the widget's own,
+    /// and a ceiling asked for below it is read as the widget's, never less.
+    @Test("At compact width, and for any lower ceiling, nothing moved")
+    func compactCeilingIsTheWidget() {
+        #expect(PanelCeiling.maximumPanelWidth(isRegularWidth: false) == WidgetMetrics.largeWidth)
+        for width in [0, 320, 338, 393, 440, 1024] as [CGFloat] {
+            let before = RowGeometry(totalWidth: width)
+            #expect(RowGeometry(totalWidth: width, maximumPanelWidth: WidgetMetrics.largeWidth) == before)
+            #expect(RowGeometry(totalWidth: width, maximumPanelWidth: 100) == before)
+            #expect(RowGeometry(totalWidth: width, maximumPanelWidth: .nan) == before)
         }
     }
 

@@ -102,6 +102,8 @@ struct WeeklyGridView: View {
     @AppStorage(GlowSettings.largeTextKey, store: GlowSettings.store)
     private var largeTextDropsIcon = false
     @Environment(\.dynamicTypeSize) private var typeSize
+    /// Read here, once, and handed to `RowGeometry` as a ceiling (#634).
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(today: Date? = nil) {
         let initialToday = WeekCalendar.day(today ?? WeekCalendar.today())
@@ -447,9 +449,16 @@ struct WeeklyGridView: View {
             // sits centred at the widget's true width with equal margins,
             // rather than as a larger widget.
             let inset = GridMetrics.horizontalPadding
+            //
+            // **At regular width the ceiling is the readable width instead**
+            // (#634): an iPad draws the widget larger, in its own proportions,
+            // rather than a 338pt card in the middle of the screen.
             let geometry = RowGeometry(
                 totalWidth: max(0, proxy.size.width - inset * 2),
-                label: LargeTextPolicy.layout(dropsIcon: largeTextDropsIcon, size: typeSize)
+                label: LargeTextPolicy.layout(dropsIcon: largeTextDropsIcon, size: typeSize),
+                maximumPanelWidth: PanelCeiling.maximumPanelWidth(
+                    isRegularWidth: horizontalSizeClass == .regular
+                )
             )
             let snapshots = self.snapshots
             let isEditing = editMode.isEditing
