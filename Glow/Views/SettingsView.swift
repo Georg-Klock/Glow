@@ -62,7 +62,7 @@ struct SettingsView: View {
     /// The two EDR values Settings names: what iOS is granting now, and what
     /// the current display configuration could grant at most. A view-bound
     /// task refreshes the snapshot while this tab is visible (#422).
-    @State private var headroom = EDRHeadroomSnapshot.mainScreen
+    @State private var headroom = EDRHeadroomSnapshot.activeScreen
 
     /// Whether the explanation sheet is up. The grid announces the condition
     /// once, unprompted; this screen never does — here the notice is something
@@ -318,6 +318,24 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(habits.isEmpty)
+                    // A choice of two, rather than a format setting nobody
+                    // would ever change twice. CSV opens in a spreadsheet;
+                    // JSON parses.
+                    //
+                    // On the row, not on the Form (#637): at regular width a
+                    // confirmation dialog is a popover whose arrow points at
+                    // what the modifier is attached to, and on the Form that
+                    // was the middle of the screen. At compact width it is
+                    // the same action sheet either way.
+                    .confirmationDialog(
+                        "Export History",
+                        isPresented: $isChoosingFormat,
+                        titleVisibility: .visible
+                    ) {
+                        Button("CSV") { export(as: .csv) }
+                        Button("JSON") { export(as: .json) }
+                        Button("Cancel", role: .cancel) {}
+                    }
 
                     resetRow
                 } header: {
@@ -366,17 +384,6 @@ struct SettingsView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            // A choice of two, rather than a format setting nobody would ever
-            // change twice. CSV opens in a spreadsheet; JSON parses.
-            .confirmationDialog(
-                "Export History",
-                isPresented: $isChoosingFormat,
-                titleVisibility: .visible
-            ) {
-                Button("CSV") { export(as: .csv) }
-                Button("JSON") { export(as: .json) }
-                Button("Cancel", role: .cancel) {}
-            }
             // The share sheet is the only way out of the app, and it opens on
             // a tap. Nothing here uploads.
             // `onDismiss` covers sharing and cancelling both, because they are
@@ -665,7 +672,7 @@ struct SettingsView: View {
     @MainActor
     private func refreshHeadroomWhileVisible() async {
         while !Task.isCancelled {
-            let sampled = EDRHeadroomSnapshot.mainScreen
+            let sampled = EDRHeadroomSnapshot.activeScreen
             if sampled != headroom { headroom = sampled }
             do {
                 try await Task.sleep(for: .seconds(1))
@@ -727,13 +734,21 @@ struct EDRHeadroomSnapshot: Equatable, Sendable {
     let current: Double
     let maximum: Double
 
+    /// Both values from the screen the app is showing on (#642), chosen by
+    /// `ActiveScreen`. `UIScreen.main` answered for the built-in screen even
+    /// with the window on an external display.
     @MainActor
-    static var mainScreen: Self {
-        Self(
-            current: Double(UIScreen.main.currentEDRHeadroom),
-            maximum: Double(UIScreen.main.potentialEDRHeadroom)
+    static var activeScreen: Self {
+        guard let screen = ActiveScreen.current else { return .standardDynamicRange }
+        return Self(
+            current: Double(screen.currentEDRHeadroom),
+            maximum: Double(screen.potentialEDRHeadroom)
         )
     }
+
+    /// No headroom above SDR white: the answer before any scene has connected,
+    /// when there is no screen to ask.
+    static let standardDynamicRange = Self(current: 1, maximum: 1)
 
     var summary: String {
         String(format: "%.1f× right now · %.1f× maximum", current, maximum)

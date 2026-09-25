@@ -402,6 +402,13 @@ ordinary 20 on an iPhone 17e, 31pt over it on a 17 Pro Max. The Widgets tab has 
 drawn its previews by that rule; the two screens now share it. The row's 6/14
 inset pair is the widget's and is not symmetrised (#331, #591).
 
+**Type never drops below 11pt** (#635), the platform's smallest text style.
+No phone reaches that floor, since an iPhone SE's panel is 335pt and the floor
+binds below about 310. An iPad in Slide Over or a third of Split View does
+reach it, and so will any narrower window. There the label column goes on
+shrinking with everything else while the type stops, so a name is cut a
+character or two sooner than the widget would cut it.
+
 **The name is 12pt at the widget's scale whatever the phone's text size** —
 a deliberate trade recorded in `docs/decisions.md` (2026-08-24) — **unless the
 person has asked for the middle position** (#567). Settings → Text has one
@@ -878,6 +885,37 @@ nothing on screen takes that path any more; the rule stays because it is what
 makes the pager's absence a tidiness rather than the only thing standing
 between edit mode and a dead end.
 
+**A keyboard and a pointer reach the same controls, and nothing else** (#641).
+The shortcuts are `keyboardShortcut` on the buttons already there (⌘N aside,
+below), so each one exists exactly where its button does, and holding ⌘ lists
+them:
+
+- **⌘←, ⌘→** — the pager's two chevrons. ⌘← is disabled against the record's
+  floor as the chevron is; ⌘→ does nothing on the current week while browsing,
+  because there is no forward chevron to press. While the list is being edited
+  the pager is hidden (#399), and both keys go with it.
+- **⌘T** — Today, on a past week while browsing. Correcting history has no
+  Today (#592) and so no ⌘T.
+- **⌘N** — New Habit, the More menu's action under the menu's own condition:
+  the current week, browsing or editing the list. Not on a past week and not
+  while correcting, where the menu does not offer it. The one key that is not
+  on the visible control: a shortcut on an item inside a toolbar menu does
+  nothing until the menu is open, so it sits on an undrawn button that shares
+  the item's action and condition (`offersNewHabit`).
+
+Under a pointer, every tappable slot and span takes the system's `.highlight`
+hover effect, shaped to the mark — a circle for a slot, a capsule for a span —
+so the pointer settles on the thing it will toggle. The highlight is the
+system's material, not a step of `GlowPalette`: hovering is not a light tier
+and says nothing about the day. Marks that take no tap have no hover.
+
+A habit row has a **context menu** — secondary click, or a long press on the
+phone — holding **Edit** and **Delete**, the same two actions as its trailing
+swipe, offered exactly when the swipe is: while browsing, on any week, and
+not in the list's edit mode or while correcting. Delete goes through the same
+path as the swipe's, which has no confirmation; a blank row offers Delete
+alone.
+
 A span row resolves the tap to **the column under the finger** rather than to
 the span's nominal day, so a habit due N times a week records the weekday it
 really happened on — the same day the month grid and the row's own dots already
@@ -1018,6 +1056,15 @@ asking.** A kind change is not free, and the next one proposed should not read
 this entry as precedent that it is — it was the population that made this
 cheap, not the mechanism.
 
+**No extra-large, on purpose** (#640, 2026-09-24). `systemExtraLarge` exists
+only on iPad, and the app became universal with #633. It is not offered in
+this pass: small, medium and large come first on iPad, measured against the
+frames an iPad actually hands them. Its absence is a decision, not an
+oversight. Adding it means new families in `WidgetKind`, a size in
+`WidgetMetrics.size(of:)` (which sends any unknown family to the small
+square), a key in `WidgetDisplaySize`, and raising that type's 600pt
+plausibility bound, which an extra-large frame exceeds.
+
 **Small's history**: the week's own small family was dropped by PR #277 — it
 drew the week's rows with the labels off, legible only to somebody who knew
 their own row order. #322 brings the family back with the month's content,
@@ -1147,7 +1194,11 @@ centred in the page's column with its heading (#591): a preview is the
 family's real frame scaled by at most 1, so it can be narrower than the column,
 and the slack splits evenly rather than collecting on the right. A row of
 Smalls centres as a row and keeps its cards at its leading edge, so a trailing
-odd card sits where the next one would go. No card carries an
+odd card sits where the next one would go. On a phone a row holds two Smalls,
+as a Home Screen does. At regular width (#640) it holds as many as the column
+fits, four on an iPad Air 11-inch in portrait (`WidgetMetrics.perRow(_:widgetWidth:fitting:gutter:)`).
+Previews stay at their true size, so the extra width becomes more of them,
+not bigger ones. No card carries an
 explaining sentence under its heading — the gallery does, because there a
 widget is an unfamiliar tile in a list, but here the widget itself is drawn
 directly below over the person's own habits and says the same thing without
