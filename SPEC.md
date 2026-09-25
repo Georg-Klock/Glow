@@ -860,6 +860,33 @@ nothing on screen takes that path any more; the rule stays because it is what
 makes the pager's absence a tidiness rather than the only thing standing
 between edit mode and a dead end.
 
+**A keyboard and a pointer reach the same controls, and nothing else** (#641).
+The shortcuts are `keyboardShortcut` on the buttons already there, so each one
+exists exactly where its button does, and holding ⌘ lists them:
+
+- **⌘←, ⌘→** — the pager's two chevrons. ⌘← is disabled against the record's
+  floor as the chevron is; ⌘→ does nothing on the current week while browsing,
+  because there is no forward chevron to press. While the list is being edited
+  the pager is hidden (#399), and both keys go with it.
+- **⌘T** — Today, on a past week while browsing. Correcting history has no
+  Today (#592) and so no ⌘T.
+- **⌘N** — New Habit, the More menu's own item, on the current week (browsing
+  or editing the list). Not on a past week and not while correcting, where the
+  menu does not offer it.
+
+Under a pointer, every tappable slot and span takes the system's `.highlight`
+hover effect, shaped to the mark — a circle for a slot, a capsule for a span —
+so the pointer settles on the thing it will toggle. The highlight is the
+system's material, not a step of `GlowPalette`: hovering is not a light tier
+and says nothing about the day. Marks that take no tap have no hover.
+
+A habit row has a **context menu** — secondary click, or a long press on the
+phone — holding **Edit** and **Delete**, the same two actions as its trailing
+swipe, offered exactly when the swipe is: while browsing, on any week, and
+not in the list's edit mode or while correcting. Delete goes through the same
+path as the swipe's, which has no confirmation; a blank row offers Delete
+alone.
+
 A span row resolves the tap to **the column under the finger** rather than to
 the span's nominal day, so a habit due N times a week records the weekday it
 really happened on — the same day the month grid and the row's own dots already
