@@ -1090,8 +1090,11 @@ The slot now takes the smaller of the track's answer and the largest slot at
 which the design's rows still fill the height, so ten rows are drawn on any of
 those frames and the bottom margin is the design's 14 exactly. What it costs is
 the right margin: the marks stay round and bring their column rhythm down with
-them, so 0.4 to 1.8 points of track are left unused at the trailing edge and the
-right margin is no longer exactly 14. Of the three things that cannot all hold
+them, so 0.4 to 1.8 points of track are left unused and neither margin is
+exactly the design's. The leftover is split across both margins (#652). It
+used to sit at the trailing edge, which was harmless on a phone. Every iPad
+hands the large family a square frame, and on an iPad Air the leftover is
+14.8 points, which drew the grid visibly off-centre. Of the three things that cannot all hold
 on a frame whose aspect differs from the design's — round marks, a track filled
 exactly, a height filled exactly — the one given up is the one the design file
 does not specify.
