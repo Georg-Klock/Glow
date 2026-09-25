@@ -14,15 +14,23 @@ final class KeyboardShortcutTests: XCTestCase {
 
         XCTAssertTrue(app.navigationBars["This Week"].waitForExistence(timeout: 3))
 
-        // Browsing stops at the current week, so ⌘→ there has no button to
-        // press and changes nothing; back first, then forward.
+        // The simulator's first synthesized key event after launch is not
+        // reliably delivered: measured, the same opening ⌘← paged the week
+        // on one run and did nothing on the next, while every later key in
+        // both runs landed. So the first key sent is one whose right answer
+        // is "nothing happens" either way — ⌘→ on the current week, where
+        // browsing has no forward chevron and so no forward key.
+        app.typeKey(.rightArrow, modifierFlags: .command)
+        XCTAssertTrue(app.navigationBars["This Week"].waitForExistence(timeout: 3))
+
         app.typeKey(.leftArrow, modifierFlags: .command)
         XCTAssertTrue(app.navigationBars["Last Week"].waitForExistence(timeout: 3))
 
         app.typeKey(.rightArrow, modifierFlags: .command)
         XCTAssertTrue(app.navigationBars["This Week"].waitForExistence(timeout: 3))
 
-        // ⌘→ on the current week: no forward chevron, so no forward key.
+        // Delivered this time, and still nothing: no forward chevron on the
+        // current week, so no forward key.
         app.typeKey(.rightArrow, modifierFlags: .command)
         XCTAssertFalse(app.navigationBars["Next Week"].waitForExistence(timeout: 1))
         XCTAssertTrue(app.navigationBars["This Week"].exists)

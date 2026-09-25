@@ -262,6 +262,7 @@ struct WeeklyGridView: View {
             // is said, as #103 first decided, and the Island's real update is
             // requested from `toggle` for the moment the app is out of view.
             .overlay(alignment: .top) { TopFade() }
+            .background { newHabitShortcut }
             .navigationTitle(weekTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1039,6 +1040,36 @@ struct WeeklyGridView: View {
         .labelStyle(.iconOnly)
     }
 
+    /// Where the menu offers New Habit: the current week, browsing or editing
+    /// the list. The menu itself is not drawn while correcting, which is the
+    /// other half of the condition — spelled out here because ⌘N has to agree
+    /// with it without being inside the menu.
+    private var offersNewHabit: Bool {
+        !isCorrectingHistory && isOnCurrentWeek
+    }
+
+    /// **⌘N** (#641): the menu's New Habit, with its action and its condition.
+    ///
+    /// **Not on the menu item, because there it does nothing** until the menu
+    /// is open. A `keyboardShortcut` inside a toolbar `Menu` registers with
+    /// the menu's content, which is built when the menu is presented —
+    /// measured: `KeyboardShortcutTests` sent ⌘N to This Week on the current
+    /// week and no editor came up, while ⌘← and ⌘→ on the chevrons beside it
+    /// worked. So the key lives on a button of its own that draws nothing,
+    /// takes no touch and says nothing to VoiceOver, and exists exactly when
+    /// the menu offers New Habit: a key never does what a tap could not.
+    @ViewBuilder
+    private var newHabitShortcut: some View {
+        if offersNewHabit {
+            Button("New Habit") { isAddingHabit = true }
+                .keyboardShortcut("n", modifiers: .command)
+                .frame(width: 0, height: 0)
+                .opacity(0)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+
     /// The existing list menu, available from every browsed week now that it
     /// is also the door to correcting history (#543). Row-management actions
     /// remain current-week-only; the history action keeps the week being
@@ -1047,15 +1078,10 @@ struct WeeklyGridView: View {
     /// its place in the bar.
     private var moreMenu: some View {
         Menu {
-            if isOnCurrentWeek {
+            if offersNewHabit {
                 Button("New Habit", systemImage: "plus") {
                     isAddingHabit = true
                 }
-                // **⌘N** (#641). On the menu's own item, so it is offered
-                // where New Habit is — the current week, browsing or
-                // editing the list — and nowhere else: not on a past week,
-                // and not while correcting, where this menu is not drawn.
-                .keyboardShortcut("n", modifiers: .command)
                 Button("Blank Row", systemImage: "rectangle.dashed") {
                     addSpacer()
                 }

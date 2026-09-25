@@ -861,8 +861,9 @@ makes the pager's absence a tidiness rather than the only thing standing
 between edit mode and a dead end.
 
 **A keyboard and a pointer reach the same controls, and nothing else** (#641).
-The shortcuts are `keyboardShortcut` on the buttons already there, so each one
-exists exactly where its button does, and holding ⌘ lists them:
+The shortcuts are `keyboardShortcut` on the buttons already there (⌘N aside,
+below), so each one exists exactly where its button does, and holding ⌘ lists
+them:
 
 - **⌘←, ⌘→** — the pager's two chevrons. ⌘← is disabled against the record's
   floor as the chevron is; ⌘→ does nothing on the current week while browsing,
@@ -870,9 +871,12 @@ exists exactly where its button does, and holding ⌘ lists them:
   the pager is hidden (#399), and both keys go with it.
 - **⌘T** — Today, on a past week while browsing. Correcting history has no
   Today (#592) and so no ⌘T.
-- **⌘N** — New Habit, the More menu's own item, on the current week (browsing
-  or editing the list). Not on a past week and not while correcting, where the
-  menu does not offer it.
+- **⌘N** — New Habit, the More menu's action under the menu's own condition:
+  the current week, browsing or editing the list. Not on a past week and not
+  while correcting, where the menu does not offer it. The one key that is not
+  on the visible control: a shortcut on an item inside a toolbar menu does
+  nothing until the menu is open, so it sits on an undrawn button that shares
+  the item's action and condition (`offersNewHabit`).
 
 Under a pointer, every tappable slot and span takes the system's `.highlight`
 hover effect, shaped to the mark — a circle for a slot, a capsule for a span —
