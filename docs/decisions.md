@@ -9221,3 +9221,26 @@ regular width the grid scales up in the widget's proportions until the panel
 reaches the readable width (#634), superseding #588's "never larger" at that
 width only; `systemExtraLarge` is not in this pass (#640); the iPad keeps the
 platform's default top tab bar (#639).
+
+## 2026-09-24 — At regular width the grid grows to the readable width (#634)
+
+**What changed.** `RowGeometry` takes a ceiling. At compact width it is the
+large widget's 338pt, which is #588 exactly; at regular width it is 672pt,
+UIKit's readable width at the default text size (`PanelCeiling`).
+`WeeklyGridView` reads `horizontalSizeClass` and passes the answer in.
+
+**Why.** Under #588 an iPad drew a 338pt card in the middle of a screen three
+and a half times as wide. #588's reason — a wider phone's surplus is margin,
+not bigger marks — holds between phones that differ by 50pt; it does not
+hold between a phone and a tablet held at twice the distance.
+
+**Why the size class, not the width.** A width threshold would have grown the
+grid on a Pro Max, which #588 decided against, and a threshold placed above
+every phone is a device check spelled as a number. The size class is the
+platform's own answer to "is this a phone-width window", it changes with
+Split View and Stage Manager, and it arrives as a parameter.
+
+**What does not change.** The screen is still the widget scaled by one factor,
+so a name truncates at the same character on every surface. Declined for now:
+spending the width on more than one week side by side — a new layout, which
+belongs in `docs/vision.md` first.

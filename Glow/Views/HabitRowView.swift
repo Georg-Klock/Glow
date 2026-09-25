@@ -1,13 +1,16 @@
 import SwiftUI
 
 /// How the screen is divided and sized: the large widget, scaled to the screen
-/// and never past its own size.
+/// and never past a ceiling — its own size at compact width, the readable
+/// width at regular width (#634).
 ///
 /// Tapping the widget is meant to land on the same thing, so every measurement
 /// here is a `WidgetMetrics` number times one factor — the width offered over
-/// the widget's 338pt, **capped at 1** (#588). On a panel narrower than the
-/// widget the screen is a smaller widget; on a wider one it is the widget at
-/// its true size, centred, with the surplus as margin on both sides. The
+/// the widget's 338pt, **capped at the ceiling's ratio** (#588, #634). On a
+/// panel narrower than the widget the screen is a smaller widget; on a wider
+/// one it is the widget at its true size — or, at regular width, larger up to
+/// `PanelCeiling.regularWidth` — centred, with the surplus as margin on both
+/// sides. The
 /// widget's spec is measured from the design file; the screen has no frame of
 /// its own, so it borrows that truth rather than keeping a second set of
 /// guesses beside it.
@@ -29,7 +32,8 @@ import SwiftUI
 /// widget scaled up, and `WeekdayHeader` has drawn the letter alone since. The
 /// sentence outlived it, which is how a stale line goes on being cited.
 struct RowGeometry: Equatable {
-    /// The width offered over the large widget's own, never above 1 (#588).
+    /// The width offered over the large widget's own, never above the
+    /// ceiling's ratio: 1 at compact width (#588), 672/338 at regular (#634).
     let scale: CGFloat
     /// The width the grid actually occupies: the width offered, up to the
     /// widget's 338pt, and exactly 338pt past it. Every horizontal measurement
@@ -232,8 +236,21 @@ struct RowGeometry: Equatable {
     /// `LargeTextPolicy` decided from the setting and the environment's type
     /// size; the tests and the editor's preview take the default unless they
     /// are asking about the grown row.
-    init(totalWidth: CGFloat, label: LargeTextPolicy.Layout = .standard) {
+    ///
+    /// `maximumPanelWidth` is `PanelCeiling`'s answer for the grid's size
+    /// class, and defaults to the widget's own width: the compact rule, which
+    /// is every iPhone and what every caller meant before #634. A ceiling
+    /// below the widget's width is read as the widget's width, so no caller
+    /// can shrink the screen by asking for less.
+    init(
+        totalWidth: CGFloat,
+        label: LargeTextPolicy.Layout = .standard,
+        maximumPanelWidth: CGFloat = WidgetMetrics.largeWidth
+    ) {
         let width = Self.usable(totalWidth)
+        let ceiling = maximumPanelWidth.isFinite
+            ? max(WidgetMetrics.largeWidth, maximumPanelWidth)
+            : WidgetMetrics.largeWidth
         self.label = label
         // **One factor, and nothing exempt from it — capped at the widget's
         // own size** (#588, superseding #370). The screen is the large widget
@@ -257,11 +274,15 @@ struct RowGeometry: Equatable {
         // as well. Scaling all the way down does the job honestly: at zero
         // width every measurement below is zero, which is what `zeroWidth`
         // asserts.
-        let scale = min(1, width / WidgetMetrics.largeWidth)
+        //
+        // **At regular width the ceiling rises** (#634). The factor may pass
+        // 1, up to the readable width over the widget's; below that the rule
+        // is the one above, so at compact width nothing here moved.
+        let scale = min(ceiling, width) / WidgetMetrics.largeWidth
         self.scale = scale
         // `min` rather than `largeWidth * scale`, which is the same number up
         // to a rounding error this type would then hand to a frame.
-        let panelWidth = min(width, WidgetMetrics.largeWidth)
+        let panelWidth = min(width, ceiling)
         self.panelWidth = panelWidth
         sideMargin = max(0, (width - panelWidth) / 2)
 

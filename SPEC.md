@@ -383,8 +383,18 @@ a phone-shaped window (#632).
 Each habit is one row: icon and name on the left, a fixed-width status track on
 the right.
 
-**This Week is the large widget at the widget's size or smaller, never larger**
-(#588, superseding #370's uncapped ratio). Every measurement on the screen is
+**At regular width the ceiling is the readable width instead** (#634). An
+iPad window, or any window iOS gives the regular horizontal size class, grows
+the grid in the widget's proportions — marks, type, label column and track by
+one factor — until the panel is 672pt wide (`PanelCeiling`), UIKit's readable
+column at the default text size, and centres it past that. On an iPad Air
+11-inch in portrait that is a factor of 1.99. A name is cut at the same
+character at any factor, because every length in the row scales together.
+Compact width, which is every iPhone and a narrow iPad window, is the rule
+below unchanged.
+
+**At compact width This Week is the large widget at the widget's size or
+smaller, never larger** (#588, superseding #370's uncapped ratio). Every measurement on the screen is
 the widget's times one factor, `min(1, width / 338)`: on a panel narrower than
 the widget the screen is a smaller widget, and on a wider one it is the widget
 at its true size, centred, with equal margins on both sides — 6pt over the
