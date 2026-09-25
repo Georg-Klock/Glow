@@ -156,7 +156,11 @@ enum HostedScreenFrames {
     /// surface under it (#643) as well as capture it once.
     @MainActor
     final class Host {
-        private let controller: UIHostingController<AnyView>
+        /// A plain view controller: the hosting controller's concrete type is the
+        /// root view's, unwrapped. Wrapping it in one more `AnyView` to name the
+        /// type moved 31 cells of the reference `weekly grid screen` frame by a
+        /// level, measured against the harness before the table.
+        private let controller: UIViewController
         private let window: UIWindow
         private let container: ModelContainer
         private(set) var surface: Surface
@@ -180,7 +184,7 @@ enum HostedScreenFrames {
             self.surface = surface
 
             let host = UIHostingController(
-                rootView: AnyView(root.environment(\.colorScheme, .dark))
+                rootView: root.environment(\.colorScheme, .dark)
             )
             host.safeAreaRegions = []
             host.overrideUserInterfaceStyle = UIUserInterfaceStyle.dark

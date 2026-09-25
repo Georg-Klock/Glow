@@ -92,6 +92,11 @@ struct HostedResizeTests {
                 )
                 let sameSize = resized.width == step.fresh.signature.width
                     && resized.height == step.fresh.signature.height
+                // The measurement the tolerance rests on, in every run's log.
+                print("""
+                    hosted-resize: \(step.name) identical=\(resized == step.fresh.signature) \
+                    worst-cell=\(worst.delta) black-delta=\(blackDelta)
+                    """)
                 if !sameSize
                     || worst.delta > RenderBaselineTests.cellTolerance
                     || blackDelta > RenderBaselineTests.hostedBlackTolerance {
