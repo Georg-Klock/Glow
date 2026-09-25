@@ -77,8 +77,10 @@ approve_lane() {
   # test.sh exits non-zero when the baseline moved, which is the ordinary case
   # here rather than an error. What the run was is decided below, from the
   # validator's own verdict, not from this status.
+  # Always the iPhone: both baselines are an iPhone's render, and an iPad run
+  # renders none (#643). An exported GLOW_DEVICE_KIND=ipad must not reach here.
   set +e
-  env ${@+"$@"} Tools/test.sh
+  env GLOW_DEVICE_KIND=iphone ${@+"$@"} Tools/test.sh
   set -e
 
   local run

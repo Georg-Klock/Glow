@@ -9245,6 +9245,45 @@ so a name truncates at the same character on every surface. Declined for now:
 spending the width on more than one week side by side — a new layout, which
 belongs in `docs/vision.md` first.
 
+## 2026-09-24 — Sizes are gated by hosted frames, device kinds by an iPad lane (#643, #632)
+
+**What changed.** `HostedScreenFrames` is a table of surfaces rather than one:
+the 393 × 852 reference phone, an iPhone SE, a Pro Max, an iPad ⅓ split, and a
+full-screen iPad Air 11-inch in both orientations, each with its own safe area
+and both size classes forced through `traitOverrides`. `HostedResizeTests`
+resizes a hosted This Week 375pt → 820pt → 375pt and compares each step with a
+fresh render. `GLOW_DEVICE_KIND=ipad Tools/test.sh` runs `GlowUITests` on an
+iPad simulator, nightly in CI.
+
+**Why the iPad lane runs `GlowUITests` alone.** Both committed render
+baselines are one iPhone's render, and a hosted frame already gives the phone
+lanes every iPad size; comparing them on an iPad would be comparing the idiom
+against a phone's picture. `GlowTests` does not branch on the device. A
+skipped test fails the validator, so the lane is not "the whole suite with the
+rest skipped": it is declared under `lanes` in `Tools/test-inventory.json`
+with its own floor and evidence, and the other bundles are left out of the
+build's test run.
+
+**The first hosted screen in a process is not like the others.** Measured on
+iOS 26.5: the reference `weekly grid screen`, hosted first in its process,
+differs by one level in 31 cells from the same frame hosted after any other
+screen, and every later render agrees with every other. The committed frame
+had always been a first render, because the gate was the only suite hosting
+screens. With `HostedResizeTests` hosting screens too, suite order would have
+decided which picture the gate compared, so the harness now makes one
+throwaway render of each screen before the first capture. That is the one
+move in the existing frames: `weekly grid screen` by one level in 31 cells on
+iOS 26.5 and 34 on iOS 18.5, and `widgets screen` by one level in 69 cells on
+iOS 18.5 — all inside the gate's tolerance of three.
+
+**Why the resize test keeps the gate's tolerances.** With the warm-up every
+step matched its fresh render exactly on both runtimes, but iOS 18.5 does not
+render the same picture twice (#431). A width or size class kept from before
+moves cells by tens; the test checks that it can see one by rendering 820pt at
+the wrong size class.
+
+**What neither half covers.** A foldable's real widths, and iPad multitasking
+chrome beyond a full-screen launch.
 ## 2026-09-24 — Type on This Week never drops below 11pt (#635)
 
 **What changed.** `RowGeometry.textSize` and `nameTextSize` are floored at

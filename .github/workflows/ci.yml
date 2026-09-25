@@ -6,7 +6,8 @@ on:
   pull_request:
   # **This is the minimum-iOS gate**, not a backstop for one. See the comment on
   # build-and-test-min: 06:00 UTC, so a compatibility failure is waiting in the
-  # morning rather than in front of a merge.
+  # morning rather than in front of a merge. The iPad lane runs on it too
+  # (build-and-test-ipad, #643).
   schedule:
     - cron: "0 6 * * *"
   # And on demand, for the case the schedule is too slow: a runtime-sensitive
@@ -227,7 +228,7 @@ jobs:
   # **Nightly, not per-merge, since 2026-08-29.** #286 accepted the CI-time cost
   # without measuring who paid it. Measured: this lane is 40 minutes against the
   # current lane's 12, of which 36 are the suite itself — the same tests, 3.6x
-  # slower on an iPhone SE 3 and a runtime downloaded fresh each run. The jobs
+  # slower on the iOS 18 runtime, downloaded fresh each run. The jobs
   # are parallel, so it *was* the whole of every pull request's feedback
   # latency, and every review comment, rebase and baseline re-approval paid it
   # again. Off the pull-request path, that feedback measured 9m13s.
@@ -302,10 +303,19 @@ jobs:
           usable
           xcrun simctl runtime list
 
-      # The smallest iPhone the declared minimum supports, created explicitly
-      # rather than trusted to exist — the whole lane is about not inheriting
-      # whatever the image happens to have.
-      - name: Create the minimum-iOS iPhone
+      # The phone this lane's baseline was measured on, made sure of rather
+      # than trusted to exist — the whole lane is about not inheriting whatever
+      # the image happens to have.
+      #
+      # **Not the iPhone SE this step used to create** (#643). Tools/test.sh
+      # prefers the device the committed baseline names, which for iOS 18 is
+      # an iPhone 16e, and the downloaded runtime brings one with it: the
+      # nightly of 2026-09-23 (run 35850317284) created "Glow minimum iPhone"
+      # as an SE and then tested on the runtime's own iPhone 16e. The SE was
+      # never used. The minimum phone *size* on the minimum runtime is covered
+      # instead by the hosted `iphone se` frames in render-signatures-ios18.json,
+      # which render 375 × 667 on whichever phone runs them.
+      - name: Make sure the baseline's iPhone exists on iOS 18
         run: |
           RUNTIME_ID=$(xcrun simctl list runtimes --json | /usr/bin/python3 -c '
           import json, sys
@@ -317,9 +327,17 @@ jobs:
               raise SystemExit("error: no available iOS 18 runtime after install")
           print(max(runtimes, key=lambda r: r["version"])["identifier"])
           ')
-          xcrun simctl create "Glow minimum iPhone" \
-            com.apple.CoreSimulator.SimDeviceType.iPhone-SE-3rd-generation \
-            "$RUNTIME_ID"
+          PHONE=$(/usr/bin/python3 -c 'import json; print(json.load(open("RenderTests/Baselines/render-signatures-ios18.json"))["device"])')
+          if xcrun simctl list devices available --json | /usr/bin/python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"].get(sys.argv[1], [])
+          raise SystemExit(0 if any(d["name"] == sys.argv[2] for d in devices) else 1)
+          ' "$RUNTIME_ID" "$PHONE"; then
+            echo "$PHONE already exists on $RUNTIME_ID"
+          else
+            xcrun simctl create "$PHONE" \
+              "com.apple.CoreSimulator.SimDeviceType.${PHONE// /-}" "$RUNTIME_ID"
+          fi
 
       - name: Show toolchain
         run: |
@@ -360,6 +378,77 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-run-min-ios-${{ github.run_id }}-${{ github.run_attempt }}
+          path: Artifacts/
+          if-no-files-found: error
+          retention-days: 14
+
+  # #632, #643: the app is universal, App Review runs it on an iPad Air
+  # 11-inch, and neither lane above ever opens an iPad. The render frames cover
+  # an iPad's *sizes* on both of them, through a hosted window forced to each
+  # surface's size class; what only a real iPad destination shows is the idiom
+  # and the system chrome around the app — the top tab bar, the window — which
+  # is what GlowUITests drives. So this lane is `GLOW_DEVICE_KIND=ipad
+  # Tools/test.sh`: GlowUITests alone on an iPad simulator, held by the
+  # validator to the `ipad` lane in Tools/test-inventory.json.
+  #
+  # Nightly and on demand, beside the iOS 18 lane and for the same reason: a
+  # question that changes with the device, not with every commit, should not
+  # sit in front of every merge. Not on pull requests, and there is no label:
+  # a change that needs the answer first can use `workflow_dispatch`.
+  build-and-test-ipad:
+    name: Build and test (iPad)
+    runs-on: macos-26
+    timeout-minutes: 30
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Cache the pinned XcodeGen
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: Tools/.xcodegen
+          key: xcodegen-${{ hashFiles('Tools/xcodegen.pin') }}
+
+      - name: Install the pinned XcodeGen
+        run: Tools/install-xcodegen.sh
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available | grep -E "^--|iPad" || true
+
+      - name: Generate and validate the project
+        run: Tools/generate.sh
+
+      # Which iPad is Tools/test.sh's choice: App Review's iPad Air 11-inch on
+      # the newest runtime when the image has one, the highest model otherwise.
+      # Printed first, so the log says which before the run spends the time.
+      - name: Run the UI tests on an iPad
+        env:
+          GLOW_ERASE_SIMULATOR: "1"
+          GLOW_DEVICE_KIND: ipad
+        run: |
+          Tools/test.sh --print-device
+          Tools/test.sh
+
+      - name: Publish the verdict
+        if: always()
+        run: |
+          summary=$(ls Artifacts/*/summary.md 2>/dev/null | head -1 || true)
+          if [ -n "$summary" ]; then
+            cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No summary was written — the run did not reach the validator." \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-run-ipad-${{ github.run_id }}-${{ github.run_attempt }}
           path: Artifacts/
           if-no-files-found: error
           retention-days: 14

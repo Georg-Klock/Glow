@@ -49,6 +49,20 @@
 # same way when GLOW_SIMULATOR_UDID is a different kind of phone. The choice
 # is inspectable without a run: `Tools/test.sh --print-device`.
 #
+# **The device kind is a choice, and the default is the iPhone** (#632, #643).
+# GLOW_DEVICE_KIND=ipad selects an iPad simulator by the same rules — newest
+# runtime, GLOW_EXPECTED_RUNTIME_MAJOR honoured and asserted, a pinned
+# GLOW_SIMULATOR_UDID checked against the kind — preferring App Review's iPad
+# Air 11-inch where the machine has one, and runs **GlowUITests only**. Not the
+# render suite: both committed baselines are pictures of one iPhone each, and a
+# hosted frame already reproduces an iPad's size and size class on the phone
+# lanes; what only a real iPad destination shows is the idiom and the system's
+# chrome, which is what the UI tests drive. Not GlowTests either: logic that
+# does not branch on the device. The validator holds that run to the `ipad`
+# entry under `lanes` in Tools/test-inventory.json — its own floor and its own
+# evidence — so leaving the other bundles out is declared rather than skipped.
+# Unset or `iphone`, nothing changes. CI runs the iPad kind nightly.
+#
 # Two locks, both held for the whole run, both queueing rather than failing:
 # one on the simulator (#221) and one on the DerivedData location (#577). The
 # second exists because two runs on *different* phones pass the first and
@@ -70,6 +84,16 @@ if [ "$#" -gt 0 ]; then
   echo "usage: Tools/test.sh [--print-device]" >&2
   exit 2
 fi
+
+DEVICE_KIND="${GLOW_DEVICE_KIND:-iphone}"
+case "$DEVICE_KIND" in
+  iphone) DEVICE_FAMILY="iPhone" ;;
+  ipad) DEVICE_FAMILY="iPad" ;;
+  *)
+    echo "error: GLOW_DEVICE_KIND is '$DEVICE_KIND'; it is iphone (the default) or ipad." >&2
+    exit 2
+    ;;
+esac
 
 RUN_ID="${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-$(date +%Y%m%d-%H%M%S)}-$$"
 RUN="Artifacts/${RUN_ID}"
@@ -111,10 +135,11 @@ DEVICE_ID="${GLOW_SIMULATOR_UDID:-}"
 
 [ -n "$DEVICE_ID" ] || DEVICE_ID=$(
   xcrun simctl list devices available --json |
-    /usr/bin/python3 -c '
+    GLOW_DEVICE_FAMILY="$DEVICE_FAMILY" /usr/bin/python3 -c '
 import json, os, re, sys
 
 expected = os.environ.get("GLOW_EXPECTED_RUNTIME_MAJOR", "")
+family = os.environ["GLOW_DEVICE_FAMILY"]
 data = json.load(sys.stdin)["devices"]
 candidates = []
 for runtime, devices in data.items():
@@ -128,7 +153,7 @@ for runtime, devices in data.items():
         continue
     for device in devices:
         name = device["name"]
-        if not device.get("isAvailable") or "iPhone" not in name:
+        if not device.get("isAvailable") or not name.startswith(family):
             continue
         # Prefer the newest runtime, then the highest model number, so a run
         # lands on a current phone rather than on whichever SE sorts last.
@@ -145,6 +170,14 @@ if not candidates:
 # be chosen before the file can be named.
 newest = max(version for (version, _, _), _ in candidates)
 on_runtime = [candidate for candidate in candidates if candidate[0][0] == newest]
+
+# An iPad has no baseline to prefer. It prefers the model App Review has run
+# this app on (#632), newest chip first, and falls back to the rule above.
+if family == "iPad":
+    reviewer = [c for c in on_runtime if c[0][2].startswith("iPad Air 11-inch")]
+    print(max(reviewer or on_runtime)[1])
+    raise SystemExit
+
 wanted, path = "", ""
 for path in (f"RenderTests/Baselines/render-signatures-ios{newest[0]}.json",
              "RenderTests/Baselines/render-signatures.json"):
@@ -171,13 +204,13 @@ else:
 
 if [ -z "$DEVICE_ID" ]; then
   if [ -n "${GLOW_EXPECTED_RUNTIME_MAJOR:-}" ]; then
-    echo "error: no available iPhone simulator on an iOS ${GLOW_EXPECTED_RUNTIME_MAJOR}.x runtime." >&2
+    echo "error: no available $DEVICE_FAMILY simulator on an iOS ${GLOW_EXPECTED_RUNTIME_MAJOR}.x runtime." >&2
     echo "The expectation is the point: this run must not fall forward to a newer" >&2
-    echo "runtime (#286). Install the iOS ${GLOW_EXPECTED_RUNTIME_MAJOR} runtime and create an iPhone on it," >&2
+    echo "runtime (#286). Install the iOS ${GLOW_EXPECTED_RUNTIME_MAJOR} runtime and create an $DEVICE_FAMILY on it," >&2
     echo "or unset GLOW_EXPECTED_RUNTIME_MAJOR. Installed runtimes:" >&2
     xcrun simctl list runtimes | grep iOS >&2 || true
   else
-    echo "error: no available iPhone simulator found. Install an iOS runtime in Xcode." >&2
+    echo "error: no available $DEVICE_FAMILY simulator found. Install an iOS runtime in Xcode." >&2
   fi
   exit 1
 fi
@@ -218,6 +251,18 @@ if [ -n "${GLOW_EXPECTED_RUNTIME_MAJOR:-}" ]; then
   esac
 fi
 
+# A pinned device has to be the kind the run was asked for: an iPhone udid
+# under GLOW_DEVICE_KIND=ipad would run the iPad lane's narrow scope on a phone
+# and report it as an iPad run.
+case "$DEVICE_NAME" in
+  "$DEVICE_FAMILY"*) ;;
+  *)
+    echo "error: GLOW_DEVICE_KIND is $DEVICE_KIND, but the chosen simulator is" >&2
+    echo "  $DEVICE_NAME ($DEVICE_ID)" >&2
+    exit 1
+    ;;
+esac
+
 # The baseline is per OS major where one is committed (#286), so which file
 # this run answers to follows from the runtime, and the phone that file was
 # measured on is the phone this run should be on (#576). A pinned device is
@@ -225,7 +270,14 @@ fi
 RUNTIME_MAJOR=$(printf '%s' "$RUNTIME_ID" | sed 's/.*iOS-\([0-9][0-9]*\)-.*/\1/')
 BASELINE_FILE=$(baseline_for_major "$RUNTIME_MAJOR")
 BASELINE_DEVICE=$(baseline_device "$BASELINE_FILE")
-if [ -n "${GLOW_SIMULATOR_UDID:-}" ] && [ -n "$BASELINE_DEVICE" ] \
+# What this run compares against, in words, for the console and the record.
+# An iPad run renders no baseline at all.
+if [ "$DEVICE_KIND" = ipad ]; then
+  BASELINE_NOTE="none, an iPad run is GlowUITests only"
+else
+  BASELINE_NOTE="$BASELINE_FILE, measured on ${BASELINE_DEVICE:-an unrecorded device}"
+fi
+if [ "$DEVICE_KIND" = iphone ] && [ -n "${GLOW_SIMULATOR_UDID:-}" ] && [ -n "$BASELINE_DEVICE" ] \
    && [ "$DEVICE_NAME" != "$BASELINE_DEVICE" ]; then
   echo "warning: GLOW_SIMULATOR_UDID is an $DEVICE_NAME, but $BASELINE_FILE was measured" >&2
   echo "on an $BASELINE_DEVICE. A render gate failure of a fraction of a point on this run" >&2
@@ -234,7 +286,7 @@ fi
 
 if [ "$PRINT_DEVICE" = 1 ]; then
   echo "==> Would test on $DEVICE_NAME ($RUNTIME_ID), simulator $DEVICE_ID"
-  echo "    against $BASELINE_FILE, measured on ${BASELINE_DEVICE:-an unrecorded device}"
+  echo "    device kind $DEVICE_KIND; baseline: $BASELINE_NOTE"
   exit 0
 fi
 
@@ -242,9 +294,10 @@ fi
 # still says which phone it died on.
 {
   echo "device: $DEVICE_NAME ($DEVICE_ID)"
+  echo "device kind: $DEVICE_KIND"
   echo "runtime: $RUNTIME_ID"
   echo "expected runtime major: ${GLOW_EXPECTED_RUNTIME_MAJOR:-unset (newest wins)}"
-  echo "baseline: $BASELINE_FILE, measured on ${BASELINE_DEVICE:-an unrecorded device}"
+  echo "baseline: $BASELINE_NOTE"
   xcodebuild -version | tr '\n' ' '
   echo
 } > "$RUN/simulator.txt"
@@ -334,14 +387,24 @@ xcrun simctl spawn "$DEVICE_ID" \
   defaults write com.apple.Accessibility ApplicationAccessibilityEnabled -bool true
 
 echo "==> Testing on $DEVICE_NAME ($RUNTIME_ID), simulator $DEVICE_ID"
-echo "==> Against $BASELINE_FILE, measured on ${BASELINE_DEVICE:-an unrecorded device}"
+echo "==> Baseline: $BASELINE_NOTE"
 echo "==> Evidence: $RUN"
+
+# The iPad lane's scope and its validation together: the bundle it runs is the
+# one the inventory's `ipad` lane declares, and the validator holds it to that.
+SCOPE=()
+LANE=()
+if [ "$DEVICE_KIND" = ipad ]; then
+  SCOPE=(-only-testing:GlowUITests)
+  LANE=(--lane ipad)
+fi
 
 set +e
 xcodebuild test \
   -project Glow.xcodeproj \
   -scheme Glow \
   -destination "platform=iOS Simulator,id=$DEVICE_ID" \
+  ${SCOPE[@]+"${SCOPE[@]}"} \
   -resultBundlePath "$RESULT" \
   CODE_SIGNING_ALLOWED=NO \
   | tee "$LOG"
@@ -461,7 +524,8 @@ set +e
   --xcresult "$RESULT" \
   --attachments "$RUN/attachments" \
   --json-output "$RUN/validation.json" \
-  --summary-output "$RUN/summary.md"
+  --summary-output "$RUN/summary.md" \
+  ${LANE[@]+"${LANE[@]}"}
 VALIDATION=$?
 set -e
 
@@ -471,7 +535,7 @@ set -e
 if [ -f "$RUN/summary.md" ]; then
   {
     echo
-    echo "Ran on: $DEVICE_NAME — \`$RUNTIME_ID\`; baseline \`$BASELINE_FILE\`, measured on ${BASELINE_DEVICE:-an unrecorded device}"
+    echo "Ran on: $DEVICE_NAME ($DEVICE_KIND) — \`$RUNTIME_ID\`; baseline: $BASELINE_NOTE"
   } >> "$RUN/summary.md"
 fi
 

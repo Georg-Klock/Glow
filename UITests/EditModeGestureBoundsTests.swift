@@ -28,14 +28,22 @@ final class EditModeGestureBoundsTests: XCTestCase {
         // the List's bound and iOS 18 runs it out to the bound, and the List's
         // bound is placed so the action lands on the track either way (#555).
         //
+        // At regular width the ceiling is the readable width, 672pt, instead
+        // (#634) — the same rule, and on an iPad the one that applies.
+        //
         // Written out rather than imported: a UI test cannot see `RowGeometry`,
-        // so this is the rule as `RowGeometryTests` pins it, in three lines.
+        // so this is the rule as `RowGeometryTests` pins it, in a few lines.
+        let sizeClass = app.windows.firstMatch.horizontalSizeClass
+        let ceiling: CGFloat = sizeClass == .regular ? 672 : 338
         let offered = app.frame.width - 40
-        let panel = min(offered, 338)
+        let panel = min(offered, ceiling)
         let scale = panel / 338
         let sideMargin = (offered - panel) / 2
         let expectedTrackEnd = app.frame.width - sideMargin - 20 - 14 * scale
-        XCTAssertEqual(delete.frame.maxX, expectedTrackEnd, accuracy: 1)
+        XCTAssertEqual(
+            delete.frame.maxX, expectedTrackEnd, accuracy: 1,
+            "at \(app.frame.width)pt, size class \(sizeClass.rawValue)"
+        )
     }
 
     func testNativeReorderStillMovesTheRow() throws {

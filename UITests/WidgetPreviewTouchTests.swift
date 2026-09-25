@@ -28,7 +28,12 @@ final class WidgetPreviewTouchTests: XCTestCase {
     }
 
     private func openWidgets(in app: XCUIApplication) {
-        let tab = app.tabBars.buttons["Widgets"]
+        // A phone's tab bar is a `TabBar`; an iPad's floats at the top of the
+        // window and reaches the accessibility tree as plain buttons (#632).
+        var tab = app.tabBars.buttons["Widgets"]
+        if !tab.waitForExistence(timeout: 3) {
+            tab = app.buttons["Widgets"].firstMatch
+        }
         XCTAssertTrue(tab.waitForExistence(timeout: 3), "Widgets tab was not available")
         tab.tap()
         XCTAssertTrue(app.navigationBars["Widgets"].waitForExistence(timeout: 3))

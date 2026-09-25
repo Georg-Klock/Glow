@@ -77,10 +77,13 @@ import UIKit
 ///   `ImageRenderer` frames are 2x, sRGB and dark over
 ///   `GlowPalette.widgetBackground`, exactly as the widget configurations are.
 ///   The two whole screens use the compositor through `HostedScreenFrames`: a
-///   393 × 852 window with that surface's 59pt top and 34pt bottom safe area, a
+///   window at one of its surfaces — the 393 × 852 reference phone, and since
+///   #643 an iPhone SE, a Pro Max, an iPad ⅓ split and a full-screen iPad in
+///   both orientations — with that surface's safe area and size classes, a
 ///   forced 2x display/output scale, dark appearance and SDR output. The safe
 ///   area correction is installed before the host enters its live scene;
-///   otherwise the simulator model still moves both screens (#481).
+///   otherwise the simulator model still moves both screens (#481). A hosted
+///   window reproduces size and size class, not the idiom; see its header.
 ///
 /// Locale still reaches the weekday initials. It is the simulator's own, en_US
 /// on every machine this runs on; a machine with another one is a legitimate
@@ -303,18 +306,67 @@ struct RenderBaselineTests {
 
     @Test("Hosted screens correct each measured model to one safe area")
     func hostedSafeAreaIsPinned() {
-        let cases: [(inherited: UIEdgeInsets, additional: UIEdgeInsets)] = [
-            (.init(top: 47, left: 0, bottom: 34, right: 0),
+        typealias Surface = HostedScreenFrames.Surface
+        let cases: [(inherited: UIEdgeInsets, surface: Surface, additional: UIEdgeInsets)] = [
+            // The reference phone, from each phone the suite has run on.
+            (.init(top: 47, left: 0, bottom: 34, right: 0), .phone,
              .init(top: 12, left: 0, bottom: 0, right: 0)),
-            (.init(top: 59, left: 0, bottom: 34, right: 0), .zero),
-            (.init(top: 62, left: 0, bottom: 0, right: 0),
+            (.init(top: 59, left: 0, bottom: 34, right: 0), .phone, .zero),
+            (.init(top: 62, left: 0, bottom: 0, right: 0), .phone,
              .init(top: -3, left: 0, bottom: 34, right: 0)),
+            // The size matrix (#643), from the 17e both lanes' baselines name.
+            (.init(top: 59, left: 0, bottom: 34, right: 0), .phoneSE,
+             .init(top: -39, left: 0, bottom: -34, right: 0)),
+            (.init(top: 59, left: 0, bottom: 34, right: 0), .phoneProMax,
+             .init(top: 3, left: 0, bottom: 0, right: 0)),
+            (.init(top: 59, left: 0, bottom: 34, right: 0), .iPad,
+             .init(top: -35, left: 0, bottom: -14, right: 0)),
+            // And the other way round: an iPad's own 24/20 corrected to a phone.
+            (.init(top: 24, left: 0, bottom: 20, right: 0), .phone,
+             .init(top: 35, left: 0, bottom: 14, right: 0)),
+            (.init(top: 24, left: 0, bottom: 20, right: 0), .iPadLandscape, .zero),
         ]
 
         for value in cases {
             #expect(
-                HostedScreenFrames.additionalSafeAreaInsets(for: value.inherited)
-                    == value.additional
+                HostedScreenFrames.additionalSafeAreaInsets(
+                    for: value.inherited, surface: value.surface
+                ) == value.additional
+            )
+        }
+    }
+
+    @Test("The hosted surfaces cover the size matrix, each with the size class it gets")
+    func hostedSurfacesAreTheSizeMatrix() {
+        // Names are the baseline's keys, so two frames under one name would
+        // gate one of them and silently drop the other.
+        let names = HostedScreenFrames.names
+        #expect(Set(names).count == names.count, "duplicate hosted frame names: \(names)")
+
+        // The two frames from before #643 are still the reference phone's.
+        let reference = HostedScreenFrames.frames.filter {
+            ["weekly grid screen", "widgets screen"].contains($0.name)
+        }
+        #expect(reference.count == 2)
+        #expect(reference.allSatisfy { $0.surface == .phone })
+
+        // This Week is on every surface: it is the screen whose layout the
+        // size class changes (#634).
+        let surfaces = HostedScreenFrames.frames.filter { $0.screen == .weeklyGrid }.map(\.surface)
+        for surface in [HostedScreenFrames.Surface.phone, .phoneSE, .phoneProMax,
+                        .iPadSplit, .iPad, .iPadLandscape] {
+            #expect(surfaces.contains(surface), "This Week has no frame at \(surface.size)")
+        }
+
+        // Every phone and the ⅓ split are compact width; the full-screen iPad
+        // is regular in both orientations. A table that forced the wrong one
+        // would gate the other layout under this one's name.
+        for frame in HostedScreenFrames.frames {
+            let expected: UIUserInterfaceSizeClass = frame.surface.size.width >= 700
+                ? .regular : .compact
+            #expect(
+                frame.surface.horizontalSizeClass == expected,
+                "\(frame.name) at \(frame.surface.size.width)pt forces the wrong width class"
             )
         }
     }
@@ -984,6 +1036,28 @@ struct RenderBaselineTests {
     }
 
     static func currentSignatures() throws -> [String: RenderSignature] {
+        try withPinnedScene {
+            var out: [String: RenderSignature] = [:]
+            for frame in frames {
+                out[frame.name] = RenderSignature(of: try render(frame))
+            }
+            for name in HostedScreenFrames.names {
+                let rendered = try HostedScreenFrames.render(named: name)
+                let image = try #require(
+                    rendered,
+                    "the hosted compositor produced nothing for \(name)"
+                )
+                out[name] = RenderSignature(of: image)
+            }
+            return out
+        }
+    }
+
+    /// Runs `body` with every piece of ambient state a frame depends on pinned,
+    /// and puts it back afterwards. Shared by the gate and by the hosted resize
+    /// test (#643), which renders the same screens and has to see the same
+    /// scene.
+    static func withPinnedScene<T>(_ body: () throws -> T) throws -> T {
         // The glow is part of the picture, so it is pinned rather than turned
         // off — and the cache is cleared, because a suite that legitimately
         // rendered at another setting leaves tiles in it.
@@ -1011,20 +1085,7 @@ struct RenderBaselineTests {
         GlowImageCache.shared.prepareForSynchronousRendering(
             peak: GlowSettings.defaultValue
         )
-
-        var out: [String: RenderSignature] = [:]
-        for frame in frames {
-            out[frame.name] = RenderSignature(of: try render(frame))
-        }
-        for name in HostedScreenFrames.names {
-            let rendered = try HostedScreenFrames.render(named: name)
-            let image = try #require(
-                rendered,
-                "the hosted compositor produced nothing for \(name)"
-            )
-            out[name] = RenderSignature(of: image)
-        }
-        return out
+        return try body()
     }
 
     // MARK: - The committed file

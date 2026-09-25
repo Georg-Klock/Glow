@@ -788,13 +788,15 @@ also reaches the production app module for two full-screen frames.
 invalid-configuration placeholder rather than the screen, so
 `HostedScreenFrames` mounts the real `WeeklyGridView` and `WidgetsView` in a
 `UIWindow` and captures the compositor with `drawHierarchy`. That path pins a
-393 × 852 logical window, its 59pt top and 34pt bottom safe area, 2x
-display/output scale, dark appearance and a fixed today. The safe-area
+logical window from a table of surfaces — the size, that size's safe area, and
+both size classes forced through `traitOverrides` — with 2x display/output
+scale, dark appearance and a fixed today; the surfaces are listed under
+"Sizes and device kinds" below. The safe-area
 correction is applied before the hosting controller enters the live scene so a
 simulator model cannot move the navigation layout (#481). It also carries the
 **render baseline**: a
 committed 16 × 16 grid of mean brightness per frame — the widget frames, three
-isolated app frames and two whole app screens — in
+isolated app frames and the two whole app screens at each hosted surface — in
 `RenderTests/Baselines/render-signatures.json`, rendered for a pinned date at a
 pinned glow setting. Each cell averages roughly 450 pixels, so antialiasing
 moves a cell by well under one level while a mark that moves a column moves
@@ -812,10 +814,11 @@ A change that is deliberate is approved by copying the manifest the run
 attached over the committed file; `Tools/test.sh` prints that command with the
 run's own path in it.
 
-`GlowUITests` is the process-level interaction exception. Its single fixture
-launches Glow with a Debug-only, in-memory store containing one deterministic
-daily habit, opens the Widgets tab, and taps the first visible preview mark at
-screen coordinates. The assertion waits for the spoken control label to flip,
+`GlowUITests` is the process-level interaction exception. Its fixtures launch
+Glow with a Debug-only, in-memory store of deterministic daily habits.
+`WidgetPreviewTouchTests` opens the Widgets tab and taps the first visible preview mark at screen
+coordinates; `TodaySlotSmokeTests` taps today's slot on This Week's first row
+and attaches a screenshot and the device, idiom and window size it ran on. The assertion waits for the spoken control label to flip,
 which proves both physical hit delivery and the optimistic face. The fixture
 cannot inherit or mutate App Group history. This target exists because hosted
 accessibility activation bypasses the physical-touch path that failed in #494;
@@ -836,6 +839,44 @@ CI runs the same script on pull requests and on merges to `main`, plus an
 unsigned Release build against the device SDK — the configuration and the SDK
 that ship, which the simulator test lane never compiles. Every run uploads its
 `Artifacts/` directory, passing or failing.
+
+### Sizes and device kinds
+
+Two halves, and each covers what the other cannot (#632, #643).
+
+**The hosted render frames cover sizes.** `HostedScreenFrames` renders This
+Week and Widgets into a window at each surface below, with its safe area and
+size classes forced, on whichever iPhone the lane runs — so every size is in
+both committed baselines, the current runtime's and iOS 18's:
+
+| Surface | Points | Safe area | Width class | This Week | Widgets |
+| --- | --- | --- | --- | --- | --- |
+| reference phone (6.1") | 393 × 852 | 59 / 34 | compact | yes | yes |
+| iPhone SE | 375 × 667 | 20 / 0 | compact | yes | yes |
+| iPhone Pro Max | 440 × 956 | 62 / 34 | compact | yes | no |
+| iPad ⅓ Split View | 320 × 1024 | 24 / 20 | compact | yes | yes |
+| iPad Air 11-inch, portrait | 820 × 1180 | 24 / 20 | regular | yes | yes |
+| iPad Air 11-inch, landscape | 1180 × 820 | 24 / 20 | regular | yes | no |
+
+`HostedResizeTests` adds the one property no fixed frame can see: This Week
+hosted at 375pt compact, resized to 820pt regular and back, matches a fresh
+render at each step — the layout is a function of the window's width and size
+class, and keeps nothing from the width before. That is the foldable case, and
+Stage Manager's.
+
+**What those frames cannot cover is the device.** A hosted window reproduces
+size and size class, not `UIUserInterfaceIdiom`: the iPad frames are an iPhone
+drawing into an iPad-sized window, with the phone's tab bar. **The device
+kinds** are covered by `GlowUITests`, which runs on an iPhone in both
+per-change lanes and on an iPad in `GLOW_DEVICE_KIND=ipad Tools/test.sh` —
+nightly in CI, preferring App Review's iPad Air 11-inch, and held by the
+validator to the inventory's `ipad` lane: `GlowUITests` alone, since there is
+no iPad render baseline and the logic suite does not branch on the device. On
+iPadOS 26.5 the universal build runs full screen at 820 × 1180 with the tab
+bar floating at the top.
+
+Not covered by either: a real foldable, and iPad multitasking chrome beyond
+what a full-screen launch shows.
 
 ## The App Group
 
