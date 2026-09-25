@@ -416,7 +416,8 @@ struct WidgetMetricsTests {
     }
 
     /// #640: the first iPad frames, read out of the App Group after the
-    /// extension rendered on an iPad Air 11-inch (M4) simulator, iPadOS 26.5.
+    /// extension rendered on three iPad simulators, iPadOS 26.5. Every one
+    /// of them hands the large family a square.
     /// Kept apart from the phones' lists on purpose: the large one is
     /// **square**, and the phones' "the cost is under two points" does not
     /// hold for it — ten rows fit, but at a 22.8pt slot the drawn track is
@@ -424,7 +425,9 @@ struct WidgetMetricsTests {
     /// Whether that is worth a layout change is #652; the row counts are
     /// what this pins.
     private static let measuredIPadFrames: [(String, large: CGSize, medium: CGSize)] = [
+        ("iPad mini (A17 Pro)", CGSize(width: 305.5, height: 305.5), CGSize(width: 305.5, height: 141)),
         ("iPad Air 11-inch (M4)", CGSize(width: 342, height: 342), CGSize(width: 342, height: 155)),
+        ("iPad Pro 13-inch (M5)", CGSize(width: 378.5, height: 378.5), CGSize(width: 378.5, height: 170)),
     ]
 
     @Test("Every frame an iPad was measured giving draws ten large rows and four medium")

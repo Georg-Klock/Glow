@@ -48,13 +48,15 @@ enum WidgetMetrics {
     /// | iPhone 15 Pro | 344.67 × 162.67 | 344.67 × 360.00 |
     /// | iPhone 17 Pro | 349.67 × 164.33 | 349.67 × 365.00 |
     /// | iPhone 17e | 342.00 × 162.00 | 342.00 × 358.00 |
+    /// | iPad mini (A17 Pro) | 305.50 × 141.00 | 305.50 × 305.50 |
     /// | iPad Air 11-inch (M4) | 342.00 × 155.00 | 342.00 × 342.00 |
+    /// | iPad Pro 13-inch (M5) | 378.50 × 170.00 | 378.50 × 378.50 |
     ///
-    /// The iPad row (#640) was read from the App Group's `WidgetDisplaySize`
+    /// The iPad rows (#640) were read from the App Group's `WidgetDisplaySize`
     /// entries after the extension rendered on a simulator, not from a pixel
-    /// count, and its large frame is **square**: ten rows still fit, at a
+    /// count, and every large frame is **square**: ten rows still fit, at a
     /// slot 7% under the track's, and the difference is the trailing-margin
-    /// question in #652. Its medium frame is the one tighter than the design's.
+    /// question in #652.
     ///
     /// **For the large family that gap cost a row**, which is #410 and the
     /// `rowLayout` above. **For the medium family it costs nothing**, and the
