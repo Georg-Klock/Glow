@@ -372,6 +372,14 @@ than trusting it.
 
 ## 6. Layout
 
+**One app on iPhone and iPad** (#633). The iPhone is portrait-only; the iPad
+takes every orientation, Split View, Slide Over and Stage Manager. Nothing in
+the layout branches on the device: every measurement is a function of the
+window's width, so an iPad window at 320pt and a phone at 375pt are the same
+question at two widths, and a window that is resized is re-asked. Before #633
+the app was iPhone-only and still ran on iPads — App Review tested it there as
+a phone-shaped window (#632).
+
 Each habit is one row: icon and name on the left, a fixed-width status track on
 the right.
 

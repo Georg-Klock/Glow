@@ -3,6 +3,22 @@
 Current technical truth. Where this and the code disagree, the code wins and
 this file is a bug.
 
+## Devices
+
+Universal since #633: `TARGETED_DEVICE_FAMILY` is `1,2` on the app and the
+widget, the iPhone's orientations are portrait only
+(`INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone`), and the iPad's are
+all four (`…_iPad`), which multitasking requires. There is no
+`UIRequiresFullScreen` and no idiom branch in `Glow/`: layout is derived from
+the window's width (`GridMetrics`, `SlotLayout`), which is what a resizable
+iPad window — and any future phone whose width changes — needs.
+
+Two gates hold that declaration, because a narrower one builds and runs
+without complaint: `Tools/check-project.py` on the generated project, and
+`Tools/check-release-build.py` on the shipped `Info.plist`s against
+`Tools/test-inventory.json`. The widget extension was already `1,2`, by
+xcodegen's default; it is now explicit.
+
 ## The shape
 
 ```

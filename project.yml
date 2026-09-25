@@ -94,7 +94,12 @@ targets:
         PRODUCT_NAME: Glow
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
-        TARGETED_DEVICE_FAMILY: "1"
+        # iPhone and iPad (#633). The iPad was a platform this app already ran
+        # on — App Review tested it on an iPad Air twice as an iPhone app in a
+        # phone-shaped window (#632) — so declaring it is a decision about how
+        # it looks there, not about whether it runs. `Tools/check-project.py`
+        # and `Tools/check-release-build.py` both hold this value.
+        TARGETED_DEVICE_FAMILY: "1,2"
         # Manual signing, deliberately. Automatic signing needs an Apple ID in
         # Xcode's Accounts to mint profiles; without one it silently falls back
         # to the team's wildcard profile, which does not grant the App Group, and
@@ -119,7 +124,17 @@ targets:
         # reason.
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        # Portrait on iPhone, every orientation on iPad (#633). The week grid
+        # has no landscape reading on a phone better than its portrait one;
+        # an iPad has no "right way up", and Split View and Stage Manager both
+        # require all four. No `UIRequiresFullScreen`: multitasking is the
+        # point of the iPad, and the layout is a function of window width.
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: >-
+          UIInterfaceOrientationPortrait
+          UIInterfaceOrientationPortraitUpsideDown
+          UIInterfaceOrientationLandscapeLeft
+          UIInterfaceOrientationLandscapeRight
         INFOPLIST_KEY_CFBundleDisplayName: Practice
 
   # The widget shares the model, logic and store with the app by compiling the
@@ -176,6 +191,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.georgklock.glow.widget
+        # Explicit, not the generator's default, which happens to be "1,2"
+        # already: the host declares iPad (#633), and a widget whose family
+        # drifted from its host's would be offered on one and not the other.
+        TARGETED_DEVICE_FAMILY: "1,2"
         PRODUCT_NAME: GlowWidget
         CODE_SIGN_STYLE: Manual
         PROVISIONING_PROFILE_SPECIFIER: Glow Up Widget Development
