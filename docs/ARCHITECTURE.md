@@ -3,6 +3,22 @@
 Current technical truth. Where this and the code disagree, the code wins and
 this file is a bug.
 
+## Devices
+
+Universal since #633: `TARGETED_DEVICE_FAMILY` is `1,2` on the app and the
+widget, the iPhone's orientations are portrait only
+(`INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone`), and the iPad's are
+all four (`…_iPad`), which multitasking requires. There is no
+`UIRequiresFullScreen` and no idiom branch in `Glow/`: layout is derived from
+the window's width (`GridMetrics`, `SlotLayout`), which is what a resizable
+iPad window — and any future phone whose width changes — needs.
+
+Two gates hold that declaration, because a narrower one builds and runs
+without complaint: `Tools/check-project.py` on the generated project, and
+`Tools/check-release-build.py` on the shipped `Info.plist`s against
+`Tools/test-inventory.json`. The widget extension was already `1,2`, by
+xcodegen's default; it is now explicit.
+
 ## The shape
 
 ```
@@ -437,6 +453,14 @@ with `DayRingView` and the geometry under it (#209); the slot was left empty
 rather than collapsed so that #210 could fill it in the same position, and the
 bar reflowed once rather than twice. #238 then moved Widgets to the front,
 an order argued on its own terms rather than inherited.
+
+**On iPad the bar is the platform's own** (#639). `RootTabView` sets no
+`tabViewStyle`, so at regular width iPadOS draws the three tabs as its compact
+control at the top of the window. `.labelStyle(.iconOnly)` holds there: the
+tabs draw their icons with no titles, and each tab's navigation bar and title
+sit below the control. A sidebar (`.sidebarAdaptable`) was declined, because
+with three destinations it mostly spends width, and the grid is what should
+get the width (#634). Measured on an iPad Air 11-inch (M4), iPadOS 26.5.
 
 **Correct History is a mode of `WeeklyGridView`, not a view** (#557; it was
 `EditHistoryView`, a `fullScreenCover`, from #543 to #557). `WeekGridMode` in

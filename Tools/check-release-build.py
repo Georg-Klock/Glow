@@ -34,6 +34,12 @@ no build failure reports.
     there and tests assert it on the simulator build; this is the same
     assertion on the artifact that actually goes up.
 
+  * **Device family and orientations** (#633). The host and every appex
+    declare iPhone and iPad, and the host's orientations are portrait on
+    iPhone and all four on iPad. A build that narrowed back to iPhone-only
+    installs and runs on an iPad anyway — as a phone-shaped window, on the
+    device App Review tests with (#632).
+
   * **Entitlements and profile** (`--require-signing`). The exact App Group,
     read back out of the signature rather than out of the source file, and an
     embedded profile that has not expired. CI's build is unsigned by design, so
@@ -197,6 +203,12 @@ def inspect_bundle(path: Path) -> dict:
         "shortVersion": plist.get("CFBundleShortVersionString"),
         "version": plist.get("CFBundleVersion"),
         "resources": sorted(child.name for child in path.iterdir()),
+        "deviceFamily": plist.get("UIDeviceFamily"),
+        "orientations": {
+            idiom: plist.get(f"UISupportedInterfaceOrientations~{idiom}")
+            or plist.get("UISupportedInterfaceOrientations")
+            for idiom in ("iphone", "ipad")
+        },
         "entitlements": entitlements_of(path),
         "profileExpiry": profile_expiry(path),
     }
@@ -278,6 +290,21 @@ def validate(artifact: dict, expectations: dict, *, require_signing: bool, now: 
                 f"{label}: CFBundleIdentifier is {describe(got)}, and the repository "
                 f"declares {want!r}."
             )
+        family = declared.get("deviceFamily")
+        if family is not None:
+            got_family = bundle.get("deviceFamily")
+            if sorted(got_family or []) != sorted(family):
+                failures.append(
+                    f"{label}: UIDeviceFamily is {describe(got_family)}, and the "
+                    f"repository declares {family!r} (#633)."
+                )
+        for idiom, want_orientations in sorted(declared.get("orientations", {}).items()):
+            got_orientations = (bundle.get("orientations") or {}).get(idiom)
+            if sorted(got_orientations or []) != sorted(want_orientations):
+                failures.append(
+                    f"{label}: {idiom} orientations are {describe(got_orientations)}, "
+                    f"and the repository declares {sorted(want_orientations)!r} (#633)."
+                )
         for resource in declared.get("requiredResources", []):
             if resource not in bundle["resources"]:
                 failures.append(
@@ -405,26 +432,45 @@ def report(artifact: dict) -> str:
 # ---------------------------------------------------------------- self-test
 
 
+IPAD_ORIENTATIONS = (
+    "UIInterfaceOrientationPortrait",
+    "UIInterfaceOrientationPortraitUpsideDown",
+    "UIInterfaceOrientationLandscapeLeft",
+    "UIInterfaceOrientationLandscapeRight",
+)
+
+
 def fabricate(root: Path, *, host_version=("0.1", "42"), widget_version=("0.1", "42"),
               host_id="com.georgklock.glow", widget_id="com.georgklock.glow.widget",
-              widget=True, manifests=True, extra_appex=False) -> Path:
+              widget=True, manifests=True, extra_appex=False,
+              host_family=(1, 2), widget_family=(1, 2),
+              iphone_orientations=("UIInterfaceOrientationPortrait",),
+              ipad_orientations=IPAD_ORIENTATIONS) -> Path:
     """A `.app` on disk, wrong in whichever way the scenario asks for."""
     app = root / "Glow.app"
     (app / "PlugIns").mkdir(parents=True)
 
-    def write(bundle: Path, identifier, versions, manifest):
+    def write(bundle: Path, identifier, versions, manifest, family=(1, 2), orientations=None):
         bundle.mkdir(parents=True, exist_ok=True)
-        (bundle / "Info.plist").write_bytes(plistlib.dumps({
+        plist = {
             "CFBundleIdentifier": identifier,
             "CFBundleShortVersionString": versions[0],
             "CFBundleVersion": versions[1],
-        }))
+        }
+        if family is not None:
+            plist["UIDeviceFamily"] = list(family)
+        for idiom, values in (orientations or {}).items():
+            if values is not None:
+                plist[f"UISupportedInterfaceOrientations~{idiom}"] = list(values)
+        (bundle / "Info.plist").write_bytes(plistlib.dumps(plist))
         if manifest:
             (bundle / "PrivacyInfo.xcprivacy").write_bytes(plistlib.dumps({}))
 
-    write(app, host_id, host_version, manifests)
+    write(app, host_id, host_version, manifests, host_family,
+          {"iphone": iphone_orientations, "ipad": ipad_orientations})
     if widget:
-        write(app / "PlugIns" / "GlowWidget.appex", widget_id, widget_version, manifests)
+        write(app / "PlugIns" / "GlowWidget.appex", widget_id, widget_version, manifests,
+              widget_family)
     if extra_appex:
         write(app / "PlugIns" / "Rogue.appex", "com.georgklock.glow.rogue", host_version, True)
     return app
@@ -439,10 +485,14 @@ def self_test() -> int:
     """
     expectations = {
         "host": {"bundleIdentifier": "com.georgklock.glow",
-                 "requiredResources": ["PrivacyInfo.xcprivacy"]},
+                 "requiredResources": ["PrivacyInfo.xcprivacy"],
+                 "deviceFamily": [1, 2],
+                 "orientations": {"iphone": ["UIInterfaceOrientationPortrait"],
+                                  "ipad": list(IPAD_ORIENTATIONS)}},
         "extensions": {"GlowWidget.appex": {
             "bundleIdentifier": "com.georgklock.glow.widget",
-            "requiredResources": ["PrivacyInfo.xcprivacy"]}},
+            "requiredResources": ["PrivacyInfo.xcprivacy"],
+            "deviceFamily": [1, 2]}},
         "appGroup": "group.com.georgklock.glow",
     }
     now = datetime(2026, 8, 22, tzinfo=timezone.utc)
@@ -478,6 +528,23 @@ def self_test() -> int:
         ("an appex outside the host's identifier fails",
          {"widget_id": "com.georgklock.widget"},
          "is not 'com.georgklock.glow' plus one component"),
+        # #633: the universal declaration, narrowed back in each way it can be.
+        ("an iPhone-only host fails",
+         {"host_family": (1,)},
+         "Glow.app: UIDeviceFamily is [1]"),
+        ("a host with no device family fails",
+         {"host_family": None},
+         "Glow.app: UIDeviceFamily is absent"),
+        ("an iPhone-only widget fails",
+         {"widget_family": (1,)},
+         "GlowWidget.appex: UIDeviceFamily is [1]"),
+        ("landscape on iPhone fails",
+         {"iphone_orientations": ("UIInterfaceOrientationPortrait",
+                                  "UIInterfaceOrientationLandscapeLeft")},
+         "iphone orientations are"),
+        ("a portrait-only iPad fails",
+         {"ipad_orientations": ("UIInterfaceOrientationPortrait",)},
+         "ipad orientations are"),
     ]
 
     bad = 0
@@ -509,6 +576,9 @@ def self_test() -> int:
     signed = {
         "host": {"name": "Glow.app", "identifier": "com.georgklock.glow",
                  "shortVersion": "0.1", "version": "42", "resources": ["PrivacyInfo.xcprivacy"],
+                 "deviceFamily": [1, 2],
+                 "orientations": {"iphone": ["UIInterfaceOrientationPortrait"],
+                                  "ipad": list(IPAD_ORIENTATIONS)},
                  "entitlements": {"com.apple.security.application-groups":
                                   ["group.com.georgklock.glow"]},
                  "profileExpiry": datetime(2027, 1, 1, tzinfo=timezone.utc)},
@@ -636,7 +706,7 @@ def main() -> int:
         return 1
 
     signing = " signature and profile," if arguments.require_signing else ""
-    print(f"check-release-build: identity, versions,{signing} manifests verified "
+    print(f"check-release-build: identity, versions, device family,{signing} manifests verified "
           f"on {1 + len(artifact['extensions'])} bundles")
     return 0
 

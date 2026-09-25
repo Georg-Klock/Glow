@@ -9195,3 +9195,29 @@ truncates at about twelve characters; "Weekly Pract…" is not a name.
 
 **Not decided here.** The feedback address in Settings is still
 `glowup@georgklock.com`; changing it needs a mailbox first.
+
+## 2026-09-24 — The app is universal: iPhone in portrait, iPad in every orientation (#633)
+
+**What changed.** `TARGETED_DEVICE_FAMILY` is `1,2`. The iPhone keeps portrait
+only; the iPad takes all four orientations and every multitasking mode, with no
+`UIRequiresFullScreen`. `Tools/check-project.py` and
+`Tools/check-release-build.py` both reject a build that narrows either back.
+
+**Why.** The iPad was already a platform this app ran on. App Review tested
+1.0 on an iPad Air 11-inch twice (#632), and on iPadOS 26.5 an iPhone-only
+build runs there as a phone-shaped window whose window controls sit on the
+This Week back button. Declaring the iPad makes how the app looks there a
+decision rather than an accident.
+
+**Why not iPhone landscape.** The week grid has no landscape reading on a
+phone that is better than its portrait one: the panel is the widget's
+width, so landscape adds black either side of it and takes rows away from
+below it. Nothing in the
+layout breaks in landscape, so this is a product choice that can be reversed
+by one key and its gate, not a technical limit.
+
+**Settled at the same time** (#644), each to land in its own change: at
+regular width the grid scales up in the widget's proportions until the panel
+reaches the readable width (#634), superseding #588's "never larger" at that
+width only; `systemExtraLarge` is not in this pass (#640); the iPad keeps the
+platform's default top tab bar (#639).

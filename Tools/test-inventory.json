@@ -78,12 +78,23 @@
     "appGroup": "group.com.georgklock.glow",
     "host": {
       "bundleIdentifier": "com.georgklock.glow",
-      "requiredResources": ["PrivacyInfo.xcprivacy"]
+      "requiredResources": ["PrivacyInfo.xcprivacy"],
+      "deviceFamily": [1, 2],
+      "orientations": {
+        "iphone": ["UIInterfaceOrientationPortrait"],
+        "ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ]
+      }
     },
     "extensions": {
       "GlowWidget.appex": {
         "bundleIdentifier": "com.georgklock.glow.widget",
-        "requiredResources": ["PrivacyInfo.xcprivacy"]
+        "requiredResources": ["PrivacyInfo.xcprivacy"],
+        "deviceFamily": [1, 2]
       }
     }
   },

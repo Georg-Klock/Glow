@@ -1,6 +1,6 @@
 # Weekly Practice
 
-An iPhone habit tracker: three tabs — Widgets, This Week, Settings — around
+An iPhone and iPad habit tracker: three tabs — Widgets, This Week, Settings — around
 one weekly grid. **Practice** on the Home Screen, **Weekly Practice** on the
 App Store; it was Glow Up until #629, and the repository, targets, bundle
 identifiers and "the glow" as the HDR feature's name keep that history. The one

@@ -26,6 +26,12 @@ The previous check was textual and failed open: it repaired what it recognised
 and said nothing when it recognised nothing. A generator whose output format
 moves is exactly the case where recognising nothing is the likely outcome.
 
+  * TARGETED_DEVICE_FAMILY and the per-idiom orientation keys (#633). The
+    app is universal, portrait-only on iPhone and every orientation on iPad.
+    A setting xcodegen drops, or an edit that narrows it back to "1", builds
+    and runs — as an iPhone app in a phone-shaped window on the device App
+    Review keeps testing on (#632).
+
 And one thing checked here is the opposite shape: a value the build does *not*
 need, whose arrival would be silent too. Glow's promise is that habit data
 never leaves the device except through an explicit share, and the road
@@ -72,6 +78,21 @@ GROUPED_TARGETS = ("Glow", "GlowWidget")
 
 # Targets that must be built with extension-only API enforcement.
 EXTENSION_TARGETS = ("GlowWidget",)
+
+# Targets that ship on iPhone and iPad (#633), and the family they declare.
+UNIVERSAL_TARGETS = ("Glow", "GlowWidget")
+DEVICE_FAMILY = "1,2"
+
+# The host's orientations per idiom (#633): portrait on iPhone, all four on
+# iPad, which multitasking requires.
+PORTRAIT = "UIInterfaceOrientationPortrait"
+ALL_ORIENTATIONS = {
+    PORTRAIT,
+    "UIInterfaceOrientationPortraitUpsideDown",
+    "UIInterfaceOrientationLandscapeLeft",
+    "UIInterfaceOrientationLandscapeRight",
+}
+ORIENTATION_TARGETS = ("Glow",)
 
 failures: list[str] = []
 
@@ -215,6 +236,41 @@ def check_extension_only(settings: dict[str, dict], name: str) -> None:
             )
 
 
+def device_policy_failures(settings: dict[str, dict], name: str, *, orientations: bool) -> list[str]:
+    """The universal-app settings (#633), per configuration."""
+    out: list[str] = []
+    for config, values in sorted(settings.items()):
+        label = f"{name} ({config})"
+        family = str(values.get("TARGETED_DEVICE_FAMILY", "")).replace(" ", "")
+        if family != DEVICE_FAMILY:
+            out.append(
+                f"{label}: TARGETED_DEVICE_FAMILY is {family or 'absent'!r}, not "
+                f"{DEVICE_FAMILY!r}. The app is universal (#633); an iPhone-only "
+                "build still runs on iPad, in a phone-shaped window (#632)."
+            )
+        if not orientations:
+            continue
+        if "INFOPLIST_KEY_UISupportedInterfaceOrientations" in values:
+            out.append(
+                f"{label}: INFOPLIST_KEY_UISupportedInterfaceOrientations is set "
+                "without an idiom suffix, which applies it to iPad as well. Use "
+                "the _iPhone and _iPad keys."
+            )
+        phone = set(str(values.get("INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone", "")).split())
+        if phone != {PORTRAIT}:
+            out.append(
+                f"{label}: iPhone orientations are {sorted(phone) or 'absent'}, not "
+                "portrait only (#633)."
+            )
+        pad = set(str(values.get("INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad", "")).split())
+        if pad != ALL_ORIENTATIONS:
+            out.append(
+                f"{label}: iPad orientations are {sorted(pad) or 'absent'}, not all "
+                "four. Split View and Stage Manager require every orientation (#633)."
+            )
+    return out
+
+
 def self_test() -> int:
     """Fixtures, each proving a policy rejection fires. See #138 for the shape.
 
@@ -266,7 +322,38 @@ def self_test() -> int:
         print(f"  {'ok  ' if ok else 'FAIL'} {name}{detail}")
         bad += 0 if ok else 1
 
-    total = len(scenarios) + len(capability_scenarios)
+    universal = {
+        "TARGETED_DEVICE_FAMILY": "1,2",
+        "INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone": PORTRAIT,
+        "INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad": " ".join(sorted(ALL_ORIENTATIONS)),
+    }
+    device_scenarios: list[tuple[str, dict, bool, str | None]] = [
+        ("the universal app passes", universal, True, None),
+        ("a universal extension passes", {"TARGETED_DEVICE_FAMILY": "1,2"}, False, None),
+        ("an iPhone-only app is rejected",
+         {**universal, "TARGETED_DEVICE_FAMILY": "1"}, True, "TARGETED_DEVICE_FAMILY"),
+        ("a missing family is rejected",
+         {k: v for k, v in universal.items() if k != "TARGETED_DEVICE_FAMILY"}, True,
+         "TARGETED_DEVICE_FAMILY"),
+        ("landscape on iPhone is rejected",
+         {**universal, "INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone":
+          f"{PORTRAIT} UIInterfaceOrientationLandscapeLeft"}, True, "iPhone orientations"),
+        ("a portrait-only iPad is rejected",
+         {**universal, "INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad": PORTRAIT}, True,
+         "iPad orientations"),
+        ("an unsuffixed orientation key is rejected",
+         {**universal, "INFOPLIST_KEY_UISupportedInterfaceOrientations": PORTRAIT}, True,
+         "without an idiom suffix"),
+    ]
+    for name, values, orientations, expected in device_scenarios:
+        messages = device_policy_failures({"Debug": values}, "fixture", orientations=orientations)
+        ok = (not messages) if expected is None \
+            else any(expected in message for message in messages)
+        detail = "" if ok else f" — got {messages}"
+        print(f"  {'ok  ' if ok else 'FAIL'} {name}{detail}")
+        bad += 0 if ok else 1
+
+    total = len(scenarios) + len(capability_scenarios) + len(device_scenarios)
     print(f"check-project self-test: {total - bad}/{total} scenarios")
     return 1 if bad else 0
 
@@ -308,15 +395,25 @@ def main() -> int:
         _, target = by_name[name]
         check_extension_only(build_settings(objects, target), name)
 
+    for name in UNIVERSAL_TARGETS:
+        if name not in by_name:
+            fail(f"{name}: no such target in the generated project.")
+            continue
+        _, target = by_name[name]
+        for message in device_policy_failures(
+            build_settings(objects, target), name, orientations=name in ORIENTATION_TARGETS
+        ):
+            fail(message)
+
     if failures:
         print("error: the generated project is not the project this repo needs.", file=sys.stderr)
         for message in failures:
             print(f"  - {message}", file=sys.stderr)
         return 1
 
-    checked = ", ".join(sorted(set(GROUPED_TARGETS + EXTENSION_TARGETS)))
-    print(f"check-project: App Groups, entitlements (within the local-only allowlist) "
-          f"and extension-only API verified on {checked}")
+    checked = ", ".join(sorted(set(GROUPED_TARGETS + EXTENSION_TARGETS + UNIVERSAL_TARGETS)))
+    print(f"check-project: App Groups, entitlements (within the local-only allowlist), "
+          f"extension-only API and the universal device family verified on {checked}")
     return 0
 
 
