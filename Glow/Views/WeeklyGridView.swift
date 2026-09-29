@@ -26,6 +26,12 @@ struct WeeklyGridView: View {
     /// the screen is up moves *this* week and leaves the one being looked at
     /// where it is. An offset would silently slide the whole view back a week
     /// at 00:00.
+    ///
+    /// **A date also holds the current week still, which is the half that was
+    /// wrong.** Someone on the current week when a new week begins, or when
+    /// Settings moves the week start, was looking at *now* and follows it; a
+    /// browsed week stays. `WeekFollow` is the rule, applied in
+    /// `refreshToday` and on a change of `firstWeekday`.
     @State private var weekStart: Date
     /// The earliest day anything is on record for, from `HabitStore`. Held
     /// rather than recomputed per redraw — see `earliestRecordedDay`.
@@ -375,6 +381,7 @@ struct WeeklyGridView: View {
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
             refreshToday()
         }
+        .onChange(of: firstWeekday) { old, _ in followWeekStart(from: old) }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 refreshToday()
@@ -1223,8 +1230,28 @@ struct WeeklyGridView: View {
 
     private func refreshToday() {
         let current = pinnedToday ?? WeekCalendar.today()
-        if current != today { today = current }
+        if current != today {
+            // Read before `today` moves: it is the week that *was* current.
+            let previousCurrent = currentWeek
+            today = current
+            show(week: WeekFollow.weekStart(
+                shown: weekStart, previousCurrent: previousCurrent, today: current
+            ))
+        }
         refreshReach()
+    }
+
+    /// The week start moved in Settings. `weekStart` is a week start in the
+    /// calendar that was in force, and a mid-week day in the new one — so a
+    /// current week would otherwise be drawn as last week (Sunday to Monday)
+    /// or stop counting as current (Monday to Sunday). See `WeekFollow`.
+    private func followWeekStart(from oldFirstWeekday: Int) {
+        var previous = WeekCalendar.calendar
+        previous.firstWeekday = WeekPreferences.clampWeekday(oldFirstWeekday)
+        let previousCurrent = WeekCalendar.startOfWeek(containing: today, calendar: previous)
+        show(week: reach.clamped(WeekFollow.weekStart(
+            shown: weekStart, previousCurrent: previousCurrent, today: today
+        )))
     }
 
     /// Re-reads how far back the record goes, and pulls the week on screen back

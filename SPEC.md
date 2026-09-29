@@ -852,6 +852,12 @@ browse-only: nothing is open and none of its marks accepts a tap. Its trailing
 toolbar keeps Today and the same menu with Correct History, which switches the
 displayed week into the correcting mode in place (#557).
 
+**The current week follows the calendar; a browsed week stays.** Someone on
+the current week when a new week begins, or when Settings changes the week start,
+lands on the new current week. A week paged back to stays put at midnight. When
+the week start changes, it becomes the new-calendar week holding the middle of
+the week that was shown (`WeekFollow`).
+
 **How far back: the record, or twelve weeks, whichever is further** (#186,
 #259). The record starts at the first completion on record or the first habit's
 creation, whichever is earlier — the demo invents completions ten weeks before

@@ -9305,3 +9305,25 @@ removal of the 34pt floor, and this entry does not reopen it.
 same character, now holds only down to a panel of about 310pt. That is below
 every phone. The editor's preview uses the same geometry at the same width,
 so it is still honest about the row it previews.
+
+## 2026-09-29 — The current week follows; a browsed week stays
+
+**What changed.** `WeekFollow.weekStart` decides which week This Week shows
+after today or the week start moves under it, and `WeeklyGridView` applies it
+in `refreshToday` and on a change of `firstWeekday`. Someone on the current
+week follows to the new current week. A browsed week stays: at a week boundary
+it is the same week, and under a new week start it is the new-calendar week
+holding the middle of the old one, which shares at least four of its days.
+
+**Why.** `weekStart` is a date rather than an offset (#117) so that midnight
+leaves a browsed week where it is. It left the current week there too. After a
+week boundary, a screen left open showed the week just ended, with nothing
+open. After Sunday to Monday in Settings, the stored Sunday closed a
+Monday-first week, and the grid drew last week under the title "This Week",
+with a Today button and a forward chevron, and nothing tappable. That was
+reproduced on `main` in the simulator by a UI-driven probe. Monday to Sunday
+leaves a start that is no longer the current week's; the probe found the
+reach's clamp pulling it back, but only because the clamp happened to run.
+
+**What it does not change.** A browsed week is still never moved by midnight.
+`WeekReach` still clamps every move.
