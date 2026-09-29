@@ -587,7 +587,17 @@ struct HabitRowView: View {
     /// than keeping its own, so the track and the letters over it go together.
     static let editFade = Animation.easeOut(duration: 0.15)
 
-    private var slots: [Slot] {
+    /// The row's seven marks.
+    ///
+    /// **Derived once per body, in `body`, and handed down** (#667). This and
+    /// `makeSpans()` used to be computed properties that the track, the
+    /// accessibility element and `isDue` each read for themselves: a weekly
+    /// row derived its spans four times and its slots twice on every redraw,
+    /// and a day-pinned row its slots twice. `HotPathReadTests` measured that
+    /// at about three times the cost of deriving each once, for the same
+    /// answer. Functions rather than properties so a second read looks like
+    /// the call it is.
+    private func makeSlots() -> [Slot] {
         WeekGrid.slots(
             for: snapshot, in: week, today: today, editing: editing, restDay: restDay
         )
@@ -595,7 +605,7 @@ struct HabitRowView: View {
 
     /// A habit due a number of times a week is not day-pinned, so it is drawn as
     /// shapes that stretch across the week rather than as seven columns.
-    private var spans: [SlotSpan] {
+    private func makeSpans() -> [SlotSpan] {
         guard case .timesPerWeek(let target) = snapshot.frequency else { return [] }
         // **This is the surface that logs a bonus** (#560). `SpanView` resolves
         // the column under the finger, so today's part of a filled bar can mean
@@ -620,6 +630,10 @@ struct HabitRowView: View {
     }
 
     var body: some View {
+        // Once per body, and everything below reads these (#667).
+        let slots = makeSlots()
+        let spans = makeSpans()
+        let isDue = Self.isDue(slots: slots, spans: spans)
         HStack(spacing: geometry.labelGap) {
             if snapshot.isSpacer {
                 // Nothing to draw, but the row still has to exist: it is holding
@@ -646,7 +660,7 @@ struct HabitRowView: View {
                     )
                     .frame(width: geometry.trackWidth, alignment: .leading)
                 } else {
-                    track
+                    track(slots: slots, spans: spans)
                         .frame(width: geometry.trackWidth, alignment: .leading)
                 }
             }
@@ -720,7 +734,7 @@ struct HabitRowView: View {
     }
 
     @ViewBuilder
-    private var track: some View {
+    private func track(slots: [Slot], spans: [SlotSpan]) -> some View {
         HStack(spacing: SlotLayout.gap(trackWidth: geometry.trackWidth)) {
             if spans.isEmpty {
                 ForEach(slots) { slot in
@@ -780,7 +794,7 @@ struct HabitRowView: View {
                 }
             }
         }
-        .overlay(alignment: .leading) { dots }
+        .overlay(alignment: .leading) { dots(spans: spans) }
     }
 
     /// Which days this row was logged on, spoken.
@@ -811,7 +825,7 @@ struct HabitRowView: View {
     /// are one fact. It takes no size, so it sits at the start of the track
     /// instead of covering it and swallowing the marks' own elements.
     @ViewBuilder
-    private var dots: some View {
+    private func dots(spans: [SlotSpan]) -> some View {
         if !spans.isEmpty {
             Color.clear
                 .frame(width: 0, height: 0)
@@ -827,7 +841,7 @@ struct HabitRowView: View {
     /// thing in its row, and one already handled today steps back. Emphasis
     /// tracks "needs you now", not "went well" — a perfect week reads quieter
     /// than a single empty slot, which is the point.
-    private var isDue: Bool {
+    private static func isDue(slots: [Slot], spans: [SlotSpan]) -> Bool {
         slots.contains { $0.state == .open } || spans.contains { $0.state == .open }
     }
 
