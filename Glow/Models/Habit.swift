@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 
 /// A tracked habit.
 ///
@@ -443,11 +444,12 @@ final class Habit {
     /// Snapshots whose fetch failure reaches the caller (#282).
     ///
     /// `snapshots(of:within:calendar:)` above degrades a failed completion
-    /// fetch into snapshots with no history, because a grid mid-render has
-    /// nothing better to do with the error. Two callers do: the export, whose
-    /// whole contract is that the file holds everything or does not exist, and
-    /// the widget stores, which must render *unavailable* rather than a
-    /// plausible emptiness. Both build from this one throwing pass.
+    /// fetch into snapshots with no history, for a caller that has nothing
+    /// better to do with the error. Three callers do: the export, whose whole
+    /// contract is that the file holds everything or does not exist, and the
+    /// widget stores and This Week (`weekRead`), which must render
+    /// *unavailable* rather than a plausible emptiness. All build from this one
+    /// throwing pass.
     ///
     /// No range means all of it — the export's case — through the same shared
     /// fetch; the measured equality between one shared fetch and one per habit
@@ -465,6 +467,31 @@ final class Habit {
         let counts = try fetchedDayCounts(of: habits, within: days, in: context)
         return habits.map { habit in
             habit.snapshot(dayCounts: counts[habit.id] ?? [:], calendar: calendar)
+        }
+    }
+
+    /// This Week's read: the week's snapshots, or `unavailable` (#666).
+    ///
+    /// The grid drew from `snapshots(of:within:calendar:)`, whose failed fetch
+    /// is a list of rows with no history — and on a week grid no history is
+    /// not a blank, it is a claim: every past day of every row drawn as
+    /// missed. That is the plausible record SPEC R9 rules out. The grid
+    /// switches on this instead, the same shape the widget stores hand their
+    /// views (#282), so the failure survives to the one place that can draw
+    /// something other than a week.
+    ///
+    /// The error goes to the log, privately, and nowhere else: a SwiftData
+    /// error can carry a path.
+    static func weekRead(
+        of habits: [Habit],
+        within days: ClosedRange<DayID>,
+        calendar: Calendar = WeekCalendar.calendar
+    ) -> StoreRead<[HabitSnapshot]> {
+        do {
+            return StoreRead(read: try fetchedSnapshots(of: habits, within: days, calendar: calendar))
+        } catch {
+            GlowLog.store.error("week read failed: \(error.localizedDescription, privacy: .private)")
+            return .unavailable
         }
     }
 }

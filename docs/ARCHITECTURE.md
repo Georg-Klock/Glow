@@ -149,6 +149,13 @@ pushes the bound into SQLite on `Completion.dayKey`.
 `habit.snapshot()` with no range still means the whole history and is what the
 export calls.
 
+**Where the answer matters, the failure is kept** (#282, #666).
+`snapshots(of:within:calendar:)` flattens a failed completion fetch into rows
+with no history; `fetchedSnapshots` throws instead, and three readers go
+through it: the export, the widget stores, and This Week, whose `Habit.weekRead` wraps it into a `StoreRead` that
+`WeeklyGridView` switches on — a failed read draws `StoreUnavailableView`
+rather than a week of misses.
+
 **And so is the write path, since #318.** `HabitStore`'s day lookup — the one
 `toggleCompletion` runs twice per tap — fetched every completion the habit had
 and picked the day's out in memory, so the app's hottest path scaled with the

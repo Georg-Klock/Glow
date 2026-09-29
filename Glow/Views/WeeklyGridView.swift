@@ -238,10 +238,20 @@ struct WeeklyGridView: View {
                         .padding(.horizontal, GridMetrics.horizontalPadding)
                         .padding(.bottom, 10)
                 }
-                if habits.isEmpty {
+                // **Three answers, as the widgets have them** (#282, #666).
+                // No habits is the first-run choice; a week whose history
+                // could not be read is withheld, never drawn as a week of
+                // misses. The read's `.empty` is exactly `habits.isEmpty`:
+                // the throwing pass returns one snapshot per habit or throws.
+                switch weekRead {
+                case .empty:
                     emptyState
-                } else {
-                    grid
+                case .loaded(let snapshots):
+                    grid(snapshots)
+                case .unavailable:
+                    StoreUnavailableView(explanation: StoreUnavailableView.weekExplanation) {
+                        intentRevision &+= 1
+                    }
                 }
             }
             // The title is drawn rather than set (#190): two lines, what the
@@ -429,12 +439,19 @@ struct WeeklyGridView: View {
     /// `week` follows `weekStart`, so paging back (#117) reads that week and
     /// costs what this one does. A pager over whole histories would have made
     /// every step back the most expensive thing the screen does.
-    private var snapshots: [HabitSnapshot] {
+    ///
+    /// **A failed read is `unavailable`, not a week of misses** (#666). This
+    /// read from `Habit.snapshots(of:within:)`, which turns a failed fetch
+    /// into rows with no history — and on this grid that draws every past day
+    /// of every row as missed. `weekRead` keeps the failure; `body` switches
+    /// on it. Retry is a redraw: it advances `intentRevision`, which this
+    /// reads so a mark written elsewhere re-fetches on the same frame.
+    private var weekRead: StoreRead<[HabitSnapshot]> {
         _ = intentRevision
-        return Habit.snapshots(of: habits, within: week.dayIDs())
+        return Habit.weekRead(of: habits, within: week.dayIDs())
     }
 
-    private var grid: some View {
+    private func grid(_ snapshots: [HabitSnapshot]) -> some View {
         GeometryReader { proxy in
             // **The grid sits on a panel, and the panel is what it measures
             // against** (#370). `GlowPalette.widgetSurface` is the ground the
@@ -467,7 +484,6 @@ struct WeeklyGridView: View {
                     isRegularWidth: horizontalSizeClass == .regular
                 )
             )
-            let snapshots = self.snapshots
             let isEditing = editMode.isEditing
             let horizontal = GridHorizontalInsets(
                 isEditing: isEditing,
