@@ -23,12 +23,12 @@ struct EditHistoryTrack: View {
     /// under, exactly as before. At regular width the grid grows by up to
     /// 1.99 (#650) and a fixed 18 became a dot lost in a 48pt column, so past
     /// 1 the circle grows by the same factor. Never taller than the slot.
-    static func circleDiameter(for geometry: RowGeometry) -> CGFloat {
+    nonisolated static func circleDiameter(for geometry: RowGeometry) -> CGFloat {
         min(18 * max(1, geometry.scale), geometry.slotHeight)
     }
 
     /// The empty circle's outline, grown with it so it doesn't thin out.
-    static func strokeWidth(for geometry: RowGeometry) -> CGFloat {
+    nonisolated static func strokeWidth(for geometry: RowGeometry) -> CGFloat {
         1.5 * max(1, geometry.scale)
     }
 
