@@ -50,7 +50,7 @@ enum GlowStore {
     /// may be shown.
     struct Unreadable: LocalizedError {
         var errorDescription: String? {
-            "Glow's data could not be read. Open Glow, then try again."
+            "Your habits could not be read. Open Practice, then try again."
         }
     }
 
