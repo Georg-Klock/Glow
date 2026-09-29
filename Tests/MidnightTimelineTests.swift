@@ -81,6 +81,77 @@ struct MidnightTimelineTests {
         #expect(next.days.first == midnight)
     }
 
+    // MARK: - The month carries one too
+
+    @Test("The month's open dot moves to the new day at midnight")
+    func theMonthCarriesAMidnightEntry() throws {
+        // Wednesday the 19th to Thursday the 20th, a daily habit with nothing
+        // logged. One read serves both entries: midnight is in the same drawn
+        // month, and the record does not change when the day does.
+        let habit = HabitSnapshot.fixture()
+        var reads: [Date] = []
+        let days = MidnightTimeline.monthDays(
+            today: TestCalendar.date(2026, 8, 19), calendar: calendar
+        ) { day in
+            reads.append(day)
+            return habit
+        }
+
+        try #require(days.count == 2, "the month timeline has no midnight entry")
+        #expect(days[1].day == TestCalendar.date(2026, 8, 20))
+        #expect(reads.count == 1, "a mid-month midnight read the store again")
+
+        func open(_ entry: (day: Date, month: HabitSnapshot)) -> [Int] {
+            MonthGrid.cells(for: entry.month, today: entry.day, restDay: nil, calendar: calendar)
+                .filter { $0.mark == .openToday }
+                .map { calendar.component(.day, from: $0.date) }
+        }
+        #expect(open(days[0]) == [19])
+        // The entry that used to be missing: without it the 19th stays open
+        // and lit until WidgetKit obliges the reload.
+        #expect(open(days[1]) == [20], "yesterday's dot is still the open one")
+    }
+
+    @Test("On the 1st the midnight entry draws the new month, from its own read")
+    func theMonthTurnsOverAtMidnight() throws {
+        // Monday the 31st of August to Tuesday the 1st of September. The drawn
+        // ranges differ — August's whole weeks end on Sunday 6 September,
+        // September's run to Sunday 4 October — so the midnight entry is read
+        // again, for the month containing midnight.
+        var reads: [Date] = []
+        let days = MidnightTimeline.monthDays(
+            today: TestCalendar.date(2026, 8, 31), calendar: calendar
+        ) { day in
+            reads.append(day)
+            return HabitSnapshot.fixture()
+        }
+
+        try #require(days.count == 2, "the month timeline has no midnight entry")
+        let first = TestCalendar.date(2026, 9, 1)
+        #expect(days[1].day == first)
+        #expect(reads == [TestCalendar.date(2026, 8, 31), first],
+                "the new month was drawn from the old month's read")
+
+        let cells = MonthGrid.cells(
+            for: days[1].month, today: days[1].day, restDay: nil, calendar: calendar
+        )
+        #expect(cells.allSatisfy { calendar.component(.month, from: $0.date) == 9 },
+                "the 1st still draws August")
+        #expect(cells.filter { $0.mark == .openToday }.map(\.date) == [first])
+    }
+
+    @Test("The next midnight is the start of the following day, across a DST change")
+    func nextMidnightIsTheNextDay() throws {
+        // Berlin springs forward at 02:00 on 29 March 2026, so that day is 23
+        // hours long. Adding 24 hours would land at 01:00 on the 30th.
+        var berlin = calendar
+        berlin.timeZone = try #require(TimeZone(identifier: "Europe/Berlin"))
+        let noon = try #require(berlin.date(from: DateComponents(year: 2026, month: 3, day: 29, hour: 12)))
+        let midnight = try #require(MidnightTimeline.next(after: noon, calendar: berlin))
+        let expected = try #require(berlin.date(from: DateComponents(year: 2026, month: 3, day: 30)))
+        #expect(midnight == expected)
+    }
+
     // MARK: - That the provider carries one
 
     /// The widget extension's sources, which this bundle cannot import: the
@@ -109,5 +180,21 @@ struct MidnightTimelineTests {
         // without a reload; the policy is what eventually refreshes the record.
         #expect(source.contains("policy: .after(midnight)"),
                 "the midnight reload policy went with the change")
+    }
+
+    @Test("The month timeline is built from MidnightTimeline, not a single entry")
+    func theMonthProviderBuildsAMidnightEntry() {
+        // The small family returned `Timeline(entries: [entry], …)` until this
+        // guarantee reached it: yesterday's dot stayed open and lit, a tap on
+        // it was refused as stale, and on the 1st the widget kept the month
+        // that ended.
+        let source = providerSource
+        #expect(!source.isEmpty, "the provider's source was not found")
+        #expect(source.contains("MidnightTimeline.monthDays("),
+                "the month timeline does not build its midnight entry")
+        #expect(!source.contains("Timeline(entries: [entry]"),
+                "a timeline of one entry is back")
+        #expect(source.contains("policy: .after(MonthStore.midnight(after:"),
+                "the month's midnight reload policy went with the change")
     }
 }

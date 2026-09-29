@@ -1046,6 +1046,12 @@ three sizes, one content type per size (#322). Medium and large draw the week;
 small draws one habit's month. They were two kinds — "This Week" and "This
 Month" — until #322 collapsed them, and three until #209.
 
+**Every size turns the day over at midnight on its own** (#345). Each timeline
+carries an entry dated at the next local midnight, so the open mark moves to the
+new day — and on the 1st the small size draws the new month — without waiting
+for the system to reload the widget. Yesterday's open mark never stays lit into
+today.
+
 **`GlowMonthSmall` is removed rather than renamed**, so a placed Month widget
 keeps its slot, freezes, and never updates again — Apple provides no way to
 move a placement from one kind to another. That is what #209's removals cost
