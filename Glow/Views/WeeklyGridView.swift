@@ -978,7 +978,12 @@ struct WeeklyGridView: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Adjust to page through earlier weeks.")
+        // Correct History reaches forward as well as back (#592).
+        .accessibilityHint(
+            isCorrectingHistory
+                ? "Adjust to page through earlier and later weeks."
+                : "Adjust to page through earlier weeks."
+        )
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment: step(1)
