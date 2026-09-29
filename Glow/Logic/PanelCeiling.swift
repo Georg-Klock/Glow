@@ -26,4 +26,17 @@ enum PanelCeiling {
     static func maximumPanelWidth(isRegularWidth: Bool) -> CGFloat {
         isRegularWidth ? regularWidth : WidgetMetrics.largeWidth
     }
+
+    /// The side margin that holds a full-width scrolling page — Settings — to
+    /// the same readable column as the grid (#663), or `nil` where the
+    /// system's own margin should stay: every compact width, and a regular
+    /// window too narrow to need more than it. `minimum` is the margin the
+    /// page would have anyway.
+    static func readableMargin(
+        width: CGFloat, isRegularWidth: Bool, minimum: CGFloat = 20
+    ) -> CGFloat? {
+        guard isRegularWidth, width.isFinite else { return nil }
+        let margin = (width - regularWidth) / 2
+        return margin > minimum ? margin : nil
+    }
 }

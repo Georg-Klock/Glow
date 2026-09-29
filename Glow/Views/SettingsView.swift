@@ -23,6 +23,9 @@ struct SettingsView: View {
     /// suspended, so the flag is re-read when the scene comes back — the same
     /// pairing `WeeklyGridView` uses.
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// The form's measured width, for the readable margin at regular width.
+    @State private var formWidth: CGFloat = 0
 
     /// Every habit, per-day and per-week alike, because an export of "your
     /// history" that quietly left one kind out would be worse than no export.
@@ -384,6 +387,16 @@ struct SettingsView: View {
                 }
             }
             .scrollContentBackground(.hidden)
+            // At regular width the rows keep to the grid's readable column
+            // (#663) instead of running a slider and a segmented picker the
+            // full width of a 1366pt window. The scroll area itself stays
+            // full width, so the page scrolls wherever it is touched.
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { formWidth = $0 }
+            .modifier(ReadableMargins(
+                margin: PanelCeiling.readableMargin(
+                    width: formWidth, isRegularWidth: horizontalSizeClass == .regular
+                )
+            ))
             // The share sheet is the only way out of the app, and it opens on
             // a tap. Nothing here uploads.
             // `onDismiss` covers sharing and cancelling both, because they are
@@ -802,4 +815,19 @@ private struct ShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
+/// Content margins only where there is a readable margin to apply (#663).
+/// Absent, the `List` keeps the system's own insets — which a `contentMargins`
+/// of any value would replace — so every phone draws exactly as before.
+private struct ReadableMargins: ViewModifier {
+    let margin: CGFloat?
+
+    func body(content: Content) -> some View {
+        if let margin {
+            content.contentMargins(.horizontal, margin, for: .scrollContent)
+        } else {
+            content
+        }
+    }
 }

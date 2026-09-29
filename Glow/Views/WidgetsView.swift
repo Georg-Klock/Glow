@@ -257,7 +257,13 @@ struct WidgetsView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // Prose keeps to the readable column at regular width (#663); the
+        // previews below keep their own true size and centring.
+        .frame(
+            maxWidth: horizontalSizeClass == .regular ? PanelCeiling.regularWidth : .infinity,
+            alignment: .leading
+        )
+        .frame(maxWidth: .infinity)
     }
 
     /// One named card: the heading, and every preview under it.
