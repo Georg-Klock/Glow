@@ -99,16 +99,40 @@ final class EditModeGestureBoundsTests: XCTestCase {
         // 13pt-clear drop in place — the List's target index had not caught
         // up with the finger by touch-up. The hold before lifting is 2.5s
         // now, so a loaded list has longer to register where the finger is.
+        //
+        // **That does not explain the `[1]->3` the nightly still reports**
+        // (#657). Recordings from the iOS 18 and iPad lanes show the lifted
+        // row drawn in the first slot for the whole hold — the target had
+        // caught up — and the misreport arriving at touch-up anyway, with the
+        // top cell left where the finger lifted. No landing point or hold
+        // fixes that; it is open in #657.
         let lift = source.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         let land = target.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1))
         let trace = app.descendants(matching: .any)["reorder-trace"]
         func drag() {
             lift.press(forDuration: 1.5, thenDragTo: land, withVelocity: .slow, thenHoldForDuration: 2.5)
         }
+        // The rows' order on screen, as the last character of each name.
+        func order() -> String {
+            app.editRows(containing: "Pitch Fixture").map { row in
+                let label = row.buttons.matching(NSPredicate(
+                    format: "label CONTAINS %@", "Edit Pitch Fixture"
+                )).firstMatch.label
+                return String(label.suffix(1))
+            }.joined()
+        }
+        let before = order()
         // The List's own account of what it received. `calls: none` means the
-        // synthesized touch never reached it as a drag at all.
+        // synthesized touch never reached it as a drag at all — **but only
+        // while the rows still stand where they started** (#657). On three
+        // iOS 18 nightlies the trace still read `calls: none` after a drag
+        // the List had received, the test sent it again, and the screen
+        // ended as 23145 — 31245 with the row then standing in the source
+        // slot dragged up a second time — over a store holding one call and
+        // the first drag's correct 31245. A drag that moved anything on
+        // screen was heard, whatever the trace says yet.
         func listHeardNothing() -> Bool {
-            trace.exists && trace.label.contains("calls: none")
+            trace.exists && trace.label.contains("calls: none") && order() == before
         }
         drag()
 
@@ -128,7 +152,8 @@ final class EditModeGestureBoundsTests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(1))
             guard listHeardNothing() else { break }
             attempts += 1
-            print("reorder: the List received no drag; sending it again (attempt \(attempts))")
+            print("reorder: the List received no drag and the rows read \(order()); "
+                + "sending it again (attempt \(attempts))")
             drag()
         }
         let drop = XCTAttachment(screenshot: app.screenshot())
@@ -140,14 +165,6 @@ final class EditModeGestureBoundsTests: XCTestCase {
         // app's `onMove` received (#556): when the drag arrived, the callbacks
         // are the evidence for where it went; when it did not, that is
         // recorded above and here.
-        func order() -> String {
-            app.editRows(containing: "Pitch Fixture").map { row in
-                let label = row.buttons.matching(NSPredicate(
-                    format: "label CONTAINS %@", "Edit Pitch Fixture"
-                )).firstMatch.label
-                return String(label.suffix(1))
-            }.joined()
-        }
         var timeline: [(Double, String)] = []
         let start = Date()
         let orderDeadline = start.addingTimeInterval(3)
