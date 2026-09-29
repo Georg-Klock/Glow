@@ -17,6 +17,21 @@ import SwiftUI
 /// removed — the label half was a second drawing of what `HabitRowView`
 /// already draws.
 struct EditHistoryTrack: View {
+    /// The circle at the widget's own scale, and how it grows past it (#664).
+    ///
+    /// 18pt in a 24.4pt slot on every phone, where the grid's factor is 1 or
+    /// under, exactly as before. At regular width the grid grows by up to
+    /// 1.99 (#650) and a fixed 18 became a dot lost in a 48pt column, so past
+    /// 1 the circle grows by the same factor. Never taller than the slot.
+    static func circleDiameter(for geometry: RowGeometry) -> CGFloat {
+        min(18 * max(1, geometry.scale), geometry.slotHeight)
+    }
+
+    /// The empty circle's outline, grown with it so it doesn't thin out.
+    static func strokeWidth(for geometry: RowGeometry) -> CGFloat {
+        1.5 * max(1, geometry.scale)
+    }
+
     let snapshot: HabitSnapshot
     let week: Week
     let geometry: RowGeometry
@@ -33,12 +48,15 @@ struct EditHistoryTrack: View {
                         if selected {
                             Circle().fill(GlowPalette.lit)
                         } else {
-                            Circle().stroke(GlowPalette.grey, lineWidth: 1.5)
+                            Circle().stroke(
+                                GlowPalette.grey,
+                                lineWidth: Self.strokeWidth(for: geometry)
+                            )
                         }
                     }
                     .frame(
-                        width: min(18, geometry.slotHeight),
-                        height: min(18, geometry.slotHeight)
+                        width: Self.circleDiameter(for: geometry),
+                        height: Self.circleDiameter(for: geometry)
                     )
                     // The whole column is the target, the same footprint the
                     // cadence marks have in this row. The separate screen gave
