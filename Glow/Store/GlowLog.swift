@@ -17,4 +17,7 @@ import os
 /// counts, never a habit's name or anything a person wrote.
 enum GlowLog {
     static let widget = Logger(subsystem: "com.georgklock.glow", category: "widget")
+    /// The app's store opening. Its messages are `.private`: a SwiftData or
+    /// migration error can carry a file path.
+    static let store = Logger(subsystem: "com.georgklock.glow", category: "store")
 }
