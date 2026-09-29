@@ -37,6 +37,14 @@ struct MarkHabitIntent: LiveActivityIntent {
     /// intent in the app's process without bringing the app to the foreground.
     static let openAppWhenRun = false
 
+    /// **Not offered in Shortcuts.** This is the widget's own tap, addressed
+    /// by a habit's UUID and an archived day — nothing a person can fill in
+    /// by hand. Discoverable by default, it appeared in the Shortcuts action
+    /// list as "Mark Habit" asking for a UUID string, a "Rendered Day" and
+    /// "Present Island Encouragement". The widget and the Widgets tab reach
+    /// it through `Button(intent:)`, which discoverability does not affect.
+    static let isDiscoverable = false
+
     @Parameter(title: "Habit")
     var habitID: String
 
