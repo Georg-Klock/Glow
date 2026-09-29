@@ -13,7 +13,7 @@ import Foundation
 /// That is why the preview cannot be a store read. The most common moment for
 /// that one call is *before the app has ever been launched*, when there is no
 /// container to open: the read comes back `.unavailable` and the gallery
-/// keeps "Data unavailable — Open Glow" for the life of the install. Reading
+/// keeps "Data unavailable — Open Practice" for the life of the install. Reading
 /// the store later is no better, because a person's real week frozen at
 /// install time is a picture that is wrong on every day but one.
 ///

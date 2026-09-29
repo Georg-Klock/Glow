@@ -1293,7 +1293,7 @@ moment the extension is installed — and then cached: re-opening the sheet
 redraws the same bitmap without asking again. So the preview cannot be a store
 read. The commonest moment for that one call is before the app has ever been
 launched, when there is no container to open, and the read that came back
-`unavailable` froze "Data unavailable — Open Glow" into all three pages for the
+`unavailable` froze "Data unavailable — Open Practice" into all three pages for the
 life of the install; a real week read later would freeze just as hard, and be
 wrong on every day but the one it was taken on. `WidgetPreviewSample` is what
 is drawn instead: `DefaultHabits.all`, the set the empty state offers, over

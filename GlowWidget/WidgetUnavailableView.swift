@@ -24,7 +24,9 @@ struct WidgetUnavailableView: View {
                 .font(.title2)
             Text("Data unavailable")
                 .font(.system(size: WidgetMetrics.textSize))
-            Text("Open Glow")
+            // The name on the Home Screen, which is the one a person can
+            // act on (#629). "Glow" is the HDR feature's name, not an app.
+            Text("Open Practice")
                 .font(.system(size: WidgetMetrics.textSize).weight(.semibold))
         }
         .foregroundStyle(GlowPalette.grey)
@@ -32,6 +34,6 @@ struct WidgetUnavailableView: View {
         // One element, one announcement: the state and the recovery action,
         // once, with no developer diagnostics to read out.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Glow's data is unavailable. Open Glow to fix this.")
+        .accessibilityLabel("Your habits are unavailable. Open Practice to fix this.")
     }
 }
