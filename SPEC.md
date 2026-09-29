@@ -854,16 +854,17 @@ displayed week into the correcting mode in place (#557).
 
 **How far back: the record, or twelve weeks, whichever is further** (#186,
 #259). The record starts at the first completion on record or the first habit's
-creation, whichever is earlier — the demo invents completions ten weeks before
-the habits that carry them, so neither alone is the answer. A fresh install can
+creation, whichever is earlier — the demo history removed in #628 invented
+completions ten weeks before the habits that carried them, which is how it was
+found that neither alone is the answer. A fresh install can
 still browse a quarter of empty history; a longer record extends the reach with
 no cap. The value that once made an uncapped reach accidentally unbounded is
 refused where it is read rather than clipped where it is used —
 `Habit.createdAt` defaults to `.distantPast` for rows written before the column
 existed, which means *unknown*, and a habit whose only signal is that default
-starts no record at all. This Week stops forward at the current week. Edit
-History shares that backward reach and alone continues forward, exactly twelve
-weeks.
+starts no record at all. This Week stops forward at the current week. Correct
+History does not share this reach: it has its own, a flat four weeks either way
+(`EditHistoryReach`, #592 — see the Correct History paragraph above).
 
 **The title names the week you are looking at: how long ago, then which days**
 (#190, #207). "This Week", "Last Week" — and past the second rung a relative
@@ -1297,7 +1298,8 @@ launched, when there is no container to open, and the read that came back
 life of the install; a real week read later would freeze just as hard, and be
 wrong on every day but the one it was taken on. `WidgetPreviewSample` is what
 is drawn instead: `DefaultHabits.all`, the set the empty state offers, over
-`SeededHistory`, the invented past the demo toggle uses — with today left open,
+`SeededHistory`, an invented past (the demo toggle that once used it too went
+with #628) — with today left open,
 because that is the one thing the widget is for. A placed widget is unaffected
 and still says what the store says.
 
@@ -1336,7 +1338,7 @@ only the widget goes blank, which is a better failure than refusing to launch.
 (#282). Empty and unavailable are different facts and each widget draws them
 apart: a store that was read and holds nothing gets the empty state's words,
 and a container or fetch that failed gets a distinct "Data unavailable — Open
-Glow" surface (`WidgetUnavailableView`), because a database failure drawn as
+Practice" surface (`WidgetUnavailableView`), because a database failure drawn as
 the deletion of every habit is a false claim about the record. The whole
 widget already deep-links into the app, and a launch that hits the same
 failure lands on the store-unavailable screen, which is the recovery surface.

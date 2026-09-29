@@ -416,7 +416,7 @@ merges asks for it**, with the `ios18` label or `workflow_dispatch`.
 
   **"Daily" is two different things and only one of them left.**
   `Frequency.daily` is a *weekly* cadence due all seven days — seven columns on
-  the week grid, Gratitude and Early night in the seed set — and it is
+  the week grid, Gratitude and Bedtime in the seed set — and it is
   untouched. Anything that reads like removing week-grid behaviour is the wrong
   one.
 - **When behaviour changes, update the docs in the same session.** Drifted docs
