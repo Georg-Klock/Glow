@@ -118,12 +118,14 @@ enum MonthStore {
         }
     }
 
-    /// One entry, and a refresh at midnight — the open dot is defined as
-    /// "today", so the day rolling over is the only moment a month goes stale
-    /// on its own. Every write reloads the timelines explicitly.
+    /// The small family's reload policy: a refresh at midnight — the open dot
+    /// is defined as "today", so the day rolling over is the only moment a
+    /// month goes stale on its own. Every write reloads the timelines
+    /// explicitly. The policy is only a request; the entry dated at midnight
+    /// is what makes the dot right without it (`MidnightTimeline`, #345).
     ///
     /// It lived on `TodayStore` and moved here when that went with the per-day
-    /// kind (#209). Its one caller is the month provider.
+    /// kind (#209). Its one caller is the small family's timeline.
     static func midnight(after now: Date) -> Date {
         WeekCalendar.calendar.date(
             byAdding: .day, value: 1, to: WeekCalendar.day(now)

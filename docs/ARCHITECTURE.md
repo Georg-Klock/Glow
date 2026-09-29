@@ -709,6 +709,15 @@ changes. Three paths, and all are needed:
   only through the trace line the widget reload writes; see decisions.md,
   2026-09-02.
 
+The widgets cannot observe anything, so they carry the rollover in their
+timelines instead: every family's timeline holds an entry for now and one dated
+at the next local midnight (#345), beside a `.after(midnight)` reload policy.
+The policy is a request WidgetKit obliges when it chooses; the entry is what
+moves the open mark to the new day without waiting for it. The week families
+build theirs with `nextMidnightEntry(after:)`, the small family's month with
+`MidnightTimeline.monthDays`, which reads the store again only when midnight
+falls in a different drawn month — on the 1st the entry draws the new month.
+
 ## Which day the app thinks it is
 
 `WeekCalendar.today()` is where "today" is established, and every surface that

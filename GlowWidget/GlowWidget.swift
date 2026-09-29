@@ -218,22 +218,22 @@ struct WeekProvider: AppIntentTimelineProvider {
         // problems.
         // **The small family is the month** (#322): one habit's calendar,
         // chosen by the intent's `habit` or falling back to the first offered
-        // (`MonthStore.month`). One still entry and the same midnight policy
-        // the month kind always had — no burst frames, because the month's
-        // tap acknowledgement is the dot itself. The trace keeps the month
+        // (`MonthStore.month`). No burst frames, because the month's tap
+        // acknowledgement is the dot itself — but the same guarantee the week
+        // families carry (#345): an entry now and an entry at the next
+        // midnight, so the open dot moves to the new day without waiting on
+        // the reload policy, and the 1st draws its own month rather than the
+        // one that ended. `MidnightTimeline.monthDays` decides which days and
+        // whether midnight needs a read of its own. The trace keeps the month
         // vocabulary so the lines read continuously across the merge.
         if context.family == .systemSmall {
             let loadStarted = Date()
-            let entry = monthEntry(for: configuration)
+            let entries = monthEntries(for: configuration)
             WidgetTrace.record(
                 "month timeline: family=\(context.family), habit=\(WidgetTrace.tag(configuration.habit?.id))"
-                    + ", load \(WidgetTrace.elapsed(since: loadStarted))"
+                    + ", \(entries.count) entries, load \(WidgetTrace.elapsed(since: loadStarted))"
             )
-            let now = Date()
-            let midnight = WeekCalendar.calendar.date(
-                byAdding: .day, value: 1, to: WeekCalendar.day(now)
-            ) ?? now.addingTimeInterval(3600)
-            return Timeline(entries: [entry], policy: .after(midnight))
+            return Timeline(entries: entries, policy: .after(MonthStore.midnight(after: Date())))
         }
 
         let loadStarted = Date()
@@ -363,9 +363,7 @@ struct WeekProvider: AppIntentTimelineProvider {
     /// week start is exactly the case where reusing it would draw the new day
     /// against the old seven columns.
     private func nextMidnightEntry(after entry: WeekEntry) -> WeekEntry? {
-        guard let midnight = WeekCalendar.calendar.date(
-            byAdding: .day, value: 1, to: WeekCalendar.day(entry.date)
-        ) else { return nil }
+        guard let midnight = MidnightTimeline.next(after: entry.date) else { return nil }
         return WeekEntry(
             date: midnight,
             week: WeekCalendar.week(containing: midnight),
@@ -386,6 +384,23 @@ struct WeekProvider: AppIntentTimelineProvider {
             habits: .empty,
             month: MonthStore.month(of: configuration.habit?.id, containing: today)
         )
+    }
+
+    /// The small family's timeline: today's entry and the next midnight's
+    /// (#345), the second built for the day after — in the month containing
+    /// that midnight, so the 1st switches months. The store is read again only
+    /// when midnight crosses into a different drawn range.
+    private func monthEntries(for configuration: SelectWeekLayoutIntent) -> [WeekEntry] {
+        MidnightTimeline.monthDays(today: WeekCalendar.today()) { day in
+            MonthStore.month(of: configuration.habit?.id, containing: day)
+        }.map { day, month in
+            WeekEntry(
+                date: day,
+                week: WeekCalendar.week(containing: day),
+                habits: .empty,
+                month: month
+            )
+        }
     }
 }
 
