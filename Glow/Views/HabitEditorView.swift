@@ -8,6 +8,14 @@ import WidgetKit
 enum HabitEditorGeometry {
     /// The icon, name and frequency platters are one height. The step faces
     /// leave this same inset at the row's outer left/right and top/bottom.
+    ///
+    /// **A floor for the name and frequency platters, not a fixed height**
+    /// (#662). The editor is system UI and its type follows Dynamic Type —
+    /// the grid's decision not to scale (2026-08-24) is about the grid — so
+    /// those two platters grow with their content, holding `stepInset` above
+    /// and below it. At the default size that content is shorter than this
+    /// and the floor decides, which leaves the default layout where it was.
+    /// The icon platter stays square at this size: its glyph is a fixed 24pt.
     static let rowHeight: CGFloat = 56
     static let stepInset: CGFloat = 10
     /// Width keeps the existing hit target; height makes the vertical margins
@@ -25,6 +33,9 @@ enum HabitEditorGeometry {
     /// keeping the ten: the inset is unchanged on all four sides, so the
     /// concentric radius below is unchanged too. Height stays 36 — this is a
     /// correction to what the face is shaped like, not to where it sits.
+    /// The height is the default-size value: `HabitEditorView` scales it with
+    /// the glyph at larger type (#662), so it is 36 exactly where this row was
+    /// designed and taller only where the plus would otherwise overhang it.
     static let stepSize = CGSize(width: 88, height: 36)
     /// Rounder than the old segmented-control corner, but short of a capsule.
     static let stepRadius: CGFloat = 16
@@ -32,6 +43,12 @@ enum HabitEditorGeometry {
     /// warning changes opacity inside this slot rather than entering the
     /// layout, so typing the first too-wide glyph cannot move the field or the
     /// frequency row (#456).
+    ///
+    /// **The slot's minimum, not its height** (#662). The sentence wraps
+    /// rather than truncating — at larger type, and on a narrow phone where
+    /// the gutter leaves it less than a line — and the slot takes whatever
+    /// height the wrapped sentence needs whether or not it is showing, so the
+    /// no-movement rule above still holds at every size.
     static let nameHintHeight: CGFloat = 18
     static let nameHintSpacing: CGFloat = 6
 
@@ -93,6 +110,13 @@ struct HabitEditorView: View {
     @AppStorage(GlowSettings.largeTextKey, store: GlowSettings.store)
     private var largeTextDropsIcon = false
     @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// The step faces' height, from `HabitEditorGeometry.stepSize` at the
+    /// default size — where it resolves to exactly that — and grown with the
+    /// glyph they hold above it, so a larger plus does not stand out past its
+    /// face (#662). The width stays: 88 is a proportion (#458), not a fit.
+    @ScaledMetric(relativeTo: .body)
+    private var stepHeight = HabitEditorGeometry.stepSize.height
 
     @State private var name = ""
     @State private var icon = HabitSymbol.default
@@ -181,7 +205,7 @@ struct HabitEditorView: View {
                     // that chose between them is gone and the count is the
                     // whole decision.
                     frequencyRow
-                        .frame(height: HabitEditorGeometry.rowHeight)
+                        .frame(minHeight: HabitEditorGeometry.rowHeight)
                         .background(platter)
 
                     if isEditing {
@@ -367,11 +391,12 @@ struct HabitEditorView: View {
                 Text(HabitEditorCopy.nameWarning)
                     .font(.footnote)
                     .foregroundStyle(GlowPalette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .opacity(isNameCut ? 1 : 0)
                     .accessibilityHidden(!isNameCut)
             }
-            .frame(height: HabitEditorGeometry.nameHintHeight)
+            .frame(minHeight: HabitEditorGeometry.nameHintHeight)
 
             HStack(spacing: 10) {
                 Button { isPickingIcon = true } label: {
@@ -446,8 +471,11 @@ struct HabitEditorView: View {
                     }
                 }
                 .padding(.horizontal, Self.namePadding)
+                // Grows with the field's scaled type rather than cutting it
+                // off (#662); the floor is what decides at the default size.
+                .padding(.vertical, HabitEditorGeometry.stepInset)
                 .frame(maxWidth: .infinity)
-                .frame(height: HabitEditorGeometry.rowHeight)
+                .frame(minHeight: HabitEditorGeometry.rowHeight)
                 .background(platter)
                 .accessibilityHint(
                     isNameCut ? HabitEditorCopy.nameWarning : ""
@@ -471,16 +499,23 @@ struct HabitEditorView: View {
                 count.wrappedValue -= 1
             }
 
-            HStack(spacing: 0) {
-                // The count glows, and the `x` is part of the count rather
-                // than part of the sentence: "7x" is the value the steppers
-                // move, and splitting the multiplier off into the grey left
-                // the lit part reading as a bare number.
-                Text("\(count.wrappedValue)x")
-                    .monospacedDigit()
-                    .glowing()
-                Text(" per week")
-                    .foregroundStyle(.secondary)
+            // One line where it fits, which is every phone at the default
+            // size; the count over the unit where it does not, rather than
+            // "7x per w…" (#662). Two views rather than one concatenated
+            // `Text` because only the count glows.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 0) {
+                    countText
+                    Text(" per week")
+                        .foregroundStyle(.secondary)
+                }
+                VStack(spacing: 0) {
+                    countText
+                    Text("per week")
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .frame(maxWidth: .infinity)
 
@@ -489,8 +524,12 @@ struct HabitEditorView: View {
             }
         }
         // Inset from the platter's edges. Hard against them the controls read
-        // as part of the container rather than as things inside it.
+        // as part of the container rather than as things inside it. Vertical
+        // too since #662: at the default size it is the same 10 the fixed
+        // 56pt row used to leave around the 36pt faces, and at larger sizes
+        // it is what keeps the wrapped reading off the platter's edge.
         .padding(.horizontal, HabitEditorGeometry.stepInset)
+        .padding(.vertical, HabitEditorGeometry.stepInset)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Times per week")
         .accessibilityValue("\(count.wrappedValue)")
@@ -504,6 +543,15 @@ struct HabitEditorView: View {
                 break
             }
         }
+    }
+
+    /// The count glows, and the `x` is part of the count rather than part of
+    /// the sentence: "7x" is the value the steppers move, and splitting the
+    /// multiplier off into the grey left the lit part reading as a bare number.
+    private var countText: some View {
+        Text("\(count.wrappedValue)x")
+            .monospacedDigit()
+            .glowing()
     }
 
     /// Minus and plus, each on its own platter.
@@ -534,7 +582,7 @@ struct HabitEditorView: View {
                 .font(.body.weight(.medium))
                 .frame(
                     width: HabitEditorGeometry.stepSize.width,
-                    height: HabitEditorGeometry.stepSize.height
+                    height: stepHeight
                 )
                 .background(
                     RoundedRectangle(

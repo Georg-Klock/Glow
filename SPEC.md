@@ -795,10 +795,19 @@ fit depends on which letters they are and no counter can state a number. The
 field therefore uses the system's body-sized type and a width enlarged from the
 compact row by the same factor, then tail-truncates while it is being edited.
 The larger input remains an honest preview because its width-to-type ratio is
-unchanged. Once the name overruns, a fixed-height amber line immediately above
-it reads *Short titles work better. Long titles will be cut.* The line reserves
-its height while empty, so the field and frequency control do not move when it
-appears. **One field is honest about both surfaces**, because they are one row
+unchanged. Once the name overruns, an amber line immediately above it reads
+*Short titles work better. Long titles will be cut.* The line reserves its
+height while empty, so the field and frequency control do not move when it
+appears; where the sentence does not fit on one line — larger type, or a narrow
+phone — it wraps, and the reserved height is the wrapped height (#662).
+
+**The editor follows Dynamic Type without clipping** (#662). It is system UI,
+so the grid's decision not to scale its type (`docs/decisions.md`, 2026-08-24)
+does not reach it. The name and frequency platters are 56pt at the default size
+and grow with their content above it; the step faces' height scales with their
+glyph from 36pt; and where "7x per week" no longer fits on one line between the
+step faces, the count sits above the unit. At the default size every one of
+those resolves to the design's numbers. **One field is honest about both surfaces**, because they are one row
 at two sizes: `RowGeometry` is the large widget's geometry times a single
 factor — never above 1 (#588) — applied to the text size as well as to the
 label column, so a name breaks at the same character on This Week as it does in

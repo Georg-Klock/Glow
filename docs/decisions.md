@@ -9328,6 +9328,31 @@ reach's clamp pulling it back, but only because the clamp happened to run.
 **What it does not change.** A browsed week is still never moved by midnight.
 `WeekReach` still clamps every move.
 
+## 2026-09-29 — The editor grows with its type rather than clipping it (#662)
+
+**Does not touch the 2026-08-24 entry "Dynamic Type scaling is gone".** That
+entry is about the grid, which is the large widget at one factor. The habit
+editor is system UI: its name field already took its size from `@ScaledMetric`
+(#482), and the platters around it were fixed heights, so at accessibility
+sizes the name was cut off vertically, the hint overran its 18pt slot into the
+field, and the reading truncated to "7x per…".
+
+**Every fixed number became a floor that decides at the default size.** The
+name and frequency platters are at least `rowHeight` and otherwise their
+content plus `stepInset` above and below; the hint wraps inside a slot whose
+height is a minimum, still reserved while the warning is hidden so nothing
+moves when it appears (#456); the step faces' height is `@ScaledMetric` from
+36; and the reading is a `ViewThatFits` of one line, then the count over the
+unit. At the default size each resolves to the old number, and a
+`simctl io` capture of the editor on an iPhone 17e is identical to `main`'s
+below the navigation bar, whose glass differs between relaunches of one build.
+The one default-size change is on an iPhone SE, where the 277pt beside the
+gutter never held the sentence: it ended "…will be c…" there, and now takes a
+second line, which moves the field and everything under it down by one.
+
+**The name field's width is not part of this.** It stays the row's column
+scaled by the field's type (#482), and the cut stays `NameTruncation`'s
+(#615). Only vertical room and the hint's wrapping changed.
 ## 2026-09-29 — This Week withholds a week it could not read (#666)
 
 **What changed.** `WeeklyGridView` read its week through
