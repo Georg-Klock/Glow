@@ -221,7 +221,10 @@ struct GlowApp: App {
         do {
             return (try GlowStore.makeContainer(), nil)
         } catch {
-            return (nil, error.localizedDescription)
+            // The detail is for a tethered Mac, not the screen (SPEC R9):
+            // `.private`, because a migration's reason can name a path.
+            GlowLog.store.error("store did not open: \(error.localizedDescription, privacy: .private)")
+            return (nil, "The store could not be opened.")
         }
     }
 
@@ -370,7 +373,7 @@ struct GlowApp: App {
                     // `body`, so a `.task` here is strictly after both.
                     .task { WidgetRefresh.invalidate() }
             } else {
-                StoreUnavailableView(message: failure ?? "") {
+                StoreUnavailableView {
                     let attempt = Self.open()
                     container = attempt.container
                     failure = attempt.failure

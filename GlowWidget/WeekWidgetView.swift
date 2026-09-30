@@ -66,6 +66,11 @@ struct WeekWidgetView: View {
                     .font(.title2)
                 Text("No habits yet")
                     .font(.system(size: WidgetMetrics.textSize))
+                // What to do about it, the way the unavailable state says
+                // "Open Practice": a widget placed before any habit exists
+                // otherwise ends here. The whole widget opens the app.
+                Text("Open Practice to add one")
+                    .font(.system(size: WidgetMetrics.textSize).weight(.semibold))
             }
             .foregroundStyle(GlowPalette.grey)
             .frame(maxWidth: .infinity, maxHeight: .infinity)

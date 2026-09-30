@@ -516,7 +516,9 @@ struct SettingsView: View {
         case .everything:
             "The Dynamic Island answers every log."
         case .goals, .unset:
-            "The Dynamic Island answers a finished day or week."
+            // A goal is a week's target (`GoalMet.target`); "a finished day"
+            // was the per-day kind, which went to 2.0 (#209).
+            "The Dynamic Island answers when a habit reaches its weekly goal."
         }
     }
 

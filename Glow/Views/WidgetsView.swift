@@ -247,7 +247,13 @@ struct WidgetsView: View {
             // `LocalizedStringKey`, which is what a string *literal* becomes;
             // two literals joined with `+` are a `String` before `Text` sees
             // them, and the `**+**` would render as four asterisks.
-            Text("Long-press your Home Screen, tap the **+** in the top corner, search for Practice, and drag the size you want onto the screen.")
+            //
+            // **Edit, then Add Widget — not a "+".** iOS 18 replaced the "+"
+            // with an Edit button in the top corner whose menu holds Add
+            // Widget; measured on iOS 18.5 and 26.5 by driving the Home Screen
+            // from a UI test. The deployment target is 18.0, so no supported
+            // phone shows a "+" any more.
+            Text("Long-press your Home Screen, tap **Edit** in the top corner, then **Add Widget**. Search for Practice and drag the size you want onto the screen.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

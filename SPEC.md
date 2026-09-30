@@ -1369,6 +1369,14 @@ configuration pickers throw on a failed read rather than offering an empty
 list, so the system shows its own retry. What the unavailable surface never
 shows is why — no framework error text, no paths, no names.
 
+**This Week keeps the same three answers** (#666). The grid reads its week
+through `Habit.weekRead`, a `StoreRead` built on the throwing snapshot pass:
+no habits is the first-run choice, a read week is the grid, and a completion
+fetch that failed withholds the week behind the store-unavailable screen —
+same glyph, title and Try Again, with a sentence saying the week is not shown —
+rather than drawing every past day of every row as missed. Try Again reads
+the week again; paging to another week does too.
+
 ## 10. Resolved questions
 
 The spec's open questions and their answers are in
