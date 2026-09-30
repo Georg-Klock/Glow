@@ -13,8 +13,29 @@ import SwiftUI
 /// or the migration's internal reasons. That goes to the log now, privately,
 /// where it can be read from a tethered Mac; the person gets the fixed
 /// sentences above, which say everything they can act on.
+///
+/// **This Week draws it too, for a read rather than an open** (#666). A failed
+/// completion fetch leaves the habits known and their week unknown, and a week
+/// drawn without its history is every past day missed — the plausible record
+/// SPEC R9 rules out. The glyph, the title, the retry and the advice are the
+/// same failure's; only the sentence saying what was withheld differs, because
+/// what the app declined to draw there is a week, not a list.
 struct StoreUnavailableView: View {
+    /// What was withheld instead of drawn empty. The launch's sentence unless
+    /// a caller declined to draw something else.
+    var explanation: LocalizedStringKey = Self.launchExplanation
     let retry: () -> Void
+
+    static let launchExplanation: LocalizedStringKey = """
+    Nothing has been deleted. The app stopped here rather than starting with an empty \
+    list, because adding habits to an empty list is what would make this permanent.
+    """
+
+    /// This Week's sentence (#666): the week is withheld, not the list.
+    static let weekExplanation: LocalizedStringKey = """
+    Nothing has been deleted. This week is not shown, because without its history \
+    every day in it would read as missed.
+    """
 
     var body: some View {
         ScrollView {
@@ -29,11 +50,8 @@ struct StoreUnavailableView: View {
                     .font(.title2.weight(.semibold))
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text("""
-                Nothing has been deleted. The app stopped here rather than starting with an empty \
-                list, because adding habits to an empty list is what would make this permanent.
-                """)
-                .foregroundStyle(.secondary)
+                Text(explanation)
+                    .foregroundStyle(.secondary)
 
                 // Drawn rather than styled: the app's tint is pure white, and
                 // `.borderedProminent` paints the label white on top of it.

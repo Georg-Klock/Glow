@@ -149,6 +149,62 @@ struct StoreReadStateTests {
         #expect(fetched.first?.id == habit.id)
     }
 
+    // MARK: - This Week's read (#666)
+
+    @Test("This Week's read keeps unavailable, empty and loaded apart")
+    func weekReadThreeWays() throws {
+        let url = TestStore.url()
+        defer { TestStore.discard(url) }
+        let container = try container(at: url)
+        let days = WeekCalendar
+            .week(containing: TestCalendar.date(2026, 8, 19), calendar: TestCalendar.monday)
+            .dayIDs(in: TestCalendar.monday)
+
+        #expect(Habit.weekRead(of: [], within: days, calendar: TestCalendar.monday) == .empty)
+
+        let habit = try seed(container, name: "Gym", day: TestCalendar.date(2026, 8, 18))
+        let habits = try ModelContext(container).fetch(FetchDescriptor<Habit>())
+        let read = Habit.weekRead(of: habits, within: days, calendar: TestCalendar.monday)
+        let rows = try #require(read.value)
+        #expect(rows.map(\.id) == [habit.id])
+        #expect(rows[0].completionCounts.values.reduce(0, +) == 1)
+    }
+
+    /// The failure is a real one: the habits are read, then the file under
+    /// them stops being a database, and the completion fetch that follows
+    /// fails in SQLite (`SQLITE_NOTADB`) the way a damaged or unreadable
+    /// store does. No mock of the store, per the rule above.
+    @Test("A completion fetch that fails is unavailable, not a week of misses")
+    func weekReadFailsUnavailable() throws {
+        let url = TestStore.url()
+        defer { TestStore.discard(url) }
+        let container = try container(at: url)
+        try seed(container, name: "Gym", day: TestCalendar.date(2026, 8, 18))
+        let habits = try ModelContext(container).fetch(FetchDescriptor<Habit>())
+        #expect(habits.count == 1)
+        let days = WeekCalendar
+            .week(containing: TestCalendar.date(2026, 8, 19), calendar: TestCalendar.monday)
+            .dayIDs(in: TestCalendar.monday)
+
+        for suffix in ["", "-wal", "-shm"] {
+            let path = url.path + suffix
+            guard FileManager.default.fileExists(atPath: path) else { continue }
+            try Data(repeating: 0x5A, count: 8192).write(to: URL(fileURLWithPath: path))
+        }
+
+        // The throwing pass sees the failure...
+        #expect(throws: (any Error).self) {
+            _ = try Habit.fetchedSnapshots(
+                of: habits, within: days, calendar: TestCalendar.monday
+            )
+        }
+        // ...and This Week's read hands it on as the state the screen draws.
+        #expect(
+            Habit.weekRead(of: habits, within: days, calendar: TestCalendar.monday)
+                == .unavailable
+        )
+    }
+
     @Test("Fixtures snapshot without a store, and without failing")
     func fetchedSnapshotsOnFixtures() throws {
         let habit = Habit(
