@@ -9327,3 +9327,37 @@ reach's clamp pulling it back, but only because the clamp happened to run.
 
 **What it does not change.** A browsed week is still never moved by midnight.
 `WeekReach` still clamps every move.
+
+## 2026-09-29 — This Week withholds a week it could not read (#666)
+
+**What changed.** `WeeklyGridView` read its week through
+`Habit.snapshots(of:within:)`, which turns a failed completion fetch into rows
+with no history. On the week grid that is not a blank: every past day of every
+row draws as missed, which is the plausible record SPEC R9 rules out. The grid
+now reads through `Habit.weekRead`, a `StoreRead<[HabitSnapshot]>` built on the
+throwing `fetchedSnapshots` pass, and `body` switches on it: `.empty` is the
+first-run choice, `.loaded` is the grid, `.unavailable` is
+`StoreUnavailableView`.
+
+**Why that surface.** The failure is the one the launch screen already names —
+the store did not answer — so it gets the same glyph, title, Try Again and
+advice. Only the sentence about what was withheld changes, because what the
+screen declined to draw is a week rather than a list; `StoreUnavailableView`
+takes that sentence as a parameter and keeps the launch's as its default.
+`OperationNotices` was not used: it tells a person that an action they took
+failed, and nobody acted here. A row-level unavailable mark was not used
+either: the fetch is one shared pass for every row, so it fails for all of
+them at once, and a grid of seven-column placeholders is still a grid that
+looks like a record.
+
+**Retry is a re-read.** Try Again advances `intentRevision`, which the read
+already depends on so a widget's write redraws the grid (#465). Paging to
+another week reads again as well.
+
+**How it is tested.** `StoreReadStateTests` reads a real store's habits, then
+overwrites the file under them so the completion fetch fails in SQLite
+(`SQLITE_NOTADB`), and asserts `weekRead` answers `.unavailable`. No mock of
+the store.
+
+**Not done here.** The Widgets tab's in-app previews (`WidgetPreviewProjection`)
+still read through the non-throwing helper.

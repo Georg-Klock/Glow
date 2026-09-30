@@ -389,6 +389,12 @@ struct HabitEditorView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Icon")
+                // Which one, not only that there is one: the symbol's spoken
+                // name from the catalogue, or the emoji itself, which
+                // VoiceOver names on its own.
+                .accessibilityValue(
+                    HabitSymbol.isSymbol(icon) ? HabitSymbol.spokenName(for: icon) : icon
+                )
                 .accessibilityHint("Choose a different icon")
                 .accessibilityAddTraits(.isButton)
 
