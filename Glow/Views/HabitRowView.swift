@@ -625,7 +625,13 @@ struct HabitRowView: View {
                 // Nothing to draw, but the row still has to exist: it is holding
                 // a position in the order, and it needs its height to be
                 // draggable and its place to be visible as a gap.
+                // Named, because in edit mode the List hangs a delete circle
+                // and a reorder handle on it, and VoiceOver otherwise offers
+                // them for a row it cannot say anything about. The widget's
+                // More menu that adds it uses the same words ("Blank Row").
                 Color.clear
+                    .accessibilityElement()
+                    .accessibilityLabel("Blank Row")
             } else {
                 // Editing gives the week's width back. `List` draws a delete
                 // circle at the leading edge and a reorder handle at the
@@ -900,7 +906,10 @@ struct HabitRowView: View {
         // this element says what it *does* rather than repeating the name on
         // its own.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Edit \(snapshot.name)")
-        .accessibilityAddTraits(.isButton)
+        // While correcting history the tap is refused (`onEdit` returns
+        // early), so the element says the name and is not offered as a
+        // button: a control VoiceOver announces must do what it says.
+        .accessibilityLabel(isCorrectingHistory ? snapshot.name : "Edit \(snapshot.name)")
+        .accessibilityAddTraits(isCorrectingHistory ? [] : .isButton)
     }
 }
