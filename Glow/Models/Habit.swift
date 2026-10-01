@@ -445,11 +445,11 @@ final class Habit {
     ///
     /// `snapshots(of:within:calendar:)` above degrades a failed completion
     /// fetch into snapshots with no history, for a caller that has nothing
-    /// better to do with the error. Three callers do: the export, whose whole
+    /// better to do with the error. These callers do: the export, whose whole
     /// contract is that the file holds everything or does not exist, and the
-    /// widget stores and This Week (`weekRead`), which must render
-    /// *unavailable* rather than a plausible emptiness. All build from this one
-    /// throwing pass.
+    /// widget stores, This Week and the Widgets tab's previews (`weekRead`),
+    /// which must render *unavailable* rather than a plausible emptiness. All
+    /// build from this one throwing pass.
     ///
     /// No range means all of it — the export's case — through the same shared
     /// fetch; the measured equality between one shared fetch and one per habit
@@ -479,6 +479,12 @@ final class Habit {
     /// switches on this instead, the same shape the widget stores hand their
     /// views (#282), so the failure survives to the one place that can draw
     /// something other than a week.
+    ///
+    /// **The Widgets tab's previews read through it too** (#677). Their one
+    /// shared pass spans a month rather than a week, and the claim a failed
+    /// fetch would make there is the same one: every preview drawn with no
+    /// history. `WidgetPreviewProjectionCache` hands `.unavailable` on to the
+    /// cards, which draw what a placed widget draws.
     ///
     /// The error goes to the log, privately, and nowhere else: a SwiftData
     /// error can carry a path.

@@ -232,6 +232,10 @@ struct WeeklyGridView: View {
 
     var body: some View {
         NavigationStack {
+            // Read once per redraw (#135): the content, the menu and ⌘N all
+            // answer from this one value, so the bar cannot offer what the
+            // screen withheld (#677) and the week is fetched once, not thrice.
+            let weekRead = self.weekRead
             VStack(spacing: 0) {
                 if lowPower.isLowPowerMode {
                     LowPowerBanner { isShowingLowPowerNotice = true }
@@ -280,7 +284,7 @@ struct WeeklyGridView: View {
             // is said, as #103 first decided, and the Island's real update is
             // requested from `toggle` for the moment the app is out of view.
             .overlay(alignment: .top) { TopFade() }
-            .background { newHabitShortcut }
+            .background { newHabitShortcut(over: weekRead) }
             .navigationTitle(weekTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -353,14 +357,21 @@ struct WeeklyGridView: View {
                         // this button swaps its own label from the state this
                         // view already owns. The menu rebuilds its content on
                         // every open, so the label is current by construction.
-                        moreMenu
+                        //
+                        // Not over a withheld week (#677): see
+                        // `WeekGridMode.offersMoreMenu`.
+                        if mode.offersMoreMenu(over: weekRead) {
+                            moreMenu(over: weekRead)
+                        }
                     } else {
                         // Past weeks are browse-only now (#543, superseding
                         // #116/#117). Today is the quick way home; Correct
                         // History remains available beside it because that is
                         // where a correction to the displayed week belongs.
                         todayButton
-                        moreMenu
+                        if mode.offersMoreMenu(over: weekRead) {
+                            moreMenu(over: weekRead)
+                        }
                     }
                 }
             }
@@ -1078,11 +1089,12 @@ struct WeeklyGridView: View {
     }
 
     /// Where the menu offers New Habit: the current week, browsing or editing
-    /// the list. The menu itself is not drawn while correcting, which is the
-    /// other half of the condition — spelled out here because ⌘N has to agree
-    /// with it without being inside the menu.
-    private var offersNewHabit: Bool {
-        !isCorrectingHistory && isOnCurrentWeek
+    /// the list. The menu itself is not drawn while correcting or over a
+    /// withheld week (#677), which is the other half of the condition —
+    /// spelled out because ⌘N has to agree with it without being inside the
+    /// menu. `WeekGridMode.offersNewHabit` is the rule.
+    private func offersNewHabit(over read: StoreRead<[HabitSnapshot]>) -> Bool {
+        mode.offersNewHabit(over: read, isOnCurrentWeek: isOnCurrentWeek)
     }
 
     /// **⌘N** (#641): the menu's New Habit, with its action and its condition.
@@ -1096,8 +1108,8 @@ struct WeeklyGridView: View {
     /// takes no touch and says nothing to VoiceOver, and exists exactly when
     /// the menu offers New Habit: a key never does what a tap could not.
     @ViewBuilder
-    private var newHabitShortcut: some View {
-        if offersNewHabit {
+    private func newHabitShortcut(over read: StoreRead<[HabitSnapshot]>) -> some View {
+        if offersNewHabit(over: read) {
             Button("New Habit") { isAddingHabit = true }
                 .keyboardShortcut("n", modifiers: .command)
                 .frame(width: 0, height: 0)
@@ -1112,10 +1124,10 @@ struct WeeklyGridView: View {
     /// remain current-week-only; the history action keeps the week being
     /// viewed, since it is this same screen changing what its rows draw
     /// (#557). Absent altogether while correcting — `doneCorrecting` takes
-    /// its place in the bar.
-    private var moreMenu: some View {
+    /// its place in the bar — and over a withheld week (#677).
+    private func moreMenu(over read: StoreRead<[HabitSnapshot]>) -> some View {
         Menu {
-            if offersNewHabit {
+            if offersNewHabit(over: read) {
                 Button("New Habit", systemImage: "plus") {
                     isAddingHabit = true
                 }

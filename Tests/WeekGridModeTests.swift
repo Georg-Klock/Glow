@@ -54,6 +54,25 @@ struct WeekGridModeTests {
         #expect(!WeekGridMode.browsing.drawsFactualDays)
     }
 
+    /// #677: over a withheld week every item in the menu would act on a grid
+    /// that is not on screen, so the menu — and ⌘N with it — is not offered.
+    @Test("The More menu and New Habit are not offered over a withheld week")
+    func menuFollowsTheRead() {
+        let reads: [StoreRead<[Int]>] = [.loaded([1]), .empty, .unavailable]
+        for mode in [WeekGridMode.browsing, .editingList, .correctingHistory] {
+            for read in reads {
+                let menu = mode.offersMoreMenu(over: read)
+                #expect(menu == (mode != .correctingHistory && read != .unavailable),
+                        "\(mode) over \(read)")
+                #expect(mode.offersNewHabit(over: read, isOnCurrentWeek: true) == menu)
+                #expect(!mode.offersNewHabit(over: read, isOnCurrentWeek: false))
+            }
+        }
+        // The first-run answer keeps its menu: an empty week is a real answer.
+        #expect(WeekGridMode.browsing.offersMoreMenu(over: StoreRead<[Int]>.empty))
+        #expect(!WeekGridMode.browsing.offersMoreMenu(over: StoreRead<[Int]>.unavailable))
+    }
+
     @Test("The distance is signed, and the title ladder mirrors forward")
     func titles() throws {
         let calendar = try calendar("America/Havana")

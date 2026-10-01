@@ -60,6 +60,31 @@ enum WeekGridMode: Equatable, Sendable {
     /// plain filled or empty circle instead of the cadence's open, missed,
     /// rest and joined marks (#543).
     var drawsFactualDays: Bool { self == .correctingHistory }
+
+    /// Whether the bar carries the More menu over a week read this way.
+    ///
+    /// Absent while correcting, where Done takes its place (#557). **And
+    /// absent over a withheld week** (#677): when the read is `.unavailable`
+    /// the grid is not on screen, so Correct History and Edit Habits would
+    /// enter a mode over rows nobody can see, and New Habit and Blank Row
+    /// would add a row that does not appear. Every item in the menu acts on
+    /// the grid, so the menu goes rather than standing there with four dim
+    /// items — the bar's rule since #207 is that a control which cannot do
+    /// anything is not drawn. It is also what the launch's unavailable screen
+    /// shows: no list actions at all. The pager stays, because paging reads
+    /// again, and so does any exit from a mode already entered.
+    func offersMoreMenu<Value>(over read: StoreRead<Value>) -> Bool {
+        self != .correctingHistory && !read.isUnavailable
+    }
+
+    /// Whether New Habit is on offer — in the menu and as ⌘N (#641), which
+    /// must agree: the current week, with the menu there to hold it.
+    func offersNewHabit<Value>(
+        over read: StoreRead<Value>,
+        isOnCurrentWeek: Bool
+    ) -> Bool {
+        offersMoreMenu(over: read) && isOnCurrentWeek
+    }
 }
 
 /// What the week pager needs of a reach: its two week starts, and the

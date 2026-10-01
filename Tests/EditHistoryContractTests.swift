@@ -33,7 +33,7 @@ struct EditHistoryContractTests {
     @Test("The existing More menu enters Correct History on the displayed week")
     func menuAndPresentation() throws {
         let weekly = try weeklyGrid()
-        let menuStart = try #require(weekly.range(of: "private var moreMenu"))
+        let menuStart = try #require(weekly.range(of: "private func moreMenu("))
         let menuEnd = try #require(weekly.range(
             of: "/// What the week on screen is called",
             range: menuStart.upperBound..<weekly.endIndex
