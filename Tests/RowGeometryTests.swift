@@ -714,3 +714,23 @@ struct RowGeometryTests {
         }
     }
 }
+
+/// #663: Settings keeps to the grid's readable column at regular width.
+@Suite("Readable margin")
+struct ReadableMarginTests {
+    @Test("Compact width keeps the system's margin")
+    func compactHasNone() {
+        for width in [320, 375, 440, 1024] as [CGFloat] {
+            #expect(PanelCeiling.readableMargin(width: width, isRegularWidth: false) == nil)
+        }
+    }
+
+    @Test("Regular width centres a 672pt column, and only when that is wider than the default")
+    func regularCentres() {
+        #expect(PanelCeiling.readableMargin(width: 1180, isRegularWidth: true) == 254)
+        #expect(PanelCeiling.readableMargin(width: 820, isRegularWidth: true) == 74)
+        // A regular window barely wider than the column keeps the default.
+        #expect(PanelCeiling.readableMargin(width: 700, isRegularWidth: true) == nil)
+        #expect(PanelCeiling.readableMargin(width: .nan, isRegularWidth: true) == nil)
+    }
+}
