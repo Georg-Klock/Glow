@@ -205,6 +205,48 @@ struct StoreReadStateTests {
         )
     }
 
+    // MARK: - The Widgets tab's previews (#677)
+
+    /// The same real failure as `weekReadFailsUnavailable`, read through the
+    /// previews' production reader: the cache's default, over a store whose
+    /// file stops being a database after its habits were read. Every card's
+    /// entry comes back unavailable — which `WeekWidgetView` and
+    /// `MonthWidgetView` draw as `WidgetUnavailableView` — rather than the
+    /// habits with no history.
+    @Test("A completion fetch that fails makes every preview unavailable")
+    func previewsFailUnavailable() throws {
+        try TestPreferences.withWeek(firstWeekday: 2) {
+            let url = TestStore.url()
+            defer { TestStore.discard(url) }
+            let container = try container(at: url)
+            let habit = try seed(container, name: "Gym", day: TestCalendar.date(2026, 8, 18))
+            let habits = try ModelContext(container).fetch(FetchDescriptor<Habit>())
+            #expect(habits.count == 1)
+            let today = TestCalendar.date(2026, 8, 19)
+
+            // Answered first, through the same reader, so the failure below
+            // is the file's and not the fixture's.
+            let loaded = WidgetPreviewProjectionCache().projection(
+                habits: habits, today: today, firstWeekday: 2, storeRevision: 0
+            )
+            #expect(loaded.weekEntry.habits.value?.map(\.id) == [habit.id])
+            #expect(loaded.monthEntry(for: habit.id).habit.value?.id == habit.id)
+
+            for suffix in ["", "-wal", "-shm"] {
+                let path = url.path + suffix
+                guard FileManager.default.fileExists(atPath: path) else { continue }
+                try Data(repeating: 0x5A, count: 8192).write(to: URL(fileURLWithPath: path))
+            }
+
+            let projection = WidgetPreviewProjectionCache().projection(
+                habits: habits, today: today, firstWeekday: 2, storeRevision: 0
+            )
+            #expect(projection.weekEntry.habits == .unavailable)
+            #expect(projection.monthEntry(for: habit.id).habit == .unavailable)
+            #expect(projection.monthEntry(for: nil).habit == .unavailable)
+        }
+    }
+
     @Test("Fixtures snapshot without a store, and without failing")
     func fetchedSnapshotsOnFixtures() throws {
         let habit = Habit(

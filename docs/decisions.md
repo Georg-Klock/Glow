@@ -9386,3 +9386,36 @@ the store.
 
 **Not done here.** The Widgets tab's in-app previews (`WidgetPreviewProjection`)
 still read through the non-throwing helper.
+
+## 2026-09-30 — The previews and the bar follow a withheld week (#677)
+
+**The Widgets tab's previews.** `WidgetPreviewProjectionCache` read its one
+shared month pass through `Habit.snapshots(of:within:)`, so a failed
+completion fetch drew every preview with no history: the same false record
+#666 removed from This Week, on the other tab. Its reader now returns a
+`StoreRead`, and the production reader is `Habit.weekRead`. On `.unavailable`
+the projection hands `.unavailable` to the week entry and to every month entry,
+and the cards draw what a placed widget draws for the same failure,
+`WidgetUnavailableView`, because the views already switch on the entry's read.
+A per-habit month card the read did not answer for is unavailable too, not
+"No habits yet".
+
+**The cache's contract, and the one thing it now declines to keep.** The key
+is what the store held at a revision. A read that failed says nothing about
+that, so its projection is not cached: keeping it would pin the tab to
+*unavailable* until some unrelated write or a new day changed the key. An
+answered read — loaded or empty — is cached exactly as before, and the same
+key still reads once.
+
+**The bar over a withheld week: hidden, not disabled.** Every item in the More
+menu acts on the grid. Correct History and Edit Habits would enter a mode over
+rows that are not on screen, and New Habit and Blank Row would add a row that
+does not appear. Four dimmed items would be a control that can do nothing, and
+this bar has not drawn one of those since #207 took the forward chevron off
+the current week. Disabled is kept for a control pushing at a boundary, like
+the back chevron at the record's floor. Hiding also matches the launch's
+unavailable screen, which offers no list actions. ⌘N follows the menu, as #641
+requires. The pager stays, because paging reads again. Done stays when a mode
+was already entered, because it is the way out. The rule is
+`WeekGridMode.offersMoreMenu(over:)` and `offersNewHabit(over:isOnCurrentWeek:)`,
+pure and tested.
