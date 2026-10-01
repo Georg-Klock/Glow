@@ -9328,6 +9328,31 @@ reach's clamp pulling it back, but only because the clamp happened to run.
 **What it does not change.** A browsed week is still never moved by midnight.
 `WeekReach` still clamps every move.
 
+## 2026-09-29 — The editor grows with its type rather than clipping it (#662)
+
+**Does not touch the 2026-08-24 entry "Dynamic Type scaling is gone".** That
+entry is about the grid, which is the large widget at one factor. The habit
+editor is system UI: its name field already took its size from `@ScaledMetric`
+(#482), and the platters around it were fixed heights, so at accessibility
+sizes the name was cut off vertically, the hint overran its 18pt slot into the
+field, and the reading truncated to "7x per…".
+
+**Every fixed number became a floor that decides at the default size.** The
+name and frequency platters are at least `rowHeight` and otherwise their
+content plus `stepInset` above and below; the hint wraps inside a slot whose
+height is a minimum, still reserved while the warning is hidden so nothing
+moves when it appears (#456); the step faces' height is `@ScaledMetric` from
+36; and the reading is a `ViewThatFits` of one line, then the count over the
+unit. At the default size each resolves to the old number, and a
+`simctl io` capture of the editor on an iPhone 17e is identical to `main`'s
+below the navigation bar, whose glass differs between relaunches of one build.
+The one default-size change is on an iPhone SE, where the 277pt beside the
+gutter never held the sentence: it ended "…will be c…" there, and now takes a
+second line, which moves the field and everything under it down by one.
+
+**The name field's width is not part of this.** It stays the row's column
+scaled by the field's type (#482), and the cut stays `NameTruncation`'s
+(#615). Only vertical room and the hint's wrapping changed.
 ## 2026-09-29 — This Week withholds a week it could not read (#666)
 
 **What changed.** `WeeklyGridView` read its week through
@@ -9361,3 +9386,36 @@ the store.
 
 **Not done here.** The Widgets tab's in-app previews (`WidgetPreviewProjection`)
 still read through the non-throwing helper.
+
+## 2026-09-30 — The previews and the bar follow a withheld week (#677)
+
+**The Widgets tab's previews.** `WidgetPreviewProjectionCache` read its one
+shared month pass through `Habit.snapshots(of:within:)`, so a failed
+completion fetch drew every preview with no history: the same false record
+#666 removed from This Week, on the other tab. Its reader now returns a
+`StoreRead`, and the production reader is `Habit.weekRead`. On `.unavailable`
+the projection hands `.unavailable` to the week entry and to every month entry,
+and the cards draw what a placed widget draws for the same failure,
+`WidgetUnavailableView`, because the views already switch on the entry's read.
+A per-habit month card the read did not answer for is unavailable too, not
+"No habits yet".
+
+**The cache's contract, and the one thing it now declines to keep.** The key
+is what the store held at a revision. A read that failed says nothing about
+that, so its projection is not cached: keeping it would pin the tab to
+*unavailable* until some unrelated write or a new day changed the key. An
+answered read — loaded or empty — is cached exactly as before, and the same
+key still reads once.
+
+**The bar over a withheld week: hidden, not disabled.** Every item in the More
+menu acts on the grid. Correct History and Edit Habits would enter a mode over
+rows that are not on screen, and New Habit and Blank Row would add a row that
+does not appear. Four dimmed items would be a control that can do nothing, and
+this bar has not drawn one of those since #207 took the forward chevron off
+the current week. Disabled is kept for a control pushing at a boundary, like
+the back chevron at the record's floor. Hiding also matches the launch's
+unavailable screen, which offers no list actions. ⌘N follows the menu, as #641
+requires. The pager stays, because paging reads again. Done stays when a mode
+was already entered, because it is the way out. The rule is
+`WeekGridMode.offersMoreMenu(over:)` and `offersNewHabit(over:isOnCurrentWeek:)`,
+pure and tested.

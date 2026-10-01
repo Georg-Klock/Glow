@@ -69,7 +69,7 @@ struct WidgetPreviewProjectionTests {
             var reads = 0
             let cache = WidgetPreviewProjectionCache { habits, days in
                 reads += 1
-                return Habit.snapshots(
+                return Habit.weekRead(
                     of: habits, within: days, calendar: calendar
                 )
             }
@@ -92,7 +92,7 @@ struct WidgetPreviewProjectionTests {
             var reads = 0
             let cache = WidgetPreviewProjectionCache { habits, days in
                 reads += 1
-                return Habit.snapshots(
+                return Habit.weekRead(
                     of: habits, within: days, calendar: calendar
                 )
             }
@@ -113,6 +113,49 @@ struct WidgetPreviewProjectionTests {
             habits[0].name = "Renamed"
             _ = cache.projection(
                 habits: habits, today: today, firstWeekday: 2, storeRevision: 1
+            )
+            #expect(reads == 3)
+        }
+    }
+
+    /// #677: a read that did not answer is drawn as unavailable on every card
+    /// and is not kept — the next evaluation with the same key reads again,
+    /// and an answer then is cached as before.
+    @Test("A failed read is unavailable on every card and is read again")
+    func failedReadIsUnavailableAndNotCached() throws {
+        try TestPreferences.withWeek(firstWeekday: 2) {
+            let (container, habits) = try store(habits: 3, historyDays: 10)
+            defer { withExtendedLifetime(container) {} }
+            var reads = 0
+            var fails = true
+            let cache = WidgetPreviewProjectionCache { habits, days in
+                reads += 1
+                return fails
+                    ? .unavailable
+                    : Habit.weekRead(of: habits, within: days, calendar: calendar)
+            }
+
+            let failed = cache.projection(
+                habits: habits, today: today, firstWeekday: 2, storeRevision: 0
+            )
+            #expect(failed.weekEntry.habits == .unavailable)
+            #expect(failed.unconfiguredMonthEntry.habit == .unavailable)
+            for habit in habits {
+                #expect(failed.monthEntry(for: habit.id).habit == .unavailable)
+            }
+
+            _ = cache.projection(
+                habits: habits, today: today, firstWeekday: 2, storeRevision: 0
+            )
+            #expect(reads == 2)
+
+            fails = false
+            let answered = cache.projection(
+                habits: habits, today: today, firstWeekday: 2, storeRevision: 0
+            )
+            #expect(answered.weekEntry.habits.value?.count == 3)
+            _ = cache.projection(
+                habits: habits, today: today, firstWeekday: 2, storeRevision: 0
             )
             #expect(reads == 3)
         }

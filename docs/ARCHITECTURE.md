@@ -151,10 +151,16 @@ export calls.
 
 **Where the answer matters, the failure is kept** (#282, #666).
 `snapshots(of:within:calendar:)` flattens a failed completion fetch into rows
-with no history; `fetchedSnapshots` throws instead, and three readers go
-through it: the export, the widget stores, and This Week, whose `Habit.weekRead` wraps it into a `StoreRead` that
-`WeeklyGridView` switches on — a failed read draws `StoreUnavailableView`
-rather than a week of misses.
+with no history; `fetchedSnapshots` throws instead, and these readers go
+through it: the export, the widget stores, This Week and the Widgets tab's
+previews. `Habit.weekRead` wraps it into a `StoreRead`. `WeeklyGridView`
+switches on it — a failed read draws `StoreUnavailableView` rather than a week
+of misses, and the bar drops the More menu and ⌘N
+(`WeekGridMode.offersMoreMenu`) — and `WidgetPreviewProjectionCache` reads its
+shared month pass through it (#677), handing `.unavailable` to every card,
+which `WeekWidgetView` and `MonthWidgetView` draw as `WidgetUnavailableView`.
+The cache keeps only answered reads; a failed one is read again on the next
+evaluation.
 
 **And so is the write path, since #318.** `HabitStore`'s day lookup — the one
 `toggleCompletion` runs twice per tap — fetched every completion the habit had

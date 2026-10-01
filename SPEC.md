@@ -795,10 +795,19 @@ fit depends on which letters they are and no counter can state a number. The
 field therefore uses the system's body-sized type and a width enlarged from the
 compact row by the same factor, then tail-truncates while it is being edited.
 The larger input remains an honest preview because its width-to-type ratio is
-unchanged. Once the name overruns, a fixed-height amber line immediately above
-it reads *Short titles work better. Long titles will be cut.* The line reserves
-its height while empty, so the field and frequency control do not move when it
-appears. **One field is honest about both surfaces**, because they are one row
+unchanged. Once the name overruns, an amber line immediately above it reads
+*Short titles work better. Long titles will be cut.* The line reserves its
+height while empty, so the field and frequency control do not move when it
+appears; where the sentence does not fit on one line — larger type, or a narrow
+phone — it wraps, and the reserved height is the wrapped height (#662).
+
+**The editor follows Dynamic Type without clipping** (#662). It is system UI,
+so the grid's decision not to scale its type (`docs/decisions.md`, 2026-08-24)
+does not reach it. The name and frequency platters are 56pt at the default size
+and grow with their content above it; the step faces' height scales with their
+glyph from 36pt; and where "7x per week" no longer fits on one line between the
+step faces, the count sits above the unit. At the default size every one of
+those resolves to the design's numbers. **One field is honest about both surfaces**, because they are one row
 at two sizes: `RowGeometry` is the large widget's geometry times a single
 factor — never above 1 (#588) — applied to the text size as well as to the
 label column, so a name breaks at the same character on This Week as it does in
@@ -904,8 +913,9 @@ them:
 - **⌘T** — Today, on a past week while browsing. Correcting history has no
   Today (#592) and so no ⌘T.
 - **⌘N** — New Habit, the More menu's action under the menu's own condition:
-  the current week, browsing or editing the list. Not on a past week and not
-  while correcting, where the menu does not offer it. The one key that is not
+  the current week, browsing or editing the list. Not on a past week, not
+  while correcting, and not over a withheld week (#677), where the menu is
+  not there to offer it. The one key that is not
   on the visible control: a shortcut on an item inside a toolbar menu does
   nothing until the menu is open, so it sits on an undrawn button that shares
   the item's action and condition (`offersNewHabit`).
@@ -1367,6 +1377,20 @@ fetch that failed withholds the week behind the store-unavailable screen —
 same glyph, title and Try Again, with a sentence saying the week is not shown —
 rather than drawing every past day of every row as missed. Try Again reads
 the week again; paging to another week does too.
+
+**While the week is withheld, the More menu is not in the bar** (#677). Every
+item in it acts on the grid — Correct History and Edit Habits enter a mode over
+rows that are not drawn, New Habit and Blank Row add a row that would not
+appear — so the menu goes, and ⌘N with it, rather than standing there with its
+items dimmed. That is the launch's unavailable screen's answer too: no list
+actions. The pager and the readout stay, because paging reads again; an exit
+from a mode already entered (Done) stays as well.
+
+**The Widgets tab's previews keep the same answer** (#677). Their one shared
+read goes through `Habit.weekRead` as well, so a failed completion fetch draws
+every preview card as the placed widget draws it — `WidgetUnavailableView` —
+rather than the person's habits with no history. A failed read is not
+retained; the tab reads again on its next redraw.
 
 ## 10. Resolved questions
 

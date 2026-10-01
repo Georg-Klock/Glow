@@ -17,7 +17,25 @@ struct WidgetPreviewProjection {
 
     func monthEntry(for habitID: UUID?) -> MonthEntry {
         guard let habitID else { return unconfiguredMonthEntry }
-        return monthEntries[habitID] ?? MonthEntry(date: weekEntry.date, habit: .empty)
+        if let entry = monthEntries[habitID] { return entry }
+        // A habit the read did not answer for is not a deleted habit (#677):
+        // when the whole read failed, every month card is unavailable too.
+        return MonthEntry(
+            date: weekEntry.date,
+            habit: weekEntry.habits.isUnavailable ? .unavailable : .empty
+        )
+    }
+
+    /// What every card draws when the shared read failed (#677): the week and
+    /// every month say *unavailable*, which `WeekWidgetView` and
+    /// `MonthWidgetView` already render as `WidgetUnavailableView` — the same
+    /// face a placed widget wears for the same failure.
+    static func unavailable(today: Date, week: Week) -> WidgetPreviewProjection {
+        WidgetPreviewProjection(
+            weekEntry: WeekEntry(date: today, week: week, habits: .unavailable),
+            monthEntries: [:],
+            unconfiguredMonthEntry: MonthEntry(date: today, habit: .unavailable)
+        )
     }
 }
 
@@ -29,9 +47,21 @@ struct WidgetPreviewProjection {
 /// fingerprints, and day/week settings are part of the key. Re-evaluating a
 /// GeometryReader or a lazy row with the same key therefore returns plain
 /// values and performs no fetch.
+///
+/// **A failed read is not cached** (#677). The key says what the store held
+/// at a revision; a fetch that did not answer says nothing about that, so
+/// keeping its projection would pin the previews to *unavailable* until some
+/// unrelated write or a new day happened to change the key. Only an answered
+/// read — loaded or empty — is retained, and the contract above holds for it
+/// exactly: the same key reads once. A failed one is drawn and read again on
+/// the next evaluation, which is what a placed widget does on its next
+/// timeline.
 @MainActor
 final class WidgetPreviewProjectionCache {
-    typealias Reader = ([Habit], ClosedRange<DayID>) -> [HabitSnapshot]
+    /// The shared read, kept as the store answered it (#677): a failed
+    /// completion fetch arrives as `.unavailable`, never as rows with no
+    /// history.
+    typealias Reader = ([Habit], ClosedRange<DayID>) -> StoreRead<[HabitSnapshot]>
 
     private struct HabitFingerprint: Equatable {
         let id: UUID
@@ -70,10 +100,11 @@ final class WidgetPreviewProjectionCache {
     private var cached: (key: Key, projection: WidgetPreviewProjection)?
 
     /// Tests inject a counting reader at this boundary. The production reader
-    /// is the same shared bounded SwiftData pass every other list-shaped
-    /// surface uses.
+    /// is This Week's (#666): the same shared bounded SwiftData pass, through
+    /// its throwing form, so a failed completion fetch reaches the previews as
+    /// `.unavailable` instead of as every habit's history gone (#677).
     init(read: @escaping Reader = { habits, days in
-        Habit.snapshots(of: habits, within: days)
+        Habit.weekRead(of: habits, within: days)
     }) {
         self.read = read
     }
@@ -94,7 +125,11 @@ final class WidgetPreviewProjectionCache {
         if let cached, cached.key == key { return cached.projection }
 
         let projection = load(habits: habits, today: day)
-        cached = (key, projection)
+        if projection.weekEntry.habits.isUnavailable {
+            cached = nil
+        } else {
+            cached = (key, projection)
+        }
         return projection
     }
 
@@ -118,7 +153,12 @@ final class WidgetPreviewProjectionCache {
         // month entries stay empty in that exceptional state, matching the
         // previous guard rather than drawing an incomplete month.
         let monthDays = MonthGrid.dayRange(containing: today)
-        let snapshots = read(habits, monthDays ?? weekDays)
+        let snapshots: [HabitSnapshot]
+        switch read(habits, monthDays ?? weekDays) {
+        case .loaded(let value): snapshots = value
+        case .empty: snapshots = []
+        case .unavailable: return .unavailable(today: today, week: week)
+        }
 
         let weekSnapshots = snapshots.map { snapshot in
             var weekSnapshot = snapshot
