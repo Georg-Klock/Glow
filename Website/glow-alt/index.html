@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- Local harness for the 3-D card. The Webflow page loads the same scene.js
+     split across two custom-code blocks; this file is what it is developed
+     and looked at in. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glow Up · alt — the week widget as a 3-D object</title>
+<style>
+@font-face { font-family:'GW Inter'; font-style:normal; font-weight:400; font-display:block;
+  src:url(https://cdn.prod.website-files.com/620d05babdddc967daa0780a/fonts/6aa43be4a588bf8e1b6d2fed-Inter-Regular.woff2) format('woff2'); }
+@font-face { font-family:'Soehne Buch'; font-style:normal; font-weight:400; font-display:swap;
+  src:url(https://cdn.prod.website-files.com/620d05babdddc967daa0780a/69c03c94a0f923be926fcdf9_soehne-buch.woff2) format('woff2'); }
+html, body { margin:0; background:#000; color:#86868b;
+  font-family:'Soehne Buch', Arial, sans-serif; font-size:17px; line-height:22.1px; }
+.gwa-wrap { max-width:940px; margin:0 auto; padding:40px 20px 24px; }
+.gwa-stage { position:relative; width:100%; height:min(72vh, 680px);
+  background:radial-gradient(70% 55% at 50% 40%, #121317 0%, #08080a 42%, #000 70%);
+  border-radius:20px; overflow:hidden; touch-action:none; cursor:grab; }
+.gwa-stage:active { cursor:grabbing; }
+.gwa-stage canvas { display:block; width:100%; height:100%; }
+.gwa-bar { margin:16px 0 0; text-align:center; font-size:15px; line-height:20px; color:#6a6a70; }
+.gwa-note { max-width:520px; margin:28px auto 0; text-align:center; text-wrap:balance; }
+</style>
+</head>
+<body>
+<div class="gwa-wrap">
+  <div class="gwa-stage" id="gwa" data-debug="1"></div>
+  <p class="gwa-bar">Move the pointer to tilt it. Tap today's slot to mark it done — or again to undo.</p>
+  <p class="gwa-note">Every empty slot is a real pocket cut into the surface, not a painted shadow — lean the card and they cut into it.</p>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script src="./scene.js"></script>
+</body>
+</html>

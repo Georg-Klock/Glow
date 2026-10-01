@@ -1,0 +1,162 @@
+<script>(function () {
+'use strict';
+
+var TODAY = 3, LAST = 6;
+var HABITS = [
+{ slug: 'gratitude',   name: 'Gratitude',   target: 7, miss: -2 },
+{ slug: 'stretch',     name: 'Stretch',     target: 4, pattern: [0, 1] },
+{ slug: 'read-book',   name: 'Read Book',   target: 4, pattern: [0, 2] },
+{ slug: 'workout',     name: 'Workout',     target: 3, pattern: [0, 1], doneToday: true },
+{ slug: 'vo2-max',     name: 'VO2 Max',     target: 2, pattern: [2], doneToday: true },
+{ slug: 'tutorial',    name: 'Tutorial',    target: 3, pattern: [0, 2], doneToday: true },
+{ slug: 'sunset',      name: 'Sunset',      target: 3, pattern: [0, 1] },
+{ slug: 'early-night', name: 'Early night', target: 7, miss: -1 }
+];
+var LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+var SPACERS = [3, 7];
+var ICON_BASE = 'https://cdn.prod.website-files.com/620d05babdddc967daa0780a/';
+var ICONS = {                                        // the mobile@3x masks the 2-D widget already uploaded
+'gratitude': '6aa44997b2a62113c7eecd96', 'stretch': '6aa449991fa1090afdc31dd6',
+'read-book': '6aa449981fa1090afdc31d39', 'workout': '6aa4499db2a62113c7eed199',
+'vo2-max': '6aa4499dae218f26c362eab5', 'tutorial': '6aa4499dae218f26c362eaa0',
+'sunset': '6aa4499ae2c2fc76e7cca80e', 'early-night': '6aa449971c08fb27cb532ea4'
+};
+function iconURL(slug) { return ICON_BASE + ICONS[slug] + '_gw-mobile-3x-icon-' + slug + '-mask.png'; }
+
+function widths(columns, count) {
+if (count <= 0 || columns < count) return [];
+var base = Math.floor(columns / count), extra = columns % count, out = [];
+for (var i = 0; i < count; i++) out.push(base + (i >= count - extra ? 1 : 0));
+return out;
+}
+function assignColumns(marks) {
+var count = marks.length, ends = [], previousEnd = -1, previousIndex = -1, i;
+for (i = 0; i < count; i++) {
+ends.push(null);
+if (marks[i].anchor === null) continue;
+var low = previousEnd + (i - previousIndex);
+var high = LAST - (count - 1 - i);
+var isFinal = i === count - 1 && (marks[i].state === 'done' || marks[i].state === 'open');
+var end = isFinal ? LAST : Math.max(low, Math.min(marks[i].anchor, high));
+ends[i] = end; previousEnd = end; previousIndex = i;
+}
+var spans = [], cursor = 0, runStart = 0;
+function push(mark, first, last) { spans.push({ state: mark.state, first: first, last: last }); }
+for (i = 0; i < count; i++) {
+if (ends[i] === null) continue;
+var w = widths(ends[i] - cursor, i - runStart), k;
+for (k = 0; k < w.length; k++) { push(marks[runStart + k], cursor, cursor + w[k] - 1); cursor += w[k]; }
+var first = marks[i].state === 'missed' ? ends[i] : cursor;
+push(marks[i], first, ends[i]);
+cursor = ends[i] + 1; runStart = i + 1;
+}
+var tail = widths(LAST - cursor + 1, count - runStart);
+for (i = 0; i < tail.length; i++) { push(marks[runStart + i], cursor, cursor + tail[i] - 1); cursor += tail[i]; }
+return spans;
+}
+function rowSpans(target, completed, today) {
+var done = Object.keys(completed).map(Number).sort(function (a, b) { return a - b; });
+var doneToday = !!completed[today];
+var repsLeft = Math.max(0, target - done.length);
+var actionableLeft = 0, c;
+for (c = today; c <= LAST; c++) if (!completed[c]) actionableLeft++;
+var lost = Math.max(0, repsLeft - actionableLeft), live = repsLeft - lost;
+var blankPast = [];
+for (c = 0; c < today; c++) if (!completed[c]) blankPast.push(c);
+var anchored = done.map(function (d) { return { state: 'done', anchor: d }; });
+blankPast.slice(0, lost).forEach(function (d) { anchored.push({ state: 'missed', anchor: d }); });
+var canOpen = live > 0 && !doneToday;
+if (canOpen) anchored.push({ state: 'open', anchor: today });
+anchored.sort(function (a, b) { return a.anchor - b.anchor; });
+var upcoming = live - (canOpen ? 1 : 0);
+for (c = 0; c < upcoming; c++) anchored.push({ state: 'upcoming', anchor: null });
+return assignColumns(anchored);
+}
+function week() {
+return HABITS.map(function (h) {
+var completed = {}, c;
+if (h.target === 7) {
+for (c = 0; c < TODAY; c++) if (c !== TODAY + h.miss) completed[c] = true;
+} else {
+h.pattern.forEach(function (d) { if (d < TODAY) completed[d] = true; });
+if (h.doneToday) completed[TODAY] = true;
+}
+return { habit: h, completed: completed, spans: [] };
+});
+}
+
+var CELL = 24, GAP = 8, LABEL_W = 98, LABEL_GAP = 4, ICON_W = 24, ICON_GAP = 2.25;
+var HEADER_H = 14, HEADER_GAP = 4, PAD_L = 6, PAD_R = 14, PAD_T = 10, PAD_B = 14;
+var RADIUS = 22, TEXT = 12, INSET = 1;
+var TRACK = 7 * CELL + 6 * GAP;                      // 216
+var TRACK_L = PAD_L + LABEL_W + LABEL_GAP;           // 108
+var W = TRACK_L + TRACK + PAD_R;                     // 338
+var ROWS_TOP = PAD_T + HEADER_H + HEADER_GAP;        // 28
+var NROWS = HABITS.length + SPACERS.length;          // 10
+var H = ROWS_TOP + NROWS * CELL + (NROWS - 1) * GAP + PAD_B;  // 354
+function cellX(c) { return TRACK_L + c * (CELL + GAP); }
+function rowY(r) { return ROWS_TOP + r * (CELL + GAP); }
+
+var THICK = 16;        // slab thickness
+var EDGE = 3.2;        // fillet radius where the top face rolls into the side
+var WELLD = 3.4;       // how deep a socket is cut into the top face
+var RIM = 0.9;         // how far the rounded-over lip eats inward
+var PILLTOP = THICK - 0.9;   // a completed mark sits proud of the well, below the face
+var PR = 1.0;
+var RINGW = 1.7, RINGTOP = THICK - 0.45;
+var RAISE = 0.28;      // names, letters and icons stand off the face
+var ENGRAVE = 0.5;     // a missed day is cut into it — both as relief in the normal, not as triangles
+
+var ROWS = week(), DISPLAY = [];
+function relayout() {
+ROWS.forEach(function (row) { row.spans = rowSpans(row.habit.target, row.completed, TODAY); });
+DISPLAY = ROWS.slice();
+SPACERS.forEach(function (at) { DISPLAY.splice(at, 0, null); });
+}
+relayout();
+function emitting(row) {
+return !!row && row.spans.some(function (s) { return s.state === 'open'; });
+}
+function anyOpen() { return ROWS.some(emitting); }
+function toggle(rowIndex) {
+var row = ROWS[rowIndex];
+if (!row) return false;
+if (row.completed[TODAY]) delete row.completed[TODAY]; else row.completed[TODAY] = true;
+relayout();
+return true;
+}
+
+var SPAN_KIND = { upcoming: 1, done: 2, open: 3 };   // 0 means "no span here"
+
+function sockets() {
+var out = [];
+DISPLAY.forEach(function (row, ri) {
+if (!row) return;
+var index = ROWS.indexOf(row);
+row.spans.forEach(function (s) {
+if (s.state === 'missed') return;                // a missed day has no socket, only the cross
+var n = s.last - s.first + 1;
+var tappable = s.state === 'open' ||
+(s.state === 'done' && s.first <= TODAY && TODAY <= s.last && !!row.completed[TODAY]);
+out.push({
+x: cellX(s.first), z: rowY(ri), w: n * CELL + (n - 1) * GAP,
+kind: SPAN_KIND[s.state], row: index, tappable: tappable
+});
+});
+});
+return out;
+}
+
+window.GWA_M = {
+W: W, H: H, RADIUS: RADIUS, CELL: CELL, INSET: INSET,
+THICK: THICK, EDGE: EDGE, WELLD: WELLD, RIM: RIM,
+PILLTOP: PILLTOP, PR: PR, RINGW: RINGW, RINGTOP: RINGTOP,
+RAISE: RAISE, ENGRAVE: ENGRAVE,
+TEXT: TEXT, PAD_L: PAD_L, PAD_T: PAD_T, HEADER_H: HEADER_H,
+ICON_W: ICON_W, ICON_GAP: ICON_GAP, LETTERS: LETTERS, TODAY: TODAY,
+ICON_BASE: ICON_BASE, ICONS: ICONS,
+sockets: sockets, toggle: toggle, anyOpen: anyOpen, cellX: cellX, rowY: rowY,
+rows: function () { return DISPLAY; }
+};
+})();
+</script>
