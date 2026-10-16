@@ -9,9 +9,18 @@ Universal since #633: `TARGETED_DEVICE_FAMILY` is `1,2` on the app and the
 widget, the iPhone's orientations are portrait only
 (`INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone`), and the iPad's are
 all four (`…_iPad`), which multitasking requires. There is no
-`UIRequiresFullScreen` and no idiom branch in `Glow/`: layout is derived from
-the window's width (`GridMetrics`, `SlotLayout`), which is what a resizable
-iPad window — and any future phone whose width changes — needs.
+`UIRequiresFullScreen` and no idiom branch in `Glow/`'s layout: layout is
+derived from the window's width (`GridMetrics`, `SlotLayout`), which is what a
+resizable iPad window — and any future phone whose width changes — needs.
+
+The idiom is read in one place, for a hardware question rather than a layout
+one: whether the device has a Dynamic Island for the goal pop (#661).
+`GoalPopAvailability.isOffered(idiom:)` answers yes for `.phone` only.
+`SettingsView` reads `UIDevice.current.userInterfaceIdiom` to decide whether
+the Encouragement section exists, and `GoalPopCentre.pop(name:)` reads it as
+its first line, ahead of the enablement check, the running-activity update and
+`Activity.request`. `GoalPopAvailabilityTests` scans production sources so
+that every Live Activity request is that one, or Debug-only.
 
 Two gates hold that declaration, because a narrower one builds and runs
 without complaint: `Tools/check-project.py` on the generated project, and
@@ -220,6 +229,12 @@ the toggle would produce, and only then calls `HabitStore.toggleCompletion`, so
 the Island's decision has the same timing from the grid as from a widget. The
 grid draws nothing for it: `InAppPop`, PR #275's in-app capsule, is gone, and
 the row's own state change is the whole foreground acknowledgement.
+
+Both callers end in `GoalPopCentre.pop(name:)`, the only production
+`Activity.request`, and its first line returns unless
+`GoalPopAvailability.isOffered(idiom:)` is true for the device (#661). On an
+iPad, then, neither the widget's intent nor This Week's tap reaches ActivityKit
+at all; see "Devices" above.
 
 `LatestPopDelivery` owns replacement ordering for a running Live Activity. It
 does not serialise updates: every new operation begins immediately. When an

@@ -1,5 +1,6 @@
 import ActivityKit
 import Foundation
+import UIKit
 
 /// Requests the Dynamic Island's pop, and ends it.
 ///
@@ -75,6 +76,19 @@ enum GoalPopCentre {
     private static let updates = LatestPopDelivery()
 
     private static func pop(name: String) {
+        // **No Island, no request** (#661). Before anything else, including
+        // the update of a running activity: on an iPad, ActivityKit reports
+        // enabled and accepts the request, and iPadOS answers with a Lock
+        // Screen card and a one-time permission prompt for a feature whose
+        // surface it does not have. The idiom here is a hardware question,
+        // not a layout branch — see `GoalPopAvailability`. Every caller of
+        // the centre reaches `Activity.request` only through this line, the
+        // widget's `MarkHabitIntent` and This Week's tap alike, and
+        // `GoalPopAvailabilityTests` holds that.
+        guard GoalPopAvailability.isOffered(
+            idiom: UIDevice.current.userInterfaceIdiom
+        ) else { return }
+
         // Live Activities can be switched off system-wide, per app, and are
         // unavailable on some devices. All three arrive here as the same
         // answer, and the answer is to do nothing.

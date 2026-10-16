@@ -9419,3 +9419,43 @@ requires. The pager stays, because paging reads again. Done stays when a mode
 was already entered, because it is the way out. The rule is
 `WeekGridMode.offersMoreMenu(over:)` and `offersNewHabit(over:isOnCurrentWeek:)`,
 pure and tested.
+
+## 2026-10-16 — No Dynamic Island, no goal pop (#661)
+
+**What was measured.** On the iPad Air 11-inch (M4) simulator, iPadOS 26.5,
+`ActivityAuthorizationInfo().areActivitiesEnabled` is true and
+`Activity.request` for `GoalPopAttributes` succeeds, so `GoalPopCentre`'s
+existing guard did not stop it. On screen, nothing appears over the Home
+Screen — there is no Island — but the activity is listed as a card on the Lock
+Screen / Notification Centre, and the first request brings iPadOS's own
+"Allow Live Activities from Practice?" prompt.
+
+**The choice.** Two ways out: keep the Encouragement section on iPad and word
+its footer by capability ("Lock Screen" where there is no Island), or hide the
+section and never request the activity there. The second. The pop's argument
+(SPEC §3, the one bounded exception to "no celebratory flourishes") is two
+seconds over the Island. A card left on the Lock Screen is a different
+feature, and a system permission prompt for a feature whose surface the
+device lacks is worse than not having it.
+
+**What changed.** `GoalPopAvailability.isOffered(idiom:)` in `Glow/Logic`,
+true for `.phone` only — an unknown idiom is a no, because a wrong yes costs a
+permission prompt and a wrong no costs two seconds of words. `SettingsView`
+omits the whole Encouragement section where it is false, and
+`GoalPopCentre.pop(name:)` returns before anything touches ActivityKit. Both
+callers — `MarkHabitIntent` for the widget and `WeeklyGridView.toggle` for
+This Week — end there, so one guard covers both. A level stored before this
+change is kept and ignored. The iPhone keeps the same section and the same
+pop.
+
+**The idiom is a hardware question here, not a layout branch.**
+docs/ARCHITECTURE.md keeps layout off the idiom since #633, because a
+resizable iPad window needs layout to follow its width. Whether the device
+has an Island does not change with the window.
+
+**How it is held.** `GoalPopAvailabilityTests` tests the rule over every
+idiom and scans production sources: the only `Activity.request` outside
+`#if DEBUG` is `GoalPopCentre`'s, the rule comes before the enablement check,
+the running-activity update and the request, and Settings draws the section
+only inside the rule. The Debug `-glow-debug-pop` affordance still requests
+unconditionally, because it is how the iPad behaviour above was measured.
