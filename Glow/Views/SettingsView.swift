@@ -240,33 +240,42 @@ struct SettingsView: View {
                         .font(.footnote)
                 }
 
-                Section {
-                    // Three states, so it is a picker rather than a toggle
-                    // (#119). Segmented rather than a menu because the three
-                    // are a scale — quiet, the rare thing, everything — and a
-                    // scale reads better laid out than hidden behind its own
-                    // current value.
-                    Picker("Encouragement", selection: popBinding) {
-                        ForEach(Self.popChoices, id: \.0) { level, title in
-                            Text(title).tag(level)
+                // Absent, not disabled, where there is no Dynamic Island
+                // (#661): the whole section — picker and footer — because
+                // every word of it describes the Island. Nothing else on the
+                // screen moves. The idiom is read here as a hardware
+                // question, not a layout one; see `GoalPopAvailability`.
+                if GoalPopAvailability.isOffered(
+                    idiom: UIDevice.current.userInterfaceIdiom
+                ) {
+                    Section {
+                        // Three states, so it is a picker rather than a toggle
+                        // (#119). Segmented rather than a menu because the three
+                        // are a scale — quiet, the rare thing, everything — and a
+                        // scale reads better laid out than hidden behind its own
+                        // current value.
+                        Picker("Encouragement", selection: popBinding) {
+                            ForEach(Self.popChoices, id: \.0) { level, title in
+                                Text(title).tag(level)
+                            }
                         }
+                        .pickerStyle(.segmented)
+                        // The label goes in the header, because a segmented picker
+                        // in a `Form` drops it — leaving three unlabelled words
+                        // where a row used to say what it was for.
+                        .labelsHidden()
+                    } header: {
+                        // "Encouragement", not "Say well done" (#561): the header
+                        // matches the one other place a person reads this concept
+                        // named, `MarkHabitIntent`'s "Present Island Encouragement"
+                        // parameter. The picker's three positions are unchanged.
+                        Text("Encouragement")
+                    } footer: {
+                        // The explainer belongs outside the control's platter
+                        // again; all three shortened variants remain (#474).
+                        Text(popNote)
+                            .font(.footnote)
                     }
-                    .pickerStyle(.segmented)
-                    // The label goes in the header, because a segmented picker
-                    // in a `Form` drops it — leaving three unlabelled words
-                    // where a row used to say what it was for.
-                    .labelsHidden()
-                } header: {
-                    // "Encouragement", not "Say well done" (#561): the header
-                    // matches the one other place a person reads this concept
-                    // named, `MarkHabitIntent`'s "Present Island Encouragement"
-                    // parameter. The picker's three positions are unchanged.
-                    Text("Encouragement")
-                } footer: {
-                    // The explainer belongs outside the control's platter
-                    // again; all three shortened variants remain (#474).
-                    Text(popNote)
-                        .font(.footnote)
                 }
 
                 // One row now. This section held the rest day too — a toggle

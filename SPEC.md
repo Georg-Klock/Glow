@@ -266,6 +266,17 @@ do, so the announcement cannot lag the mark.
   cannot show a Live Activity — and is recorded as open in docs/decisions.md.
   The Widgets tab's hosted preview still asks for no Island (#465).
 
+  **No Island, no pop, and no section** (#661). An iPad has no Dynamic Island,
+  and the pop's whole argument is two seconds over it. iPadOS still accepts
+  the Live Activity request — it shows the activity as a card in the Lock
+  Screen list, the first time behind its own permission prompt — so on any
+  device that is not a phone the app never makes the request, from the
+  widget or from This Week, and Settings has no Encouragement section at
+  all: not the picker, not its footer. A stored level is kept and ignored.
+  The iPhone is unchanged. `GoalPopAvailability.isOffered(idiom:)` is the
+  rule, asked by `SettingsView` and by `GoalPopCentre` before anything
+  touches ActivityKit.
+
   The alternative was to rewrite §1 so that light may also mean *well done*.
   That was declined: it would put a second meaning on the one signal the app
   has. See docs/decisions.md.
