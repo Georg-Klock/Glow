@@ -44,3 +44,7 @@ private/
 # an untracked nested checkout is one `git add -A` away from being committed
 # into the repository it is a copy of.
 .claude/worktrees/
+
+# The marketing website is not part of the app and does not belong in this
+# repository — kept local only.
+Website/
